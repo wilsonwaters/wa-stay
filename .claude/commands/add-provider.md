@@ -46,9 +46,13 @@ Run all of it, and fix what fails:
 1. `npm run lint && npm run format:check && npm run type-check && npm test && npm run test:tz`
 2. `npm run build:e2e && npm run test:e2e` (`xvfb-run -a npm run test:e2e` on Linux)
 
-### Step 7: Report
+### Step 7: The website
 
-Tell the user what the provider can do, what is left (capabilities not built yet), the test and preview results, and anything the terms of use limit. Commit only if they ask, with a conventional message.
+When the provider is ready to ship, add its row to the providers list in `site/index.html` (`data-provider="<id>"`, its manifest name and monogram, what WA Stay does with it) and its badge colour to `site/styles.css`, as step 7 of "Adding a provider" in `CLAUDE.md` describes. `npm test` checks the row against the manifest. If it isn't shipping yet, tell the user this step is still to do.
+
+### Step 8: Report
+
+Tell the user what the provider can do, what is left (capabilities not built yet, the website row if not added), the test and preview results, and anything the terms of use limit. Commit only if they ask, with a conventional message.
 
 ## Rules
 
