@@ -12,6 +12,7 @@ to use WA Stay, so it says what the app does in plain words and never describes 
 - [A custom domain](#a-custom-domain)
 - [Previewing changes](#previewing-changes)
 - [Screenshots](#screenshots)
+- [Keeping it in step with the app](#keeping-it-in-step-with-the-app)
 - [Rules for the page](#rules-for-the-page)
 
 ## Where it is published
@@ -88,12 +89,34 @@ unchanged copies of the app's own.
 
 ## Screenshots
 
-The screenshots in `site/assets/screens/` come from the built app, with the Mapbox map, in
-network-free fixture mode. `npm run site:screenshots` rebuilds and retakes them. Retake them when
-a screen they show changes.
+The screenshots in `site/assets/screens/` come from the built app in fixture mode. ParkStay's
+recorded catalogue and example availability for 10–12 Nov 2026 stand in for live data. The map is
+Mapbox's, and the places' photos are the providers' own; both are loaded live, anonymously, while
+the screenshots are taken. Every other request is answered from the fixtures. They show no
+provider documents, such as campground maps.
 
-They never show a provider's photos or documents: DBCA's campground photos and maps appear live
-in the app and are never copied into the repository or the site.
+`npm run site:screenshots` rebuilds and retakes them; it needs a Mapbox token. Retake them when a
+screen they show changes, then update each image's size and alt text in `site/index.html`.
+
+## Keeping it in step with the app
+
+The page describes the app, so a change to what the app does or shows changes the page in the
+same pull request ([CLAUDE.md, "Website"](../CLAUDE.md#website) has the list). In particular:
+
+- **A provider ships:** add its row to the providers list ("Different providers, one app"), with
+  `data-provider="<id>"`, its manifest name and monogram, and what WA Stay does with it. Add its
+  brand colour as `--provider-<id>` in `site/styles.css`, with a
+  `[data-provider='<id>'] .provider__badge` rule. The site test checks the row against the
+  manifest.
+- **A "Soon" feature ships:** move it out of "Coming next" into a section of its own, with a
+  screenshot.
+- **A claim changes**, such as watch intervals, holds, accounts, what data leaves the computer, or
+  supported Windows versions: update the copy and the questions that mention it.
+- **A screen the screenshots show changes:** retake them (above).
+
+The site test catches broken links, wrong image sizes, colours outside the app's tokens, loads
+from other sites and provider rows that don't match a manifest. It cannot catch copy that has
+gone stale: read the page against the change.
 
 ## Rules for the page
 
@@ -104,8 +127,10 @@ in the app and are never copied into the repository or the site.
 - **Say only what is true**, in the app's voice: Australian English and sentence case, with
   "checks as often as every 15 minutes" rather than "never miss a site". A feature still marked
   "Soon" in the app is described as coming, never as available.
-- **Name ParkStay WA only as the provider**, and keep the independence notice: WA Stay is not
-  made by or affiliated with DBCA, ParkStay WA or Tourism WA, and it is not a government
+- **Provider-neutral copy.** WA Stay brings different providers into one app, so the copy speaks
+  of places, sites and providers. A provider is named only in its providers row and in the
+  independence notice: WA Stay is not made by or affiliated with the providers it shows
+  (including DBCA, which runs ParkStay WA) or with Tourism WA, and it is not a government
   service.
 - **Nothing from another site.** Fonts, images and the script are files in `site/`, and the
   page sets no cookies and has no analytics. The only outside request is the script's call to

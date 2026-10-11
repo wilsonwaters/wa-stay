@@ -39,6 +39,9 @@
   --ws-sun-100: #fcebb6;
   --ws-sun-700: #855a00;
 
+  /* Providers' badge colours: each manifest's brand colour (the site test checks them). */
+  --provider-parkstay: #2f5d50;
+
   --canvas: var(--ws-sand-50);
   --surface: var(--ws-sand-0);
   --surface-subtle: var(--ws-sand-100);
@@ -522,6 +525,114 @@ h3 {
   margin-top: 16px;
 }
 
+/* A note from someone who uses WA Stay ------------------------------------ */
+
+.note {
+  padding-block: clamp(64px, 9vw, 128px) 0;
+}
+
+.note blockquote p {
+  font-family: var(--font-display);
+  font-size: clamp(1.75rem, 1.3rem + 1.6vw, 2.5rem);
+  font-weight: 500;
+  font-optical-sizing: auto;
+  line-height: 1.25;
+  letter-spacing: -0.01em;
+  text-indent: -0.45em;
+  text-wrap: balance;
+}
+
+.note blockquote {
+  margin: 0;
+}
+
+.note figcaption {
+  margin-top: 20px;
+  color: var(--fg-secondary);
+  font-weight: 600;
+}
+
+/* Providers -------------------------------------------------------------- */
+
+.providers {
+  padding-block: clamp(64px, 9vw, 128px) 0;
+}
+
+.providers__intro {
+  display: grid;
+  grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
+  align-items: end;
+  gap: 24px clamp(40px, 6vw, 96px);
+}
+
+.providers__intro p {
+  max-width: 32em;
+  color: var(--fg-secondary);
+  font-size: 1.125rem;
+  line-height: 1.6;
+  text-wrap: pretty;
+}
+
+.providers__list {
+  margin-top: clamp(32px, 4vw, 48px);
+  border-top: 1px solid var(--border);
+}
+
+.provider {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 16px 24px;
+  padding-block: 24px;
+  border-bottom: 1px solid var(--border);
+}
+
+.provider__badge {
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  border-radius: var(--radius-lg);
+  color: var(--ws-sand-0);
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+[data-provider='parkstay'] .provider__badge {
+  background: var(--provider-parkstay);
+}
+
+.provider__body p {
+  margin-top: 4px;
+  color: var(--fg-secondary);
+}
+
+.provider__features {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.provider__features li {
+  padding: 4px 12px;
+  border-radius: var(--radius-full);
+  background: var(--surface-subtle);
+  color: var(--fg-secondary);
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.provider--more .provider__badge {
+  border: 1px dashed var(--ws-sand-600);
+  background: transparent;
+  color: var(--fg-secondary);
+}
+
+.provider--more h3 {
+  color: var(--fg-secondary);
+}
+
 /* Coming next ------------------------------------------------------------ */
 
 .soon {
@@ -701,8 +812,18 @@ h3 {
   }
 
   .feature--flip .feature__inner,
-  .feature--wide .feature__copy {
+  .feature--wide .feature__copy,
+  .providers__intro {
     grid-template-columns: minmax(0, 1fr);
+  }
+
+  .provider {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .provider__features {
+    grid-column: 2;
+    justify-content: flex-start;
   }
 
   .feature--flip .feature__copy {

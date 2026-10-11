@@ -12,6 +12,7 @@ import fs from 'fs';
 import path from 'path';
 import { JSDOM } from 'jsdom';
 import sharp from 'sharp';
+import { BUILT_IN_PROVIDERS } from '@main/providers';
 
 const ROOT = path.resolve(__dirname, '../../..');
 const SITE = path.join(ROOT, 'site');
@@ -169,6 +170,36 @@ describe('site/index.html', () => {
     expect(policy).toContain('connect-src https://api.github.com;');
     expect(policy?.match(/https?:\/\/[^\s;]+/g)).toEqual(['https://api.github.com']);
   });
+});
+
+describe('the providers list', () => {
+  const rows = [...load('index.html').querySelectorAll('li[data-provider]')];
+
+  it('lists at least one provider', () => {
+    expect(rows.length).toBeGreaterThan(0);
+  });
+
+  // Every row must be a built-in provider, shown as its manifest says. A built-in provider the
+  // site doesn't list yet is allowed (a scaffolded provider passes the gate before it ships);
+  // listing it is a step of "Adding a provider" in CLAUDE.md.
+  it.each(rows.map((row) => [row.getAttribute('data-provider') ?? '', row] as const))(
+    '%s matches its manifest: name, monogram and badge colour',
+    (id, row) => {
+      const manifest = BUILT_IN_PROVIDERS.find((factory) => factory.id === id)?.manifest;
+      expect(manifest).toBeDefined();
+      expect(row.querySelector('h3')?.textContent?.trim()).toBe(manifest?.name);
+      expect(row.querySelector('.provider__badge')?.textContent?.trim()).toBe(
+        manifest?.brand.monogram
+      );
+      const colour = CSS.match(new RegExp(`--provider-${id}:\\s*(#[0-9a-f]{6});`, 'i'))?.[1];
+      expect(colour?.toLowerCase()).toBe(manifest?.brand.color.toLowerCase());
+      expect(CSS).toMatch(
+        new RegExp(
+          `\\[data-provider='${id}'\\] \\.provider__badge \\{\\s*background: var\\(--provider-${id}\\);`
+        )
+      );
+    }
+  );
 });
 
 describe('site/styles.css', () => {

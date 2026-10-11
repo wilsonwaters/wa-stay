@@ -241,9 +241,11 @@ use roles and accessible names only. More: [tests/README.md](../tests/README.md)
 - **Website screenshots** (`npm run site:screenshots`): the same, for the product website
   (`tests/site/`, `playwright.site.config.ts`), and it needs the Mapbox token. Fixture mode serves
   all 169 ParkStay campgrounds with illustrative availability (generated at run time by
-  `tests/site/support/site-fixtures.ts`, with no photos); the window is 1440 × 900 at 2×. It
-  keeps the raw PNGs in `test-results/site/` and writes each as WebP, at 2× and at 1×
-  (`-1x.webp`), to `site/assets/screens/`.
+  `tests/site/support/site-fixtures.ts`). Unlike the docs run, it loads the places' photos live:
+  anonymous image requests to ParkStay's `/media/` paths, checked at the end of the run. The
+  window is 1440 × 900 at 2× (the Explore hero 1440 × 730). It keeps the raw PNGs in
+  `test-results/site/` and writes each as WebP, at 2× and at 1× (`-1x.webp`), to
+  `site/assets/screens/`. Then update the image sizes in `site/index.html` (`docs/website.md`).
 
 **No test touches live provider data that matters.** Tests use recorded fixtures; live checks
 are anonymous and read-only, and nothing ever places a real hold, booking or payment
