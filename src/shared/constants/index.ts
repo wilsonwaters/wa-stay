@@ -1,2 +1,2 @@
 export * from './app-constants';
-export * from './ipc-channels';
+export * from './brand';

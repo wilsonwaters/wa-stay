@@ -1,0 +1,37 @@
+{
+  "routes": [
+    { "method": "GET", "path": "/api/parks", "file": "fixtures/parks.json" },
+    { "method": "GET", "path": "/api/parks/101", "file": "fixtures/park-101.json" },
+    {
+      "method": "GET",
+      "path": "/api/parks/101/availability",
+      "query": {
+        "arrival": "2026-11-10",
+        "departure": "2026-11-12",
+        "guests": "2",
+        "siteType": "powered"
+      },
+      "file": "fixtures/availability-101.json"
+    },
+    {
+      "method": "GET",
+      "path": "/api/parks/101/availability",
+      "query": { "siteType": "any" },
+      "file": "fixtures/availability-101.json"
+    },
+    {
+      "method": "GET",
+      "path": "/api/availability",
+      "query": { "arrival": "2026-11-10", "departure": "2026-11-12" },
+      "file": "fixtures/bulk.json"
+    },
+    { "method": "POST", "path": "/api/holds", "status": 201, "file": "fixtures/hold-created.json" },
+    { "method": "GET", "path": "/api/parks/999", "status": 404, "file": "fixtures/not-found.json" },
+    {
+      "method": "GET",
+      "path": "/api/parks/999/availability",
+      "status": 404,
+      "file": "fixtures/not-found.json"
+    }
+  ]
+}

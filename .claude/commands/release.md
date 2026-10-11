@@ -21,11 +21,11 @@ Ask the user what type of release this is (patch, minor, or major) using AskUser
 
 ### Step 3: Pre-release checks
 
-Run the checks from `docs/release-process.md` (lint, format:check, type-check, test). If any fail, fix and re-run before proceeding.
+Run the checks from `docs/release-process.md` (lint, format:check, type-check, test, test:tz). If any fail, fix and re-run before proceeding.
 
 ### Step 4: Update CHANGELOG.md
 
-Add a new entry derived from the git log since the last tag. Follow the Keep a Changelog format already in the file. Categorise using conventional commit prefixes (`feat` -> Added, `fix` -> Fixed, `docs`/`chore`/etc -> Changed or omit if trivial). Write human-readable descriptions. Only include sections that have entries.
+Changes are written under `## [Unreleased]` as they merge. Rename that heading to the new version and today's date (`## [X.Y.Z] - YYYY-MM-DD`) and add a fresh empty `## [Unreleased]` above it. Do NOT regenerate the section from the git log: it is written for users and already carries the upgrade notes. Only if something in the git log since the last tag is missing from it, add an entry in the same Keep a Changelog style. Never change older versions' entries. For 2.0.0, first work through "The 2.0.0 release" in `docs/release-process.md` (the repository rename comes before publishing).
 
 ### Step 5: Bump version and release
 
@@ -39,7 +39,7 @@ Do NOT use `npm run version:patch/minor/major` — those auto-push tags before t
 
 ### Step 6: Confirm
 
-Tell the user the new version, that GitHub Actions will build a draft release, and link to https://github.com/wilsonwaters/parkstay-bookings/releases to publish once CI completes.
+Tell the user the new version, that GitHub Actions will build a draft release, and link to https://github.com/wilsonwaters/wa-stay/releases to publish once CI completes.
 
 ## Rules
 

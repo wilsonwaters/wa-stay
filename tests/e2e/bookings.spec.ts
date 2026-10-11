@@ -1,192 +1,152 @@
 /**
- * E2E Bookings Tests
- * Tests booking management workflows
+ * Bookings in the built app (U3), network-free: bookings are seeded through the real preload,
+ * IPC handler and SQLite database (`bookings.create`), then the Trips list and a booking's page
+ * are used by role and accessible name only. Nothing is sent to any provider: "Manage on
+ * ParkStay" is checked, never followed.
  */
 
-import { test, expect, Page } from '@playwright/test';
+import type { Page } from '@playwright/test';
+import { expect, test, withoutGuardedRequests, withoutRemoteImages } from './support/wa-stay';
+import { expectHeadingFocused, expectRoute, NAV_PAGES, navLink } from './support/shell';
 
-test.describe('Bookings Management', () => {
-  let page: Page;
+interface SeedBooking {
+  providerId: string;
+  bookingReference: string;
+  location: { externalId?: string; name: string; areaName?: string };
+  stay: { arrival: string; departure: string; adults: number };
+  unitIds?: string[];
+  totalCost?: number;
+}
 
-  test.beforeEach(async ({ page: p }) => {
-    page = p;
-    await page.goto('/');
+/** `days` from today in Perth (the e2e run's zone), as `YYYY-MM-DD`. */
+function perthDay(days: number): string {
+  const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Australia/Perth' }).format(
+    new Date()
+  );
+  const date = new Date(`${today}T00:00:00Z`);
+  date.setUTCDate(date.getUTCDate() + days);
+  return date.toISOString().slice(0, 10);
+}
 
-    // Login first
-    await page.fill('input[type="email"]', 'test@example.com');
-    await page.fill('input[type="password"]', 'SecurePassword123!');
-    await page.fill('input[name="firstName"]', 'John');
-    await page.fill('input[name="lastName"]', 'Doe');
-    await page.click('button[type="submit"]');
+function seed(window: Page, booking: SeedBooking) {
+  return window.evaluate(
+    (input) =>
+      (
+        globalThis as unknown as {
+          api: { bookings: { create(i: unknown): Promise<{ success: boolean }> } };
+        }
+      ).api.bookings.create(input),
+    booking
+  );
+}
 
-    await expect(page).toHaveURL(/\/dashboard/);
+test('lists seeded trips in tabs and opens one with its manage link, then removes it', async ({
+  launchWaStay,
+}) => {
+  const wa = await launchWaStay();
+  const { window } = wa;
 
-    // Navigate to bookings
-    await page.click('a[href="/bookings"]');
-    await expect(page).toHaveURL(/\/bookings/);
-  });
+  const bookings: SeedBooking[] = [
+    {
+      providerId: 'parkstay',
+      bookingReference: 'PB0001234',
+      location: { externalId: '20', name: 'Bungarra', areaName: 'Kennedy Range National Park' },
+      stay: { arrival: perthDay(-1), departure: perthDay(1), adults: 2 },
+      unitIds: ['7'],
+      totalCost: 45,
+    },
+    {
+      providerId: 'parkstay',
+      bookingReference: 'PB0005678',
+      location: { name: 'Dales Campground', areaName: 'Karijini National Park' },
+      stay: { arrival: perthDay(-30), departure: perthDay(-27), adults: 4 },
+    },
+  ];
+  for (const booking of bookings) {
+    expect(await seed(window, booking)).toMatchObject({ success: true });
+  }
 
-  test('should display empty bookings list initially', async () => {
-    await expect(page.locator('.bookings-list')).toBeVisible();
-    await expect(page.locator('.empty-state')).toContainText('No bookings yet');
-  });
+  await navLink(window, NAV_PAGES.bookings.link).click();
+  await expectHeadingFocused(window, 'Bookings');
+  await expect(window.getByText('Bookings is still being finalised.')).toBeVisible();
+  await expect(window.getByRole('button', { name: 'Add booking' })).toBeVisible();
+  await expect(window.getByRole('button', { name: 'Import booking' })).toHaveCount(0);
 
-  test('should create a manual booking', async () => {
-    // Click add booking button
-    await page.click('button:has-text("Add Booking")');
+  const upcoming = window.getByRole('tab', { name: 'Upcoming, 1 trip' });
+  await expect(upcoming).toHaveAttribute('aria-selected', 'true');
+  await expect(window.getByRole('tab', { name: 'Past, 1 trip' })).toBeVisible();
+  await expect(window.getByRole('tab', { name: 'Cancelled, 0 trips' })).toBeVisible();
+  const bungarra = window.getByRole('article', { name: 'Bungarra' });
+  await expect(bungarra.getByText('Happening now')).toBeVisible();
+  await expect(bungarra.getByRole('img', { name: 'ParkStay WA' })).toBeVisible();
+  await expect(bungarra).toContainText('Ref PB0001234');
 
-    // Fill in booking form
-    await page.fill('input[name="bookingReference"]', 'BK123456');
-    await page.fill('input[name="parkName"]', 'Karijini National Park');
-    await page.fill('input[name="campgroundName"]', 'Dales Campground');
-    await page.fill('input[name="siteNumber"]', '12');
-    await page.selectOption('select[name="siteType"]', 'Unpowered');
+  // Past, by keyboard, kept in the URL.
+  await upcoming.focus();
+  await window.keyboard.press('ArrowRight');
+  await expectRoute(window, '/bookings?tab=past');
+  await expect(window.getByRole('article', { name: 'Dales Campground' })).toBeVisible();
+  await window.getByRole('searchbox', { name: 'Search trips' }).fill('karijini');
+  await expectRoute(window, '/bookings?tab=past&q=karijini');
+  await window.reload();
+  await expect(window.getByRole('article', { name: 'Dales Campground' })).toBeVisible();
+  await expect(window.getByRole('tab', { name: 'Past, 1 trip' })).toHaveAttribute(
+    'aria-selected',
+    'true'
+  );
 
-    // Set dates (30 days from now)
-    const arrivalDate = new Date();
-    arrivalDate.setDate(arrivalDate.getDate() + 30);
-    const departureDate = new Date(arrivalDate);
-    departureDate.setDate(departureDate.getDate() + 3);
+  // The detail page. Each change lands in the address before the next one, so a slow machine
+  // cannot have the tab's update bring the old search back.
+  await window.getByRole('tab', { name: /^Upcoming/ }).click();
+  await expectRoute(window, '/bookings?q=karijini');
+  await window.getByRole('searchbox', { name: 'Search trips' }).fill('');
+  await expectRoute(window, '/bookings');
+  await window.getByRole('link', { name: 'Bungarra', exact: true }).click();
+  await expect(window.getByRole('heading', { level: 1, name: 'Bungarra' })).toBeVisible();
+  const manage = window.getByRole('link', { name: 'Manage on ParkStay (opens in your browser)' });
+  await expect(manage).toHaveAttribute('href', 'https://parkstay.dbca.wa.gov.au/mybookings/');
+  await expect(manage).toHaveAttribute('target', '_blank');
+  await expect(manage).toHaveAttribute('rel', 'noopener noreferrer');
+  await expect(window.getByRole('link', { name: 'About Bungarra' })).toHaveAttribute(
+    'href',
+    '#/places/parkstay/20'
+  );
+  await expect(window.getByRole('region', { name: 'Cost' })).toContainText('$45.00');
+  await expect(window.getByRole('button', { name: 'Copy reference PB0001234' })).toBeVisible();
 
-    await page.fill('input[name="arrivalDate"]', arrivalDate.toISOString().split('T')[0]);
-    await page.fill('input[name="departureDate"]', departureDate.toISOString().split('T')[0]);
+  // The main window's session refuses every permission but the clipboard write that copying
+  // needs (main-window.ts guardPermissions): copying works, and the reference is on the clipboard.
+  const permissionStates = await window.evaluate(() =>
+    Promise.all(
+      (['clipboard-write', 'geolocation', 'notifications', 'camera'] as PermissionName[]).map(
+        (name) => navigator.permissions.query({ name }).then((status) => `${name}: ${status.state}`)
+      )
+    )
+  );
+  expect(permissionStates).toEqual([
+    'clipboard-write: granted',
+    'geolocation: denied',
+    'notifications: denied',
+    'camera: denied',
+  ]);
+  await window.getByRole('button', { name: 'Copy reference PB0001234' }).click();
+  await expect(window.getByText('Copied', { exact: true })).toBeVisible();
+  expect(await wa.app.evaluate(({ clipboard }) => clipboard.readText())).toBe('PB0001234');
 
-    await page.fill('input[name="numGuests"]', '2');
-    await page.fill('input[name="totalCost"]', '105.00');
+  // Remove it from WA Stay (nothing changes at ParkStay).
+  await window.getByRole('button', { name: 'More actions for Bungarra' }).click();
+  await window.getByRole('menuitem', { name: 'Remove from WA Stay' }).click();
+  const confirm = window.getByRole('alertdialog', { name: 'Remove Bungarra from WA Stay?' });
+  await expect(confirm).toContainText('It does not cancel it on ParkStay.');
+  await confirm.getByRole('button', { name: 'Remove from WA Stay' }).click();
+  await expectRoute(window, '/bookings');
+  await expect(
+    window.getByRole('region', { name: 'Notifications' }).getByText('Removed Bungarra from WA Stay')
+  ).toBeVisible();
+  await expect(window.getByRole('tab', { name: 'Upcoming, 0 trips' })).toBeVisible();
+  await expect(window.getByRole('article', { name: 'Bungarra' })).toHaveCount(0);
 
-    // Submit form
-    await page.click('button[type="submit"]:has-text("Create Booking")');
-
-    // Should show success message
-    await expect(page.locator('.toast-success')).toContainText('Booking created');
-
-    // Should appear in list
-    await expect(page.locator('.booking-card')).toContainText('BK123456');
-    await expect(page.locator('.booking-card')).toContainText('Karijini National Park');
-  });
-
-  test('should validate booking form', async () => {
-    await page.click('button:has-text("Add Booking")');
-
-    // Try to submit empty form
-    await page.click('button[type="submit"]');
-
-    // Should show validation errors
-    await expect(page.locator('.field-error')).toHaveCount(5); // Multiple required fields
-  });
-
-  test('should view booking details', async () => {
-    // Create a booking first (reuse previous test logic or use fixture)
-    await page.click('button:has-text("Add Booking")');
-    await page.fill('input[name="bookingReference"]', 'BK123456');
-    await page.fill('input[name="parkName"]', 'Test Park');
-    await page.fill('input[name="campgroundName"]', 'Test Campground');
-    // ... fill other fields ...
-    await page.click('button[type="submit"]');
-
-    // Click on booking card
-    await page.click('.booking-card:has-text("BK123456")');
-
-    // Should navigate to detail page
-    await expect(page).toHaveURL(/\/bookings\/\d+/);
-    await expect(page.locator('.booking-detail')).toContainText('BK123456');
-    await expect(page.locator('.booking-detail')).toContainText('Test Park');
-  });
-
-  test('should edit booking', async () => {
-    // Create booking
-    await page.click('button:has-text("Add Booking")');
-    await page.fill('input[name="bookingReference"]', 'BK123456');
-    await page.fill('input[name="parkName"]', 'Test Park');
-    await page.fill('input[name="campgroundName"]', 'Test Campground');
-    // ... fill required fields ...
-    await page.click('button[type="submit"]');
-
-    // Navigate to detail page
-    await page.click('.booking-card');
-
-    // Click edit button
-    await page.click('button:has-text("Edit")');
-
-    // Update site number
-    await page.fill('input[name="siteNumber"]', '99');
-
-    // Save changes
-    await page.click('button[type="submit"]:has-text("Save")');
-
-    // Should show success message
-    await expect(page.locator('.toast-success')).toContainText('updated');
-
-    // Should reflect changes
-    await expect(page.locator('.booking-detail')).toContainText('Site 99');
-  });
-
-  test('should cancel booking with confirmation', async () => {
-    // Create booking
-    await page.click('button:has-text("Add Booking")');
-    await page.fill('input[name="bookingReference"]', 'BK123456');
-    // ... fill required fields ...
-    await page.click('button[type="submit"]');
-
-    // Navigate to detail page
-    await page.click('.booking-card');
-
-    // Click cancel button
-    await page.click('button:has-text("Cancel Booking")');
-
-    // Should show confirmation dialog
-    await expect(page.locator('.confirm-dialog')).toBeVisible();
-    await expect(page.locator('.confirm-dialog')).toContainText('Are you sure you want to cancel');
-
-    // Confirm cancellation
-    await page.click('.confirm-dialog button:has-text("Confirm")');
-
-    // Should show success message
-    await expect(page.locator('.toast-success')).toContainText('cancelled');
-
-    // Status should be updated
-    await expect(page.locator('.booking-status')).toContainText('Cancelled');
-  });
-
-  test('should delete booking with confirmation', async () => {
-    // Create booking
-    await page.click('button:has-text("Add Booking")');
-    await page.fill('input[name="bookingReference"]', 'BK123456');
-    // ... fill required fields ...
-    await page.click('button[type="submit"]');
-
-    // Navigate to detail page
-    await page.click('.booking-card');
-
-    // Click delete button
-    await page.click('button:has-text("Delete")');
-
-    // Confirm deletion
-    await expect(page.locator('.confirm-dialog')).toBeVisible();
-    await page.click('.confirm-dialog button:has-text("Delete")');
-
-    // Should redirect to list
-    await expect(page).toHaveURL(/\/bookings$/);
-
-    // Booking should not appear in list
-    await expect(page.locator('.booking-card:has-text("BK123456")')).not.toBeVisible();
-  });
-
-  test('should filter bookings by status', async () => {
-    // Create multiple bookings with different statuses
-    // ... create confirmed booking ...
-    // ... create cancelled booking ...
-
-    // Filter by upcoming
-    await page.click('button:has-text("Upcoming")');
-    await expect(page.locator('.booking-card')).toHaveCount(1);
-
-    // Filter by past
-    await page.click('button:has-text("Past")');
-    // Expect different count
-
-    // Filter by cancelled
-    await page.click('button:has-text("Cancelled")');
-    await expect(page.locator('.booking-card')).toHaveCount(1);
-  });
+  const requests = wa.unexpectedRequests();
+  expect(withoutGuardedRequests(await wa.consoleErrors(), requests)).toEqual([]);
+  expect(withoutRemoteImages(requests)).toEqual([]);
 });

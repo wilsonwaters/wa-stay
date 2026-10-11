@@ -1,82 +1,47 @@
-import { WatchService } from '../services/watch/watch.service';
-import { SiteSniperService } from '../services/sitesniper/sitesniper.service';
-import { NotificationService } from '../services/notification/notification.service';
-import { NotificationDispatcher } from '../services/notification/notification-dispatcher';
-import { AuthService } from '../services/auth/AuthService';
-import { BookingService } from '../services/booking/BookingService';
-import { ParkStayService } from '../services/parkstay/parkstay.service';
-import { QueueService } from '../services/queue/queue.service';
-import { SettingsRepository } from '../database/repositories/SettingsRepository';
-import { NotificationProviderRepository } from '../database/repositories/notification-provider.repository';
-import { JobScheduler } from '../scheduler/job-scheduler';
-import { GmailOTPService } from '../services/gmail/GmailOTPService';
-import { registerWatchHandlers } from './handlers/watch.handlers';
-import { registerSiteSniperHandlers } from './handlers/site-sniper.handlers';
-import { registerNotificationHandlers } from './handlers/notification.handlers';
-import { registerNotificationProviderHandlers } from './handlers/notification-provider.handlers';
-import { registerAuthHandlers } from './handlers/auth.handlers';
-import { registerBookingHandlers } from './handlers/booking.handlers';
+/**
+ * IPC registration. Every handler is registered through one `handle()` (see `handle.ts`),
+ * one handler file per contract namespace, all built from the composition root.
+ */
+
+import type { AppContainer } from '../app/container';
+import { createHandle, IpcMainLike, SenderGuard } from './handle';
+import { registerAccountsHandlers } from './handlers/accounts.handlers';
+import { registerAppHandlers } from './handlers/app.handlers';
+import { registerBookingsHandlers } from './handlers/bookings.handlers';
+import { registerCatalogHandlers } from './handlers/catalog.handlers';
+import { registerNotificationsHandlers } from './handlers/notifications.handlers';
+import { registerNotifiersHandlers } from './handlers/notifiers.handlers';
+import { registerProvidersHandlers } from './handlers/providers.handlers';
 import { registerSettingsHandlers } from './handlers/settings.handlers';
-import { registerGmailHandlers } from './handlers/gmail.handlers';
-import { registerParkStayHandlers } from './handlers/parkstay.handlers';
-import { registerQueueHandlers } from './handlers/queue.handlers';
-import { registerUpdaterHandlers } from './handlers/updater.handler';
-import { registerAppHandlers } from './handlers/app.handler';
-import { AutoUpdaterService } from '../services/updater/auto-updater.service';
+import { registerSnipesHandlers } from './handlers/snipes.handlers';
+import { registerUpdaterHandlers } from './handlers/updater.handlers';
+import { registerWatchesHandlers } from './handlers/watches.handlers';
 import { logger } from '../utils/logger';
 
-/**
- * Register all IPC handlers
- */
-export function registerIPCHandlers(
-  authService: AuthService,
-  bookingService: BookingService,
-  settingsRepository: SettingsRepository,
-  watchService: WatchService,
-  siteSniperService: SiteSniperService,
-  notificationService: NotificationService,
-  jobScheduler: JobScheduler,
-  parkStayService?: ParkStayService,
-  notificationProviderRepository?: NotificationProviderRepository,
-  notificationDispatcher?: NotificationDispatcher,
-  queueService?: QueueService,
-  autoUpdaterService?: AutoUpdaterService
+export interface IpcRegistrationOptions {
+  /** Sender check for every invoke (`createSenderGuard`). */
+  isTrustedSender: SenderGuard;
+  /** Defaults to Electron's `ipcMain`. */
+  ipc?: IpcMainLike;
+}
+
+export function registerIpcHandlers(
+  container: AppContainer,
+  { isTrustedSender, ipc }: IpcRegistrationOptions
 ): void {
-  logger.info('Registering IPC handlers...');
+  const handle = createHandle({ isTrustedSender, ipc });
 
-  // Get Gmail service singleton
-  const gmailService = GmailOTPService.getInstance();
-
-  registerAuthHandlers(authService);
-  registerBookingHandlers(bookingService, () => authService.getCurrentUser()?.id || 0);
-  registerSettingsHandlers(settingsRepository);
-  registerWatchHandlers(watchService, jobScheduler);
-  registerSiteSniperHandlers(siteSniperService, jobScheduler);
-  registerNotificationHandlers(notificationService);
-  registerGmailHandlers(gmailService);
-
-  // Register ParkStay handlers if service provided
-  if (parkStayService) {
-    registerParkStayHandlers(parkStayService);
-  }
-
-  // Register notification provider handlers if repository and dispatcher provided
-  if (notificationProviderRepository && notificationDispatcher) {
-    registerNotificationProviderHandlers(notificationProviderRepository, notificationDispatcher);
-  }
-
-  // Register queue handlers if service provided
-  if (queueService) {
-    registerQueueHandlers(queueService);
-  }
-
-  // Register updater handlers if service provided
-  if (autoUpdaterService) {
-    registerUpdaterHandlers(autoUpdaterService);
-  }
-
-  // Register app handlers
-  registerAppHandlers(settingsRepository);
+  registerBookingsHandlers(handle, container);
+  registerWatchesHandlers(handle, container);
+  registerSnipesHandlers(handle, container);
+  registerNotificationsHandlers(handle, container);
+  registerNotifiersHandlers(handle, container);
+  registerSettingsHandlers(handle, container);
+  registerAppHandlers(handle, container);
+  registerUpdaterHandlers(handle, container);
+  registerProvidersHandlers(handle, container);
+  registerCatalogHandlers(handle, container);
+  registerAccountsHandlers(handle, container);
 
   logger.info('IPC handlers registered');
 }

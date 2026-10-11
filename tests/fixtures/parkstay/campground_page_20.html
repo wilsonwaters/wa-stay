@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <title>
+                Department of Biodiversity, Conservation and Attractions
+        </title>
+    <link href="https://queue.dbca.wa.gov.au/static/css/django_queue_manager/queue-manager.css" type="text/css" rel="stylesheet"></head>
+    <body>
+
+<div class="container" style="z-index:1">
+
+<div class="col-lg-12 mb-4">
+                 <div class="round-box col-12 px-3 pt-3 pb-3" style="background-color: #f1f1f1; border: 1px solid #d2d2d2;">
+                             <div>
+                                    <i class="bi-bell" id="bell-flash" style="font-size: 20px; color: #ff0000; padding-right:8px;"></i>
+				    <span style="color:#ff0000; margin-top: -10px;">1 active alert(s) found for this park <a href="https://alerts.dbca.wa.gov.au" type="button" class="btn btn-danger" style="color:#FFF">Read More</a>
+				     </span>
+
+                             </div>
+                  </div>
+
+        </div>
+
+<div class="col-12 ">
+                <div class="col-md-12"><p><button onclick="navigateGoBack()" class="btn btn-warning">BACK</button> <a href="/booking-session/abort-redirect" class="btn btn-danger">QUIT</a></p></div>
+        </div>
+
+<ul class="nav nav-pills ">
+              <li class="nav-item">
+                <a class="nav-link active" id="campsite-booking-tab" aria-current="page" href="#" onclick="search_avail.change_tabs('campsite-booking');">BOOKING</a>
+              </li>
+              <li class="nav-item">
+                <a class="nav-link" id="campground-details-tab" href="#" onclick="search_avail.change_tabs('campground-details');">MORE DETAILS</a>
+              </li>
+            </ul>
+
+<div id="campsite-booking">
+        <br>
+        <div class="row">
+
+            <div class="col-lg-12 ">
+
+                 <div class="round-box col-12 px-3 " style="background-color: #ffcbcb; border: 1px solid #fb9e9e;">
+
+<div>
+                                    <i class="bi-exclamation-diamond-fill" style="font-size: 20px; color: red; padding-right:8px;"></i>
+                                    <span style="color:red; margin-top: -10px;">Drinking water not supplied: bring your own</span>
+
+                             </div>
+
+<div>
+                                    <i class="bi-exclamation-diamond-fill" style="font-size: 20px; color: red; padding-right:8px;"></i>
+                                    <span style="color:red; margin-top: -10px;">No dump point: carry portable toilet waste out</span>
+
+                             </div>
+
+<div>
+                                    <i class="bi-exclamation-diamond-fill" style="font-size: 20px; color: red; padding-right:8px;"></i>
+                                    <span style="color:red; margin-top: -10px;">No campfires at any time</span>
+
+                             </div>
+
+<div>
+                                    <i class="bi-exclamation-diamond-fill" style="font-size: 20px; color: red; padding-right:8px;"></i>
+                                    <span style="color:red; margin-top: -10px;">No dogs or other domestic animals</span>
+
+                             </div>
+
+<div>
+                                    <i class="bi-exclamation-diamond-fill" style="font-size: 20px; color: red; padding-right:8px;"></i>
+                                    <span style="color:red; margin-top: -10px;">No generators</span>
+
+                             </div>
+
+</div>
+
+<div class="round-box col-12 px-3 " style="background-color: #fff4e0; border: 1px solid #ff89358a;">
+
+<div>
+                                    <i class="bi-exclamation-triangle-fill" style="font-size: 20px; color: #ffa500; padding-right:8px;"></i>
+                                    <span style="color:#ffa500; margin-top: -10px;">No-flush pit toilets only</span>
+
+                             </div>
+
+<div>
+                                    <i class="bi-exclamation-triangle-fill" style="font-size: 20px; color: #ffa500; padding-right:8px;"></i>
+                                    <span style="color:#ffa500; margin-top: -10px;">SEASONAL CLOSURE FROM 1 NOVEMBER 2026, REOPENING ON 15 MARCH 2027</span>
+
+                             </div>
+
+</div>
+
+<div class="round-box col-12 px-3 " style="background-color: #cbe5ff; border: 1px solid #9eccfb;">
+
+<div>
+                                    <i class="bi-info-circle-fill" style="font-size: 20px; color: #2a84e0; padding-right:8px;"></i>
+                                    <span style="color:#2a84e0; margin-top: -10px;">Book now for stays to 30 April 2027</span>
+
+                             </div>
+
+<div>
+                                    <i class="bi-info-circle-fill" style="font-size: 20px; color: #2a84e0; padding-right:8px;"></i>
+                                    <span style="color:#2a84e0; margin-top: -10px;">Bookings for May 2027 open 10AM AWST Tuesday 3 November 2026</span>
+
+                             </div>
+
+<div>
+                                    <i class="bi-info-circle-fill" style="font-size: 20px; color: #2a84e0; padding-right:8px;"></i>
+                                    <span style="color:#2a84e0; margin-top: -10px;">Additional per-vehicle entry fee shown after 'Book now'</span>
+
+                             </div>
+
+<div>
+                                    <i class="bi-info-circle-fill" style="font-size: 20px; color: #2a84e0; padding-right:8px;"></i>
+                                    <span style="color:#2a84e0; margin-top: -10px;">To pay entry fee separately: deselect 'Pay park entry' at next screen</span>
+
+                             </div>
+
+</div>
+
+</div>
+                 <div class="col-lg-12 ">
+                 <form autocomplete="off" onkeydown="return event.key != 'Enter';">
+		 <div class="round-box col-12 px-3">
+			 <div class="col-12">
+				<div class="row">
+ 				     <div class="col-sm-12">
+                                        <h5 class="bi-geo-alt"> Where</h5>
+				     </div>
+				</div>
+			 </div>
+			 <div class="col-12">
+                                <div class="row">
+				     <div class="col-sm-12 col-md-6">
+					<div class="col-sm-12 col-md-12">
+						<div id="region-park-avail-selection-outer" class="form-control">
+
+							 <div class="selection-informbox">
+
+								  <span id="region-park-selection-inner">
+									  Bungarra, Cape Range National Park
+								  </span>
+							 </div>
+					         </div>
+						 <div>
+						</div>
+					</div>
+				    </div>
+				</div>
+                 </form>
+                 </div>
+
+                  <div id="campsite-availablity" class="round-box col-12 px-3" istyle="float:left; ">
+                          <div class="col-12" id="campsite-availablity-results"></div>
+                  </div>
+         </div>
+     </div>
+
+     <!-- booking campsite tab -->
+     </div>
+     <div id="campground-details" style="display:none">
+
+<br>
+
+<!-- The dots/circles -->
+
+<h1>Bungarra</h1>
+<div id="carouselExampleCaptions" class="carousel slide" data-bs-ride="carousel" style="border: 1px solid #e7e7e7; padding: 10px;">
+  <div class="carousel-indicators">
+
+    <button type="button" data-bs-target="#carouselExampleCaptions" data-bs-slide-to="0" class="active" aria-current="true" aria-label="Slide 1"></button>
+
+</div>
+  <div class="carousel-inner">
+
+    <div class="carousel-item active">
+	    <img src="/campground-image/650/1200/?mediafile=/media/parkstay/campground_images/25f050a7-6c3.jpg" class="d-block w-100" alt="...">
+    </div>
+
+</div>
+  <button class="carousel-control-prev" type="button" data-bs-target="#carouselExampleCaptions" data-bs-slide="prev">
+    <span class="carousel-control-prev-icon" aria-hidden="true"></span>
+    <span class="visually-hidden">Previous</span>
+  </button>
+  <button class="carousel-control-next" type="button" data-bs-target="#carouselExampleCaptions" data-bs-slide="next">
+    <span class="carousel-control-next-icon" aria-hidden="true"></span>
+    <span class="visually-hidden">Next</span>
+  </button>
+</div>
+
+<br>
+<br>
+
+<p></p><p>Bungarra is a small campground 600m walk from a special purpose zone of Ningaloo Marine Park where shore-based fishing is permitted.</p><p></p>
+
+<h5>Booking</h5>
+<p></p><div class="alert alert-success"><p><b>Bookings open monthly on the first Tuesday of the month at 10:00am AWST (Perth time).</b></p><p>Book now for stays departing on or before Friday 30 April 2027.</p><p>Bookings for Friday 30 April to Tuesday 1 June 2027 will open at 10am AWST on Tuesday 3 November 2026, when demand is expected to be very high.</p><p><a href="https://exploreparks.dbca.wa.gov.au/sites/default/files/2026-09/guide-to-booking-a-campsite-on-the%20-ningaloo-coast.pdf" target="_blank">Guide to booking a campsite in the Ningaloo Coast World Heritage Area</a></p></div>
+<p>Bookings are essential and can be made:</p><p></p>
+<ul><li>online and at this website only</li>
+<li>for one campsite only that you must camp on yourself</li>
+<li>up to and including the day of arrival (subject to campsite availability and your own internet service* to make a booking)</li></ul>
+<p>* Check your mobile service provider’s coverage map but beware that the quality and reliability of service in regional and remote Australia can be variable.</p>
+<p>Friends, family or other social groups travelling together who cannot be accommodated on the same campsite must make their own separate bookings.</p><p>The maximum stay in any park is 14 nights if any night is during <a href="https://www.education.wa.edu.au" target="_blank">Western Australia public school holidays</a>, 28 nights at any other time.</p><p>If you are an outdoor education provider, licensed commercial tour operator or are organising an event (friends, family and other social groups camping together does not constitute an event), contact Milyering Discovery Centre (Cape Range National Park) to discuss your requirements.</p> <p></p>
+
+<h5>Campsites</h5>
+<p></p><p>Five reverse-in compacted gravel campsites.</p><p>All campsites are unpowered.</p><p>Check campsite details and the campground map carefully when booking.</p><p></p>
+
+<h5>Facilities</h5>
+<p></p><p>A no-flush pit toilet is the only facility.</p>
+<p></p><h6>Milyering Visitor Centre</h6><p></p><p>Milyering Visitor Centre is open 9am-3.45pm every day except Christmas Day and is on the route to the campground from Exmouth</p><p>Self-service on-arrival booking can be made during opening hours&nbsp;<i>subject to availability of campsites</i>.</p><p></p>
+
+<h5>Campground Rules</h5>
+<p></p><p>No campfires or solid fuel barbecues, cookers and heaters at any time.</p><p>Gas or liquid fuel appliances, including stoves, barbecues, heaters and lighting may be used unless a Total Fire Ban is declared for the Shire of Exmouth. Go to <a href="https://www.emergency.wa.gov.au/" target="_blank">Emergency WA</a> for Total Fire Ban information.</p><p>No dogs or other domestic animals.</p><p>Generator use is not permitted.</p><p>Do not empty waste from portable toilets into campground toilets.&nbsp;Carry waste out of the park for disposal in an authorised dump point.</p><p></p>
+
+<h5>Fees</h5>
+<p></p><p>A per person camping fee and a per vehicle park entry fee apply.</p><p>Camping fee must be paid by Mastercard or VISA when booking.</p><p>Park entry fee may be paid when booking, on arrival at Cape Range National Park or by purchasing a park pass and is required for motor vehicles only. Payment is not required for trailers, including camper trailers and caravans.</p><p><a href="https://exploreparks.dbca.wa.gov.au/fees" target="_blank">More about fees</a></p><p>No booking fee.</p><p>A fee may apply if you cancel or remove dates from a booking. Stricter conditions apply for peak periods. Current and upcoming peak periods for Cape Range National Park are:</p><ul><li>Friday 25 September - Saturday 10 October 2026</li><li>Thursday 25 - Sunday 28 March 2027</li><li>Friday 9 - Sunday 25 April 2027</li></ul><p><a href="https://exploreparks.dbca.wa.gov.au/online-campsite-booking-terms-and-conditions" target="_blank">Full terms and conditions</a></p><p></p>
+
+<h5>Your safety and health</h5>
+<p></p><p>Drinking water is not provided.</p><p>No-flush pit toilets are the only personal hygiene facility.</p><p>December to April can be extremely hot.</p><p>November to April is tropical cyclone season.</p><p>Storms are common between May and October throughout WA.</p><p>Cape Range National Park is in very remote Australia.</p><p>Ensure you have sufficient supplies (including water, food, fuel, medication and first aid), and equipment and clothing appropriate for the conditions before travelling.</p><p>Be prepared for an emergency. For alerts, warnings and advice go to: <a href="https://www.emergency.wa.gov.au/#" target="_blank">Emergency WA</a></p><p></p>
+
+<h5>Location </h5>
+<p></p><p>79km from Exmouth via Murat Road and Yardie Creek Road.</p><p>Go to <a href="https://travelmap.mainroads.wa.gov.au/" target="_blank">Main Roads WA Travel Map</a> for route planning information</p><p>Read more about <a href="https://exploreparks.dbca.wa.gov.au/park/cape-range-national-park" target="_blank">Cape Range National Park</a> and <a href="https://exploreparks.dbca.wa.gov.au/park/ningaloo" target="_blank">Ningaloo Marine Park</a> (including information about zoning and permitted activities).</p><p>Contact <a href="https://exploreparks.dbca.wa.gov.au/contact/park-stay-milyering-discovery-centre-cape-range-national-park" target="_blank">Milyering Discovery Centre (Cape Range National Park)</a></p><p></p>
+
+</div>
+
+     <div class="col-12 ">
+        <div class="col-md-12"><p><button onclick="navigateGoBack()" class="btn btn-warning">BACK</button> <a href="/booking-session/abort-redirect" class="btn btn-danger">QUIT</a></p></div>
+    </div>
+</div>
+<br>
+<br>
+
+<script>
+window.onload = function() {
+   search_avail.var.page = 'campsite-availablity';
+
+search_avail.var.campground_id = '20';
+       search_avail.var.campers.adult = parseInt('2');
+       search_avail.var.campers.concession = parseInt('0');
+       search_avail.var.campers.children = parseInt('0');
+       search_avail.var.campers.infant = parseInt('0');
+
+       search_avail.var.vehicles.vehicle =  parseInt('1');
+       search_avail.var.vehicles.campervan = parseInt('0');
+       search_avail.var.vehicles.motorcycle = parseInt('0');
+       search_avail.var.vehicles.trailer = parseInt('0');
+       search_avail.var.vehicles.caravan = parseInt('0');
+       search_avail.var.max_advance_booking = '180';
+       search_avail.var.campground_release_date = '2027-04-30';
+       search_avail.var.campground_booking_open_date = '2026-10-06';
+       search_avail.var.today_date = '2026-10-10';
+       search_avail.var.release_time = '02:00:00';
+
+       search_avail.var.arrival = '2026/11/10';
+       search_avail.var.departure = '2026/11/12';
+
+search_avail.total_campers();
+       search_avail.total_vehicles();
+       search_avail.get_search_locations();
+       search_avail.get_locations();
+       search_avail.get_places();
+
+       $(".filter-features").click(function() {
+           console.log("Filters Updated (Reloading)");
+           search_avail.load_campsite_availabilty();
+       });
+
+search_avail.init_dateselection('2026/11/10','2026/11/12');
+       search_avail.init();
+
+window.addEventListener( "pageshow", function ( event ) {
+  var historyTraversal = event.persisted || ( typeof window.performance != "undefined" && window.performance.navigation.type === 2 );
+  if ( historyTraversal ) {
+    // Handle page restore.
+    //alert('refresh');
+    window.location.reload();
+  }
+});
+
+   console.log('loaded');
+
+window.navigateGoBack = () => {
+   const currentParams = new URLSearchParams(window.location.search);
+   const searchParams = new URLSearchParams("");
+   const cg_id = '20'
+   searchParams.append('campground_id', cg_id)
+   searchParams.append('arrival', currentParams.get("arrival"))
+   searchParams.append('departure', currentParams.get("departure"))
+   window.location.replace('/search-availability/information/?' + searchParams.toString())
+}
+}
+</script>
+
+<script src="https://queue.dbca.wa.gov.au/static/js/django_queue_manager/site-queue-manager.js?ver=6e54a126a9ffcced95dedd566f224ef9f6497e2d31e6319ef2b734dde8fca2f1
+"></script>
+        <script>
+             if (typeof sitequeuemanager !== "undefined") {
+          	     sitequeuemanager.init('dbca.wa.gov.au','https://queue.dbca.wa.gov.au','https://queue-endpoint.dbca.wa.gov.au','parkstayv2','parkstay.dbca.wa.gov.au');
+             }
+        </script>
+    </body>
+</html>

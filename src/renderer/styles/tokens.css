@@ -1,0 +1,164 @@
+/*
+ * WA Stay design tokens — the single source of truth.
+ *
+ * Colours are space-separated RGB channels, so a rule can add alpha:
+ *   rgb(var(--ws-accent) / 0.4)
+ * Tailwind maps them in index.css (`@theme`): bg-accent, and bg-accent/10 with alpha.
+ *
+ * Components use the semantic aliases (second block) through Tailwind.
+ * The raw palette is for illustration only (brushstroke, map, logo).
+ * Rules and reasoning: docs/design/design-language.md
+ */
+:root {
+  /* ---- Raw palette ------------------------------------------------- */
+
+  /* Ink: the black swan. Text and dark surfaces. */
+  --ws-ink-900: 21 24 29;
+  --ws-ink-700: 58 63 71;
+
+  /* Sand: warm neutrals for canvas, fills and hairlines. */
+  --ws-sand-0: 255 255 255;
+  --ws-sand-50: 250 247 242;
+  --ws-sand-100: 243 238 230;
+  --ws-sand-200: 230 222 210;
+  --ws-sand-500: 138 127 112;
+  --ws-sand-600: 107 98 86;
+
+  /* Ocean: Indian Ocean blue, the brand colour. 500 is the reference brushstroke blue. */
+  --ws-ocean-50: 238 244 251;
+  --ws-ocean-100: 214 229 245;
+  --ws-ocean-200: 174 203 234;
+  --ws-ocean-500: 58 116 184;
+  --ws-ocean-600: 45 96 160;
+  --ws-ocean-700: 33 76 130;
+
+  /* Coral: the beak. 600 is the single call-to-action colour.
+     400 is the reference beak colour: decorative or large graphics only, never text. */
+  --ws-coral-50: 253 240 234;
+  --ws-coral-400: 208 88 48;
+  --ws-coral-600: 191 69 32;
+  --ws-coral-700: 158 56 25;
+
+  /* Sun: gold for time and release cues. 400 is the reference sun: decorative only. */
+  --ws-sun-50: 254 247 225;
+  --ws-sun-100: 252 235 182;
+  --ws-sun-400: 232 184 88;
+  --ws-sun-700: 133 90 0;
+
+  /* Eucalypt: blue-green gum leaf for "available". */
+  --ws-eucalypt-50: 234 243 238;
+  --ws-eucalypt-600: 45 115 86;
+  --ws-eucalypt-700: 33 87 66;
+
+  /* Danger: crimson, kept well away from the coral hue. */
+  --ws-danger-50: 252 237 239;
+  --ws-danger-600: 179 38 62;
+  --ws-danger-700: 142 30 49;
+
+  /* ---- Semantic aliases -------------------------------------------- */
+
+  --ws-canvas: var(--ws-sand-50);
+  --ws-surface: var(--ws-sand-0);
+  --ws-surface-subtle: var(--ws-sand-100);
+  --ws-surface-inverse: var(--ws-ink-900);
+
+  --ws-fg: var(--ws-ink-900);
+  --ws-fg-secondary: var(--ws-ink-700);
+  --ws-fg-muted: var(--ws-sand-600);
+  --ws-fg-inverse: var(--ws-sand-0);
+
+  --ws-border: var(--ws-sand-200);
+  --ws-border-strong: var(--ws-sand-500);
+
+  --ws-brand: var(--ws-ocean-600);
+  --ws-brand-strong: var(--ws-ocean-700);
+  --ws-brand-subtle: var(--ws-ocean-50);
+
+  --ws-accent: var(--ws-coral-600);
+  --ws-accent-hover: var(--ws-coral-700);
+  --ws-accent-subtle: var(--ws-coral-50);
+  --ws-accent-fg: var(--ws-sand-0);
+
+  --ws-focus: var(--ws-ocean-600);
+
+  --ws-available: var(--ws-eucalypt-600);
+  --ws-available-subtle: var(--ws-eucalypt-50);
+  --ws-available-fg: var(--ws-eucalypt-700);
+
+  --ws-warning-subtle: var(--ws-sun-50);
+  --ws-warning-fg: var(--ws-sun-700);
+
+  --ws-danger: var(--ws-danger-600);
+  --ws-danger-subtle: var(--ws-danger-50);
+  --ws-danger-fg: var(--ws-danger-700);
+
+  --ws-sun: var(--ws-sun-400);
+  --ws-sun-subtle: var(--ws-sun-100);
+
+  /* ---- Type -------------------------------------------------------- */
+
+  --ws-font-sans: 'Figtree Variable', system-ui, 'Segoe UI', sans-serif;
+  --ws-font-display: 'Fraunces Variable', Georgia, serif;
+
+  --ws-text-xs: 0.75rem;
+  --ws-leading-xs: 1rem;
+  --ws-text-sm: 0.875rem;
+  --ws-leading-sm: 1.25rem;
+  --ws-text-base: 1rem;
+  --ws-leading-base: 1.5rem;
+  --ws-text-lg: 1.125rem;
+  --ws-leading-lg: 1.75rem;
+  --ws-text-xl: 1.25rem;
+  --ws-leading-xl: 1.75rem;
+  --ws-text-2xl: 1.5rem;
+  --ws-leading-2xl: 2rem;
+  --ws-text-display-sm: 1.75rem;
+  --ws-leading-display-sm: 2.125rem;
+  --ws-text-display-md: 2.25rem;
+  --ws-leading-display-md: 2.625rem;
+  --ws-text-display-lg: 3rem;
+  --ws-leading-display-lg: 3.25rem;
+
+  /* ---- Radii ------------------------------------------------------- */
+
+  --ws-radius-sm: 6px;
+  --ws-radius-md: 8px;
+  --ws-radius-lg: 12px;
+  --ws-radius-xl: 16px;
+  --ws-radius-2xl: 24px;
+  --ws-radius-full: 9999px;
+
+  /* ---- Elevation: ink-tinted, low alpha, never a glow --------------- */
+
+  --ws-shadow-card:
+    0 1px 2px rgb(var(--ws-ink-900) / 0.06), 0 1px 3px rgb(var(--ws-ink-900) / 0.04);
+  --ws-shadow-pill:
+    0 1px 2px rgb(var(--ws-ink-900) / 0.08), 0 4px 12px rgb(var(--ws-ink-900) / 0.08);
+  --ws-shadow-pop:
+    0 4px 8px rgb(var(--ws-ink-900) / 0.06), 0 8px 24px rgb(var(--ws-ink-900) / 0.12);
+  --ws-shadow-modal:
+    0 8px 16px rgb(var(--ws-ink-900) / 0.08), 0 24px 48px rgb(var(--ws-ink-900) / 0.18);
+
+  /* ---- Motion ------------------------------------------------------ */
+
+  --ws-duration-fast: 120ms;
+  --ws-duration-base: 200ms;
+  --ws-duration-slow: 320ms;
+  --ws-ease-standard: cubic-bezier(0.2, 0, 0, 1);
+
+  /* ---- Layers ------------------------------------------------------ */
+
+  --ws-z-header: 30;
+  --ws-z-tray: 40;
+  --ws-z-overlay: 50;
+  --ws-z-toast: 60;
+  --ws-z-tooltip: 70;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --ws-duration-fast: 0ms;
+    --ws-duration-base: 0ms;
+    --ws-duration-slow: 0ms;
+  }
+}

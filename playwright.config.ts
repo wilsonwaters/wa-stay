@@ -1,42 +1,33 @@
-import { defineConfig, devices } from '@playwright/test';
-import path from 'path';
+import { defineConfig } from '@playwright/test';
 
 /**
- * Playwright configuration for E2E testing
- * Tests the Electron app in a real browser-like environment
+ * Electron smoke tests (`tests/e2e`): they drive the built app with Playwright's `_electron`
+ * launcher, one app at a time, isolated and network-free (`tests/e2e/support/wa-stay.ts`).
+ *
+ *   npm run build:e2e && npm run test:e2e        # Linux without a display: xvfb-run -a npm run test:e2e
+ *
+ * There is no web server, base URL or browser project: the tests launch Electron themselves.
+ * The harness records the Electron window's trace and screenshot and keeps them for failed
+ * tests, with the main process's output and log (`tests/e2e/support/wa-stay.ts`).
  */
 export default defineConfig({
   testDir: './tests/e2e',
-  fullyParallel: true,
+  testMatch: '**/*.spec.ts',
+  fullyParallel: false,
+  workers: 1,
   forbidOnly: !!process.env.CI,
-  retries: process.env.CI ? 2 : 0,
-  workers: process.env.CI ? 1 : undefined,
-  reporter: 'html',
-
-  use: {
-    trace: 'on-first-retry',
-    screenshot: 'only-on-failure',
-    video: 'retain-on-failure',
-    baseURL: 'http://localhost:3000',
-  },
-
-  projects: [
-    {
-      name: 'chromium',
-      use: { ...devices['Desktop Chrome'] },
-    },
-  ],
-
-  webServer: {
-    command: 'npm run dev:renderer',
-    url: 'http://localhost:3000',
-    reuseExistingServer: !process.env.CI,
-    timeout: 120000,
-  },
-
+  retries: process.env.CI ? 1 : 0,
+  timeout: 60_000,
+  expect: { timeout: 10_000 },
+  reporter: [['list'], ['html', { open: 'never' }]],
+  globalSetup: './tests/e2e/support/global-setup.ts',
   outputDir: 'test-results/',
-  timeout: 30000,
-  expect: {
-    timeout: 5000,
+  use: {
+    // The test-level trace (steps, errors). The harness traces the Electron window itself.
+    trace: 'retain-on-failure',
+    // Off: Playwright's own failure screenshot of an Electron window is taken from a finished
+    // fixture step ("Internal error: step id not found"). The harness attaches the same
+    // screenshot itself when a test fails.
+    screenshot: 'off',
   },
 });

@@ -1,0 +1,18 @@
+{
+  "id": 101,
+  "name": "Granite Bay Campground",
+  "type": "campground",
+  "lat": -34.3321,
+  "lng": 115.1593,
+  "town": "Augusta",
+  "region": "South West",
+  "photos": ["https://images.example-parks.test/101/main.jpg"],
+  "facilities": ["Toilets", "Fire pits"],
+  "siteCount": 3,
+  "description": "<p>Sheltered sites behind the dunes.</p>",
+  "sites": [
+    { "id": "s1", "name": "Site 1", "type": "Powered", "sleeps": 6 },
+    { "id": "s2", "name": "Site 2", "type": "Unpowered", "sleeps": 4 },
+    { "id": "s3", "name": "Site 3", "type": "Unpowered", "sleeps": 4 }
+  ]
+}

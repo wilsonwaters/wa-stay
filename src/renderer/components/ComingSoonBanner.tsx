@@ -1,50 +1,71 @@
-/**
- * Coming Soon Banner Component
- * Dismissible banner to indicate a feature is under development
- */
+import { useRef, useState } from 'react';
+import { Hammer } from 'lucide-react';
+import { Notice } from './ui';
 
-import React, { useState } from 'react';
-
-interface ComingSoonBannerProps {
+export interface ComingSoonBannerProps {
+  /** The feature's name as the nav shows it: "Bookings", "Site Sniper". */
   featureName: string;
+  /** Overrides the localStorage key; the default is `comingSoonDismissed_<Feature_Name>`. */
   storageKey?: string;
 }
 
-const ComingSoonBanner: React.FC<ComingSoonBannerProps> = ({ featureName, storageKey }) => {
-  const key = storageKey || `comingSoonDismissed_${featureName.replace(/\s+/g, '_')}`;
-  const [isDismissed, setIsDismissed] = useState(() => {
-    return localStorage.getItem(key) === 'true';
-  });
+/** The key earlier versions stored a dismissal under, so a dismissed banner stays dismissed. */
+export function comingSoonStorageKey(featureName: string): string {
+  return `comingSoonDismissed_${featureName.replace(/\s+/g, '_')}`;
+}
 
-  const handleDismiss = () => {
-    localStorage.setItem(key, 'true');
-    setIsDismissed(true);
+function readDismissed(key: string): boolean {
+  try {
+    return window.localStorage.getItem(key) === 'true';
+  } catch {
+    return false;
+  }
+}
+
+function writeDismissed(key: string): void {
+  try {
+    window.localStorage.setItem(key, 'true');
+  } catch {
+    // Storage blocked: the banner still hides for this visit.
+  }
+}
+
+/**
+ * Says a feature that keeps its "Soon" pill (stakeholder decision D4) works but is still being
+ * finished. Dismissed once, it stays hidden: the choice is kept in localStorage under the key
+ * format earlier versions used. On dismissal, focus moves to the page's heading rather than
+ * falling to the body.
+ */
+export function ComingSoonBanner({ featureName, storageKey }: ComingSoonBannerProps) {
+  const key = storageKey ?? comingSoonStorageKey(featureName);
+  const [dismissed, setDismissed] = useState(() => readDismissed(key));
+  const ref = useRef<HTMLDivElement>(null);
+
+  if (dismissed) return null;
+
+  const dismiss = () => {
+    writeDismissed(key);
+    const heading = ref.current?.closest('main')?.querySelector<HTMLElement>('h1');
+    setDismissed(true);
+    if (heading) {
+      if (!heading.hasAttribute('tabindex')) heading.setAttribute('tabindex', '-1');
+      heading.focus();
+    }
   };
 
-  if (isDismissed) {
-    return null;
-  }
-
   return (
-    <div className="mb-4 p-4 bg-amber-50 border border-amber-200 rounded-lg flex items-center justify-between">
-      <div className="flex items-center">
-        <span className="text-amber-500 text-xl mr-3">⚠️</span>
-        <div>
-          <span className="font-medium text-amber-800">Coming Soon:</span>
-          <span className="text-amber-700 ml-2">
-            The {featureName} feature is under development and may not be fully functional.
-          </span>
-        </div>
-      </div>
-      <button
-        onClick={handleDismiss}
-        className="ml-4 text-amber-600 hover:text-amber-800 p-1"
-        aria-label="Dismiss"
+    <div ref={ref}>
+      <Notice
+        tone="info"
+        icon={Hammer}
+        onDismiss={dismiss}
+        dismissLabel={`Dismiss the ${featureName} notice`}
       >
-        ✕
-      </button>
+        <span className="font-semibold">{featureName} is still being finalised.</span> It works, but
+        expect rough edges.
+      </Notice>
     </div>
   );
-};
+}
 
 export default ComingSoonBanner;

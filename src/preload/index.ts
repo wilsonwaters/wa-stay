@@ -1,377 +1,157 @@
 /**
  * Preload Script
- * Exposes secure API to renderer process via context bridge
+ * Exposes `window.api`, implementing `WindowApi` from `shared/contracts`.
+ *
+ * Each method maps its positional arguments to the single payload object its contract
+ * method expects and invokes that method's channel. Only the zod-free `channels` module is
+ * imported at runtime; everything else from the contract is types only, so zod never loads
+ * here. `events.on` returns a function that removes just that subscription.
  */
 
-import { contextBridge, ipcRenderer } from 'electron';
-import { IPC_CHANNELS } from '../shared/constants/ipc-channels';
-import {
-  UserInput,
-  UserCredentials,
-  BookingInput,
-  Booking,
-  WatchInput,
-  Watch,
-  SiteSnipe,
-  SiteSnipeInput,
-  Notification,
-  APIResponse,
-  SettingValueType,
-  SettingCategory,
-  OAuth2Credentials,
-  GmailAuthStatus,
-  OTPResult,
-  GmailMessage,
-  NotificationProvider,
-  NotificationProviderInput,
-  NotificationChannel,
-  TestConnectionResult,
-  QueueSession,
-  QueueStatusEvent,
-} from '../shared/types';
+import { contextBridge, ipcRenderer, IpcRendererEvent } from 'electron';
+import { CHANNELS, isEventName } from '../shared/contracts/channels';
+import type {
+  Contract,
+  ContractNamespace,
+  EventName,
+  EventPayloads,
+  MethodDef,
+  RequestInput,
+  WindowApi,
+} from '../shared/contracts';
 
-// Define the API that will be exposed to the renderer
-const api = {
-  // Authentication APIs
-  auth: {
-    storeCredentials: (credentials: UserInput): Promise<APIResponse<boolean>> =>
-      ipcRenderer.invoke(IPC_CHANNELS.AUTH_STORE_CREDENTIALS, credentials),
+/** For each method of namespace `N`: turns the preload method's arguments into its payload. */
+type PayloadMappers<N extends ContractNamespace> = {
+  [M in keyof Contract[N]]: Contract[N][M] extends MethodDef
+    ? (...args: Contract[N][M]['args']) => RequestInput<Contract[N][M]>
+    : never;
+};
 
-    getCredentials: (): Promise<APIResponse<UserCredentials | null>> =>
-      ipcRenderer.invoke(IPC_CHANNELS.AUTH_GET_CREDENTIALS),
+function bind<N extends ContractNamespace>(namespace: N, mappers: PayloadMappers<N>): WindowApi[N] {
+  const channels = CHANNELS[namespace] as Record<string, string>;
+  const methods: Record<string, (...args: unknown[]) => Promise<unknown>> = {};
+  for (const [method, toPayload] of Object.entries(mappers) as [
+    string,
+    (...args: unknown[]) => unknown,
+  ][]) {
+    const channel = channels[method];
+    methods[method] = (...args) => ipcRenderer.invoke(channel, toPayload(...args));
+  }
+  return methods as unknown as WindowApi[N];
+}
 
-    updateCredentials: (email: string, newPassword: string): Promise<APIResponse<boolean>> =>
-      ipcRenderer.invoke(IPC_CHANNELS.AUTH_UPDATE_CREDENTIALS, email, newPassword),
+const none = (): undefined => undefined;
 
-    deleteCredentials: (): Promise<APIResponse<boolean>> =>
-      ipcRenderer.invoke(IPC_CHANNELS.AUTH_DELETE_CREDENTIALS),
+const api: WindowApi = {
+  bookings: bind('bookings', {
+    list: (filter) => filter,
+    get: (id) => ({ id }),
+    create: (input) => input,
+    update: (id, updates) => ({ id, updates }),
+    delete: (id) => ({ id }),
+    import: (providerId, reference) => ({ providerId, reference }),
+  }),
 
-    validateSession: (): Promise<APIResponse<boolean>> =>
-      ipcRenderer.invoke(IPC_CHANNELS.AUTH_VALIDATE_SESSION),
-  },
+  watches: bind('watches', {
+    list: (filter) => filter,
+    get: (id) => ({ id }),
+    create: (input) => input,
+    update: (id, updates) => ({ id, updates }),
+    delete: (id) => ({ id }),
+    activate: (id) => ({ id }),
+    deactivate: (id) => ({ id }),
+    runNow: (id) => ({ id }),
+    openPayment: (id) => ({ id }),
+  }),
 
-  // Booking APIs
-  booking: {
-    create: (input: BookingInput): Promise<APIResponse<Booking>> =>
-      ipcRenderer.invoke(IPC_CHANNELS.BOOKING_CREATE, input),
+  snipes: bind('snipes', {
+    list: (filter) => filter,
+    get: (id) => ({ id }),
+    create: (input) => input,
+    update: (id, updates) => ({ id, updates }),
+    delete: (id) => ({ id }),
+    activate: (id) => ({ id }),
+    deactivate: (id) => ({ id }),
+    runNow: (id) => ({ id }),
+    openPayment: (id) => ({ id }),
+  }),
 
-    get: (id: number): Promise<APIResponse<Booking | null>> =>
-      ipcRenderer.invoke(IPC_CHANNELS.BOOKING_GET, id),
+  notifications: bind('notifications', {
+    list: (limit) => ({ limit }),
+    markRead: (id) => ({ id }),
+    markAllRead: none,
+    unreadCount: none,
+    delete: (id) => ({ id }),
+    clearAll: none,
+  }),
 
-    list: (): Promise<APIResponse<Booking[]>> => ipcRenderer.invoke(IPC_CHANNELS.BOOKING_LIST),
+  notifiers: bind('notifiers', {
+    list: none,
+    get: (channel) => ({ channel }),
+    configure: (input) => input,
+    enable: (channel) => ({ channel }),
+    disable: (channel) => ({ channel }),
+    test: (channel) => ({ channel }),
+  }),
 
-    update: (id: number, updates: Partial<BookingInput>): Promise<APIResponse<Booking>> =>
-      ipcRenderer.invoke(IPC_CHANNELS.BOOKING_UPDATE, id, updates),
+  settings: bind('settings', {
+    get: (key) => ({ key }),
+    set: (key, value) => ({ key, value }),
+    getAll: none,
+  }),
 
-    delete: (id: number): Promise<APIResponse<boolean>> =>
-      ipcRenderer.invoke(IPC_CHANNELS.BOOKING_DELETE, id),
+  app: bind('app', {
+    getInfo: none,
+    openLogsFolder: none,
+    setAutoLaunch: (enabled, startMinimised) =>
+      startMinimised === undefined ? { enabled } : { enabled, startMinimised },
+    getAutoLaunch: none,
+  }),
 
-    sync: (id: number): Promise<APIResponse<Booking>> =>
-      ipcRenderer.invoke(IPC_CHANNELS.BOOKING_SYNC, id),
+  updater: bind('updater', {
+    checkForUpdates: none,
+    downloadUpdate: none,
+    installUpdate: none,
+    getStatus: none,
+  }),
 
-    syncAll: (): Promise<APIResponse<boolean>> => ipcRenderer.invoke(IPC_CHANNELS.BOOKING_SYNC_ALL),
+  providers: bind('providers', {
+    list: none,
+    accessStatus: (providerId) => ({ providerId }),
+  }),
 
-    import: (bookingReference: string): Promise<APIResponse<Booking>> =>
-      ipcRenderer.invoke(IPC_CHANNELS.BOOKING_IMPORT, bookingReference),
-  },
+  catalog: bind('catalog', {
+    search: (query) => query,
+    get: (key) => ({ key }),
+    availability: (stay, options) => ({ stay, ...options }),
+    checkLocation: (key, stay) => ({ key, stay }),
+    refresh: (providerId) => ({ providerId }),
+    status: none,
+    openDocument: (locationKey, documentId) => ({ locationKey, documentId }),
+  }),
 
-  // Settings APIs
-  settings: {
-    get: (key: string): Promise<APIResponse<any>> =>
-      ipcRenderer.invoke(IPC_CHANNELS.SETTINGS_GET, key),
+  accounts: bind('accounts', {
+    list: none,
+    status: (providerId) => ({ providerId }),
+    signIn: (providerId) => ({ providerId }),
+    signOut: (providerId) => ({ providerId }),
+    openSignInLink: (providerId, url) => ({ providerId, url }),
+  }),
 
-    set: (
-      key: string,
-      value: any,
-      valueType: SettingValueType,
-      category: SettingCategory
-    ): Promise<APIResponse<boolean>> =>
-      ipcRenderer.invoke(IPC_CHANNELS.SETTINGS_SET, key, value, valueType, category),
-
-    getAll: (): Promise<APIResponse<Record<string, any>>> =>
-      ipcRenderer.invoke(IPC_CHANNELS.SETTINGS_GET_ALL),
-  },
-
-  // Watch APIs
-  watch: {
-    create: (userId: number, input: WatchInput): Promise<APIResponse<Watch>> =>
-      ipcRenderer.invoke(IPC_CHANNELS.WATCH_CREATE, userId, input),
-
-    get: (id: number): Promise<APIResponse<Watch | null>> =>
-      ipcRenderer.invoke(IPC_CHANNELS.WATCH_GET, id),
-
-    list: (userId: number): Promise<APIResponse<Watch[]>> =>
-      ipcRenderer.invoke(IPC_CHANNELS.WATCH_LIST, userId),
-
-    update: (id: number, updates: Partial<WatchInput>): Promise<APIResponse<Watch>> =>
-      ipcRenderer.invoke(IPC_CHANNELS.WATCH_UPDATE, id, updates),
-
-    delete: (id: number): Promise<APIResponse<boolean>> =>
-      ipcRenderer.invoke(IPC_CHANNELS.WATCH_DELETE, id),
-
-    activate: (id: number): Promise<APIResponse<boolean>> =>
-      ipcRenderer.invoke(IPC_CHANNELS.WATCH_ACTIVATE, id),
-
-    deactivate: (id: number): Promise<APIResponse<boolean>> =>
-      ipcRenderer.invoke(IPC_CHANNELS.WATCH_DEACTIVATE, id),
-
-    execute: (id: number): Promise<APIResponse<any>> =>
-      ipcRenderer.invoke(IPC_CHANNELS.WATCH_EXECUTE, id),
-  },
-
-  // Site Sniper APIs
-  siteSniper: {
-    create: (userId: number, input: SiteSnipeInput): Promise<APIResponse<SiteSnipe>> =>
-      ipcRenderer.invoke(IPC_CHANNELS.SNIPE_CREATE, userId, input),
-
-    get: (id: number): Promise<APIResponse<SiteSnipe | null>> =>
-      ipcRenderer.invoke(IPC_CHANNELS.SNIPE_GET, id),
-
-    list: (userId: number): Promise<APIResponse<SiteSnipe[]>> =>
-      ipcRenderer.invoke(IPC_CHANNELS.SNIPE_LIST, userId),
-
-    update: (id: number, updates: Partial<SiteSnipeInput>): Promise<APIResponse<SiteSnipe>> =>
-      ipcRenderer.invoke(IPC_CHANNELS.SNIPE_UPDATE, id, updates),
-
-    delete: (id: number): Promise<APIResponse<boolean>> =>
-      ipcRenderer.invoke(IPC_CHANNELS.SNIPE_DELETE, id),
-
-    activate: (id: number): Promise<APIResponse<boolean>> =>
-      ipcRenderer.invoke(IPC_CHANNELS.SNIPE_ACTIVATE, id),
-
-    deactivate: (id: number): Promise<APIResponse<boolean>> =>
-      ipcRenderer.invoke(IPC_CHANNELS.SNIPE_DEACTIVATE, id),
-
-    execute: (id: number): Promise<APIResponse<any>> =>
-      ipcRenderer.invoke(IPC_CHANNELS.SNIPE_EXECUTE, id),
-  },
-
-  // Notification APIs
-  notification: {
-    list: (userId: number, limit?: number): Promise<APIResponse<Notification[]>> =>
-      ipcRenderer.invoke(IPC_CHANNELS.NOTIFICATION_LIST, userId, limit),
-
-    markRead: (id: number): Promise<APIResponse<boolean>> =>
-      ipcRenderer.invoke(IPC_CHANNELS.NOTIFICATION_MARK_READ, id),
-
-    delete: (id: number): Promise<APIResponse<boolean>> =>
-      ipcRenderer.invoke(IPC_CHANNELS.NOTIFICATION_DELETE, id),
-
-    deleteAll: (userId: number): Promise<APIResponse<number>> =>
-      ipcRenderer.invoke(IPC_CHANNELS.NOTIFICATION_DELETE_ALL, userId),
-  },
-
-  // ParkStay APIs
-  parkstay: {
-    searchCampgrounds: (query: string): Promise<APIResponse<any[]>> =>
-      ipcRenderer.invoke(IPC_CHANNELS.PARKSTAY_SEARCH_CAMPGROUNDS, query),
-
-    getAllCampgrounds: (): Promise<APIResponse<any[]>> =>
-      ipcRenderer.invoke(IPC_CHANNELS.PARKSTAY_GET_ALL_CAMPGROUNDS),
-
-    checkAvailability: (
-      campgroundId: string,
-      params: {
-        arrivalDate: string;
-        departureDate: string;
-        numGuests: number;
-        siteType?: string;
+  events: {
+    on<E extends EventName>(name: E, callback: (payload: EventPayloads[E]) => void): () => void {
+      if (!isEventName(name)) {
+        throw new Error(`Unknown event: ${String(name)}`);
       }
-    ): Promise<APIResponse<any>> =>
-      ipcRenderer.invoke(IPC_CHANNELS.PARKSTAY_CHECK_AVAILABILITY, campgroundId, params),
-  },
-
-  // Gmail APIs
-  gmail: {
-    setCredentials: (credentials: OAuth2Credentials): Promise<APIResponse<boolean>> =>
-      ipcRenderer.invoke(IPC_CHANNELS.GMAIL_SET_CREDENTIALS, credentials),
-
-    getCredentials: (): Promise<APIResponse<OAuth2Credentials | null>> =>
-      ipcRenderer.invoke(IPC_CHANNELS.GMAIL_GET_CREDENTIALS),
-
-    authorize: (): Promise<APIResponse<boolean>> =>
-      ipcRenderer.invoke(IPC_CHANNELS.GMAIL_AUTHORIZE),
-
-    checkAuthStatus: (): Promise<APIResponse<GmailAuthStatus>> =>
-      ipcRenderer.invoke(IPC_CHANNELS.GMAIL_CHECK_AUTH_STATUS),
-
-    revokeAuth: (): Promise<APIResponse<boolean>> =>
-      ipcRenderer.invoke(IPC_CHANNELS.GMAIL_REVOKE_AUTH),
-
-    waitForEmail: (
-      fromEmail: string,
-      subject: string,
-      timeout?: number
-    ): Promise<APIResponse<OTPResult>> =>
-      ipcRenderer.invoke(IPC_CHANNELS.GMAIL_WAIT_FOR_EMAIL, fromEmail, subject, timeout),
-
-    getRecentEmails: (maxResults?: number): Promise<APIResponse<GmailMessage[]>> =>
-      ipcRenderer.invoke(IPC_CHANNELS.GMAIL_GET_RECENT_EMAILS, maxResults),
-
-    testSearch: (fromEmail: string, subject: string): Promise<APIResponse<GmailMessage[]>> =>
-      ipcRenderer.invoke(IPC_CHANNELS.GMAIL_TEST_SEARCH, fromEmail, subject),
-  },
-
-  // Notification Provider APIs
-  notificationProvider: {
-    list: (): Promise<APIResponse<NotificationProvider[]>> =>
-      ipcRenderer.invoke(IPC_CHANNELS.PROVIDER_LIST),
-
-    get: (channel: NotificationChannel): Promise<APIResponse<NotificationProvider | null>> =>
-      ipcRenderer.invoke(IPC_CHANNELS.PROVIDER_GET, channel),
-
-    configure: (input: NotificationProviderInput): Promise<APIResponse<NotificationProvider>> =>
-      ipcRenderer.invoke(IPC_CHANNELS.PROVIDER_CONFIGURE, input),
-
-    enable: (channel: NotificationChannel): Promise<APIResponse<boolean>> =>
-      ipcRenderer.invoke(IPC_CHANNELS.PROVIDER_ENABLE, channel),
-
-    disable: (channel: NotificationChannel): Promise<APIResponse<boolean>> =>
-      ipcRenderer.invoke(IPC_CHANNELS.PROVIDER_DISABLE, channel),
-
-    test: (channel: NotificationChannel): Promise<APIResponse<TestConnectionResult>> =>
-      ipcRenderer.invoke(IPC_CHANNELS.PROVIDER_TEST, channel),
-  },
-
-  // Updater APIs
-  updater: {
-    checkForUpdates: (): Promise<APIResponse<any>> => ipcRenderer.invoke(IPC_CHANNELS.UPDATE_CHECK),
-
-    downloadUpdate: (): Promise<APIResponse<boolean>> =>
-      ipcRenderer.invoke(IPC_CHANNELS.UPDATE_DOWNLOAD),
-
-    installUpdate: (): Promise<APIResponse<boolean>> =>
-      ipcRenderer.invoke(IPC_CHANNELS.UPDATE_INSTALL),
-
-    getStatus: (): Promise<APIResponse<any>> => ipcRenderer.invoke(IPC_CHANNELS.UPDATE_GET_STATUS),
-  },
-
-  // App APIs
-  app: {
-    getInfo: (): Promise<APIResponse<any>> => ipcRenderer.invoke(IPC_CHANNELS.APP_GET_INFO),
-
-    openLogsFolder: (): Promise<APIResponse<boolean>> =>
-      ipcRenderer.invoke(IPC_CHANNELS.APP_OPEN_LOGS_FOLDER),
-
-    setAutoLaunch: (enabled: boolean): Promise<APIResponse<boolean>> =>
-      ipcRenderer.invoke(IPC_CHANNELS.APP_SET_AUTO_LAUNCH, enabled),
-
-    getAutoLaunch: (): Promise<APIResponse<boolean>> =>
-      ipcRenderer.invoke(IPC_CHANNELS.APP_GET_AUTO_LAUNCH),
-  },
-
-  // Queue APIs
-  queue: {
-    check: (): Promise<APIResponse<QueueSession>> => ipcRenderer.invoke(IPC_CHANNELS.QUEUE_CHECK),
-
-    wait: (): Promise<APIResponse<QueueSession>> => ipcRenderer.invoke(IPC_CHANNELS.QUEUE_WAIT),
-
-    getStatus: (): Promise<
-      APIResponse<{
-        session: QueueSession | null;
-        isActive: boolean;
-        isExpired: boolean;
-        isWaiting: boolean;
-        estimatedWait: string;
-        expiryRemaining: string;
-      }>
-    > => ipcRenderer.invoke(IPC_CHANNELS.QUEUE_GET_STATUS),
-
-    clear: (): Promise<APIResponse<void>> => ipcRenderer.invoke(IPC_CHANNELS.QUEUE_CLEAR),
-  },
-
-  // Event listeners
-  on: {
-    bookingUpdated: (callback: (booking: Booking) => void) => {
-      ipcRenderer.on(IPC_CHANNELS.BOOKING_UPDATED, (_event, booking) => callback(booking));
-    },
-
-    notificationCreated: (callback: (notification: any) => void) => {
-      ipcRenderer.on(IPC_CHANNELS.NOTIFICATION_CREATED, (_event, notification) =>
-        callback(notification)
-      );
-    },
-
-    watchResult: (callback: (result: any) => void) => {
-      ipcRenderer.on(IPC_CHANNELS.WATCH_RESULT, (_event, result) => callback(result));
-    },
-
-    snipeStatusUpdate: (callback: (result: any) => void) => {
-      ipcRenderer.on(IPC_CHANNELS.SNIPE_STATUS_UPDATE, (_event, result) => callback(result));
-    },
-
-    queueStatusUpdate: (callback: (event: QueueStatusEvent) => void) => {
-      ipcRenderer.on(IPC_CHANNELS.QUEUE_STATUS_UPDATE, (_event, data) => callback(data));
-    },
-
-    updateAvailable: (callback: (data: { version: string; releaseNotes?: string }) => void) => {
-      ipcRenderer.on(IPC_CHANNELS.UPDATE_AVAILABLE, (_event, data) => callback(data));
-    },
-
-    updateDownloaded: (callback: (data: { version: string }) => void) => {
-      ipcRenderer.on(IPC_CHANNELS.UPDATE_DOWNLOADED, (_event, data) => callback(data));
-    },
-
-    updateProgress: (
-      callback: (data: {
-        percent: number;
-        bytesPerSecond: number;
-        transferred: number;
-        total: number;
-      }) => void
-    ) => {
-      ipcRenderer.on(IPC_CHANNELS.UPDATE_PROGRESS, (_event, data) => callback(data));
-    },
-
-    updateError: (callback: (data: { error: string }) => void) => {
-      ipcRenderer.on(IPC_CHANNELS.UPDATE_ERROR, (_event, data) => callback(data));
-    },
-  },
-
-  // Remove event listeners
-  off: {
-    bookingUpdated: () => {
-      ipcRenderer.removeAllListeners(IPC_CHANNELS.BOOKING_UPDATED);
-    },
-
-    notificationCreated: () => {
-      ipcRenderer.removeAllListeners(IPC_CHANNELS.NOTIFICATION_CREATED);
-    },
-
-    watchResult: () => {
-      ipcRenderer.removeAllListeners(IPC_CHANNELS.WATCH_RESULT);
-    },
-
-    snipeStatusUpdate: () => {
-      ipcRenderer.removeAllListeners(IPC_CHANNELS.SNIPE_STATUS_UPDATE);
-    },
-
-    queueStatusUpdate: () => {
-      ipcRenderer.removeAllListeners(IPC_CHANNELS.QUEUE_STATUS_UPDATE);
-    },
-
-    updateAvailable: () => {
-      ipcRenderer.removeAllListeners(IPC_CHANNELS.UPDATE_AVAILABLE);
-    },
-
-    updateDownloaded: () => {
-      ipcRenderer.removeAllListeners(IPC_CHANNELS.UPDATE_DOWNLOADED);
-    },
-
-    updateProgress: () => {
-      ipcRenderer.removeAllListeners(IPC_CHANNELS.UPDATE_PROGRESS);
-    },
-
-    updateError: () => {
-      ipcRenderer.removeAllListeners(IPC_CHANNELS.UPDATE_ERROR);
+      // One wrapper per subscription, so unsubscribing removes only this one.
+      const listener = (_event: IpcRendererEvent, payload: EventPayloads[E]): void =>
+        callback(payload);
+      ipcRenderer.on(name, listener);
+      return () => {
+        ipcRenderer.removeListener(name, listener);
+      };
     },
   },
 };
 
-// Expose API to renderer
-console.log('[Preload] About to expose API to window.api');
 contextBridge.exposeInMainWorld('api', api);
-console.log('[Preload] API exposed successfully');
-
-// Export type for TypeScript
-export type API = typeof api;

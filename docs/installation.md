@@ -1,525 +1,134 @@
-# WA ParkStay Bookings - Installation Guide
-
-**Version:** 1.0.0
-**Last Updated:** 2026-02-10
-
-## Table of Contents
-
-1. [System Requirements](#system-requirements)
-2. [Windows Installation](#windows-installation)
-3. [macOS Installation](#macos-installation) *(Coming Soon)*
-4. [Linux Installation](#linux-installation) *(Coming Soon)*
-5. [First-Run Setup](#first-run-setup)
-6. [Troubleshooting](#troubleshooting)
-7. [Uninstallation](#uninstallation)
-8. [Updating](#updating)
-
-> **Note:** v1.0.0 is Windows-only. macOS and Linux builds are planned for future releases.
-
----
-
-## System Requirements
-
-### Minimum Requirements
-
-**Windows:**
-- Windows 10 (64-bit) or later
-- 4 GB RAM
-- 500 MB free disk space
-- Internet connection
-
-**macOS:**
-- macOS 10.15 (Catalina) or later
-- 4 GB RAM
-- 500 MB free disk space
-- Internet connection
-
-**Linux:**
-- Ubuntu 20.04 LTS or later (or equivalent)
-- 4 GB RAM
-- 500 MB free disk space
-- Internet connection
-
-### Recommended Requirements
-
-- 8 GB RAM or more
-- 1 GB free disk space
-- Stable broadband internet connection
-- Modern multi-core processor
-
----
-
-## Windows Installation
-
-### Method 1: Using the Installer (Recommended)
-
-1. **Download the Installer**
-   - Go to the [releases page](https://github.com/wilsonwaters/parkstay-bookings/releases)
-   - Download the latest `WA-ParkStay-Bookings-Setup-x.x.x.exe` file
-
-2. **Run the Installer**
-   - Double-click the downloaded `.exe` file
-   - If Windows SmartScreen appears, click "More info" then "Run anyway"
-   - The installer will open
-
-3. **Installation Steps**
-   - Read and accept the license agreement
-   - Choose installation location (default: `C:\Program Files\WA ParkStay Bookings`)
-   - Select additional tasks:
-     - Create desktop shortcut (recommended)
-     - Create Start Menu shortcut (recommended)
-   - Click "Install"
-   - Wait for installation to complete
-   - Click "Finish" to launch the application
-
-4. **First Launch**
-   - The application will open automatically
-   - Windows Defender Firewall may ask for network access - click "Allow"
-   - Proceed to [First-Run Setup](#first-run-setup)
-
-### Method 2: Portable Version
-
-1. **Download Portable Version**
-   - Download `WA-ParkStay-Bookings-Portable-x.x.x.exe` from the releases page
-
-2. **Run Directly**
-   - Save the file to any location (USB drive, Documents folder, etc.)
-   - Double-click to run - no installation required
-   - All data will be stored in the same directory as the executable
-
-3. **Notes**
-   - Portable version doesn't create shortcuts or registry entries
-   - Updates must be downloaded manually
-   - Ideal for running from USB drives or testing
-
-### Windows Installation Notes
-
-- **Administrator Rights**: Installation to Program Files requires administrator rights
-- **Antivirus**: Some antivirus software may flag the application. Add an exception if needed
-- **Auto-Start**: You can configure the app to start with Windows in Settings
-- **Multiple Users**: Each Windows user account has separate application data
-
----
-
-## macOS Installation
-
-> **Coming Soon:** macOS builds are not yet available for v1.0.0. Check back for future releases or [build from source](../README.md#building-from-source).
-
-### Standard Installation (When Available)
-
-1. **Download the DMG**
-   - Go to the [releases page](https://github.com/wilsonwaters/parkstay-bookings/releases)
-   - Download the latest `WA-ParkStay-Bookings-x.x.x-arm64.dmg` (Apple Silicon) or
-   - Download `WA-ParkStay-Bookings-x.x.x-x64.dmg` (Intel Mac)
-
-2. **Mount the DMG**
-   - Double-click the downloaded `.dmg` file
-   - A new window will open showing the application icon and Applications folder
-
-3. **Install the Application**
-   - Drag the "WA ParkStay Bookings" icon to the "Applications" folder
-   - Wait for the copy to complete
-   - Eject the DMG by clicking the eject button in Finder
-
-4. **First Launch**
-   - Open Applications folder
-   - Double-click "WA ParkStay Bookings"
-   - macOS may show a security warning: "WA ParkStay Bookings is an app downloaded from the Internet"
-   - Click "Open" to confirm you want to run the app
-   - Proceed to [First-Run Setup](#first-run-setup)
-
-### Troubleshooting macOS Gatekeeper
-
-If macOS prevents the app from opening:
-
-1. **Method 1: Security & Privacy**
-   - Go to System Preferences > Security & Privacy > General tab
-   - You'll see a message: "WA ParkStay Bookings was blocked..."
-   - Click "Open Anyway"
-   - Confirm by clicking "Open" in the dialog
-
-2. **Method 2: Right-Click Open**
-   - Right-click (or Control-click) the application
-   - Select "Open" from the menu
-   - Click "Open" in the warning dialog
-
-3. **Method 3: Remove Quarantine (Advanced)**
-   ```bash
-   xattr -cr /Applications/WA\ ParkStay\ Bookings.app
-   ```
-
-### macOS Installation Notes
-
-- **Apple Silicon vs Intel**: Download the correct version for your Mac
-- **Automatic Updates**: The app will check for updates automatically
-- **Data Location**: Application data is stored in `~/Library/Application Support/parkstay-bookings`
-- **Login Items**: Enable in Settings to launch at login
-
----
-
-## Linux Installation
-
-> **Coming Soon:** Linux builds are not yet available for v1.0.0. Check back for future releases or [build from source](../README.md#building-from-source).
-
-### Ubuntu/Debian (AppImage - When Available)
-
-1. **Download AppImage**
-   ```bash
-   # Download latest release
-   wget https://github.com/wilsonwaters/parkstay-bookings/releases/latest/download/WA-ParkStay-Bookings-x.x.x-x86_64.AppImage
-   ```
-
-2. **Make Executable**
-   ```bash
-   chmod +x WA-ParkStay-Bookings-x.x.x-x86_64.AppImage
-   ```
-
-3. **Run Application**
-   ```bash
-   ./WA-ParkStay-Bookings-x.x.x-x86_64.AppImage
-   ```
-
-4. **Optional: Integrate with Desktop**
-   - The app will ask if you want to integrate with your desktop
-   - Click "Yes" to create menu entries and file associations
-   - Or use AppImageLauncher for automatic integration
-
-### Ubuntu/Debian (DEB Package)
-
-1. **Download DEB Package**
-   ```bash
-   wget https://github.com/wilsonwaters/parkstay-bookings/releases/latest/download/wa-parkstay-bookings_x.x.x_amd64.deb
-   ```
-
-2. **Install Package**
-   ```bash
-   sudo dpkg -i wa-parkstay-bookings_x.x.x_amd64.deb
-
-   # Fix dependencies if needed
-   sudo apt-get install -f
-   ```
-
-3. **Launch Application**
-   - Find "WA ParkStay Bookings" in your application menu
-   - Or run from terminal: `parkstay-bookings`
-
-### Fedora/RHEL (RPM Package)
-
-1. **Download RPM Package**
-   ```bash
-   wget https://github.com/wilsonwaters/parkstay-bookings/releases/latest/download/wa-parkstay-bookings-x.x.x.x86_64.rpm
-   ```
-
-2. **Install Package**
-   ```bash
-   sudo rpm -i wa-parkstay-bookings-x.x.x.x86_64.rpm
-
-   # Or using dnf
-   sudo dnf install wa-parkstay-bookings-x.x.x.x86_64.rpm
-   ```
-
-3. **Launch Application**
-   - Find "WA ParkStay Bookings" in your application menu
-   - Or run from terminal: `parkstay-bookings`
-
-### Linux Installation Notes
-
-- **Dependencies**: Most dependencies are bundled, but some system libraries may be required
-- **Permissions**: AppImage may need `--no-sandbox` flag on some systems
-- **Data Location**: Application data is stored in `~/.config/parkstay-bookings`
-- **Autostart**: Configure via your desktop environment's startup applications
-
----
-
-## First-Run Setup
-
-After installing and launching the application for the first time:
-
-### 1. Welcome Screen
-
-You'll see the welcome screen with a brief introduction to the application.
-
-Click "Get Started" to begin setup.
-
-### 2. Account Setup
-
-**Enter Your ParkStay Credentials:**
-
-- **Email Address**: Your ParkStay account email
-- **Password**: Your ParkStay account password
-
-**Security Notes:**
-- Your credentials are encrypted and stored locally on your computer
-- No data is sent to external servers except ParkStay
-- The app uses AES-256 encryption to protect your password
-
-Click "Save Credentials" to continue.
-
-### 3. Verify Connection
-
-The app will test your credentials by logging into ParkStay:
-
-- If successful: You'll see a green checkmark
-- If failed: Check your credentials and try again
-- If ParkStay is down: Try again later
-
-### 4. Configure Notifications
-
-**Choose Notification Preferences:**
-
-- Desktop Notifications: Show system notifications when availability is found
-- Sound Alerts: Play a sound with notifications
-- Notification Types: Choose which events trigger notifications
-
-Click "Save Settings" to continue.
-
-### 5. Application Tour (Optional)
-
-Take a quick tour of the main features:
-
-- Dashboard: Overview of active watches and bookings
-- Bookings: Manage existing reservations
-- Watches: Set up availability monitoring
-- Skip The Queue: Automated rebooking
-- Settings: Configure application preferences
-
-Click "Skip Tour" or complete the tour.
-
-### 6. Ready to Use
-
-You're all set! The application is now ready to use.
-
-**Next Steps:**
-- Import existing bookings
-- Create your first watch
-- Explore the features
-
----
-
-## Troubleshooting
-
-### Windows Issues
-
-**Issue: "Windows protected your PC" message**
-- **Solution**: Click "More info" then "Run anyway"
-- This is normal for newly downloaded applications
-- The app is safe and doesn't contain malware
-
-**Issue: Application won't start**
-- **Solution 1**: Run as administrator (right-click > Run as administrator)
-- **Solution 2**: Check Windows Event Viewer for error details
-- **Solution 3**: Reinstall Visual C++ Redistributables
-
-**Issue: Antivirus blocking the application**
-- **Solution**: Add an exception for the application in your antivirus settings
-- File path: `C:\Program Files\WA ParkStay Bookings\`
-
-**Issue: "Cannot find module" error**
-- **Solution**: Reinstall the application
-- Delete the installation directory completely before reinstalling
-
-### macOS Issues
-
-**Issue: "App can't be opened because it is from an unidentified developer"**
-- **Solution**: See [Troubleshooting macOS Gatekeeper](#troubleshooting-macos-gatekeeper) section above
-
-**Issue: Application crashes on startup**
-- **Solution 1**: Check Console app for crash logs
-- **Solution 2**: Remove preferences file:
-  ```bash
-  rm ~/Library/Application\ Support/parkstay-bookings/config.json
-  ```
-- **Solution 3**: Reinstall the application
-
-**Issue: "Damaged and can't be opened" message**
-- **Solution**: Remove quarantine attribute:
-  ```bash
-  xattr -cr /Applications/WA\ ParkStay\ Bookings.app
-  ```
-
-### Linux Issues
-
-**Issue: AppImage won't run**
-- **Solution 1**: Make sure it's executable: `chmod +x *.AppImage`
-- **Solution 2**: Try with `--no-sandbox` flag:
-  ```bash
-  ./WA-ParkStay-Bookings-*.AppImage --no-sandbox
-  ```
-- **Solution 3**: Install FUSE:
-  ```bash
-  sudo apt install libfuse2  # Ubuntu/Debian
-  sudo dnf install fuse-libs  # Fedora
-  ```
-
-**Issue: Missing dependencies**
-- **Solution**: Install required libraries:
-  ```bash
-  sudo apt install libnotify4 libappindicator1 libxtst6 libnss3
-  ```
-
-**Issue: Icon not showing in menu**
-- **Solution**: Update desktop database:
-  ```bash
-  sudo update-desktop-database
-  ```
-
-### General Issues
-
-**Issue: Cannot connect to ParkStay**
-- **Check**: Internet connection is active
-- **Check**: ParkStay website (parkstay.dbca.wa.gov.au) is accessible
-- **Solution**: Wait a few minutes and try again
-
-**Issue: Invalid credentials error**
-- **Check**: Email and password are correct
-- **Check**: Can you log in to ParkStay website directly?
-- **Solution**: Update credentials in Settings
-
-**Issue: Database errors**
-- **Solution 1**: Close all instances of the app
-- **Solution 2**: Delete database file (will lose data):
-  - Windows: `%APPDATA%\parkstay-bookings\parkstay.db`
-  - macOS: `~/Library/Application Support/parkstay-bookings/parkstay.db`
-  - Linux: `~/.config/parkstay-bookings/parkstay.db`
-
-**Issue: High CPU or memory usage**
-- **Check**: Number of active watches (reduce if needed)
-- **Check**: Polling intervals (increase to reduce frequency)
-- **Solution**: Restart the application
-
----
-
-## Uninstallation
-
-### Windows
-
-**Method 1: Control Panel**
-1. Open Control Panel > Programs > Programs and Features
-2. Find "WA ParkStay Bookings" in the list
-3. Right-click and select "Uninstall"
-4. Follow the uninstaller prompts
-5. Choose whether to delete application data
-
-**Method 2: Settings**
-1. Open Settings > Apps > Apps & features
-2. Search for "WA ParkStay Bookings"
-3. Click and select "Uninstall"
-4. Confirm uninstallation
-
-**Remove Application Data:**
-If you want to completely remove all data:
-```
-%APPDATA%\parkstay-bookings
-%LOCALAPPDATA%\parkstay-bookings
-```
-
-### macOS
-
-**Uninstall Application:**
-1. Open Finder > Applications
-2. Find "WA ParkStay Bookings"
-3. Drag to Trash (or right-click > Move to Trash)
-4. Empty Trash
-
-**Remove Application Data:**
-```bash
-rm -rf ~/Library/Application\ Support/parkstay-bookings
-rm -rf ~/Library/Preferences/com.parkstay.bookings.plist
-rm -rf ~/Library/Caches/parkstay-bookings
-rm -rf ~/Library/Logs/parkstay-bookings
-```
-
-### Linux
-
-**DEB Package:**
-```bash
-sudo apt remove parkstay-bookings
-# Remove configuration files too
-sudo apt purge parkstay-bookings
-```
-
-**RPM Package:**
-```bash
-sudo dnf remove parkstay-bookings
-```
-
-**AppImage:**
-```bash
-# Simply delete the AppImage file
-rm WA-ParkStay-Bookings-*.AppImage
-
-# Remove desktop integration if installed
-rm ~/.local/share/applications/parkstay-bookings.desktop
-rm ~/.local/share/icons/hicolor/*/apps/parkstay-bookings.png
-```
-
-**Remove Application Data:**
-```bash
-rm -rf ~/.config/parkstay-bookings
-rm -rf ~/.local/share/parkstay-bookings
-rm -rf ~/.cache/parkstay-bookings
-```
-
----
-
-## Updating
-
-### Automatic Updates (Recommended)
-
-The application checks for updates automatically:
-
-1. When a new version is available, you'll see a notification
-2. Click "Download Update" to download in the background
-3. Once downloaded, click "Install and Restart"
-4. The app will close, install the update, and restart
-5. Your data and settings are preserved
-
-### Manual Updates
-
-If automatic updates are disabled:
-
-1. Download the latest version from the releases page
-2. Follow the installation instructions for your platform
-3. The new version will install over the old one
-4. Your data and settings are preserved
-
-### Update Settings
-
-Configure update behavior in Settings:
-
-- **Check for Updates**: Automatically check for updates on startup
-- **Download Automatically**: Download updates in the background
-- **Update Channel**: Stable (recommended) or Beta
-
----
-
-## Getting Help
-
-If you encounter issues not covered in this guide:
-
-1. **Check the Documentation**: See the [User Guide](./user-guide.md) for feature help
-2. **Search Issues**: Check [GitHub Issues](https://github.com/wilsonwaters/parkstay-bookings/issues)
-3. **Report a Bug**: Create a new issue with details about your problem
-4. **Contact Support**: Email support@example.com (if applicable)
-
-### Include in Bug Reports
-
-When reporting issues, please include:
-
-- Operating system and version
-- Application version (Help > About)
-- Steps to reproduce the problem
-- Error messages or screenshots
-- Log files (Settings > Advanced > Export Logs)
-
----
-
-## License
-
-This application is released under the MIT License. See LICENSE file for details.
-
----
-
-**Next Steps:**
-- Read the [User Guide](./user-guide.md) to learn how to use the application
-- See [Development Guide](./development.md) if you want to contribute
+# Installation
+
+WA Stay is a Windows desktop app. macOS and Linux builds are not released; developers can
+[build from source](development.md) on any of the three.
+
+## Contents
+
+- [Requirements](#requirements)
+- [Download](#download)
+- [Install](#install)
+- [First start](#first-start)
+- [Upgrading from WA ParkStay Bookings](#upgrading-from-wa-parkstay-bookings)
+- [Updates](#updates)
+- [Uninstall](#uninstall)
+- [Where WA Stay keeps things](#where-wa-stay-keeps-things)
+
+## Requirements
+
+- Windows 10 or later, 64-bit (the installer refuses older versions).
+- An internet connection for places, availability and the map. The catalogue and your watches,
+  snipes and bookings are kept locally.
+- For providers that need browser automation (none yet): Microsoft Edge or Google Chrome.
+
+## Download
+
+From the [latest release](https://github.com/wilsonwaters/wa-stay/releases/latest):
+
+| File | Use it when |
+| --- | --- |
+| `WA-Stay-Setup-x.y.z.exe` | You want WA Stay installed, with Start-menu and desktop shortcuts and automatic updates. **Recommended.** |
+| `WA-Stay-Portable-x.y.z.exe` | You want to run it without installing. It does not update itself: download the new portable exe for each release. |
+
+WA Stay is **not code-signed yet**, so Windows SmartScreen may say "Windows protected your PC".
+Choose **More info**, then **Run anyway**.
+
+## Install
+
+1. Run `WA-Stay-Setup-x.y.z.exe` (approve SmartScreen as above).
+2. Choose where to install it. The default, for your user only, is
+   `%LOCALAPPDATA%\Programs\WA Stay`; no administrator rights are needed.
+3. The installer creates **WA Stay** shortcuts on the desktop and in the Start menu, and can
+   start WA Stay when it finishes.
+
+To pin WA Stay to the taskbar, right-click its Start-menu shortcut (or the running app's
+taskbar button) and choose **Pin to taskbar**.
+
+## First start
+
+WA Stay opens on **Explore**: no login, no setup wizard. A few seconds after start-up it
+downloads the provider's catalogue (ParkStay's 169 campgrounds), and then you can search,
+filter and open places. Optional next steps:
+
+- **Settings → Notifications**: set up email alerts.
+- **Settings → Accounts → Connect ParkStay**: sign in to ParkStay in the app (optional; it makes
+  paying for a held site quicker).
+- **Settings → App**: start WA Stay when you sign in to Windows, so watches keep running.
+
+See the [user guide](user-guide.md).
+
+## Upgrading from WA ParkStay Bookings
+
+WA Stay is the new name of WA ParkStay Bookings, rebuilt as a booking app for all of Western
+Australia. **Upgrading keeps your data and needs nothing from you.**
+
+- **Auto-update works.** WA ParkStay Bookings 1.x offers the WA Stay update like any other (it
+  follows GitHub's redirect to the renamed repository). You can also download and run
+  `WA-Stay-Setup-x.y.z.exe` yourself.
+- **If the old version's uninstaller asks whether to delete your data, choose No.** The WA Stay
+  installer has already copied the old data folder to `%APPDATA%\WA Stay\legacy-snapshot`
+  before that question, so your data is safe either way, but No keeps the original backup too.
+- **Your data is copied on the first start.** WA Stay copies your watches, snipes, bookings,
+  notifications, settings and email settings from `%APPDATA%\parkstay-bookings` to
+  `%APPDATA%\WA Stay`, then shows a notice, "Your data has moved to WA Stay". The old folder
+  is **left untouched as a backup**. Once you have checked that everything is there, it is safe
+  to delete. If the copy fails, WA Stay says why and offers **Retry**, **Start fresh** (open
+  without your old data, which stays in the old folder) or **Quit**.
+- **The install folder.** An automatic (silent) update keeps the old program folder,
+  `%LOCALAPPDATA%\Programs\WA ParkStay Bookings\`. Running the installer by hand puts WA Stay in
+  a `WA Stay` subfolder of it, `%LOCALAPPDATA%\Programs\WA ParkStay Bookings\WA Stay\`. Both
+  work; nothing needs fixing.
+- **Shortcuts are renamed.** The installer removes the old **WA ParkStay Bookings** desktop and
+  Start-menu shortcuts and adds **WA Stay** ones. A **taskbar pin** made for the old version
+  still points at the old program (`WA ParkStay Bookings.exe`): unpin it, then pin WA Stay
+  again from its new shortcut.
+- **Launch at login carries over.** If WA ParkStay Bookings started when you signed in, WA Stay
+  does too: the old entry is replaced with one for WA Stay. The old version always started
+  hidden, so **Start minimised** is turned on for you (WA Stay opens in the taskbar). Change
+  either in Settings → App.
+- **What carries over, and what deliberately does not.** Your watches, snipes, bookings,
+  notifications, settings and email settings (including the email password, re-encrypted) all
+  carry over. Two old sign-ins do not, by design: the saved ParkStay password (dropped; your
+  ParkStay email is kept) and the Gmail OTP sign-in (removed). Both are explained below.
+- **Your ParkStay password is no longer used.** Sign-in now happens on ParkStay's own page, in
+  the app. Connect ParkStay once in **Settings → Accounts** if you like; ParkStay emails you a
+  code to sign in. It is optional: watches, Site Sniper and holds all work without it. The old
+  saved password is removed from WA Stay's data; only your email is kept, as a sign-in hint.
+- **Gmail OTP is removed.** Nothing used it any more. WA Stay deletes any saved Gmail sign-in
+  from its own data folder on start. If you used Gmail OTP in v1.x, a copy of that sign-in
+  (`gmail-oauth.json`, with a still-valid access token) remains in the old v1 data folder
+  (`%APPDATA%\parkstay-bookings`), which WA Stay keeps untouched as your backup; it is safe to
+  delete that file. To revoke the access you gave the app, remove it from your Google account
+  at <https://myaccount.google.com/permissions>.
+- **Downgrading is not supported.** WA ParkStay Bookings cannot read WA Stay's data. Because
+  WA Stay never changes the old folder, a reinstalled v1.2.0 would show your data as it was
+  before the upgrade, and would offer the WA Stay update again.
+
+The old folder also still holds the v1.x database with its encrypted ParkStay password until
+you delete the folder ([security](security.md#legacy-v1x-secrets)).
+
+## Updates
+
+The installed app checks GitHub for a new version 15 seconds after it starts. When there is
+one, a card at the bottom right offers **Download**; once downloaded, **Restart now** installs
+it (or it installs when you next quit). **Settings → About → Check for updates** checks at any
+time. Updates keep your data.
+
+## Uninstall
+
+**Windows Settings → Apps → WA Stay → Uninstall.** The uninstaller asks "Do you also want to
+delete your WA Stay data?" (default **No**). If the old app's data folder
+(`%APPDATA%\parkstay-bookings`) is still there, it asks about that separately (default **No**). An update never deletes data.
+
+## Where WA Stay keeps things
+
+| What | Where (Windows) |
+| --- | --- |
+| Data folder | `%APPDATA%\WA Stay` |
+| Database | `%APPDATA%\WA Stay\wa-stay.db` |
+| Logs | `%APPDATA%\WA Stay\logs` (**Settings → About → Open logs folder**) |
+| ParkStay's session (cookies) | `%APPDATA%\WA Stay\Partitions\provider-parkstay` |
+| The old 1.x app's data (after an upgrade) | `%APPDATA%\parkstay-bookings`, untouched |
+| The program | `%LOCALAPPDATA%\Programs\WA Stay` (or the old folder after an upgrade, above) |
+
+Problems: [troubleshooting](troubleshooting.md).

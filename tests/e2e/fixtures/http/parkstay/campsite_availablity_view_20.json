@@ -1,0 +1,222 @@
+{
+  "id": 20,
+  "name": "Bungarra",
+  "site_type": 0,
+  "long_description": "<style>\r\nspan.disable { color: grey !important; text-decoration: line-through; }\r\n.custom-line { border-bottom: 1px solid grey; padding-bottom: 5px; }\r\n.red { color: red;}\r\n</style>\r\n\r\n<h4 style=\"color:red;\"><strong>This campground is in the Gascoyne Region</strong></h4>\r\n<div>\r\n<img src=\"/media/parkstay/campground_images/25f050a7-6c3.jpg\" class=\"img-responsive\"> \r\n</div>\r\n<h4 style=\"text-align:center;\">Five camp sites</h4>\r\n<hr>\r\n<div class=\"row\">\r\n\t<div class=\"col-md-3\" >\r\n\t\t<h5>Sites suitable for</h5>\r\n\t</div>\r\n\t<div class=\"col-md-9\" >\r\n\t\t\t<div class=\"row\" >\r\n\t\t\t\t<div class=\"col-md-4\">\r\n\t\t\t\t\t<i class=\"\"> </i>Freestanding tents & swags\r\n\t\t\t\t</div>\r\n\t\t\t\t<div class=\"col-md-4\">\r\n\t\t\t\t\t<i class=\"\"> </i>Campervans, rooftop & awning tents\r\n\t\t\t\t</div>\r\n\t\t\t\t<div class=\"col-md-4\">\r\n\t\t\t\t\t<i class=\"\"> </i>Caravans & camper trailers\r\n\t\t\t\t</div>\r\n\t\t\t\t<div class=\"col-md-12 center\">\r\n\t\t\t\t<i class=\"fa fa-warning red\">\r\n\t\t\t\t\t</i> Camp site surface is compacted. Driving pegs is difficult.\r\n\t\t\t\t</div>\r\n\t\t\t</div>\t\r\n\t</div>\r\n</div>\r\n<hr>\r\n<div class=\"row\">\r\n\t<div class=\"col-md-3\" >\r\n\t\t<h5>Vehicle access</h5>\r\n\t</div>\r\n\t<div class=\"col-md-9\" >\r\n\t\t<div class=\"row\" >\r\n\t\t\t<div class=\"col-md-4\">\r\n\t\t\t\t<i class=\"\"> </i>2WD access\r\n\t\t\t</div>\r\n\t\t\t<div class=\"col-md-8\">\r\n\t\t\t\t<i class=\"\"> </i>Unsealed roads within the campground\r\n\t\t\t</div>\r\n\t\t</div>\t\r\n\t</div>\r\n</div>\r\n<hr>\r\n<div class=\"row\">\r\n<div class=\"col-md-3\" >\r\n\t<h5>Campfires, pets, generators</h5>\r\n</div>\r\n\t<div class=\"col-md-9\" >\r\n\t\t\t<div class=\"row\" >\r\n\t\t\t\t<div class=\"col-md-4\">\r\n\t\t\t\t<span class=\"disable\"><i class=\"\">\r\n\t\t\t\t\t</i>Campfires permitted</span>\r\n\t\t\t\t</div>\r\n\t\t\t\t<div class=\"col-md-4\">\r\n\t\t\t\t <span class=\"disable\">\r\n\t\t\t\t\t <i class=\"\"> </i>Pets permitted</span>\r\n\t\t\t\t</div>\r\n\t\t\t\t<div class=\"col-md-4\">\r\n\t\t\t\t<span class=\"disable\"><i class=\"\">\r\n\t\t\t\t\t</i> Generators permitted</span>\r\n\t\t\t\t</div>\r\n\t\t\t</div>\t\r\n\t</div>\r\n</div>\r\n<hr>\r\n<div class=\"row\">\r\n\t<div class=\"col-md-3\" >\r\n\t\t<h5>Facilities</h5>\r\n\t</div>\r\n\t<div class=\"col-md-9\" >\r\n\t\t<div class=\"row\" >\r\n\t\t\t<div class=\"col-md-3\">\r\n\t\t\t\t<span class=\"disable\"><i class=\"\"> </i>Drinking water</span>\r\n\t\t\t</div>\r\n\t\t\t<div class=\"col-md-3\">\r\n\t\t\t\t<i class=\"\"> </i><em>No-flush</em> pit toilets\r\n\t\t\t</div>\r\n\t\t\t<div class=\"col-md-3\">\r\n\t\t\t\t<span class=\"disable\"><i class=\"\"> </i>Showers</span>\r\n\t\t\t</div>\r\n\t\t\t<div class=\"col-md-3\">\r\n\t\t\t\t<span class=\"disable\"><i class=\"\"> </i>Dump station</span>\r\n\t\t\t</div>\r\n\t\t</div>\r\n\t\t<div class=\"row\">\r\n\t\t\t<div class=\"col-md-3\">\r\n\t\t\t\t<span class=\"disable\"><i class=\"\">  </i>Picnic tables</span>\r\n\t\t\t</div>\r\n\t\t\t<div class=\"col-md-3\">\r\n\t\t\t\t<span class=\"disable\"><i class=\"\"> </i>Gas barbecues</span>\r\n\t\t\t</div>\r\n\t\t\t<div class=\"col-md-3\">\r\n\t\t\t\t<span class=\"disable\"><i class=\"\"> </i>Dishwashing</span>\r\n\t\t\t</div>\r\n\t\t\t<div class=\"col-md-3\">\r\n\t\t\t\t<span class=\"disable\"><i class=\"\"> </i>Powered sites</span>\r\n\t\t\t</div>\r\n\t\t</div>\r\n\t</div>\r\n</div>\r\n<hr>\r\n<div class=\"row\">\r\n\t<div class=\"col-md-3\" >\r\n\t\t<h5>Fees</h5>\r\n\t</div>\r\n\t<div class=\"col-md-9\" >\r\n\t\t\t<div class=\"row\" >\r\n\t\t\t\t<div class=\"col-md-12\">\r\n\t\t\t\t\tCamping fee: per person, per night camping fee indicated below. Pay in full to complete your booking.\r\n\t\t\t\t</div>\r\n\t\t\t</div>\r\n\t\t\t<div class=\"col-md-12\">\r\n\t\t\t\t<div class=\"row\" >\r\n\t\t\t\t\t<span>Park entry fee: per vehicle. Pay when booking or purchase a  <a href=\"https://shop.dbca.wa.gov.au\"> park pass</a> separately.</span>\r\n\t\t\t\t</div>\r\n\t\t\t</div>\r\n\t\t\t<div class=\"col-md-12\">\r\n\t\t\t\t<div class=\"row\" >\r\n\t\t\t\t\t<a href=\"https://exploreparks.dbca.wa.gov.au/know/fees\">More about fees</a>\r\n\t\t\t\t</div>\r\n\t\t\t</div>\r\n\t</div>\r\n</div>\r\n<hr>\r\n<div class=\"row\">\r\n\t<div class=\"col-md-3\" >\r\n\t\t<h5>Booking</h5>\r\n\t</div>\r\n\t\t<div class=\"col-md-9\" >\r\n\t\t\t<div class=\"row\" >\r\n<div class=\"col-md-12\">\r\n\t\t\t\t\tChoose your camp site when you book: <a href=\"/media/parkstay/campground_maps/20/Bungarra_Campground_mud_map.pdf\" target=\"_blank\">view the campground plan</a>\r\n\t\t\t\t</div>\r\n\t\t\t\t<div class=\"col-md-12\">\r\n\t\t\t\t\tBook up to 180 days before arrival.\r\n\t\t\t\t</div>\r\n\t\t\t\t<div class=\"col-md-12\">\r\n\t\t\t\t\tOne site only per booking. Booking must be in the name of a person who will occupy the site.\r\n\t\t\t\t</div>\r\n\t\t\t\t<div class=\"col-md-12\">\r\n\t\t\t\t\tMaximum stay in Cape Range National Park: 14 nights in any 42 night period if <em>any</em> night booked is during <a href=\"https://www.education.wa.edu.au/\">Western Australia public school holidays</a>, 28 nights in any 42 night period at any other time.\r\n\t\t\t\t</div>\r\n\t\t\t\t<div class=\"col-md-12\">\r\n\t\t\t\t\tEducation and tour operator groups cannot be booked online: <a href=\"https://exploreparks.dbca.wa.gov.au/park-stay-enquiry-cape-range-national-park\">make an enquiry</a>\r\n\t\t\t\t</div>\r\n\t\t\t</div>\r\n\t\t</div>\r\n</div>\r\n<hr>\r\n<div class=\"row\">\r\n\t<div class=\"col-md-3\" >\r\n\t\t<h5>Changes, cancellation, refund</h5>\r\n    </div>\r\n\t<div class=\"col-md-9\" >\r\n\t\t<div class=\"row\" >\r\n\t\t\t<div class=\"col-md-12\">\r\n\t\t\t\t<i class=\"fa fa-warning red\">\r\n\t\t\t\t\t</i> Changes not permitted. Notify us if you will not occupy the camp site for any night of your booking or it may be cancelled.\r\n\t\t\t</div>\r\n\t\t\t<div class=\"col-md-12\">\r\n\t\t\t\tCancel up to 29 days before arrival for 50% refund.\r\n\t\t\t</div>\r\n\t\t\t<div class=\"col-md-12\">\r\n\t\t\t\t<a href=\"https://exploreparks.dbca.wa.gov.au/know/online-camp-site-booking-terms-and-conditions\">Full terms and conditions</a>\r\n\t\t\t</div>\r\n\t\t</div>\r\n\t</div>\r\n</div>\r\n<hr>\r\n<div class=\"row\">\r\n\t<div class=\"col-md-3\" >\r\n\t\t<h5>Arrival and departure</h5>\r\n\t</div>\r\n\t\t<div class=\"col-md-9\" >\r\n\t\t\t<div class=\"row\">\r\n\t\t\t\t<div class=\"col-md-12\">\r\n\t\t\t\t\tSet up camp from 10am. Vacate site by 10am\r\n\t\t\t\t</div>\r\n\t\t\t</div>\r\n\t\t</div>\r\n</div>\r\n<hr>\r\n<div class=\"row\">\r\n\t<div class=\"col-md-3\" >\r\n\t\t<h5>Location</h5>\r\n\t</div>\r\n\t<div class=\"col-md-9\" >\r\n\t\t<div class=\"row\" >\r\n\t\t\t<div class=\"col-md-12\">\r\n\t\t\t\t79km from Exmouth via Murat Road and Yardie Creek Road.\r\n\t\t\t</div>\r\n\t\t</div>\r\n\t</div>\r\n</div>\r\n<hr>\r\n<div class=\"row\">\r\n\t\t<div class=\"col-md-3\">\r\n\t\t\t<h5>The park</h5>\r\n\t\t</div>\r\n\t\t<div class=\"col-md-9\">\r\n\t\t\t<div class=\"row\">\r\n\t\t\t\t<div class=\"col-md-12\">\r\n\t\t\t\t\tRead more about <a href=\"https://exploreparks.dbca.wa.gov.au/park/cape-range\">Cape Range National Park</a> and <i class=\"fa fa-warning red\"> </i> check <a href=\"https://alerts.dbca.wa.gov.au\">Parks and Wildlife alerts</a>\r\n\t\t\t\t</div>\r\n\t\t\t\t</div>\r\n\t\t\t</div>\r\n\t\t</div>\r\n<hr>\r\n\t\t<div class=\"row\">\r\n\t\t<div class=\"col-md-3\">\r\n<h5>Enquiries</h5>\r\n\t\t</div>\r\n\t\t<div class=\"col-md-9\">\r\n\t\t\t<div class=\"row\">\r\n\t\t\t\t<div class=\"col-md-12\">\r\n\t\t\t\t\t<a href=\"https://exploreparks.dbca.wa.gov.au/park-stay-enquiry-cape-range-national-park\">Contact Milyering Discovery Centre, Cape Range National Park</a>\r\n\t\t\t\t</div>\r\n\t\t\t</div>\r\n\t\t</div>\r\n\t</div>\r\n<hr>",
+  "map": "/media/parkstay/campground_maps/20/Bungarra_Campground_mud_map.pdf",
+  "ongoing_booking": false,
+  "ongoing_booking_id": null,
+  "arrival": "2026/11/10",
+  "days": 2,
+  "adults": 1,
+  "children": 0,
+  "maxAdults": 30,
+  "maxChildren": 30,
+  "sites": [
+    {
+      "name": "CAMPSITE 01",
+      "id": 1,
+      "type": 0,
+      "class": null,
+      "price": false,
+      "availability": [
+        [
+          false,
+          "Unavailable",
+          "30.00",
+          null,
+          null,
+          "2026-11-10"
+        ],
+        [
+          false,
+          "Unavailable",
+          "30.00",
+          null,
+          null,
+          "2026-11-11"
+        ]
+      ],
+      "gearType": {
+        "tent": true,
+        "campervan": true,
+        "caravan": true,
+        "vehicle": true,
+        "motorcycle": true,
+        "trailer": true
+      },
+      "features": [],
+      "min_people": 1,
+      "max_people": 6,
+      "max_vehicles": 3,
+      "description": "x",
+      "short_description": "12m x 7m reverse-in compacted gravel site."
+    },
+    {
+      "name": "CAMPSITE 02",
+      "id": 2,
+      "type": 0,
+      "class": null,
+      "price": false,
+      "availability": [
+        [
+          false,
+          "Unavailable",
+          "30.00",
+          null,
+          null,
+          "2026-11-10"
+        ],
+        [
+          false,
+          "Unavailable",
+          "30.00",
+          null,
+          null,
+          "2026-11-11"
+        ]
+      ],
+      "gearType": {
+        "tent": true,
+        "campervan": true,
+        "caravan": true,
+        "vehicle": true,
+        "motorcycle": true,
+        "trailer": true
+      },
+      "features": [],
+      "min_people": 1,
+      "max_people": 6,
+      "max_vehicles": 3,
+      "description": "x",
+      "short_description": "12m x 7m reverse-in compacted gravel site."
+    },
+    {
+      "name": "CAMPSITE 03",
+      "id": 3,
+      "type": 0,
+      "class": null,
+      "price": "$60.00",
+      "availability": [
+        [
+          true,
+          "$30.00",
+          "30.00",
+          null,
+          null,
+          "2026-11-10"
+        ],
+        [
+          true,
+          "$30.00",
+          "30.00",
+          null,
+          null,
+          "2026-11-11"
+        ]
+      ],
+      "gearType": {
+        "tent": true,
+        "campervan": true,
+        "caravan": true,
+        "vehicle": true,
+        "motorcycle": true,
+        "trailer": true
+      },
+      "features": [],
+      "min_people": 1,
+      "max_people": 6,
+      "max_vehicles": 3,
+      "description": "x",
+      "short_description": "12m x 7m reverse-in compacted gravel site."
+    },
+    {
+      "name": "CAMPSITE 04",
+      "id": 4,
+      "type": 0,
+      "class": null,
+      "price": "$60.00",
+      "availability": [
+        [
+          true,
+          "$30.00",
+          "30.00",
+          null,
+          null,
+          "2026-11-10"
+        ],
+        [
+          true,
+          "$30.00",
+          "30.00",
+          null,
+          null,
+          "2026-11-11"
+        ]
+      ],
+      "gearType": {
+        "tent": true,
+        "campervan": true,
+        "caravan": true,
+        "vehicle": true,
+        "motorcycle": true,
+        "trailer": true
+      },
+      "features": [],
+      "min_people": 1,
+      "max_people": 6,
+      "max_vehicles": 3,
+      "description": "x",
+      "short_description": "12m x 7m reverse-in compacted gravel site."
+    },
+    {
+      "name": "CAMPSITE 05",
+      "id": 5,
+      "type": 0,
+      "class": null,
+      "price": "$60.00",
+      "availability": [
+        [
+          true,
+          "$30.00",
+          "30.00",
+          null,
+          null,
+          "2026-11-10"
+        ],
+        [
+          true,
+          "$30.00",
+          "30.00",
+          null,
+          null,
+          "2026-11-11"
+        ]
+      ],
+      "gearType": {
+        "tent": true,
+        "campervan": true,
+        "caravan": true,
+        "vehicle": true,
+        "motorcycle": true,
+        "trailer": true
+      },
+      "features": [],
+      "min_people": 1,
+      "max_people": 6,
+      "max_vehicles": 3,
+      "description": "x",
+      "short_description": "12m x 7m reverse-in compacted gravel site."
+    }
+  ],
+  "classes": {
+    "null": null
+  },
+  "current_booking_campsite_id": null,
+  "current_booking_campsite_class_id": null,
+  "result": true,
+  "release_time_friendly": "02:00 AM",
+  "release_date": "2027-04-01",
+  "booking_open_date": "2026-09-01",
+  "booking_time_open": true
+}

@@ -1,174 +1,55 @@
-# WA ParkStay Bookings - Documentation
+# WA Stay documentation
 
-Complete documentation for the WA ParkStay Bookings desktop application.
+WA Stay is a desktop app for finding and booking places to stay across Western Australia,
+starting with ParkStay WA's national-park campgrounds. The project overview and downloads are in
+the [README](../README.md).
 
-## Table of Contents
+## Using WA Stay
 
-### For Users
+- [Installation](installation.md): download, install, update, uninstall, and
+  [upgrading from WA ParkStay Bookings](installation.md#upgrading-from-wa-parkstay-bookings).
+- [User guide](user-guide.md): Explore, a place's page, watches, Site Sniper, bookings,
+  notifications and settings.
+- [Watches and notifications](watches-and-notifications.md): how watches check and match,
+  automatic holds, desktop and email notifications.
+- [Site Sniper](site-sniper.md) (coming soon): release modes, holds, payment and booking
+  responsibly.
+- [Troubleshooting](troubleshooting.md).
 
-- **[Installation Guide](./installation.md)** - How to install the application on Windows, macOS, or Linux
-- **[User Guide](./user-guide.md)** - Complete guide to using all features of the application
+## Developing WA Stay
 
-### For Developers
+- [Development](development.md): setup, the native module, running, building, scripts and tests.
+- [Architecture overview](architecture/overview.md): processes, source layout, start-up, the
+  provider architecture, the data model, security and the upgrade path.
+  - [ADR-001: UI framework choice](architecture/adr/ADR-001-ui-framework-choice.md)
+- [Security](security.md): secret storage, legacy secrets, provider sign-in and payment windows.
+- [CLAUDE.md](../CLAUDE.md): conventions for working in the code (IPC, migrations, checks).
+- [Tests](../tests/README.md): the Jest suite, fixtures and the Electron smoke tests.
 
-- **[Development Guide](./development.md)** - Set up development environment and contribute to the project
-- **[Architecture Documentation](./architecture/)** - Technical architecture and design decisions
-- **[Implementation Plan](./IMPLEMENTATION_PLAN.md)** - Detailed implementation plan
-- **[Advanced Features Guide](./ADVANCED_FEATURES_GUIDE.md)** - Watch, STQ, and notification deep-dive
+## Providers
 
-### Gmail Integration
+- [Providers](providers/README.md): the providers matrix and the provider SDK.
+- [Adding a provider](providers/adding-a-provider.md): a quick start (`npm run provider:new`,
+  then preview it in the app), and API and browser providers step by step, with compiling
+  examples of holds and sign-in.
+- [Browser providers](providers/browser-providers.md): providers with no API.
+- [ParkStay WA](providers/parkstay/README.md): the manifest, releases, data and terms.
+  - [Endpoints](providers/parkstay/endpoints.md): what is requested, with verification status.
+  - [Sign-in](providers/parkstay/authentication.md): the in-app sign-in window.
 
-- **[Gmail OTP Quick Start](./gmail-otp-quick-start.md)** - Get started with Gmail OAuth2 OTP extraction
-- **[Gmail OTP Setup](./gmail-otp-setup.md)** - Detailed Gmail OAuth2 setup guide
-- **[Gmail Usage Examples](./gmail-usage-examples.md)** - Usage examples and patterns
-- **[Gmail Integration Summary](./GMAIL-INTEGRATION-SUMMARY.md)** - Overview of the Gmail integration
+## Design
 
-### ParkStay API
+Owned by the design stream; the source of truth for the UI.
 
-- **[ParkStay API Overview](./parkstay-api/README.md)** - API documentation overview
-- **[Authentication Flow](./parkstay-api/AUTHENTICATION_FLOW.md)** - ParkStay authentication details
-- **[API Endpoints](./parkstay-api/ENDPOINTS.md)** - Available ParkStay API endpoints
+- [Design language](design/design-language.md): palette, type, motion, the brushstroke.
+- [Components](design/components.md): the `components/ui` primitives.
+- [Shell](design/shell.md): navigation, routes and stable accessible names.
+- [Map](design/map.md): Explore's map style and layers.
 
-### For Release Managers
+## Releasing
 
-- **[Release Process](./release-process.md)** - Complete release workflow and procedures
-- **[Code Signing and Deployment](./code-signing-and-deployment.md)** - Code signing, packaging, and deployment
-- **[Deployment Summary](./DEPLOYMENT-SUMMARY.md)** - Overview of all deployment configuration
-- **[Setup Checklist](./SETUP-CHECKLIST.md)** - Environment setup checklist
-
-### Quick Links
-
-- **[Deployment Checklist](../DEPLOYMENT-CHECKLIST.md)** - Pre-release checklist
-- **[Resources Guide](../resources/README.md)** - App icons and assets
-
-## Documentation Structure
-
-```
-docs/
-├── README.md (this file)              # Documentation index
-├── installation.md                    # Installation guide
-├── user-guide.md                      # User guide
-├── development.md                     # Development guide
-├── release-process.md                 # Release process
-├── code-signing-and-deployment.md     # Code signing guide
-├── DEPLOYMENT-SUMMARY.md             # Deployment overview
-├── SETUP-CHECKLIST.md                # Setup checklist
-├── ADVANCED_FEATURES_GUIDE.md        # Advanced features deep-dive
-├── IMPLEMENTATION_PLAN.md            # Implementation plan
-├── gmail-otp-setup.md                # Gmail OAuth2 setup
-├── gmail-otp-quick-start.md          # Gmail quick start
-├── gmail-usage-examples.md           # Gmail usage examples
-├── GMAIL-INTEGRATION-SUMMARY.md      # Gmail integration overview
-├── architecture/                      # Architecture documentation
-│   ├── README.md
-│   ├── system-architecture.md
-│   ├── project-structure.md
-│   ├── data-models.md
-│   ├── architecture-diagrams.md
-│   ├── implementation-roadmap.md
-│   └── ADR-001-ui-framework-choice.md
-└── parkstay-api/                      # ParkStay API documentation
-    ├── README.md
-    ├── AUTHENTICATION_FLOW.md
-    └── ENDPOINTS.md
-```
-
-## Getting Started
-
-### I want to install and use the app
-> Start with [Installation Guide](./installation.md)
-> Then read [User Guide](./user-guide.md)
-
-### I want to contribute to development
-> Start with [Development Guide](./development.md)
-> Then review [Architecture Documentation](./architecture/)
-
-### I want to set up Gmail integration
-> Start with [Gmail OTP Quick Start](./gmail-otp-quick-start.md)
-> Then see [Gmail OTP Setup](./gmail-otp-setup.md) for detailed instructions
-
-### I want to create a release
-> Review [Release Process](./release-process.md)
-> Check [Deployment Checklist](../DEPLOYMENT-CHECKLIST.md)
-> Follow [Code Signing Guide](./code-signing-and-deployment.md)
-
-## Key Documents
-
-### User Guide
-Complete guide to using the application:
-- Dashboard overview
-- Managing bookings
-- Creating and managing watches
-- Using Skip The Queue
-- Notifications and email alerts
-- Queue system handling
-- Settings (including email/SMTP configuration)
-- Tips and best practices
-- Extensive FAQ
-
-### Development Guide
-Everything you need to contribute:
-- Development environment setup
-- Project structure
-- Building and testing
-- Code style and conventions
-- Contributing guidelines
-
-### Gmail Integration
-OAuth2-based Gmail integration for:
-- Extracting OTP codes from ParkStay emails
-- Automated authentication flow support
-
-### ParkStay API
-Documentation of the ParkStay API:
-- Authentication flow (Azure AD B2C)
-- Available endpoints
-- Queue system handling
-
-## Documentation Standards
-
-### Writing Style
-- Clear and concise
-- Use active voice
-- Include examples
-- Step-by-step instructions
-
-### Code Examples
-```bash
-# Always include working examples
-npm install
-npm run dev
-```
-
-## Contributing to Documentation
-
-### Reporting Issues
-If you find errors or areas for improvement:
-1. Open an issue on [GitHub](https://github.com/wilsonwaters/parkstay-bookings/issues)
-2. Describe the problem clearly
-3. Suggest improvements
-
-### Submitting Changes
-1. Fork the repository
-2. Make your changes
-3. Test all examples
-4. Submit a pull request
-
-## Additional Resources
-
-### External Documentation
-- [Electron Documentation](https://www.electronjs.org/docs/latest)
-- [React Documentation](https://react.dev/)
-- [TypeScript Handbook](https://www.typescriptlang.org/docs/)
-- [Electron Builder](https://www.electron.build/)
-
-### Project Resources
-- [GitHub Repository](https://github.com/wilsonwaters/parkstay-bookings)
-- [Issue Tracker](https://github.com/wilsonwaters/parkstay-bookings/issues)
-- [Discussions](https://github.com/wilsonwaters/parkstay-bookings/discussions)
-- [Releases](https://github.com/wilsonwaters/parkstay-bookings/releases)
-
----
-
-**Document Version:** 1.0.0
-**Last Updated:** 2026-02-09
+- [Release process](release-process.md): checks, the changelog rule, the pipeline, the 2.0.0
+  rename, the repository description.
+- [2.0 release checklist](release-checklist-2.0.md): the manual checks for 2.0.0.
+- [Code signing](code-signing.md).
+- [Brand and icons](../resources/README.md).

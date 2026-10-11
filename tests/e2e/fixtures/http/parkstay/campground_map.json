@@ -1,0 +1,957 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "id": 20,
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          113.83999999999999,
+          -22.247000000000025
+        ]
+      },
+      "properties": {
+        "campground_type": 0,
+        "max_advance_booking": 180,
+        "description": "",
+        "features": [
+          {
+            "id": 8,
+            "name": "Toilet",
+            "description": "Usually no-flush pit type.\r\nAt campgrounds with no toilets campers must bring and use a chemical cartridge toilet.",
+            "image": null,
+            "type": 0
+          },
+          {
+            "id": 17,
+            "name": "Road access for 2WD/SUV",
+            "description": "May include unsealed roads and variable conditions",
+            "image": null,
+            "type": 0
+          }
+        ],
+        "images": [
+          {
+            "image": "/media/parkstay/campground_images/25f050a7-6c3.jpg"
+          }
+        ],
+        "info_url": "https://exploreparks.dbca.wa.gov.au/site/bungarra",
+        "name": "Bungarra",
+        "park": {
+          "id": 10,
+          "name": "Cape Range National Park",
+          "district": {
+            "id": 11,
+            "name": "Exmouth",
+            "abbreviation": "EXM",
+            "ratis_id": 22,
+            "region": {
+              "id": 18,
+              "name": "Pilbara",
+              "abbreviation": "PILBC",
+              "ratis_id": -1
+            }
+          },
+          "entry_fee_required": true
+        },
+        "price_hint": null,
+        "campsites": [
+          {
+            "id": 2,
+            "campground_id": 20,
+            "name": "CAMPSITE 02",
+            "tent": true,
+            "campervan": true,
+            "caravan": true,
+            "max_people": 6,
+            "max_vehicles": 3,
+            "description": "x",
+            "features": []
+          },
+          {
+            "id": 1,
+            "campground_id": 20,
+            "name": "CAMPSITE 01",
+            "tent": true,
+            "campervan": true,
+            "caravan": true,
+            "max_people": 6,
+            "max_vehicles": 3,
+            "description": "x",
+            "features": []
+          },
+          {
+            "id": 3,
+            "campground_id": 20,
+            "name": "CAMPSITE 03",
+            "tent": true,
+            "campervan": true,
+            "caravan": true,
+            "max_people": 6,
+            "max_vehicles": 3,
+            "description": "x",
+            "features": []
+          }
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": 18,
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          113.859409,
+          -22.177481000000007
+        ]
+      },
+      "properties": {
+        "campground_type": 0,
+        "max_advance_booking": 180,
+        "description": "",
+        "features": [
+          {
+            "id": 8,
+            "name": "Toilet",
+            "description": "Usually no-flush pit type.\r\nAt campgrounds with no toilets campers must bring and use a chemical cartridge toilet.",
+            "image": null,
+            "type": 0
+          },
+          {
+            "id": 17,
+            "name": "Road access for 2WD/SUV",
+            "description": "May include unsealed roads and variable conditions",
+            "image": null,
+            "type": 0
+          }
+        ],
+        "images": [
+          {
+            "image": "/media/parkstay/campground_images/fe58f3f0-6ea.jpg"
+          }
+        ],
+        "info_url": "https://exploreparks.dbca.wa.gov.au/site/kurrajong-campground-cape-range",
+        "name": "Kurrajong (Cape Range)",
+        "park": {
+          "id": 10,
+          "name": "Cape Range National Park",
+          "district": {
+            "id": 11,
+            "name": "Exmouth",
+            "abbreviation": "EXM",
+            "ratis_id": 22,
+            "region": {
+              "id": 18,
+              "name": "Pilbara",
+              "abbreviation": "PILBC",
+              "ratis_id": -1
+            }
+          },
+          "entry_fee_required": true
+        },
+        "price_hint": null,
+        "campsites": [
+          {
+            "id": 7,
+            "campground_id": 18,
+            "name": "CAMPSITE 02",
+            "tent": true,
+            "campervan": true,
+            "caravan": true,
+            "max_people": 8,
+            "max_vehicles": 3,
+            "description": "x",
+            "features": []
+          },
+          {
+            "id": 8,
+            "campground_id": 18,
+            "name": "CAMPSITE 03",
+            "tent": true,
+            "campervan": true,
+            "caravan": true,
+            "max_people": 8,
+            "max_vehicles": 3,
+            "description": "x",
+            "features": []
+          },
+          {
+            "id": 9,
+            "campground_id": 18,
+            "name": "CAMPSITE 04",
+            "tent": true,
+            "campervan": true,
+            "caravan": true,
+            "max_people": 8,
+            "max_vehicles": 3,
+            "description": "x",
+            "features": []
+          }
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": 85,
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          119.5206,
+          -27.587400000000013
+        ]
+      },
+      "properties": {
+        "campground_type": 1,
+        "max_advance_booking": 180,
+        "description": "",
+        "features": [
+          {
+            "id": 8,
+            "name": "Toilet",
+            "description": "Usually no-flush pit type.\r\nAt campgrounds with no toilets campers must bring and use a chemical cartridge toilet.",
+            "image": null,
+            "type": 0
+          },
+          {
+            "id": 17,
+            "name": "Road access for 2WD/SUV",
+            "description": "May include unsealed roads and variable conditions",
+            "image": null,
+            "type": 0
+          }
+        ],
+        "images": [
+          {
+            "image": "/media/parkstay/campground_images/6aee9610-177.jpg"
+          }
+        ],
+        "info_url": "https://exploreparks.dbca.wa.gov.au/site/lake-mason-homestead",
+        "name": "Lake Mason Homestead",
+        "park": {
+          "id": 23,
+          "name": "Lake Mason Conservation Park (proposed)",
+          "district": {
+            "id": 17,
+            "name": "No district - Goldfields Region",
+            "abbreviation": "KAL",
+            "ratis_id": 14,
+            "region": {
+              "id": 5,
+              "name": "Goldfields",
+              "abbreviation": "GOLD",
+              "ratis_id": 5
+            }
+          },
+          "entry_fee_required": false
+        },
+        "price_hint": null,
+        "campsites": [
+          {
+            "id": 365,
+            "campground_id": 85,
+            "name": "FOR FILTER ONLY",
+            "tent": true,
+            "campervan": true,
+            "caravan": true,
+            "max_people": 12,
+            "max_vehicles": 1,
+            "description": "x",
+            "features": []
+          }
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": 5,
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          115.76660830000002,
+          -32.12923609999999
+        ]
+      },
+      "properties": {
+        "campground_type": 2,
+        "max_advance_booking": 180,
+        "description": "",
+        "features": [
+          {
+            "id": 8,
+            "name": "Toilet",
+            "description": "Usually no-flush pit type.\r\nAt campgrounds with no toilets campers must bring and use a chemical cartridge toilet.",
+            "image": null,
+            "type": 0
+          },
+          {
+            "id": 17,
+            "name": "Road access for 2WD/SUV",
+            "description": "May include unsealed roads and variable conditions",
+            "image": null,
+            "type": 0
+          }
+        ],
+        "images": [
+          {
+            "image": "/media/parkstay/campground_images/b2e56399-97d.jpg"
+          },
+          {
+            "image": "/media/parkstay/campground_images/631505cc-b74.jpg"
+          }
+        ],
+        "info_url": "https://www.discoveryholidayparks.com.au/caravan-parks/western-australia/cockburn-woodman-point",
+        "name": "Woodman Point Holiday Park",
+        "park": {
+          "id": 52,
+          "name": "Woodman Point Regional Park",
+          "district": {
+            "id": 37,
+            "name": "Swan Coastal",
+            "abbreviation": "SCT",
+            "ratis_id": 74,
+            "region": {
+              "id": 1,
+              "name": "Swan",
+              "abbreviation": "SWAN",
+              "ratis_id": 10
+            }
+          },
+          "entry_fee_required": false
+        },
+        "price_hint": null,
+        "campsites": []
+      }
+    },
+    {
+      "type": "Feature",
+      "id": 16,
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          113.861038,
+          -22.17279600000001
+        ]
+      },
+      "properties": {
+        "campground_type": 4,
+        "max_advance_booking": 180,
+        "description": "",
+        "features": [
+          {
+            "id": 8,
+            "name": "Toilet",
+            "description": "Usually no-flush pit type.\r\nAt campgrounds with no toilets campers must bring and use a chemical cartridge toilet.",
+            "image": null,
+            "type": 0
+          },
+          {
+            "id": 17,
+            "name": "Road access for 2WD/SUV",
+            "description": "May include unsealed roads and variable conditions",
+            "image": null,
+            "type": 0
+          }
+        ],
+        "images": [
+          {
+            "image": "/media/parkstay/campground_images/a4de3a0c-6e7.jpg"
+          }
+        ],
+        "info_url": "https://exploreparks.dbca.wa.gov.au/site/north-kurrajong-campground",
+        "name": "North Kurrajong & T-Bone (Cape Range)",
+        "park": {
+          "id": 10,
+          "name": "Cape Range National Park",
+          "district": {
+            "id": 11,
+            "name": "Exmouth",
+            "abbreviation": "EXM",
+            "ratis_id": 22,
+            "region": {
+              "id": 18,
+              "name": "Pilbara",
+              "abbreviation": "PILBC",
+              "ratis_id": -1
+            }
+          },
+          "entry_fee_required": true
+        },
+        "price_hint": null,
+        "campsites": [
+          {
+            "id": 41,
+            "campground_id": 16,
+            "name": "CAMPSITE 29",
+            "tent": true,
+            "campervan": true,
+            "caravan": true,
+            "max_people": 6,
+            "max_vehicles": 2,
+            "description": "x",
+            "features": []
+          },
+          {
+            "id": 42,
+            "campground_id": 16,
+            "name": "CAMPSITE 30",
+            "tent": true,
+            "campervan": true,
+            "caravan": true,
+            "max_people": 6,
+            "max_vehicles": 2,
+            "description": "x",
+            "features": []
+          },
+          {
+            "id": 43,
+            "campground_id": 16,
+            "name": "CAMPSITE 31",
+            "tent": true,
+            "campervan": true,
+            "caravan": true,
+            "max_people": 6,
+            "max_vehicles": 2,
+            "description": "x",
+            "features": []
+          }
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": 182,
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          115.84859658995569,
+          -34.57173355958317
+        ]
+      },
+      "properties": {
+        "campground_type": 2,
+        "max_advance_booking": 180,
+        "description": "",
+        "features": [
+          {
+            "id": 8,
+            "name": "Toilet",
+            "description": "Usually no-flush pit type.\r\nAt campgrounds with no toilets campers must bring and use a chemical cartridge toilet.",
+            "image": null,
+            "type": 0
+          }
+        ],
+        "images": [
+          {
+            "image": "/media/parkstay/campground_images/70e4cc1b-27f.jpg"
+          }
+        ],
+        "info_url": "",
+        "name": "Yeagarup Hut",
+        "park": {
+          "id": 14,
+          "name": "D'Entrecasteaux National Park",
+          "district": {
+            "id": 7,
+            "name": "Donnelly",
+            "abbreviation": "DON",
+            "ratis_id": 65,
+            "region": {
+              "id": 3,
+              "name": "Warren",
+              "abbreviation": "WARR",
+              "ratis_id": 3
+            }
+          },
+          "entry_fee_required": true
+        },
+        "price_hint": null,
+        "campsites": []
+      }
+    },
+    {
+      "type": "Feature",
+      "id": 43,
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          122.2199,
+          -33.9906
+        ]
+      },
+      "properties": {
+        "campground_type": 0,
+        "max_advance_booking": 180,
+        "description": "",
+        "features": [
+          {
+            "id": 8,
+            "name": "Toilet",
+            "description": "Usually no-flush pit type.\r\nAt campgrounds with no toilets campers must bring and use a chemical cartridge toilet.",
+            "image": null,
+            "type": 0
+          },
+          {
+            "id": 17,
+            "name": "Road access for 2WD/SUV",
+            "description": "May include unsealed roads and variable conditions",
+            "image": null,
+            "type": 0
+          }
+        ],
+        "images": [
+          {
+            "image": "/media/parkstay/campground_images/e5ced99b-c23.jpg"
+          },
+          {
+            "image": "/media/parkstay/campground_images/fd753e15-c5e.jpg"
+          }
+        ],
+        "info_url": "https://exploreparks.dbca.wa.gov.au/site/lucky-bay",
+        "name": "Lucky Bay (Cape Le Grand)",
+        "park": {
+          "id": 9,
+          "name": "Cape Le Grand National Park",
+          "district": {
+            "id": 10,
+            "name": "Esperance",
+            "abbreviation": "ESP",
+            "ratis_id": 17,
+            "region": {
+              "id": 4,
+              "name": "South Coast",
+              "abbreviation": "SCST",
+              "ratis_id": 4
+            }
+          },
+          "entry_fee_required": true
+        },
+        "price_hint": null,
+        "campsites": [
+          {
+            "id": 1115,
+            "campground_id": 43,
+            "name": "02",
+            "tent": true,
+            "campervan": true,
+            "caravan": true,
+            "max_people": 8,
+            "max_vehicles": 2,
+            "description": "x",
+            "features": [
+              {
+                "id": 15,
+                "name": "Generators permitted",
+                "description": "Time of use restrictions apply. Check campground information for more details.",
+                "image": null,
+                "type": 1
+              }
+            ]
+          },
+          {
+            "id": 1142,
+            "campground_id": 43,
+            "name": "28",
+            "tent": true,
+            "campervan": true,
+            "caravan": true,
+            "max_people": 8,
+            "max_vehicles": 2,
+            "description": "x",
+            "features": [
+              {
+                "id": 15,
+                "name": "Generators permitted",
+                "description": "Time of use restrictions apply. Check campground information for more details.",
+                "image": null,
+                "type": 1
+              }
+            ]
+          },
+          {
+            "id": 1143,
+            "campground_id": 43,
+            "name": "29",
+            "tent": true,
+            "campervan": true,
+            "caravan": true,
+            "max_people": 8,
+            "max_vehicles": 2,
+            "description": "x",
+            "features": [
+              {
+                "id": 15,
+                "name": "Generators permitted",
+                "description": "Time of use restrictions apply. Check campground information for more details.",
+                "image": null,
+                "type": 1
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": 91,
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          125.71839000000001,
+          -14.82019000000002
+        ]
+      },
+      "properties": {
+        "campground_type": 1,
+        "max_advance_booking": 180,
+        "description": "",
+        "features": [
+          {
+            "id": 8,
+            "name": "Toilet",
+            "description": "Usually no-flush pit type.\r\nAt campgrounds with no toilets campers must bring and use a chemical cartridge toilet.",
+            "image": null,
+            "type": 0
+          }
+        ],
+        "images": [
+          {
+            "image": "/media/parkstay/campground_images/9a714a7a-d03.jpg"
+          },
+          {
+            "image": "/media/parkstay/campground_images/5d98c2c6-a8b.jpg"
+          }
+        ],
+        "info_url": "https://exploreparks.dbca.wa.gov.au/site/mitchell-falls-campground",
+        "name": "Mitchell Falls",
+        "park": {
+          "id": 29,
+          "name": "Mitchell River National Park",
+          "district": {
+            "id": 9,
+            "name": "East Kimberley",
+            "abbreviation": "EKM",
+            "ratis_id": 66,
+            "region": {
+              "id": 6,
+              "name": "Kimberley",
+              "abbreviation": "KIMB",
+              "ratis_id": 6
+            }
+          },
+          "entry_fee_required": true
+        },
+        "price_hint": null,
+        "campsites": [
+          {
+            "id": 371,
+            "campground_id": 91,
+            "name": "FOR FILTER ONLY",
+            "tent": true,
+            "campervan": true,
+            "caravan": true,
+            "max_people": 12,
+            "max_vehicles": 1,
+            "description": "x",
+            "features": []
+          }
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": 11,
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          124.91570000000002,
+          -16.821899999999992
+        ]
+      },
+      "properties": {
+        "campground_type": 2,
+        "max_advance_booking": 180,
+        "description": "",
+        "features": [
+          {
+            "id": 8,
+            "name": "Toilet",
+            "description": "Usually no-flush pit type.\r\nAt campgrounds with no toilets campers must bring and use a chemical cartridge toilet.",
+            "image": null,
+            "type": 0
+          }
+        ],
+        "images": [
+          {
+            "image": "/media/parkstay/campground_images/623f4b90-062.jpg"
+          }
+        ],
+        "info_url": "http://mounthart.com.au/",
+        "name": "Walarra Mindi (Mount Hart) Homestead",
+        "park": {
+          "id": 22,
+          "name": "Wunaamin Conservation Park",
+          "district": {
+            "id": 40,
+            "name": "West Kimberley",
+            "abbreviation": "WKM",
+            "ratis_id": 76,
+            "region": {
+              "id": 6,
+              "name": "Kimberley",
+              "abbreviation": "KIMB",
+              "ratis_id": 6
+            }
+          },
+          "entry_fee_required": true
+        },
+        "price_hint": null,
+        "campsites": []
+      }
+    },
+    {
+      "type": "Feature",
+      "id": 104,
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          115.17574999999998,
+          -24.662340000000007
+        ]
+      },
+      "properties": {
+        "campground_type": 0,
+        "max_advance_booking": 180,
+        "description": "",
+        "features": [
+          {
+            "id": 8,
+            "name": "Toilet",
+            "description": "Usually no-flush pit type.\r\nAt campgrounds with no toilets campers must bring and use a chemical cartridge toilet.",
+            "image": null,
+            "type": 0
+          },
+          {
+            "id": 17,
+            "name": "Road access for 2WD/SUV",
+            "description": "May include unsealed roads and variable conditions",
+            "image": null,
+            "type": 0
+          }
+        ],
+        "images": [
+          {
+            "image": "/media/parkstay/campground_images/befda252-0c2.jpg"
+          },
+          {
+            "image": "/media/parkstay/campground_images/a1f6a188-88a.jpg"
+          }
+        ],
+        "info_url": "https://exploreparks.dbca.wa.gov.au/site/temple-gorge",
+        "name": "Temple Gorge",
+        "park": {
+          "id": 21,
+          "name": "Kennedy Range National Park - Mundatharrda",
+          "district": {
+            "id": 33,
+            "name": "Gascoyne",
+            "abbreviation": "SBY",
+            "ratis_id": 73,
+            "region": {
+              "id": 8,
+              "name": "Midwest",
+              "abbreviation": "MWST",
+              "ratis_id": 8
+            }
+          },
+          "entry_fee_required": false
+        },
+        "price_hint": null,
+        "campsites": [
+          {
+            "id": 2842,
+            "campground_id": 104,
+            "name": "CAMPSITE 18",
+            "tent": true,
+            "campervan": true,
+            "caravan": true,
+            "max_people": 6,
+            "max_vehicles": 2,
+            "description": "",
+            "features": [
+              {
+                "id": 15,
+                "name": "Generators permitted",
+                "description": "Time of use restrictions apply. Check campground information for more details.",
+                "image": null,
+                "type": 1
+              }
+            ]
+          },
+          {
+            "id": 2843,
+            "campground_id": 104,
+            "name": "CAMPSITE 19",
+            "tent": true,
+            "campervan": true,
+            "caravan": true,
+            "max_people": 6,
+            "max_vehicles": 2,
+            "description": "",
+            "features": [
+              {
+                "id": 15,
+                "name": "Generators permitted",
+                "description": "Time of use restrictions apply. Check campground information for more details.",
+                "image": null,
+                "type": 1
+              }
+            ]
+          },
+          {
+            "id": 399,
+            "campground_id": 104,
+            "name": "CAMPSITE 01",
+            "tent": true,
+            "campervan": true,
+            "caravan": true,
+            "max_people": 6,
+            "max_vehicles": 2,
+            "description": "x",
+            "features": [
+              {
+                "id": 15,
+                "name": "Generators permitted",
+                "description": "Time of use restrictions apply. Check campground information for more details.",
+                "image": null,
+                "type": 1
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": 113,
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          115.687961,
+          -33.95393499999999
+        ]
+      },
+      "properties": {
+        "campground_type": 0,
+        "max_advance_booking": 180,
+        "description": "",
+        "features": [
+          {
+            "id": 8,
+            "name": "Toilet",
+            "description": "Usually no-flush pit type.\r\nAt campgrounds with no toilets campers must bring and use a chemical cartridge toilet.",
+            "image": null,
+            "type": 0
+          },
+          {
+            "id": 17,
+            "name": "Road access for 2WD/SUV",
+            "description": "May include unsealed roads and variable conditions",
+            "image": null,
+            "type": 0
+          }
+        ],
+        "images": [
+          {
+            "image": "/media/parkstay/campground_images/f547c134-d09.jpg"
+          },
+          {
+            "image": "/media/parkstay/campground_images/25ccf3cf-849.jpg"
+          }
+        ],
+        "info_url": "https://exploreparks.dbca.wa.gov.au/site/workmans-pool",
+        "name": "Workmans Pool",
+        "park": {
+          "id": 40,
+          "name": "St John Brook Conservation Park",
+          "district": {
+            "id": 2,
+            "name": "Blackwood",
+            "abbreviation": "BWD",
+            "ratis_id": 5,
+            "region": {
+              "id": 2,
+              "name": "South West",
+              "abbreviation": "SWST",
+              "ratis_id": 11
+            }
+          },
+          "entry_fee_required": false
+        },
+        "price_hint": null,
+        "campsites": [
+          {
+            "id": 2797,
+            "campground_id": 113,
+            "name": "CAMPSITE 01",
+            "tent": true,
+            "campervan": true,
+            "caravan": true,
+            "max_people": 8,
+            "max_vehicles": 2,
+            "description": "",
+            "features": [
+              {
+                "id": 1,
+                "name": "Campfires seasonally permitted",
+                "description": "Campfires seasonally permitted",
+                "image": null,
+                "type": 1
+              }
+            ]
+          },
+          {
+            "id": 408,
+            "campground_id": 113,
+            "name": "CAMPSITE 02",
+            "tent": true,
+            "campervan": true,
+            "caravan": true,
+            "max_people": 8,
+            "max_vehicles": 2,
+            "description": "x",
+            "features": [
+              {
+                "id": 1,
+                "name": "Campfires seasonally permitted",
+                "description": "Campfires seasonally permitted",
+                "image": null,
+                "type": 1
+              }
+            ]
+          },
+          {
+            "id": 2358,
+            "campground_id": 113,
+            "name": "CAMPSITE 03",
+            "tent": true,
+            "campervan": true,
+            "caravan": false,
+            "max_people": 8,
+            "max_vehicles": 2,
+            "description": "",
+            "features": [
+              {
+                "id": 1,
+                "name": "Campfires seasonally permitted",
+                "description": "Campfires seasonally permitted",
+                "image": null,
+                "type": 1
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ]
+}

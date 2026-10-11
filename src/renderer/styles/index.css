@@ -1,35 +1,287 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+/*
+ * The renderer's stylesheet and its Tailwind configuration (Tailwind 4, CSS-first).
+ * `@theme` maps utility names onto the CSS variables in tokens.css: values live in tokens.css
+ * only; rules live in docs/design/design-language.md.
+ */
 
-@layer base {
-  body {
-    @apply bg-gray-50 text-gray-900;
+@import 'tailwindcss' source(none);
+/* Every @import comes first: one after another rule is dropped. */
+@import './tokens.css';
+
+/* Classes are read from the renderer's sources only, as before. */
+@source '../**/*.{html,js,ts,jsx,tsx}';
+
+/*
+ * `inline`: a utility uses the token itself (`bg-accent` is `rgb(var(--ws-accent))`), with no
+ * second set of variables. An alpha modifier (`bg-accent/10`) mixes the colour with transparent.
+ */
+@theme inline {
+  --color-canvas: rgb(var(--ws-canvas));
+
+  --color-surface: rgb(var(--ws-surface));
+  --color-surface-subtle: rgb(var(--ws-surface-subtle));
+  --color-surface-inverse: rgb(var(--ws-surface-inverse));
+
+  --color-fg: rgb(var(--ws-fg));
+  --color-fg-secondary: rgb(var(--ws-fg-secondary));
+  --color-fg-muted: rgb(var(--ws-fg-muted));
+  --color-fg-inverse: rgb(var(--ws-fg-inverse));
+
+  --color-border: rgb(var(--ws-border));
+  --color-border-strong: rgb(var(--ws-border-strong));
+
+  --color-brand: rgb(var(--ws-brand));
+  --color-brand-strong: rgb(var(--ws-brand-strong));
+  --color-brand-subtle: rgb(var(--ws-brand-subtle));
+
+  --color-accent: rgb(var(--ws-accent));
+  --color-accent-hover: rgb(var(--ws-accent-hover));
+  --color-accent-subtle: rgb(var(--ws-accent-subtle));
+  --color-accent-fg: rgb(var(--ws-accent-fg));
+
+  --color-focus: rgb(var(--ws-focus));
+
+  --color-available: rgb(var(--ws-available));
+  --color-available-subtle: rgb(var(--ws-available-subtle));
+  --color-available-fg: rgb(var(--ws-available-fg));
+
+  --color-warning-subtle: rgb(var(--ws-warning-subtle));
+  --color-warning-fg: rgb(var(--ws-warning-fg));
+
+  --color-danger: rgb(var(--ws-danger));
+  --color-danger-subtle: rgb(var(--ws-danger-subtle));
+  --color-danger-fg: rgb(var(--ws-danger-fg));
+
+  --color-sun: rgb(var(--ws-sun));
+  --color-sun-subtle: rgb(var(--ws-sun-subtle));
+
+  /* legacy: delete when U-stream lands.
+   * The old sky-blue `primary` scale, re-pointed at ocean so the legacy pages still render.
+   * New code must use the semantic names above (the token guard test rejects `primary-*`
+   * outside legacy folders). */
+  --color-primary-50: rgb(var(--ws-ocean-50));
+  --color-primary-100: rgb(var(--ws-ocean-100));
+  --color-primary-200: rgb(var(--ws-ocean-200));
+  --color-primary-300: rgb(var(--ws-ocean-200));
+  --color-primary-400: rgb(var(--ws-ocean-500));
+  --color-primary-500: rgb(var(--ws-ocean-500));
+  --color-primary-600: rgb(var(--ws-ocean-600));
+  --color-primary-700: rgb(var(--ws-ocean-700));
+  --color-primary-800: rgb(var(--ws-ocean-700));
+  --color-primary-900: rgb(var(--ws-ocean-700));
+  /* end legacy */
+
+  /* A bare `ring-2` (no colour class) is the focus ring at full strength, not currentcolor. */
+  --default-ring-color: rgb(var(--ws-focus));
+
+  --font-sans: var(--ws-font-sans);
+  --font-display: var(--ws-font-display);
+
+  --text-xs: var(--ws-text-xs);
+  --text-xs--line-height: var(--ws-leading-xs);
+  --text-sm: var(--ws-text-sm);
+  --text-sm--line-height: var(--ws-leading-sm);
+  --text-base: var(--ws-text-base);
+  --text-base--line-height: var(--ws-leading-base);
+  --text-lg: var(--ws-text-lg);
+  --text-lg--line-height: var(--ws-leading-lg);
+  --text-xl: var(--ws-text-xl);
+  --text-xl--line-height: var(--ws-leading-xl);
+  --text-2xl: var(--ws-text-2xl);
+  --text-2xl--line-height: var(--ws-leading-2xl);
+  --text-2xl--letter-spacing: -0.01em;
+  --text-display-sm: var(--ws-text-display-sm);
+  --text-display-sm--line-height: var(--ws-leading-display-sm);
+  --text-display-sm--letter-spacing: -0.01em;
+  --text-display-md: var(--ws-text-display-md);
+  --text-display-md--line-height: var(--ws-leading-display-md);
+  --text-display-md--letter-spacing: -0.015em;
+  --text-display-lg: var(--ws-text-display-lg);
+  --text-display-lg--line-height: var(--ws-leading-display-lg);
+  --text-display-lg--letter-spacing: -0.02em;
+
+  /* `rounded-sm` … `rounded-full` are the token radii (Tailwind's own `xs`, `3xl` and `4xl` stay). */
+  --radius-sm: var(--ws-radius-sm);
+  --radius-md: var(--ws-radius-md);
+  --radius-lg: var(--ws-radius-lg);
+  --radius-xl: var(--ws-radius-xl);
+  --radius-2xl: var(--ws-radius-2xl);
+  --radius-full: var(--ws-radius-full);
+
+  --shadow-card: var(--ws-shadow-card);
+  --shadow-pill: var(--ws-shadow-pill);
+  --shadow-pop: var(--ws-shadow-pop);
+  --shadow-modal: var(--ws-shadow-modal);
+
+  --transition-duration-fast: var(--ws-duration-fast);
+  --transition-duration-base: var(--ws-duration-base);
+  --transition-duration-slow: var(--ws-duration-slow);
+
+  --ease-standard: var(--ws-ease-standard);
+
+  --z-index-header: var(--ws-z-header);
+  --z-index-tray: var(--ws-z-tray);
+  --z-index-overlay: var(--ws-z-overlay);
+  --z-index-toast: var(--ws-z-toast);
+  --z-index-tooltip: var(--ws-z-tooltip);
+
+  --animate-shimmer: shimmer 1.6s linear infinite;
+  --animate-fade-in: fade-in var(--ws-duration-base) var(--ws-ease-standard) both;
+  --animate-scale-in: scale-in var(--ws-duration-base) var(--ws-ease-standard) both;
+
+  @keyframes shimmer {
+    from {
+      background-position: 100% 0;
+    }
+    to {
+      background-position: -100% 0;
+    }
+  }
+
+  @keyframes fade-in {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+
+  @keyframes scale-in {
+    from {
+      opacity: 0;
+      transform: scale(0.96);
+    }
+    to {
+      opacity: 1;
+      transform: scale(1);
+    }
   }
 }
 
-@layer components {
-  .btn {
-    @apply px-4 py-2 rounded-md font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2;
+/* `hover:` applies whenever the pointer is over the element, as in Tailwind 3, not only on
+ * devices whose primary input can hover. */
+@custom-variant hover (&:hover);
+
+@layer base {
+  /* Tailwind 3 defaults kept: a bare `border` is the border token, a ring offset is the
+   * surface token, and buttons show the pointer. */
+  *,
+  ::after,
+  ::before,
+  ::backdrop,
+  ::file-selector-button {
+    border-color: rgb(var(--ws-border));
+    --tw-ring-offset-color: rgb(var(--ws-surface));
   }
 
-  .btn-primary {
-    @apply btn bg-primary-600 text-white hover:bg-primary-700 focus:ring-primary-500;
+  button:not(:disabled),
+  [role='button']:not(:disabled) {
+    cursor: pointer;
   }
 
-  .btn-secondary {
-    @apply btn bg-gray-200 text-gray-900 hover:bg-gray-300 focus:ring-gray-500;
+  body {
+    @apply bg-canvas text-fg font-sans antialiased;
   }
 
-  .btn-danger {
-    @apply btn bg-red-600 text-white hover:bg-red-700 focus:ring-red-500;
+  /* One focus treatment everywhere: a 2px ocean ring, offset so it never touches the control. */
+  :focus-visible {
+    outline: 2px solid rgb(var(--ws-focus));
+    outline-offset: 2px;
   }
 
-  .input {
-    @apply block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500;
+  /* A heading takes focus only from code (useRouteFocus on a page change, tabindex -1), never
+   * from Tab, so it gets no ring. Anything a person can Tab to keeps the ring above. */
+  :where(h1, h2, h3)[tabindex='-1']:focus {
+    outline: none;
   }
 
-  .card {
-    @apply bg-white rounded-lg shadow-sm border border-gray-200 p-6;
+  ::selection {
+    background-color: rgb(var(--ws-ocean-100));
+    color: rgb(var(--ws-fg));
   }
+
+  /* Placeholders are hints, so they get muted text that still passes AA (replaces gray-400). */
+  input::placeholder,
+  textarea::placeholder {
+    color: rgb(var(--ws-fg-muted));
+    opacity: 1;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+}
+
+/* legacy: delete when U-stream lands.
+ * Bridge classes used by the pre-redesign pages, restyled with tokens so they
+ * match the new language until the U-stream rebuilds those pages from components/ui. */
+
+/* legacy: delete when U-stream lands.
+ * Hover colours apply only while enabled; `:not(:disabled)` also covers link-styled buttons. */
+@utility btn {
+  @apply inline-flex items-center justify-center gap-2 rounded-md px-4 py-2 text-sm font-semibold transition-colors duration-fast ease-standard disabled:cursor-not-allowed disabled:opacity-50;
+}
+
+/* legacy: delete when U-stream lands */
+@utility btn-primary {
+  @apply btn bg-accent text-accent-fg not-disabled:hover:bg-accent-hover;
+}
+
+/* legacy: delete when U-stream lands */
+@utility btn-secondary {
+  @apply btn border border-fg bg-surface text-fg not-disabled:hover:bg-surface-subtle;
+}
+
+/* legacy: delete when U-stream lands */
+@utility btn-danger {
+  @apply btn border border-danger bg-surface text-danger not-disabled:hover:bg-danger-subtle;
+}
+
+/* legacy: delete when U-stream lands */
+@utility input {
+  @apply block w-full rounded-md border border-border-strong bg-surface px-3 py-2 text-fg transition-colors duration-fast ease-standard focus:border-focus disabled:bg-surface-subtle disabled:text-fg-muted;
+}
+
+/* legacy: delete when U-stream lands */
+@utility card {
+  @apply rounded-lg border border-border bg-surface p-6 shadow-card;
+}
+
+/*
+ * Explore's map (docs/design/map.md): Mapbox's popups and zoom buttons in the app's style.
+ * mapbox-gl.css loads after this file, so every rule names one class more than Mapbox's own.
+ */
+
+/* The preview and the list of places on one spot: a card, with no tip. */
+.mapboxgl-popup.ws-map-popup .mapboxgl-popup-content {
+  padding: 0;
+  overflow: hidden;
+  border-radius: var(--ws-radius-xl);
+  background: rgb(var(--ws-surface));
+  box-shadow: var(--ws-shadow-pop);
+  font: inherit;
+}
+
+.mapboxgl-popup.ws-map-popup .mapboxgl-popup-tip {
+  display: none;
+}
+
+/* The zoom buttons: the pill shadow and the app's focus ring. */
+.ws-map.mapboxgl-map .mapboxgl-ctrl-group:not(:empty) {
+  border-radius: var(--ws-radius-md);
+  box-shadow: var(--ws-shadow-pill);
+}
+
+.ws-map.mapboxgl-map .mapboxgl-ctrl-group button:focus:focus-visible {
+  box-shadow: none;
+  outline: 2px solid rgb(var(--ws-focus));
+  outline-offset: 2px;
 }

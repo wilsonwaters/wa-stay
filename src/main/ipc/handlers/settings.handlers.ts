@@ -1,89 +1,28 @@
 /**
- * Settings IPC Handlers
- * Handles settings-related IPC requests from renderer
+ * `settings` handlers. Keys come from the typed registry (`SETTING_KEYS`, architecture-notes
+ * §12.7); main stores each under the registry's `valueType` and `category`, never values the
+ * renderer sends. `settings.set` takes only renderer-writable keys (the request schema refuses
+ * the rest). The values are read where they are used (`NotificationService` reads its
+ * preferences on every notification), so a change needs nothing applied here.
  */
 
-import { ipcMain, IpcMainInvokeEvent } from 'electron';
-import { IPC_CHANNELS } from '@shared/constants/ipc-channels';
-import { SettingsRepository } from '../../database/repositories/SettingsRepository';
-import { APIResponse, SettingValueType, SettingCategory } from '@shared/types';
-import { logger } from '../../utils/logger';
+import { contract, SETTING_KEYS } from '@shared/contracts';
+import type { AppContainer } from '../../app/container';
+import { readSetting } from '../../app/settings-values';
+import type { Handle } from '../handle';
 
-export function registerSettingsHandlers(settingsRepository: SettingsRepository): void {
-  /**
-   * Get setting by key
-   */
-  ipcMain.handle(
-    IPC_CHANNELS.SETTINGS_GET,
-    async (_event: IpcMainInvokeEvent, key: string): Promise<APIResponse<any>> => {
-      try {
-        const value = settingsRepository.getValue(key);
+export function registerSettingsHandlers(handle: Handle, c: AppContainer): void {
+  const { settings } = contract;
+  const repository = c.repositories.settings;
 
-        return {
-          success: true,
-          data: value,
-        };
-      } catch (error: any) {
-        logger.error('Error getting setting:', error);
-        return {
-          success: false,
-          error: error.message || 'Failed to get setting',
-        };
-      }
-    }
-  );
+  // A key with nothing stored answers its default
+  handle(settings.get, ({ key }) => readSetting(repository, key));
 
-  /**
-   * Set setting value
-   */
-  ipcMain.handle(
-    IPC_CHANNELS.SETTINGS_SET,
-    async (
-      _event: IpcMainInvokeEvent,
-      key: string,
-      value: any,
-      valueType: SettingValueType,
-      category: SettingCategory
-    ): Promise<APIResponse<boolean>> => {
-      try {
-        settingsRepository.set(key, value, valueType, category);
+  handle(settings.set, ({ key, value }) => {
+    const { valueType, category } = SETTING_KEYS[key];
+    repository.set(key, value, valueType, category);
+    return true;
+  });
 
-        return {
-          success: true,
-          data: true,
-        };
-      } catch (error: any) {
-        logger.error('Error setting value:', error);
-        return {
-          success: false,
-          error: error.message || 'Failed to set setting',
-        };
-      }
-    }
-  );
-
-  /**
-   * Get all settings
-   */
-  ipcMain.handle(
-    IPC_CHANNELS.SETTINGS_GET_ALL,
-    async (_event: IpcMainInvokeEvent): Promise<APIResponse<Record<string, any>>> => {
-      try {
-        const settings = settingsRepository.getAllAsObject();
-
-        return {
-          success: true,
-          data: settings,
-        };
-      } catch (error: any) {
-        logger.error('Error getting all settings:', error);
-        return {
-          success: false,
-          error: error.message || 'Failed to get settings',
-        };
-      }
-    }
-  );
-
-  logger.info('Settings IPC handlers registered');
+  handle(settings.getAll, () => repository.getAllAsObject());
 }

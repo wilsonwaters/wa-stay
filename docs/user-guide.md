@@ -1,751 +1,168 @@
-# WA ParkStay Bookings - User Guide
+# User guide
+
+WA Stay helps you find places to stay across Western Australia and get them when they are
+hard to book. It works with **providers**, the booking systems that own the places. The first
+is **ParkStay WA**, DBCA's booking system for national-park campgrounds; more are planned.
+
+New to WA Stay? Install it first ([installation](installation.md)). Upgrading from the old 1.x
+app? Your data moves over by itself ([upgrading](installation.md#upgrading-from-wa-parkstay-bookings)).
 
-**Version:** 1.0.0
-**Last Updated:** 2026-02-09
+## Contents
+
+- [Finding your way around](#finding-your-way-around)
+- [Explore](#explore)
+- [A place's page](#a-places-page)
+- [Watches](#watches)
+- [Site Sniper (coming soon)](#site-sniper-coming-soon)
+- [Bookings (coming soon)](#bookings-coming-soon)
+- [Notifications](#notifications)
+- [Settings](#settings)
+- [Good to know](#good-to-know)
 
-## Table of Contents
-
-1. [Getting Started](#getting-started)
-2. [Dashboard Overview](#dashboard-overview)
-3. [Managing Bookings](#managing-bookings)
-4. [Creating Watches](#creating-watches)
-5. [Using Beat the Crowd](#using-beat-the-crowd)
-6. [Notifications](#notifications)
-7. [Settings](#settings)
-8. [Tips and Best Practices](#tips-and-best-practices)
-9. [FAQ](#faq)
-
----
-
-## Getting Started
-
-Welcome to WA ParkStay Bookings! This desktop application helps you automate campground bookings on the Western Australia Parks and Wildlife Service ParkStay system.
-
-> **Note:** Some features are still being finalized. The Bookings import page and Beat the Crowd page are temporarily disabled in the sidebar while they are being completed. Watches, notifications, and settings are fully functional.
-
-### What Can This App Do?
-
-**Automated Availability Monitoring:**
-- Set up watches to monitor campsite availability
-- Get notified when sites become available (desktop and email notifications)
-- Optionally auto-book when availability is found
-
-**Queue Handling:**
-- The app automatically handles ParkStay's DBCA queue system
-- Queue position is tracked and persisted across app restarts
-
-**Email Notifications:**
-- Receive email alerts when watches find availability
-- Configure SMTP settings or use Gmail OAuth2 in the Settings page
-
-**Beat the Crowd (coming soon):**
-- Book popular campsites well in advance of ParkStay's 180-day booking limit
-- Automatically cancel and rebook your reservation as the booking window advances
-- Secure high-demand sites before anyone else can book them
-
-**Booking Management (coming soon):**
-- View all your bookings in one place
-- Import existing ParkStay bookings
-- Sync with ParkStay automatically
-- Track booking details and status
-
-### Key Features
-
-- **Local-First**: All data stored on your computer
-- **Secure**: Your credentials are encrypted
-- **Automated**: Runs in the background
-- **Flexible**: Customizable polling intervals
-- **Reliable**: Automatic retry on failures
-
----
-
-## Dashboard Overview
-
-The Dashboard is your command center, showing key information at a glance.
-
-### Dashboard Sections
-
-**1. Active Watches**
-- Number of watches currently running
-- Next scheduled check time
-- Quick access to watch management
-
-**2. Recent Activity**
-- Latest watch executions
-- Booking updates
-- System notifications
-
-**3. Upcoming Bookings**
-- Next 5 bookings by date
-- Quick view of arrival/departure
-- Booking status
-
-**4. Statistics**
-- Total bookings managed
-- Successful bookings
-- Active watches
-- Success rate
-
-**5. Quick Actions**
-- Create New Watch
-- Import Booking
-- View All Notifications
-- Open Settings
-
-### Status Indicators
-
-**Watches:**
-- Green: Active and running
-- Yellow: Paused
-- Red: Error or stopped
-- Gray: Inactive
-
-**Bookings:**
-- Green: Confirmed
-- Yellow: Pending
-- Red: Cancelled
-- Blue: Beat the Crowd active
-
----
-
-## Managing Bookings
-
-The Bookings page shows all your ParkStay reservations.
-
-### Viewing Bookings
-
-**List View:**
-- Shows all bookings in a table
-- Sort by date, park, status
-- Filter by status, date range, park
-- Search by booking reference or park name
-
-**Card View:**
-- Visual cards for each booking
-- Shows key details at a glance
-- Color-coded by status
-
-### Booking Details
-
-Click any booking to see full details:
-
-**Reservation Information:**
-- Booking reference number
-- Park and campground name
-- Site number (if assigned)
-- Arrival and departure dates
-- Number of nights
-- Number of guests
-
-**Cost Information:**
-- Nightly rate
-- Total cost
-- Payment status
-
-**Status:**
-- Confirmed: Booking is active
-- Pending: Waiting for confirmation
-- Cancelled: Booking was cancelled
-
-**Actions:**
-- View on ParkStay: Opens booking on ParkStay website
-- Enable Beat the Crowd: Set up automatic advance rebooking
-- Export Details: Save booking information
-- Delete: Remove from local database
-
-### Importing Bookings
-
-You can import existing ParkStay bookings into the app:
-
-**Method 1: By Booking Reference**
-
-1. Click "Import Booking" button
-2. Enter your booking reference number (e.g., PS-12345)
-3. Click "Import"
-4. The app will fetch booking details from ParkStay
-5. Review and confirm the import
-
-**Method 2: Sync All Bookings**
-
-1. Click "Sync with ParkStay" button
-2. The app will fetch all bookings from your ParkStay account
-3. New bookings will be added
-4. Existing bookings will be updated
-5. Review the sync results
-
-### Syncing Bookings
-
-Keep your bookings up to date:
-
-- **Manual Sync**: Click "Sync Now" to update immediately
-- **Automatic Sync**: Enable in Settings for daily updates
-- **Sync on Startup**: Update bookings when app launches
-
----
-
-## Creating Watches
-
-Watches monitor ParkStay for campsite availability and notify you when sites become available.
-
-### Creating a New Watch
-
-1. **Navigate to Watches Page**
-   - Click "Watches" in the sidebar
-   - Click "Create New Watch" button
-
-2. **Basic Information**
-   - **Watch Name**: Give your watch a descriptive name (e.g., "Karijini Easter Weekend")
-   - **Notes**: Optional notes for reference
-
-3. **Select Location**
-   - **Park**: Choose from list of WA parks (e.g., "Karijini National Park")
-   - **Campground**: Select specific campground (e.g., "Dales Campground")
-
-4. **Select Dates**
-   - **Arrival Date**: When you want to arrive
-   - **Departure Date**: When you want to leave
-   - **Flexible Dates**: Option to include nearby dates
-
-5. **Party Details**
-   - **Number of Guests**: Total number of people
-   - **Vehicle Type**: Car, motorhome, caravan, etc.
-
-6. **Site Preferences**
-   - **Preferred Sites**: Specific site numbers (optional)
-   - **Site Type**: Powered, unpowered, walk-in, etc.
-   - **Accessibility**: Any special requirements
-
-7. **Watch Configuration**
-   - **Check Interval**: How often to check (default: 5 minutes)
-   - **Max Price**: Maximum price per night (optional)
-   - **Notification Only**: Just notify, don't auto-book
-   - **Auto-Book**: Automatically book when available
-
-8. **Review and Create**
-   - Review all settings
-   - Click "Create Watch"
-   - Watch will start immediately
-
-### Watch Settings
-
-**Check Interval:**
-- Minimum: 2 minutes (to avoid rate limiting)
-- Default: 5 minutes
-- Maximum: 60 minutes
-- Shorter intervals = faster notifications but more API calls
-
-**Notification Options:**
-- Desktop notification when availability found
-- Sound alert
-- Email notification (if configured)
-
-**Auto-Booking:**
-- Enable to automatically book when availability found
-- Requires valid payment method on ParkStay
-- Use with caution - you'll be charged immediately
-- Recommended to start with "Notification Only"
-
-### Managing Watches
-
-**Active Watches:**
-- Green indicator shows watch is active
-- Shows last check time and next check time
-- Shows number of check attempts
-
-**Pausing a Watch:**
-- Click "Pause" to temporarily stop checks
-- Resume anytime by clicking "Resume"
-- Useful when you're not ready to book
-
-**Editing a Watch:**
-- Click "Edit" to modify settings
-- Cannot change park/dates for active watches
-- Can adjust interval, notifications, auto-book
-
-**Deleting a Watch:**
-- Click "Delete" to remove completely
-- Confirm deletion
-- Historical data is preserved in logs
-
-### Watch Results
-
-When a watch finds availability:
-
-**Notification:**
-- Desktop notification appears
-- Sound plays (if enabled)
-- Email notification sent (if configured in Settings)
-- Watch status shows "Available"
-
-**Available Sites:**
-- The AvailabilityGrid shows available sites visually
-- List of available sites matching criteria
-- Price per night for each site
-- Total cost for your dates
-
-**Actions:**
-- **Book Now**: Opens ParkStay to complete booking
-- **Auto-Book**: If enabled, books automatically
-- **Pause Watch**: Stop checking temporarily
-- **Delete Watch**: Remove if no longer needed
-
----
-
-## Using Beat the Crowd
-
-> **Note:** The Beat the Crowd page is temporarily disabled in the sidebar while it is being finalized. The underlying service is implemented and will be re-enabled soon.
-
-Beat the Crowd helps you manage bookings in advance of ParkStay's 180-day booking limit, securing popular campsites before anyone else can book them. ParkStay only allows bookings up to 180 days ahead, which means high-demand sites (like Karijini or Cape Range during school holidays) are snapped up the moment they become available. Beat the Crowd handles this by booking a site now, then automatically cancelling and rebooking as you approach the 180-day limit — effectively pushing your reservation further into the future before anyone else can book those dates.
-
-### How Beat the Crowd Works
-
-1. You create a booking for the earliest available dates at your desired campsite
-2. The app monitors the 180-day booking window as it advances
-3. When new dates become bookable, it automatically cancels your current reservation and rebooks for later dates
-4. This cycle repeats, keeping your reservation rolling forward until you reach your target dates
-5. The result: you secure a site that would otherwise be instantly booked by others
-
-### Setting Up Beat the Crowd
-
-**Method 1: From Existing Booking**
-
-1. Go to Bookings page
-2. Find a confirmed booking
-3. Click "Enable Beat the Crowd"
-4. Configure settings
-5. Click "Activate"
-
-**Method 2: From Beat the Crowd Page**
-
-1. Navigate to "Beat the Crowd" page
-2. Click "Create New Entry"
-3. Select or import a booking
-4. Configure settings
-5. Click "Activate"
-
-### Configuration
-
-**Check Interval:**
-- Default: 1 hour
-- Minimum: 1 hour
-- Maximum: 24 hours
-- Shorter intervals = higher chance of catching new dates as they open
-
-**Max Attempts:**
-- Default: 1000 attempts
-- Set limit to avoid infinite loops
-- Can increase if needed
-
-**Auto-Rebook:**
-- Automatically cancels and rebooks when new dates are available
-- Requires valid payment method
-- You may be charged for each rebooking cycle
-
-### Status
-
-**Active:**
-- Actively monitoring the 180-day window
-- Shows number of attempts
-- Shows last check time
-
-**Success:**
-- Rebooking to target dates was successful
-- New booking created
-- Original booking retained for reference
-
-**Failed:**
-- Max attempts reached without success
-- Manual intervention required
-- Can reset and try again
-
-**Paused:**
-- Temporarily stopped
-- Can resume anytime
-
-### Best Practices for Beat the Crowd
-
-1. **Start Early**: The earlier you set this up, the further ahead you can book
-2. **Check Frequently**: Use 1-hour interval to catch new dates promptly
-3. **Monitor Progress**: Check periodically to see attempts
-4. **Backup Plan**: Always have an alternative plan
-
-### When to Use Beat the Crowd
-
-**Good Use Cases:**
-- High-demand campsites (Karijini, Cape Range) during peak season
-- School holiday bookings that sell out immediately at the 180-day mark
-- Long weekends and public holidays at popular parks
-- Any dates you know will be impossible to book at the 180-day mark
-
-**Not Recommended:**
-- Low-demand campsites (likely to have availability anyway)
-- Off-peak season (better to just book directly when the window opens)
-- When you're unsure about going (you'll be charged for each booking cycle)
-
----
+## Finding your way around
+
+There is no login: WA Stay opens on **Explore**. The top navigation has **Explore**,
+**Watches**, **Site Sniper** and **Bookings**; the last two carry a **Soon** pill because they
+are still being finished, but you can use them. On the right are the **notifications bell** and
+the **account menu**, which opens **Settings**.
+
+Everything shows which provider it belongs to: a small coloured badge with the provider's
+monogram (ParkStay's is "PS" on green).
+
+## Explore
+
+![Explore: the search pill with dates for 10 to 12 November and 2 adults, filter chips, results showing 11 places of which 3 are available, and a map of Western Australia with pins showing free sites](images/explore.png)
+
+- **Search.** The pill at the top takes **Where** (a place, park or region), **When** (your
+  dates) and **Who** (guests). Results update as you type.
+- **Filters.** **Provider**, **Type** (campground, cabin, holiday park…), **Region**,
+  **Facilities**, **Book online** and, once you have dates, **Available only**.
+- **Availability.** With dates, every card and map pin shows how many sites are free for your
+  whole stay ("2 of 3 sites available", "No site free every night", "Info only" for places
+  that are not booked online), and the heading counts the places available.
+- **The map** shows every place from every provider. With **Search as I move the map** on, the
+  list narrows to the area you are looking at. Pins cluster when zoomed out; the key explains
+  the colours. If WA Stay was built without a map token, Explore shows the list only and says
+  so.
+- The list is ordered by distance from the middle of the map. Your search, filters, dates and
+  map position are in the page address, so Back takes you where you were.
+
+Places and photos come live from the provider. The catalogue is refreshed once a day and works
+offline in between; availability needs a connection.
+
+## A place's page
+
+![A place's page for Bungarra in Cape Range National Park: the ParkStay badge, the photo area, an availability table showing three campsites free at 30 dollars on both nights, and the Check your dates card](images/place-detail.png)
+
+Click a place to open its page:
+
+- the provider, the type of place, the park and region, photos and the provider's description;
+- **Check your dates**: pick dates and guests and **Check availability** to see every site
+  night by night, with prices ("3 of 5 sites free for all 2 nights"; **Fully available only**
+  narrows the table), and under each site's name how many people and vehicles it takes and
+  the provider's description of it;
+- **Book on ParkStay** opens ParkStay in your browser with this place and your dates chosen;
+  its **See availability** takes you on to book;
+- **Watch for availability** starts a watch for this place and these dates;
+- **Snipe a site** starts a Site Sniper snipe;
+- **View on ParkStay** and **More information** open the provider's pages in your browser.
+
+## Watches
+
+![The Watches page with a watch for Bungarra, 10 to 12 November, checked just now: 3 sites available, found once, now paused](images/watches.png)
+
+A watch checks a place for your dates on a schedule and tells you when sites free up.
+
+1. **New watch** (or **Watch for availability** on a place's page).
+2. Choose the provider, the place and your stay: dates, guests, **Camping with**, the sites you
+   prefer (or any) and an optional maximum price per night.
+3. Choose the alerts: how often to check (every 15 minutes to daily; 1 hour by default),
+   whether to tell you about partial availability (only some nights free), whether to stop
+   after the first alert, and, for ParkStay, **Hold a site automatically when found**.
+4. Review and **Create watch**.
+
+Each watch shows its last result, when it last checked and next checks, and how many times it
+has found something. **Check now** checks at once. The menu lets you edit, pause or resume, and
+delete it. Filter the list by provider and by status (active or paused).
+
+A watch that holds a site shows **Pay now**: see [Site Sniper](#when-a-site-is-held). More
+detail: [Watches and notifications](watches-and-notifications.md).
+
+## Site Sniper (coming soon)
+
+Site Sniper holds a hard-to-get site the moment it is released: when ParkStay opens a new
+date (180 days ahead, at the campground's release time), at a scheduled block release, or when
+someone cancels. It joins the DBCA queue when the release uses it, checks rapidly across the
+release, and places a 30-minute hold that you then pay for.
+
+**New snipe** walks through the provider, the place, your stay (with ParkStay's vehicles and
+postcode), when the sites are released, and a review. Hold only what you will use. Full guide:
+[Site Sniper](site-sniper.md).
+
+### When a site is held
+
+You get a notification, and the snipe (or watch) shows "<site> is held for you", the time it is
+held until and a countdown of the time left to pay ("Held until 10:42 am AWST · 23:10 left").
+A watch and a snipe show the same panel.
+
+1. **Pay now** opens ParkStay's payment page in its own window. If the DBCA queue is busy,
+   WA Stay first gets you through it.
+2. Sign in there if ParkStay asks; the held site stays in your basket.
+3. Pay on ParkStay's pages. WA Stay never sees your card.
+4. When ParkStay confirms this booking, the snipe or watch shows **Booked** and the booking
+   appears under Bookings.
+
+## Bookings (coming soon)
+
+Bookings keeps your trips from every provider in one place, in **Upcoming**, **Past** and
+**Cancelled** tabs, with search and a provider filter.
+
+- Bookings paid through WA Stay's payment window are added for you.
+- **Add booking** records one you made elsewhere: the provider, the place, check-in and
+  check-out, the unit, guests, the reference and the cost.
+- A booking's page shows its details, copies the reference, and links to **Manage on
+  ParkStay** to change or cancel it on ParkStay's own site.
+- Importing bookings straight from a provider appears only for providers that support it;
+  ParkStay does not yet.
 
 ## Notifications
 
-Stay informed with the application's notification system.
+The bell shows every notification, newest first, with an unread count; click one to open what
+it is about. WA Stay also shows desktop notifications (titled with the provider, e.g.
+"ParkStay · Sites available at Bungarra") and can email you. Notifications older than 30 days
+are deleted automatically.
 
-### Notification Types
-
-**Watch Found:**
-- Triggered when availability matches a watch
-- Shows park, dates, and available sites
-- Includes price information
-
-**STQ Success:**
-- Triggered when rebooking succeeds
-- Shows new booking details
-- Links to booking in ParkStay
-
-**Booking Updates:**
-- New booking created
-- Booking status changed
-- Booking cancelled
-
-**Error Alerts:**
-- Watch failed to execute
-- Login failed
-- Network errors
-
-**System Messages:**
-- App updates available
-- Maintenance notifications
-- General information
-
-### Notification Channels
-
-**In-App Notifications:**
-- Bell icon in header shows unread count
-- Click to view notification list
-- Mark as read/unread
-- Delete notifications
-
-**Desktop Notifications:**
-- Native OS notifications
-- Appear even when app is minimized
-- Click to open app and view details
-- Can be disabled in Settings
-
-**Sound Alerts:**
-- Plays sound with important notifications
-- Customizable sound
-- Can be disabled in Settings
-
-**Email Notifications:**
-- Receive email alerts for watch results and important events
-- Configure SMTP settings in the Settings page (Email Settings card)
-- Supports any SMTP provider (Gmail, Outlook, custom servers)
-- Use the "Test Connection" button to verify your email setup
-- Alternatively, set up Gmail OAuth2 for automatic OTP extraction (see Settings)
-
-### Queue System
-
-When accessing ParkStay during busy periods, the DBCA website may place you in a queue. The app handles this automatically:
-- Queue position is tracked and displayed via the QueueStatus component
-- Queue sessions are persisted in the database, so your position is maintained even if the app restarts
-- No manual intervention is needed — the app waits in the queue and proceeds automatically
-
-### Managing Notifications
-
-**Viewing Notifications:**
-1. Click bell icon in header
-2. Notification panel slides in
-3. Shows all recent notifications
-4. Grouped by type
-
-**Notification Actions:**
-- Click to view details
-- Mark as read/unread
-- Delete individual notification
-- Clear all notifications
-
-**Notification Settings:**
-- Enable/disable desktop notifications
-- Enable/disable sounds
-- Choose which types to receive
-- Set quiet hours (coming soon)
-
----
+The tray at the bottom right shows the DBCA queue while WA Stay is waiting in it, and offers
+app updates when one is ready.
 
 ## Settings
 
-Customize the application to your preferences.
-
-### Account Settings
-
-**ParkStay Credentials:**
-- Email address
-- Password (encrypted)
-- Update credentials
-- Test connection
-
-**Profile Information:**
-- First and last name
-- Phone number
-- Emergency contact
-
-### Notification Settings
-
-**Desktop Notifications:**
-- Enable/disable system notifications
-- Notification position
-- Duration
-
-**Sound Alerts:**
-- Enable/disable sounds
-- Choose notification sound
-- Volume control
-
-**Notification Types:**
-- Watch found notifications
-- STQ success notifications
-- Error notifications
-- System notifications
-
-### Email / SMTP Settings
-
-**Email Configuration (in Settings page):**
-- SMTP server address and port
-- Authentication credentials
-- Sender and recipient email addresses
-- TLS/SSL configuration
-- Test connection button to verify setup
-- SMTP setup instructions are provided in the app for common providers
-
-**Gmail OAuth2:**
-- Connect your Gmail account for OTP code extraction
-- OAuth2 flow handled in-app
-- See the Gmail setup documentation for details
-
-### Watch Settings
-
-**Default Settings:**
-- Default check interval
-- Default notification behavior
-- Default auto-book setting
-
-**Rate Limiting:**
-- Maximum concurrent watches
-- Minimum interval between checks
-- Retry behavior
-
-### Beat the Crowd Settings
-
-**Default Settings:**
-- Default check interval
-- Default max attempts
-- Default auto-rebook setting
-
-**Behavior:**
-- Retry on errors
-- Pause on repeated failures
-- Notification preferences
-
-### Application Settings
-
-**General:**
-- Start app on system startup
-- Start app minimized
-- Minimize to system tray
-- Close to system tray
-
-**Appearance:**
-- Theme: Light/Dark/System
-- Compact mode
-- Font size
-
-**Updates:**
-- Check for updates automatically
-- Download updates automatically
-- Update channel: Stable/Beta
-
-**Advanced:**
-- Log level: Info/Debug
-- Export logs
-- Clear cache
-- Reset to defaults
-
-### Data Management
-
-**Backup:**
-- Export all data (bookings, watches, settings)
-- Save as JSON file
-- Schedule automatic backups
-
-**Restore:**
-- Import data from backup file
-- Merge or replace existing data
-- Verify before restore
-
-**Database:**
-- Database location
-- Database size
-- Vacuum database (optimize)
-- Reset database (delete all data)
-
----
-
-## Tips and Best Practices
-
-### Getting the Most from Watches
-
-1. **Use Descriptive Names**: Name watches clearly (e.g., "Karijini Dales Apr 2025")
-2. **Set Reasonable Intervals**: 5 minutes is good for most cases
-3. **Start with Notification Only**: Test before enabling auto-book
-4. **Monitor Regularly**: Check watch status periodically
-5. **Use Multiple Watches**: Create separate watches for different preferences
-
-### Beat the Crowd Tips
-
-1. **Enable Immediately**: Set up Beat the Crowd right after confirming your initial booking
-2. **Check Frequently**: Use 1-hour interval for high-demand sites
-3. **Set High Max Attempts**: 1000+ attempts is reasonable
-4. **Check Progress**: Monitor attempt count regularly
-
-### Booking Management
-
-1. **Sync Regularly**: Keep bookings up to date with ParkStay
-2. **Import All**: Import all bookings for complete view
-3. **Use Filters**: Organize bookings by status and date
-4. **Add Notes**: Document special requests or details
-
-### Security
-
-1. **Strong Password**: Use a strong ParkStay password
-2. **Keep Updated**: Install app updates promptly
-3. **Secure Computer**: Use password/biometric login on your computer
-4. **Review Access**: Periodically verify ParkStay login sessions
-
-### Performance
-
-1. **Limit Watches**: Keep active watches under 10 for best performance
-2. **Reasonable Intervals**: Don't set every watch to 2 minutes
-3. **Close Unused**: Delete watches you no longer need
-4. **Restart Periodically**: Restart app weekly to clear memory
-
----
-
-## FAQ
-
-### General Questions
-
-**Q: Is this app official or affiliated with ParkStay?**
-A: No, this is an independent tool. It uses ParkStay's public website like a regular user would.
-
-**Q: Is it legal to use this app?**
-A: Yes, the app simply automates what you could do manually by checking the website repeatedly.
-
-**Q: Will I get banned from ParkStay?**
-A: The app respects rate limits and mimics human behavior. Use reasonable check intervals (5+ minutes).
-
-**Q: Does this app guarantee I'll get a booking?**
-A: No, it increases your chances but doesn't guarantee availability. Popular sites sell out quickly.
-
-**Q: Is my data safe?**
-A: Yes, all data is stored locally on your computer. Your password is encrypted using industry-standard encryption.
-
-### Watch Questions
-
-**Q: How often should I check for availability?**
-A: 5 minutes is a good balance. More frequent checking doesn't significantly improve chances.
-
-**Q: Can I watch multiple parks at once?**
-A: Yes, create separate watches for different parks. Limit to 10 active watches for best performance.
-
-**Q: What happens if I miss a notification?**
-A: Notifications stay in the app. The site might be taken by someone else, but you can keep watching.
-
-**Q: Should I enable auto-booking?**
-A: Only if you're certain you want to book. You'll be charged immediately. Start with notifications only.
-
-**Q: My watch hasn't found anything. What should I do?**
-A: Be patient. Some sites rarely have availability. Consider alternative dates or locations.
-
-### Beat the Crowd Questions
-
-**Q: What is Beat the Crowd?**
-A: A feature that helps you manage bookings in advance of ParkStay's 180-day booking limit by automatically cancelling and rebooking your reservation as the booking window advances, letting you secure popular campsites well before others can book them.
-
-**Q: When should I use Beat the Crowd?**
-A: When you want to book a high-demand campsite for dates that are more than 180 days away. It's ideal for peak season bookings at popular parks like Karijini or Cape Range.
-
-**Q: How long does Beat the Crowd take?**
-A: It depends on how far out your target dates are. The 180-day window advances one day at a time.
-
-**Q: Can I run multiple entries?**
-A: Yes, but each uses resources. Limit to bookings you really care about.
-
-**Q: What if it never succeeds?**
-A: You'll reach max attempts and it will stop. You can increase attempts or try a different strategy.
-
-### Technical Questions
-
-**Q: Does the app need to stay open?**
-A: Yes, watches and Beat the Crowd only run while the app is open. It can run in the background/tray.
-
-**Q: What happens if my computer sleeps?**
-A: Watches and Beat the Crowd entries pause during sleep and resume when computer wakes.
-
-**Q: Can I run this on multiple computers?**
-A: Yes, but be careful of rate limiting. Each instance checks independently.
-
-**Q: How much bandwidth does it use?**
-A: Minimal. Each check is a small HTTP request (few KB).
-
-**Q: Does this work on VPN?**
-A: Yes, as long as the VPN doesn't block ParkStay website.
-
-### Troubleshooting
-
-**Q: Getting "Invalid credentials" error?**
-A: Update your credentials in Settings. Make sure you can log in to ParkStay website directly.
-
-**Q: Watch shows "Error" status?**
-A: Check logs for details. Usually network issues or ParkStay being down. Will retry automatically.
-
-**Q: Notifications not working?**
-A: Check notification settings. Ensure system notifications are enabled for the app.
-
-**Q: App is slow or unresponsive?**
-A: Restart the app. Reduce number of active watches. Clear cache in Settings.
-
-**Q: Lost my data after update?**
-A: Data should persist across updates. Check backup location or contact support.
-
----
-
-## Getting Help
-
-If you need additional assistance:
-
-1. **Check Documentation**: Re-read relevant sections of this guide
-2. **Search Issues**: Look through [GitHub Issues](https://github.com/wilsonwaters/parkstay-bookings/issues)
-3. **Ask Question**: Create a new issue with the "question" label
-4. **Report Bug**: Create an issue with detailed information
-5. **Contact Support**: Email support@example.com (if applicable)
-
----
-
-## What's Next?
-
-Now that you're familiar with the application:
-
-1. **Create Your First Watch**: Start monitoring availability
-2. **Import Your Bookings**: Get all bookings in one place
-3. **Customize Settings**: Tailor the app to your preferences
-4. **Explore Features**: Try different notification options
-5. **Share Feedback**: Let us know how we can improve!
-
-Happy camping!
-
----
-
-## Additional Resources
-
-- [Installation Guide](./installation.md) - Installation and setup help
-- [Development Guide](./development.md) - Contributing to the project
-- [Architecture Documentation](./architecture/) - Technical details
-- [GitHub Repository](https://github.com/wilsonwaters/parkstay-bookings) - Source code and issues
+Open Settings from the account menu (top right).
+
+- **Accounts.** One row per provider. **Connect** signs you in to ParkStay in an in-app
+  window, on ParkStay's own pages: ParkStay emails you a code to type in. It is optional: holds
+  work without it, and you can sign in on the payment page instead. Connecting before a release
+  just makes checkout quicker. Got a sign-in link by email instead? Paste it under **Have a
+  sign-in link?**. **Sign out** clears ParkStay's session in WA Stay and nothing else; it waits
+  while a snipe or hold needs the session. [How sign-in works](providers/parkstay/authentication.md).
+- **Notifications.** **Desktop notifications** and **Play a sound**, and **Email**: your SMTP
+  settings (Gmail, Outlook or your own server), where to send alerts, and **Send test email**.
+  [Email setup](watches-and-notifications.md#email).
+- **App.** **Start WA Stay when you sign in** and **Start minimised** (it opens in the
+  taskbar instead of on screen). Available on Windows and macOS.
+- **About.** The version, **Check for updates**, **Open logs folder**, and **Technical
+  details** (versions of Electron, Chrome and Node.js) for bug reports.
+
+## Good to know
+
+- **WA Stay checks watches and runs snipes only while it is running** (and the computer is
+  awake). Closing the window quits it; turn on **Start WA Stay when you sign in** to keep it
+  going.
+- **Your data stays on your computer**, in `%APPDATA%\WA Stay` on Windows. WA Stay talks to the
+  providers (ParkStay, the DBCA queue), Mapbox for the map (the Mapbox map library also sends
+  Mapbox its standard usage events), GitHub for updates, and your own email server if you set
+  one up. WA Stay itself has no account, no cloud service and no analytics.
+- **Payment is always yours to make**, on the provider's own site.
+- **Book responsibly.** One account per person, one booking per night, and only stays you will
+  take. [DBCA's terms](providers/parkstay/README.md#dbcas-terms).
+- Something not working? [Troubleshooting](troubleshooting.md).

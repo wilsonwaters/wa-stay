@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <title>WA Stay</title>
+  <rect width="32" height="32" rx="7" fill="#FAF7F2"/>
+  <path fill="#E8B858" d="M3.5 21C3.5 14.1 9.1 8.5 16 8.5C22.9 8.5 28.5 14.1 28.5 21Z"/>
+  <path fill="#15181D" d="M16 11L20.5 21L11.5 21Z"/>
+  <path fill="#3A74B8" d="M4.3 20L27.8 20C29 20 30 21 30 22.3L30 22.3C30 23.5 29 24.5 27.8 24.5L4.3 24.5C3 24.5 2 23.5 2 22.3L2 22.3C2 21 3 20 4.3 20Z"/>
+</svg>

@@ -1,0 +1,12 @@
+# Text files keep LF line endings on every OS, so a Windows checkout (core.autocrlf=true on the
+# GitHub runners) matches Linux and macOS byte for byte. Tests parse docs line by line, and
+# generated SVG artwork is compared byte for byte and copied byte for byte into the renderer.
+* text=auto eol=lf
+*.svg text eol=lf
+
+# Binary assets: never convert line endings or diff them as text.
+*.png binary
+*.ico binary
+*.bmp binary
+*.woff2 binary
+*.pdf binary

@@ -1,0 +1,48 @@
+%PDF-1.4
+%‚„œ”
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [3 0 R] /Count 1 >>
+endobj
+3 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >>
+endobj
+4 0 obj
+<< /Length 766 >>
+stream
+BT /F1 28 Tf 60 760 Td (Bungarra) Tj ET
+BT /F1 12 Tf 60 740 Td (CAPE RANGE NATIONAL PARK) Tj ET
+BT /F1 10 Tf 60 715 Td (Test fixture: a made-up campground map, not the real one) Tj ET
+3 w 120 160 m 300 360 l 330 520 l 420 560 l 480 520 l 300 360 l S
+3 w 480 520 m 520 560 l S
+1.5 w 0.6 G 430 300 m 440 420 l S 360 330 m 440 330 l S 0 G
+291 461 m 309 461 l 309 479 l 291 479 l h f
+BT 1 g /F1 12 Tf 297 466 Td (1) Tj ET 0 g
+371 591 m 389 591 l 389 609 l 371 609 l h f
+BT 1 g /F1 12 Tf 377 596 Td (2) Tj ET 0 g
+511 571 m 529 571 l 529 589 l 511 589 l h f
+BT 1 g /F1 12 Tf 517 576 Td (3) Tj ET 0 g
+441 431 m 459 431 l 459 449 l 441 449 l h f
+BT 1 g /F1 12 Tf 447 436 Td (4) Tj ET 0 g
+391 271 m 409 271 l 409 289 l 391 289 l h f
+BT 1 g /F1 12 Tf 397 276 Td (5) Tj ET 0 g
+endstream
+endobj
+5 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>
+endobj
+xref
+0 6
+0000000000 65535 f 
+0000000015 00000 n 
+0000000064 00000 n 
+0000000121 00000 n 
+0000000247 00000 n 
+0000001063 00000 n 
+trailer
+<< /Size 6 /Root 1 0 R >>
+startxref
+1133
+%%EOF

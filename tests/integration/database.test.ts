@@ -3,9 +3,9 @@
  * Tests database connection, repositories, and data persistence
  */
 
-import { TestDatabaseHelper } from '@tests/utils/database-helper';
-import { UserRepository } from '@main/database/repositories/UserRepository';
-import { BookingRepository } from '@main/database/repositories/BookingRepository';
+import { insertUser, TestDatabaseHelper } from '@tests/utils/database-helper';
+import { UserRepository } from '@main/database/repositories/user.repository';
+import { BookingRepository } from '@main/database/repositories/booking.repository';
 import { WatchRepository } from '@main/database/repositories';
 import { SiteSniperRepository } from '@main/database/repositories';
 import { NotificationRepository } from '@main/database/repositories';
@@ -40,11 +40,20 @@ describe('Database Integration', () => {
       expect(tableNames).toContain('users');
       expect(tableNames).toContain('bookings');
       expect(tableNames).toContain('watches');
-      expect(tableNames).toContain('skip_the_queue_entries');
+      expect(tableNames).toContain('notifiers');
+      expect(tableNames).toContain('notification_delivery_logs');
+      // v8: queue_session moved into provider_state
+      expect(tableNames).not.toContain('queue_session');
+      expect(tableNames).toContain('provider_state');
+      expect(tableNames).toContain('provider_accounts');
+      expect(tableNames).toContain('locations');
+      expect(tableNames).toContain('locations_fts');
+      expect(tableNames).not.toContain('skip_the_queue_entries');
       expect(tableNames).toContain('site_snipes');
       expect(tableNames).toContain('notifications');
       expect(tableNames).toContain('settings');
-      expect(tableNames).toContain('job_logs');
+      // v10: the never-written job_logs is gone
+      expect(tableNames).not.toContain('job_logs');
       expect(tableNames).toContain('migrations');
     });
 
@@ -68,7 +77,7 @@ describe('Database Integration', () => {
       const bookingRepo = new BookingRepository(db);
 
       // Create user and booking
-      const user = userRepo.create(mockUserInput.email, 'enc', 'key', 'iv', 'tag');
+      const user = insertUser(db, mockUserInput.email);
       const bookingInput = createMockBookingInput();
       const booking = bookingRepo.create(user.id, bookingInput);
 
@@ -88,13 +97,12 @@ describe('Database Integration', () => {
 
     it('should handle complex watch-booking-notification flow', async () => {
       const db = dbHelper.getDb();
-      const userRepo = new UserRepository(db);
       const bookingRepo = new BookingRepository(db);
       const watchRepo = new WatchRepository(db);
-      const notifRepo = new NotificationRepository();
+      const notifRepo = new NotificationRepository(db);
 
       // Create user
-      const user = userRepo.create(mockUserInput.email, 'enc', 'key', 'iv', 'tag');
+      const user = insertUser(db, mockUserInput.email);
 
       // Create booking
       const bookingInput = createMockBookingInput();
@@ -125,11 +133,10 @@ describe('Database Integration', () => {
 
     it('should handle Site Sniper workflow', async () => {
       const db = dbHelper.getDb();
-      const userRepo = new UserRepository(db);
-      const snipeRepo = new SiteSniperRepository();
+      const snipeRepo = new SiteSniperRepository(db);
 
       // Create user
-      const user = userRepo.create(mockUserInput.email, 'enc', 'key', 'iv', 'tag');
+      const user = insertUser(db, mockUserInput.email);
 
       // Create site snipe
       const snipeInput = createMockSiteSnipeInput();
@@ -137,7 +144,7 @@ describe('Database Integration', () => {
 
       expect(snipe.userId).toBe(user.id);
       expect(snipe.status).toBe(SnipeStatus.ARMED);
-      expect(snipe.targetSiteIds).toEqual(snipeInput.targetSiteIds);
+      expect(snipe.unitIds).toEqual(snipeInput.unitIds);
 
       // Simulate a successful hold
       const heldExpiresAt = new Date(Date.now() + 30 * 60 * 1000);
@@ -145,8 +152,9 @@ describe('Database Integration', () => {
 
       const updated = snipeRepo.findById(snipe.id);
       expect(updated?.status).toBe(SnipeStatus.HELD);
-      expect(updated?.heldBookingPk).toBe('987654');
-      expect(updated?.heldExpiresAt).toBeDefined();
+      expect(updated?.holdReference).toBe('987654');
+      expect(updated?.holdUnitId).toBe('136');
+      expect(updated?.holdExpiresAt).toBeDefined();
     });
   });
 
@@ -155,14 +163,14 @@ describe('Database Integration', () => {
       const db = dbHelper.getDb();
       const userRepo = new UserRepository(db);
 
-      const user = userRepo.create(mockUserInput.email, 'enc', 'key', 'iv', 'tag');
+      const user = insertUser(db, mockUserInput.email);
 
       // Attempt transaction that should fail
       try {
         db.transaction(() => {
-          userRepo.create(mockUserInput.email, 'enc', 'key', 'iv', 'tag'); // Duplicate email
+          insertUser(db, mockUserInput.email); // Duplicate email
         })();
-      } catch (error) {
+      } catch {
         // Expected to fail
       }
 
@@ -187,7 +195,8 @@ describe('Database Integration', () => {
       expect(indexNames).toContain('idx_bookings_user_id');
       expect(indexNames).toContain('idx_watches_user_id');
       expect(indexNames).toContain('idx_watches_active');
-      expect(indexNames).toContain('idx_stq_booking_id');
+      expect(indexNames).toContain('idx_delivery_logs_notification_id');
+      expect(indexNames).toContain('idx_notifiers_channel');
       expect(indexNames).toContain('idx_notifications_user_id');
     });
   });
@@ -195,10 +204,9 @@ describe('Database Integration', () => {
   describe('Performance', () => {
     it('should handle bulk inserts efficiently', async () => {
       const db = dbHelper.getDb();
-      const userRepo = new UserRepository(db);
       const bookingRepo = new BookingRepository(db);
 
-      const user = userRepo.create(mockUserInput.email, 'enc', 'key', 'iv', 'tag');
+      const user = insertUser(db, mockUserInput.email);
 
       const startTime = Date.now();
       const count = 100;
@@ -221,10 +229,9 @@ describe('Database Integration', () => {
 
     it('should handle bulk reads efficiently', async () => {
       const db = dbHelper.getDb();
-      const userRepo = new UserRepository(db);
       const bookingRepo = new BookingRepository(db);
 
-      const user = userRepo.create(mockUserInput.email, 'enc', 'key', 'iv', 'tag');
+      const user = insertUser(db, mockUserInput.email);
 
       // Create 100 bookings
       for (let i = 0; i < 100; i++) {

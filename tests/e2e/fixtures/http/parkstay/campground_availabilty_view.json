@@ -1,0 +1,17 @@
+{
+  "campground": {},
+  "campground_available": {
+    "20": { "sites": [2, 3], "total_available": 3, "total_bookable": 2 },
+    "18": { "sites": [], "total_available": 3, "total_bookable": 0 },
+    "85": { "sites": [] },
+    "5": { "sites": [] },
+    "16": { "sites": [] },
+    "182": { "sites": [] },
+    "43": { "sites": [1115, 1142, 1143], "total_available": 3, "total_bookable": 3 },
+    "91": { "sites": [] },
+    "11": { "sites": [] },
+    "104": { "sites": [], "total_available": 0, "total_bookable": 0 },
+    "113": { "sites": [408], "total_available": 3, "total_bookable": 1 }
+  },
+  "available_cg": [{ "id": 20 }, { "id": 43 }, { "id": 113 }, { "id": 85 }, { "id": 91 }, { "id": 5 }, { "id": 182 }, { "id": 11 }]
+}

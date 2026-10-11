@@ -1,298 +1,190 @@
 <p align="center">
-  <img src="resources/banner.png" alt="WA ParkStay Bookings Banner" width="600">
+  <img src="resources/brand/readme-banner.png" alt="WA Stay: places to stay across Western Australia. The logo is an ink roofline over a gold sun setting into an ocean brushstroke." width="640">
 </p>
 
 <h1 align="center">
-  <img src="resources/icon-source.png" alt="WA ParkStay Bookings" width="32" valign="middle">
-  WA ParkStay Bookings
+  <img src="resources/brand/wa-stay-mark-small.svg" alt="WA Stay mark" width="32" valign="middle">
+  WA Stay
 </h1>
 
 <p align="center">
-  <strong>Automated booking tool for Western Australia ParkStay campgrounds</strong>
+  <strong>Find and book places to stay across Western Australia.</strong>
 </p>
 
 <p align="center">
-  An Electron-based desktop application that automates the process of monitoring and booking campsites on the WA Parks and Wildlife Service ParkStay system.
+  A map of every place, availability for your dates, watches that tell you when a site frees
+  up, and help getting hard-to-book sites, from the providers that own them. ParkStay WA's
+  national-park campgrounds come first; RAC Parks &amp; Resorts is planned next.
 </p>
 
-## Download
+<p align="center">
+  <a href="https://github.com/wilsonwaters/wa-stay/releases/latest"><strong>Download for Windows</strong></a>
+  ·
+  <a href="docs/user-guide.md">User guide</a>
+  ·
+  <a href="docs/README.md">Documentation</a>
+</p>
 
-**[Download the latest release](https://github.com/wilsonwaters/parkstay-bookings/releases/latest)** - Windows only for v1.0.0.
+WA Stay is a Windows desktop app. It grew out of an app that automated ParkStay campground
+bookings: ParkStay is now one **provider** among the ones to come, and existing users are
+[upgraded automatically](#upgrading-from-wa-parkstay-bookings), data and all.
 
-- **Installer**: `WA-ParkStay-Bookings-Setup-x.x.x.exe` - Recommended, includes auto-updates
-- **Portable**: `WA-ParkStay-Bookings-Portable-x.x.x.exe` - No installation required
-
-> **Note:** The app is not yet code-signed. Windows SmartScreen may show a warning — click "More info" then "Run anyway" to proceed.
-
-**macOS and Linux builds coming soon.** For now, Windows users can download pre-built installers. macOS/Linux users can [build from source](#building-from-source).
+![Explore: a search pill with dates and guests, filter chips, a list of campgrounds with availability for 10 to 12 November, and a map of Western Australia with pins showing free sites](docs/images/explore.png)
 
 ## Features
 
-### Current
+- **Explore.** Every place from every provider on a map of WA and in a list: search by place,
+  park or region; filter by provider, type, region, facilities, online booking and
+  availability; add your dates and guests to see how many sites are free on every pin and card.
+  Without a map token it works as a list.
+- **Place pages.** Photos, the provider's description and facilities, the park and region,
+  every site night by night with prices for your dates, and links to book or read more on the
+  provider's own site.
+- **Watches.** Choose a place, dates and the sites you want; WA Stay checks on a schedule (from
+  every 15 minutes to daily) and tells you when something frees up, even for only some nights,
+  with a price limit if you like. For ParkStay a watch can also hold the site for you.
+- **Notifications.** An in-app notification list, desktop notifications that open the right
+  page, and email through your own email account (Gmail, Outlook or any SMTP server).
+- **The DBCA queue.** WA Stay waits in ParkStay's virtual queue when it is on, shows your place,
+  and keeps the session alive while it is needed.
+- **Provider accounts.** Sign in to ParkStay in the app, on ParkStay's own page (optional;
+  holds work without it).
+- **Site Sniper** *(coming soon)*. Hold a hard-to-get site the moment it is released: when
+  ParkStay opens a new date, at a scheduled block release, or when someone cancels. You pay for
+  the hold on ParkStay's own page, in the app.
+- **Bookings** *(coming soon)*. Your trips from every provider in one place, with links to
+  manage them on the provider's site; holds you pay for in the app are added for you.
+- **Private and local.** Your data stays on your computer. WA Stay has no account, cloud
+  service or analytics of its own; it talks to the providers, Mapbox (the map, whose library
+  also reports its usage to Mapbox), GitHub (updates) and your email server if you set one up.
 
-- **Watch System**: Monitor campground availability automatically with configurable intervals, notifications when sites are found, and optional auto-booking
-- **Notifications**: Desktop notifications, in-app notification center, and email notifications via SMTP
-- **Queue Handling**: Automatic handling of the ParkStay/DBCA queue system with session persistence
-- **Gmail Integration**: OAuth2-based Gmail integration for extracting OTP codes from ParkStay emails
-- **Credential Security**: AES-256-GCM encryption for all credentials, stored locally
-- **Settings**: Full settings page with email/SMTP configuration, notification preferences, and account management
-- **Dashboard**: Overview of active watches, recent activity, upcoming bookings, and statistics
-- **Privacy First**: All data stored locally in SQLite, no cloud dependencies, no telemetry
+Site Sniper and Bookings work but are still being finished, so the navigation marks them
+**Soon**.
 
-- **Auto-Updates**: In-app update notifications with one-click install via GitHub Releases
-- **About Dialog**: Version info, system details, and quick access to logs
+![A place's page for Bungarra: the ParkStay badge, the park and region, an availability table with three campsites free at 30 dollars a night, and the Check your dates card](docs/images/place-detail.png)
 
-### Coming Soon
+![The Watches page: a watch for Bungarra from 10 to 12 November that found 3 sites available](docs/images/watches.png)
 
-- **Booking Management**: Import and manage ParkStay bookings (page temporarily disabled)
-- **Skip The Queue**: Automated rebooking of cancelled reservations (page temporarily disabled)
+## Providers
 
-## Technology Stack
+| Provider | Status | Explore | Availability | Watches | Site Sniper | Holds and payment | Account |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| **ParkStay WA** (DBCA national-park campgrounds) | Built in | Yes, 169 campgrounds | Yes, per night with prices | Yes | Coming soon | Yes (30-minute holds, paid on ParkStay) | Optional |
+| **RAC Parks & Resorts** | Planned | | | | | | |
 
-| Component | Technology |
-|-----------|-----------|
-| Desktop Framework | Electron 28 |
-| UI Framework | React 18 |
-| Language | TypeScript 5 |
-| Database | SQLite (better-sqlite3) |
-| Job Scheduler | node-cron |
-| HTTP Client | axios |
-| Email | nodemailer, googleapis |
-| Validation | Zod |
-| Styling | Tailwind CSS |
-| Build Tool | Vite 5 |
-| Packaging | Electron Builder |
-| Testing | Jest 29 + Playwright |
+Providers are modules behind a provider SDK, so more can be added, including sites with no
+API: see [adding a provider](docs/providers/adding-a-provider.md).
 
-## System Requirements
+## Download
 
-### Windows (v1.0.0)
-- Windows 10 or later (64-bit)
-- 4GB RAM minimum
-- 500MB free disk space
+**[Download the latest release](https://github.com/wilsonwaters/wa-stay/releases/latest)**
+(Windows 10 or later, 64-bit):
 
-### macOS & Linux (Coming Soon)
-- Support planned for future releases
-- Can build from source in the meantime
+- **`WA-Stay-Setup-x.y.z.exe`**: the installer. Recommended; it keeps itself up to date.
+- **`WA-Stay-Portable-x.y.z.exe`**: runs without installing; download each new version yourself.
 
-## Installation
+WA Stay is not code-signed yet, so Windows SmartScreen may warn you: choose **More info**, then
+**Run anyway**. macOS and Linux builds are not released; you can
+[build from source](#building-from-source). Full instructions: [installation](docs/installation.md).
 
-### Windows Installer (Recommended)
+## Upgrading from WA ParkStay Bookings
 
-1. Download the latest `.exe` installer from [GitHub Releases](https://github.com/wilsonwaters/parkstay-bookings/releases/latest)
-2. Run the installer. If SmartScreen appears, click **"More info"** then **"Run anyway"**
-3. Follow the setup wizard (choose install location, create shortcuts)
-4. Launch the app and enter your ParkStay credentials
+Your copy of WA ParkStay Bookings updates itself to WA Stay, or you can run the new installer.
+Either way:
 
-See [docs/installation.md](docs/installation.md) for detailed instructions.
+- **Your data is copied on the first start** to `%APPDATA%\WA Stay`: watches, snipes, bookings,
+  notifications, settings and email settings. The old folder, `%APPDATA%\parkstay-bookings`, is
+  kept untouched as a backup; delete it once you have checked everything is there.
+- **Shortcuts are renamed** to WA Stay. A taskbar pin made for the old version points at the
+  old program (`WA ParkStay Bookings.exe`): unpin it and pin WA Stay from its new shortcut.
+- **The install folder:** an automatic update keeps the old program folder
+  (`%LOCALAPPDATA%\Programs\WA ParkStay Bookings\`), and running the installer by hand puts WA
+  Stay in a `WA Stay` subfolder of it. Both work.
+- **Launch at login carries over**, with **Start minimised** turned on (the old version always
+  started hidden).
+- **Your saved ParkStay password is no longer used** and is not carried over (your ParkStay
+  email is). Connect ParkStay once in **Settings → Accounts** if you like: ParkStay emails you a
+  code. It is optional; holds work without it.
+- **Gmail OTP is removed.** WA Stay deletes its own copy; the old folder keeps
+  `gmail-oauth.json`, which is safe to delete. Revoke the app's access in your
+  [Google account](https://myaccount.google.com/permissions).
+- **Going back to WA ParkStay Bookings is not supported.**
 
-### Building from Source
+Details: [upgrading from WA ParkStay Bookings](docs/installation.md#upgrading-from-wa-parkstay-bookings).
+
+## Building from source
+
+You need **Node.js 24** (npm 10 or later; `.nvmrc` says 24) and Git. On Windows, also install
+the Node.js installer's **Tools for Native Modules** (Python and the C++ build tools): `npm ci`
+runs node-gyp for better-sqlite3, which needs them even though it compiles nothing.
 
 ```bash
-# Clone repository
-git clone https://github.com/wilsonwaters/parkstay-bookings.git
-cd parkstay-bookings
-
-# Install dependencies
-npm install
-
-# Start development server
-npm run dev
-
-# Or build a Windows installer
-npm run dist:win
+git clone https://github.com/wilsonwaters/wa-stay.git
+cd wa-stay
+npm ci
+cp .env.example .env         # optional: MAPBOX_ACCESS_TOKEN=pk.your-token-here
+npm run build
+npx electron .               # or npm run dist:win for the Windows installer
 ```
+
+- **The map** needs a **public** Mapbox token (`pk.`) in `.env`; it is bundled into the app. A
+  secret `sk.` token fails the build. Without a token, Explore shows a list.
+- **better-sqlite3 is native**, but ships one prebuilt Node-API binary that both the Jest tests
+  (Node) and the app (Electron) load: there is nothing to rebuild. `npx electron .` downloads
+  the Electron binary the first time it runs.
 
 ## Development
 
-### Prerequisites
-
-- Node.js 20 LTS or later
-- npm 10 or later
-- Git
-
-### Available Scripts
-
 ```bash
-# Development
-npm run dev              # Start dev server with hot reload (main + renderer)
-npm run type-check       # Run TypeScript type checking
-npm run lint             # Run ESLint
-npm run lint:fix         # Fix ESLint errors
-npm run format           # Format code with Prettier
-
-# Testing
-npm run test             # Run unit tests
-npm run test:coverage    # Run tests with coverage report
-npm run test:e2e         # Run end-to-end tests
-
-# Building
-npm run build            # Build for production
-npm run dist:win         # Build Windows installer
-npm run dist:mac         # Build macOS installer
+npm run dev     # terminal 1: main in watch mode, the preload bundle, Vite on port 3000
+npm start       # terminal 2: Electron on the dev server
 ```
 
-### Project Structure
+| Script | What it does |
+| --- | --- |
+| `npm run build` | Production build into `dist/` |
+| `npm run dist:win` | The Windows installer and portable exe in `release/` |
+| `npm test` | Jest unit and integration tests (main and renderer) |
+| `npm run test:tz` | The timestamp tests in Perth time |
+| `npm run build:e2e` then `npm run test:e2e` | The Electron smoke tests on the built app, network-free (`xvfb-run -a` on Linux without a display) |
+| `npm run test:electron` | Live Electron tests of the HTTP transport and provider windows |
+| `npm run smoke:packaged` | Starts the packaged Linux app and checks it opens and quits |
+| `npm run docs:screenshots` | Retakes the screenshots in `docs/images/` |
+| `npm run lint`, `npm run format:check`, `npm run type-check` | The checks CI runs with `npm test` |
 
-```
-parkstay-bookings/
-├── docs/                       # Documentation
-│   ├── architecture/           # Architecture documents
-│   ├── parkstay-api/           # ParkStay API documentation
-│   ├── gmail-otp-setup.md      # Gmail OAuth2 integration
-│   ├── user-guide.md           # User guide
-│   └── ...
-├── src/
-│   ├── main/                   # Electron main process
-│   │   ├── database/           # SQLite connection, migrations, repositories
-│   │   ├── services/           # Business logic services
-│   │   │   ├── auth/           # Credential encryption
-│   │   │   ├── booking/        # Booking management
-│   │   │   ├── gmail/          # Gmail OAuth2 OTP
-│   │   │   ├── notification/   # Notifications + providers
-│   │   │   ├── parkstay/       # ParkStay API client
-│   │   │   ├── queue/          # DBCA queue handler
-│   │   │   ├── stq/            # Skip The Queue
-│   │   │   └── watch/          # Availability monitoring
-│   │   ├── scheduler/          # node-cron job scheduler
-│   │   ├── ipc/                # IPC handlers
-│   │   └── utils/              # Logger, helpers
-│   ├── preload/                # Preload scripts (security bridge)
-│   ├── renderer/               # React UI
-│   │   ├── components/         # Reusable components
-│   │   │   ├── forms/          # WatchForm, STQForm, ImportBookingForm
-│   │   │   ├── settings/       # EmailSettingsCard, SMTPSetupInstructions
-│   │   │   └── layouts/        # MainLayout
-│   │   ├── pages/              # Dashboard, Login, Settings, Watches/, Bookings/, SkipTheQueue/
-│   │   └── styles/             # Tailwind CSS
-│   └── shared/                 # Shared code
-│       ├── constants/          # IPC channels, app constants
-│       ├── types/              # TypeScript type definitions
-│       └── schemas/            # Zod validation schemas
-├── tests/                      # Test files
-│   ├── unit/                   # Unit tests
-│   ├── integration/            # Integration tests
-│   ├── e2e/                    # E2E tests (Playwright)
-│   ├── fixtures/               # Test data
-│   └── utils/                  # Test helpers
-└── resources/                  # Icons, assets
-```
+Stack: Electron 44, React 19, TypeScript 6, Vite 8, Tailwind CSS 4, SQLite (better-sqlite3),
+React Query, Mapbox GL JS, playwright-core, Jest 30 and Playwright. Start with
+[development](docs/development.md) and the [architecture overview](docs/architecture/overview.md);
+[CLAUDE.md](CLAUDE.md) has the code conventions.
 
-## Usage
+## Documentation
 
-### First Time Setup
+- [User guide](docs/user-guide.md), [installation](docs/installation.md),
+  [troubleshooting](docs/troubleshooting.md)
+- [Watches and notifications](docs/watches-and-notifications.md), [Site Sniper](docs/site-sniper.md)
+- [Architecture overview](docs/architecture/overview.md), [security](docs/security.md),
+  [development](docs/development.md)
+- [Providers](docs/providers/README.md), [adding a provider](docs/providers/adding-a-provider.md),
+  [ParkStay endpoints](docs/providers/parkstay/endpoints.md)
+- [Release process](docs/release-process.md), [changelog](CHANGELOG.md)
+- Everything: [docs/README.md](docs/README.md)
 
-1. Launch the application
-2. Enter your ParkStay credentials on the login page
-3. Credentials are encrypted and stored securely on your machine
-
-### Creating a Watch
-
-1. Navigate to the Watches page from the sidebar
-2. Click "Create New Watch"
-3. Select a park and campground
-4. Choose your dates and guest details
-5. Set the check interval (default: 5 minutes)
-6. Choose notification preferences
-7. Optionally enable auto-booking
-8. Activate the watch
-
-The app will check for availability at the configured interval and notify you when sites become available.
-
-### Email Notifications
-
-1. Go to Settings
-2. Configure your SMTP email settings (or use Gmail OAuth2)
-3. Test the connection
-4. Email notifications will be sent alongside desktop notifications when watches find availability
-
-### Managing Notifications
-
-- Click the bell icon in the header to view notifications
-- Click a notification to navigate to the related item
-- Mark as read or dismiss notifications
-- Configure notification preferences in Settings
-
-## Security
-
-### Credential Storage
-- Passwords encrypted with AES-256-GCM
-- Encryption key derived from machine-specific ID
-- Keys stored separately from encrypted data
-- Credentials never transmitted to third parties (only to ParkStay)
-
-### Data Privacy
-- All data stored locally in SQLite database
-- No cloud synchronization
-- No telemetry or analytics
-- No external API calls except to ParkStay and Gmail (if configured)
-
-### Application Security
-- Context isolation enabled in Electron
-- Node integration disabled in renderer
-- Content Security Policy enforced
-- IPC messages validated with Zod schemas
-- Dependencies regularly updated
-
-## Troubleshooting
-
-### Common Issues
-
-**"Invalid credentials" error:**
-Update your credentials in Settings. Verify you can log in to ParkStay directly.
-
-**Watch shows "Error" status:**
-Check the app logs for details. Usually caused by network issues or ParkStay being down. The watch will retry automatically.
-
-**Notifications not working:**
-Check notification settings in the app. Ensure system notifications are enabled for the app in your OS settings.
-
-**Email notifications not sending:**
-Verify SMTP settings in the Settings page. Use the "Test Connection" button to diagnose issues.
-
-### Logs
-
-Logs are stored in:
-- **Windows:** `%APPDATA%\parkstay-bookings\logs\`
-- **macOS:** `~/Library/Application Support/parkstay-bookings/logs/`
-
-## Contributing
-
-Contributions are welcome! See the [Development Guide](docs/development.md) for setup instructions.
-
-1. Read the [Architecture Documentation](docs/architecture/README.md)
-2. Fork the repository
-3. Create a feature branch
-4. Implement with tests
-5. Submit a pull request
-
-## License
-
-MIT
+The repository was called `wilsonwaters/parkstay-bookings`; it is being renamed to
+`wilsonwaters/wa-stay`, and old links and installed copies follow GitHub's redirect.
 
 ## Disclaimer
 
-This application is an unofficial tool and is not affiliated with, endorsed by, or connected to the Western Australia Parks and Wildlife Service or the Department of Biodiversity, Conservation and Attractions (DBCA).
+WA Stay is an independent project. It is not affiliated with, endorsed by or connected to the
+Department of Biodiversity, Conservation and Attractions (DBCA), Parks and Wildlife Service WA,
+Tourism Western Australia or any other provider. Places, photos and availability come live from
+the providers and remain theirs.
 
-Use this application responsibly:
-- Respect the ParkStay terms of service
-- Don't abuse the system with excessive requests
-- Don't create bookings you don't intend to use
-- Follow all camping regulations and booking policies
+Each provider's terms apply when you use it through WA Stay. For ParkStay that means one account
+per person, one booking per night, bookings in the name of someone staying, and genuine intent:
+hold only what you will use, and never book for others or resell. Payment is always completed by
+you, on the provider's own site. Use WA Stay responsibly; the authors are not responsible for
+bookings, account issues or breaches of a provider's terms.
 
-The developers are not responsible for any issues arising from the use of this application, including but not limited to booking conflicts, account issues, or violations of ParkStay policies.
+## License
 
-## Acknowledgments
-
-- Western Australia Parks and Wildlife Service for the ParkStay system
-- The Electron, React, and open-source communities
-
-## Support
-
-- **GitHub Issues:** [Report bugs and request features](https://github.com/wilsonwaters/parkstay-bookings/issues)
-- **Documentation:** See `docs/` directory
-
----
-
-**Current Version:** 1.0.0
-**Last Updated:** 2026-02-10
+WA Stay is released under the [MIT License](LICENSE).

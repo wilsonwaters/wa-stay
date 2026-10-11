@@ -10,6 +10,10 @@ export enum WatchResult {
   FOUND = 'found',
   NOT_FOUND = 'not_found',
   PARTIAL_FOUND = 'partial_found',
+  /** An auto-hold placed a hold; the night guard counts it until `hold_expires_at`. */
+  HELD = 'held',
+  /** The hold was paid for in the payment window: a confirmed booking. */
+  BOOKED = 'booked',
   ERROR = 'error',
 }
 
@@ -58,18 +62,6 @@ export enum RelatedType {
   SNIPE = 'snipe',
 }
 
-export enum JobType {
-  WATCH_POLL = 'watch_poll',
-  SNIPE = 'snipe',
-  CLEANUP = 'cleanup',
-}
-
-export enum JobStatus {
-  SUCCESS = 'success',
-  FAILURE = 'failure',
-  ERROR = 'error',
-}
-
 export enum SettingValueType {
   STRING = 'string',
   NUMBER = 'number',
@@ -87,13 +79,10 @@ export enum SettingCategory {
 }
 
 // Base types
+/** The local profile (the single `users` row). Its email is a hint, never a sign-in. */
 export interface User {
   id: number;
   email: string;
-  encryptedPassword: string;
-  encryptionKey: string;
-  encryptionIv: string;
-  encryptionAuthTag: string;
   firstName?: string;
   lastName?: string;
   phone?: string;
@@ -101,37 +90,12 @@ export interface User {
   updatedAt: Date;
 }
 
+/** The profile fields. */
 export interface UserInput {
   email: string;
-  password: string;
   firstName?: string;
   lastName?: string;
   phone?: string;
-}
-
-export interface UserCredentials {
-  email: string;
-  password: string;
-}
-
-export interface JobLog {
-  id: number;
-  jobType: JobType;
-  jobId: number;
-  status: JobStatus;
-  message?: string;
-  errorDetails?: string;
-  durationMs?: number;
-  createdAt: Date;
-}
-
-export interface JobLogInput {
-  jobType: JobType;
-  jobId: number;
-  status: JobStatus;
-  message?: string;
-  errorDetails?: string;
-  durationMs?: number;
 }
 
 export interface Setting {
@@ -141,38 +105,4 @@ export interface Setting {
   category: SettingCategory;
   description?: string;
   updatedAt: Date;
-}
-
-export interface AppSettings {
-  general: {
-    launchOnStartup: boolean;
-    minimizeToTray: boolean;
-    checkForUpdates: boolean;
-  };
-  notifications: {
-    enabled: boolean;
-    sound: boolean;
-    desktop: boolean;
-    soundFile: string;
-  };
-  watches: {
-    defaultInterval: number;
-    maxConcurrent: number;
-    autoBookEnabled: boolean;
-  };
-  siteSniper: {
-    defaultPollIntervalMs: number;
-    defaultLeadTimeSeconds: number;
-    enabled: boolean;
-  };
-  ui: {
-    theme: 'light' | 'dark' | 'system';
-    language: string;
-    dateFormat: string;
-  };
-  advanced: {
-    logLevel: 'error' | 'warn' | 'info' | 'debug';
-    databasePath: string;
-    maxLogSize: number;
-  };
 }

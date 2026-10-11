@@ -6,7 +6,11 @@
 import Database from 'better-sqlite3';
 import path from 'path';
 import fs from 'fs';
-import { runMigrations, setDatabase, SCHEMA_SQL } from '@main/database/connection';
+import os from 'os';
+import type { FixtureName } from '@tests/fixtures/db/constants';
+import { openDatabase } from '@main/database/connection';
+import { UserRepository } from '@main/database/repositories/user.repository';
+import type { User } from '@shared/types';
 
 export class TestDatabaseHelper {
   private db: Database.Database | null = null;
@@ -23,25 +27,8 @@ export class TestDatabaseHelper {
    * Initialize test database
    */
   async setup(): Promise<Database.Database> {
-    // Ensure test database directory exists
-    const dbDir = path.dirname(this.dbPath);
-    if (!fs.existsSync(dbDir)) {
-      fs.mkdirSync(dbDir, { recursive: true });
-    }
-
-    this.db = new Database(this.dbPath);
-    this.db.pragma('journal_mode = WAL');
-    this.db.pragma('foreign_keys = ON');
-
-    // Execute the production schema
-    this.db.exec(SCHEMA_SQL);
-
-    // Run production migrations
-    runMigrations(this.db);
-
-    // Set as global db so repos using getDatabase() work
-    setDatabase(this.db);
-
+    // Same path as the app: foreign keys on, WAL, and every production migration
+    this.db = openDatabase(this.dbPath);
     return this.db;
   }
 
@@ -49,7 +36,6 @@ export class TestDatabaseHelper {
    * Clean up test database
    */
   async teardown(): Promise<void> {
-    setDatabase(null);
     if (this.db) {
       this.db.close();
       this.db = null;
@@ -91,11 +77,15 @@ export class TestDatabaseHelper {
     if (!this.db) return;
 
     const tables = [
+      'notification_delivery_logs',
       'notifications',
-      'job_logs',
-      'skip_the_queue_entries',
+      'notifiers',
+      'site_snipes',
       'watches',
       'bookings',
+      'provider_state',
+      'provider_accounts',
+      'locations',
       'users',
       'settings',
     ];
@@ -103,7 +93,7 @@ export class TestDatabaseHelper {
     for (const table of tables) {
       try {
         this.db.prepare(`DELETE FROM ${table}`).run();
-      } catch (error) {
+      } catch {
         // Table might not exist, ignore
       }
     }
@@ -136,7 +126,7 @@ export class TestDatabaseHelper {
         const filePath = path.join(testDbDir, file);
         try {
           fs.unlinkSync(filePath);
-        } catch (error) {
+        } catch {
           // Ignore errors
         }
       }
@@ -158,4 +148,46 @@ export async function withTestDb<T>(
   } finally {
     await dbHelper.teardown();
   }
+}
+
+const FIXTURE_DIR = path.join(__dirname, '../fixtures/db');
+
+/**
+ * Replays a schema-fixture SQL dump (`tests/fixtures/db/<name>.sql`) into a fresh database
+ * file in its own temp directory. better-sqlite3 opens connections with foreign keys ON, so
+ * the helper turns them OFF explicitly before replaying: the dump then replays exactly as
+ * written, including the delivery-log rows behind the v6 FK to "notifications_old", which an
+ * FK-enforcing connection would reject. The returned connection still has foreign keys OFF
+ * (`runMigrations` turns them back ON). Release it with `disposeFixture`.
+ */
+export function loadFixture(name: FixtureName): Database.Database {
+  const sql = fs.readFileSync(path.join(FIXTURE_DIR, `${name}.sql`), 'utf8');
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'wa-stay-fixture-'));
+  const db = new Database(path.join(dir, `${name}.db`));
+  db.pragma('foreign_keys = OFF');
+  db.exec(sql);
+  return db;
+}
+
+/** Closes a database opened by `loadFixture` and deletes its temp directory. */
+export function disposeFixture(db: Database.Database): void {
+  if (db.open) db.close();
+  fs.rmSync(path.dirname(db.name), { recursive: true, force: true });
+}
+
+/**
+ * Inserts a `users` row (a profile: email, names, phone) and returns it. The app keeps one
+ * local profile and never creates others; tests use this for ownership and isolation cases.
+ */
+export function insertUser(
+  db: Database.Database,
+  email: string,
+  profile: { firstName?: string; lastName?: string; phone?: string } = {}
+): User {
+  const { lastInsertRowid } = db
+    .prepare('INSERT INTO users (email, first_name, last_name, phone) VALUES (?, ?, ?, ?)')
+    .run(email, profile.firstName ?? null, profile.lastName ?? null, profile.phone ?? null);
+  const user = new UserRepository(db).findById(Number(lastInsertRowid));
+  if (!user) throw new Error('insertUser: the row was not created');
+  return user;
 }

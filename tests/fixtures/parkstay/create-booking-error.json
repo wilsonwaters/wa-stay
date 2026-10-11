@@ -1,0 +1,6 @@
+{
+  "status": "error",
+  "msg": {
+    "error": "[\"Someone hit 'Book now' before you and campsite availability changed after this webpage was loaded. <BR>Reload the page using your browser controls to update availability information.\"]"
+  }
+}

@@ -1,0 +1,47 @@
+{
+  "routes": [
+    {
+      "method": "GET",
+      "path": "/api/campground_map/",
+      "file": "campground_map.json"
+    },
+    {
+      "method": "GET",
+      "path": "/api/campsite_availablity_view/20/",
+      "file": "campsite_availablity_view_20.json"
+    },
+    {
+      "method": "GET",
+      "path": "/search-availability/campground/",
+      "query": {
+        "site_id": "20"
+      },
+      "file": "campground_page_20.html"
+    },
+    {
+      "method": "GET",
+      "path": "/api/campground_availabilty_view/",
+      "file": "campground_availabilty_view.json"
+    },
+    {
+      "method": "GET",
+      "path": "/api/profile",
+      "status": 403,
+      "file": "profile-signed-out.json"
+    },
+    {
+      "method": "GET",
+      "path": "/api/check-create-session/",
+      "query": {
+        "queue_group": "parkstayv2"
+      },
+      "file": "queue-active.json"
+    },
+    {
+      "method": "GET",
+      "path": "/media/parkstay/campground_maps/20/Bungarra_Campground_mud_map.pdf",
+      "file": "campground_map_20.pdf",
+      "contentType": "application/pdf"
+    }
+  ]
+}

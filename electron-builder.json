@@ -1,22 +1,33 @@
 {
   "appId": "com.parkstay.bookings",
-  "productName": "WA ParkStay Bookings",
-  "copyright": "Copyright © 2025-2026",
-  "asar": true,
+  "productName": "WA Stay",
+  "copyright": "© 2025-2026 Wilson Waters",
+  "asar": {
+    "smartUnpack": false
+  },
+  "asarUnpack": [
+    "node_modules/playwright-core/**",
+    "node_modules/better-sqlite3/prebuilds/*.node"
+  ],
   "directories": {
     "output": "release",
     "buildResources": "resources"
   },
   "files": [
     "dist/**/*",
+    "!dist/**/*.d.ts",
+    "!dist/**/*.map",
     "package.json",
-    "node_modules/**/*"
+    "node_modules/**/*",
+    "!node_modules/better-sqlite3/{deps,src}/**",
+    "!node_modules/better-sqlite3/prebuilds/*.node",
+    "node_modules/better-sqlite3/prebuilds/${platform}-${arch}.node"
   ],
   "extraResources": [
     {
       "from": "resources/icons",
       "to": "icons",
-      "filter": ["**/*"]
+      "filter": ["icon.png", "icon.ico", "email-logo.png"]
     }
   ],
   "mac": {
@@ -31,19 +42,19 @@
         "arch": ["x64", "arm64"]
       }
     ],
-    "icon": "resources/icons/icon.icns",
+    "icon": "resources/icons/icon.png",
     "hardenedRuntime": true,
     "gatekeeperAssess": false,
     "entitlements": "resources/entitlements.mac.plist",
     "entitlementsInherit": "resources/entitlements.mac.plist",
     "darkModeSupport": true,
-    "minimumSystemVersion": "10.15.0",
+    "minimumSystemVersion": "13.0.0",
     "type": "distribution",
-    "artifactName": "${productName}-${version}-${arch}.${ext}",
+    "artifactName": "WA-Stay-${version}-${arch}.${ext}",
     "publish": {
       "provider": "github",
       "owner": "wilsonwaters",
-      "repo": "parkstay-bookings"
+      "repo": "wa-stay"
     }
   },
   "dmg": {
@@ -60,7 +71,6 @@
       }
     ],
     "title": "${productName} ${version}",
-    "icon": "resources/icons/icon.icns",
     "iconSize": 128,
     "window": {
       "width": 540,
@@ -81,15 +91,16 @@
       }
     ],
     "icon": "resources/icons/icon.ico",
-    "artifactName": "WA-ParkStay-Bookings-Setup-${version}.${ext}",
+    "artifactName": "WA-Stay-Setup-${version}.${ext}",
     "requestedExecutionLevel": "asInvoker",
-    "signingHashAlgorithms": ["sha256"],
-    "signDlls": false,
+    "signtoolOptions": {
+      "signingHashAlgorithms": ["sha256"]
+    },
     "verifyUpdateCodeSignature": false,
     "publish": {
       "provider": "github",
       "owner": "wilsonwaters",
-      "repo": "parkstay-bookings"
+      "repo": "wa-stay"
     }
   },
   "nsis": {
@@ -98,9 +109,9 @@
     "allowElevation": true,
     "installerIcon": "resources/icons/icon.ico",
     "uninstallerIcon": "resources/icons/icon.ico",
-    "installerHeader": "resources/icons/installer-header.png",
-    "installerSidebar": "resources/icons/installer-sidebar.png",
-    "uninstallerSidebar": "resources/icons/installer-sidebar.png",
+    "installerHeader": "resources/icons/installer-header.bmp",
+    "installerSidebar": "resources/icons/installer-sidebar.bmp",
+    "uninstallerSidebar": "resources/icons/installer-sidebar.bmp",
     "createDesktopShortcut": "always",
     "createStartMenuShortcut": true,
     "shortcutName": "${productName}",
@@ -117,7 +128,7 @@
     "include": "resources/installer.nsh"
   },
   "portable": {
-    "artifactName": "WA-ParkStay-Bookings-Portable-${version}.${ext}"
+    "artifactName": "WA-Stay-Portable-${version}.${ext}"
   },
   "linux": {
     "target": [
@@ -137,26 +148,28 @@
     "icon": "resources/icons",
     "category": "Utility",
     "desktop": {
-      "Name": "WA ParkStay Bookings",
-      "Comment": "Automated booking tool for WA ParkStay",
-      "Categories": "Utility;Office;",
-      "Keywords": "parkstay;booking;camping;automation;",
-      "StartupWMClass": "parkstay-bookings"
+      "entry": {
+        "Name": "WA Stay",
+        "Comment": "Find and book places to stay across Western Australia",
+        "Categories": "Utility;Office;",
+        "Keywords": "camping;caravan;holiday;accommodation;parkstay;booking;",
+        "StartupWMClass": "WA Stay"
+      }
     },
-    "artifactName": "${productName}-${version}-${arch}.${ext}",
-    "synopsis": "Automated campground booking for WA ParkStay",
-    "description": "Desktop application for automating campground bookings on the Western Australia Parks and Wildlife Service ParkStay system.",
+    "artifactName": "WA-Stay-${version}-${arch}.${ext}",
+    "synopsis": "Find and book places to stay across Western Australia",
+    "description": "WA Stay is a desktop app for finding and booking places to stay across Western Australia, such as national-park campgrounds booked through ParkStay WA.",
     "maintainer": "wilsonwaters@users.noreply.github.com",
-    "vendor": "WA ParkStay Bookings",
+    "vendor": "WA Stay",
     "publish": {
       "provider": "github",
       "owner": "wilsonwaters",
-      "repo": "parkstay-bookings"
+      "repo": "wa-stay"
     }
   },
   "appImage": {
     "license": "LICENSE",
-    "artifactName": "${productName}-${version}-${arch}.${ext}"
+    "artifactName": "WA-Stay-${version}-${arch}.${ext}"
   },
   "deb": {
     "depends": [
@@ -169,7 +182,7 @@
     ],
     "priority": "optional",
     "compression": "xz",
-    "artifactName": "${productName}-${version}-${arch}.${ext}"
+    "artifactName": "WA-Stay-${version}-${arch}.${ext}"
   },
   "rpm": {
     "depends": [
@@ -179,20 +192,26 @@
       "nss"
     ],
     "fpm": ["--rpm-compression", "xz"],
-    "artifactName": "${productName}-${version}-${arch}.${ext}"
+    "artifactName": "WA-Stay-${version}-${arch}.${ext}"
   },
   "publish": {
     "provider": "github",
     "owner": "wilsonwaters",
-    "repo": "parkstay-bookings"
+    "repo": "wa-stay"
   },
   "compression": "maximum",
   "removePackageScripts": true,
-  "npmRebuild": true,
+  "npmRebuild": false,
   "buildDependenciesFromSource": false,
   "nodeGypRebuild": false,
   "electronCompile": false,
-  "electronDist": "node_modules/electron/dist",
-  "electronVersion": "28.0.0",
+  "electronFuses": {
+    "runAsNode": false,
+    "enableNodeOptionsEnvironmentVariable": false,
+    "enableNodeCliInspectArguments": false,
+    "onlyLoadAppFromAsar": true,
+    "enableCookieEncryption": true,
+    "enableEmbeddedAsarIntegrityValidation": true
+  },
   "extends": null
 }

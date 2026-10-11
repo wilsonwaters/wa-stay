@@ -1,0 +1,5 @@
+{
+  "status": "error",
+  "msg": "You have an in-progress booking.",
+  "inprogress_booking": true
+}

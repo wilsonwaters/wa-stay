@@ -1,13 +1,13 @@
 /**
  * Window Type Declaration
- * Extends the Window interface with our API
+ * `window.api` is the preload's implementation of the IPC contract.
  */
 
-import { API } from './index';
+import type { WindowApi } from '../shared/contracts';
 
 declare global {
   interface Window {
-    api: API;
+    api: WindowApi;
   }
 }
 

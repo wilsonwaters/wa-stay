@@ -1,4 +1,4 @@
-name: CI
+name: WA Stay CI
 
 on:
   push:
@@ -18,12 +18,14 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
-          node-version: 20.x
+          node-version: 24.x
+          # The newest 24.x patch on every runner (the macOS image's cached 24.20 crashed Jest workers)
+          check-latest: true
           cache: 'npm'
 
       - name: Install dependencies
@@ -41,12 +43,14 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
-          node-version: 20.x
+          node-version: 24.x
+          # The newest 24.x patch on every runner (the macOS image's cached 24.20 crashed Jest workers)
+          check-latest: true
           cache: 'npm'
 
       - name: Install dependencies
@@ -61,27 +65,59 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
-        node-version: [20.x]
+        node-version: [24.x]
       fail-fast: false
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
           node-version: ${{ matrix.node-version }}
+          # The newest 24.x patch on every runner (the macOS image's cached 24.20 crashed Jest workers)
+          check-latest: true
           cache: 'npm'
 
+      # better-sqlite3 ships one prebuilt Node-API binary, loaded by Jest (Node) and the app
+      # (Electron) alike: nothing to rebuild after npm ci.
       - name: Install dependencies
         run: npm ci
 
-      - name: Rebuild native modules
-        run: npm rebuild better-sqlite3
-
       - name: Run unit tests
+        if: runner.os != 'macOS'
         run: npm run test:coverage
+
+      # Node 24.21 on Apple silicon now and then crashes a Jest worker inside V8's garbage
+      # collector (macOS crash report: EXC_BAD_ACCESS in ClearStaleLeftTrimmedPointerVisitor,
+      # reached from a Sparkplug baseline prologue's stack check), in a different test file each
+      # time; the same Node on x64 (Ubuntu, Windows) never has. Without Sparkplug that path never
+      # runs. Jest's workers inherit the flag through execArgv (NODE_OPTIONS refuses it).
+      - name: Run unit tests (macOS, without Sparkplug)
+        if: runner.os == 'macOS'
+        run: node scripts/check-native-abi.js && node --no-sparkplug node_modules/jest/bin/jest.js --coverage
+
+      # SQLite's own timestamps are UTC with no zone: read them with the host in Perth (UTC+8).
+      # TZ is set before Jest starts, since a running test cannot change its zone.
+      - name: Run timestamp tests in Perth time
+        run: npm run test:tz
+
+      # Jest prints only the signal when a worker crashes (a SIGSEGV seen now and then on the macOS
+      # runner, in a different test file each time); macOS's crash report names the faulting
+      # library and stack. Kept so the next one can be diagnosed.
+      - name: Keep crash reports
+        if: failure() && runner.os == 'macOS'
+        uses: actions/upload-artifact@v4
+        with:
+          name: crash-reports-macos
+          # Per-user and system-wide reports; a crashed worker's may be named after node or Jest.
+          path: |
+            ~/Library/Logs/DiagnosticReports/*node*
+            ~/Library/Logs/DiagnosticReports/*jest*
+            /Library/Logs/DiagnosticReports/*node*
+          if-no-files-found: ignore
+          retention-days: 14
 
       - name: Upload coverage to Codecov
         if: matrix.os == 'ubuntu-latest'
@@ -98,12 +134,14 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
-          node-version: 20.x
+          node-version: 24.x
+          # The newest 24.x patch on every runner (the macOS image's cached 24.20 crashed Jest workers)
+          check-latest: true
           cache: 'npm'
 
       - name: Run npm audit
@@ -113,7 +151,7 @@ jobs:
       - name: Run dependency check
         uses: dependency-check/Dependency-Check_Action@main
         with:
-          project: 'parkstay-bookings'
+          project: 'wa-stay'
           path: '.'
           format: 'HTML'
         continue-on-error: true
@@ -132,12 +170,14 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
-          node-version: 20.x
+          node-version: 24.x
+          # The newest 24.x patch on every runner (the macOS image's cached 24.20 crashed Jest workers)
+          check-latest: true
           cache: 'npm'
 
       - name: Install dependencies
@@ -145,6 +185,10 @@ jobs:
 
       - name: Build application
         run: npm run build
+        env:
+          # Public (pk.) token for Explore's map, bundled into the renderer. Without it the
+          # build still succeeds and Explore is list-only.
+          MAPBOX_ACCESS_TOKEN: ${{ secrets.MAPBOX_ACCESS_TOKEN || vars.MAPBOX_ACCESS_TOKEN }}
 
       - name: Check build artifacts
         run: |
@@ -153,3 +197,85 @@ jobs:
             exit 1
           fi
           echo "Build artifacts verified successfully"
+
+  e2e:
+    name: Electron smoke E2E
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: 24.x
+          # The newest 24.x patch on every runner (the macOS image's cached 24.20 crashed Jest workers)
+          check-latest: true
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      # Since Electron 42, npm ci no longer downloads the Electron binary; Playwright's launcher
+      # would fetch it during the first test. Fetch it here instead.
+      - name: Download the Electron binary
+        run: npx install-electron
+
+      - name: Install xvfb
+        run: command -v xvfb-run || (sudo apt-get update && sudo apt-get install -y xvfb)
+
+      - name: Build the app without a Mapbox token
+        run: npm run build:e2e
+
+      - name: Run the Electron smoke tests
+        run: xvfb-run -a npm run test:e2e
+
+      # Always: a test that failed and then passed on its retry (flaky) keeps its first attempt's
+      # trace and main-process log in test-results/, and the report lists both attempts.
+      - name: Upload the Playwright report and test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-report
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 7
+
+  packaged-smoke:
+    name: Packaged app smoke (Linux)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: 24.x
+          # The newest 24.x patch on every runner (the macOS image's cached 24.20 crashed Jest workers)
+          check-latest: true
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install xvfb
+        run: command -v xvfb-run || (sudo apt-get update && sudo apt-get install -y xvfb)
+
+      - name: Build the app without a Mapbox token
+        run: npm run build:e2e
+
+      - name: Package it for Linux, unpacked and not published
+        run: npx electron-builder --linux dir --publish never
+
+      # Reads the packaged binary's Electron fuses, then starts release/linux-unpacked/wa-stay
+      # (and a copy named electron) with a temp data folder, waits for the window, quits within
+      # 10 s with exit code 0, and checks that the test-only hooks are ignored
+      # (scripts/packaged-smoke.js).
+      - name: Start and quit the packaged app
+        run: xvfb-run -a npm run smoke:packaged

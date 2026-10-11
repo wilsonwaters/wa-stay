@@ -1,0 +1,20 @@
+{
+  "status": "Active",
+  "session_key": "FIXTUREACTIVEKEY0000000000000000000000000000000000000",
+  "queue_position": null,
+  "wait_time": 0,
+  "expiry_seconds": 1800,
+  "idle_seconds": 0,
+  "total_active_session": 412,
+  "total_waiting_session": 0,
+  "new_session": false,
+  "queue_full": false,
+  "time_left_enabled": true,
+  "show_queue_position": true,
+  "browser_inactivity_timeout": 60,
+  "browser_inactivity_enabled": true,
+  "waiting_queue_enabled": true,
+  "queue_name": "parkstayv2",
+  "custom_message": "",
+  "queue_waiting_room_url": "https://queue.dbca.wa.gov.au/site-queue/waiting-room/parkstayv2/"
+}
