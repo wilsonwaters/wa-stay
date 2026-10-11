@@ -9,10 +9,12 @@
  * ParkStay's 169 campgrounds, illustrative availability for the stay, and Bungarra's recorded
  * campsite view, campground page and map. Only Mapbox's API host is reached, for the map.
  *
- * Every shot is of the app as a person would see it: the stay (10–12 Nov 2026, 2 adults) is
- * set through Explore's URL, the watch is made in the New watch flow and checked with "Check
- * now", and the notification is the one that check raises. No provider photo appears (the
- * fixtures carry none, brief O8), and the campground map document is never opened.
+ * Only what the site shows: Explore (the window and its map), the South West's map, Bungarra's
+ * availability and notices, a watch's card and the notifications panel. Every shot is of the app
+ * as a person would see it: the stay (10–12 Nov 2026, 2 adults) is set through Explore's URL,
+ * the watch is made in the New watch flow and checked with "Check now", and the notification is
+ * the one that check raises. No provider photo appears (the fixtures carry none, brief O8), and
+ * the campground map document is never opened.
  */
 
 import fs from 'fs';
@@ -97,34 +99,85 @@ async function captureWindow(site: DocsApp, name: string): Promise<void> {
   await site.window.screenshot({ path: file(name) });
 }
 
-/** Room around an element's own edges, in logical pixels, so its picture has some air. */
-const ELEMENT_MARGIN = 24;
+/** Room around an area's own edges, in logical pixels, so its picture has some air. */
+const AREA_MARGIN = 24;
 
 /**
- * One element, with `ELEMENT_MARGIN` of the page around it. The window grows to show the page
- * down to it, so nothing scrolls and the sticky header never covers it, then returns to its size.
+ * Part of an area: an element's box, or with `text`, only the extent of its text (a heading's
+ * box spans the column however short the heading is).
  */
-async function captureElement(site: DocsApp, name: string, element: Locator): Promise<void> {
-  const page = site.window;
-  const bottom = await element.evaluate(
-    (node) => node.getBoundingClientRect().bottom + window.scrollY
+type AreaPart = Locator | { text: Locator };
+
+/** A part's box in the viewport (`scrollY` 0), or in the document with `inDocument`. */
+function partBox(part: AreaPart, inDocument = false) {
+  const element = 'text' in part ? part.text : part;
+  return element.evaluate(
+    (node, { textOnly, inDocument }) => {
+      let rect = node.getBoundingClientRect();
+      if (textOnly) {
+        const range = document.createRange();
+        range.selectNodeContents(node);
+        rect = range.getBoundingClientRect();
+      }
+      const dy = inDocument ? window.scrollY : 0;
+      return { x: rect.left, y: rect.top + dy, width: rect.width, height: rect.height };
+    },
+    { textOnly: 'text' in part, inDocument }
   );
-  const grow = bottom + 2 * ELEMENT_MARGIN > WINDOW.height;
-  if (grow) await resize(site, Math.ceil(bottom + 2 * ELEMENT_MARGIN));
+}
+
+/**
+ * The area the `parts` cover together, with `AREA_MARGIN` of the page around it. The window
+ * grows to show the page down to it, so nothing scrolls and the sticky header never covers it,
+ * then returns to its size.
+ */
+async function captureArea(site: DocsApp, name: string, parts: AreaPart[]): Promise<void> {
+  const page = site.window;
+  let bottom = 0;
+  for (const part of parts) {
+    const box = await partBox(part, true);
+    bottom = Math.max(bottom, box.y + box.height);
+  }
+  const grow = bottom + 2 * AREA_MARGIN > WINDOW.height;
+  if (grow) await resize(site, Math.ceil(bottom + 2 * AREA_MARGIN));
   await page.evaluate(() => window.scrollTo(0, 0));
   await settle(page);
-  const box = await element.boundingBox();
-  if (!box) throw new Error(`${name}: the element is not on the page`);
+  const boxes = [];
+  for (const part of parts) boxes.push(await partBox(part));
+  const left = Math.min(...boxes.map((b) => b.x));
+  const top = Math.min(...boxes.map((b) => b.y));
+  const right = Math.max(...boxes.map((b) => b.x + b.width));
+  const end = Math.max(...boxes.map((b) => b.y + b.height));
   await page.screenshot({
     path: file(name),
     clip: {
-      x: box.x - ELEMENT_MARGIN,
-      y: box.y - ELEMENT_MARGIN,
-      width: box.width + 2 * ELEMENT_MARGIN,
-      height: box.height + 2 * ELEMENT_MARGIN,
+      x: left - AREA_MARGIN,
+      y: top - AREA_MARGIN,
+      width: right - left + 2 * AREA_MARGIN,
+      height: end - top + 2 * AREA_MARGIN,
     },
   });
   if (grow) await resize(site, WINDOW.height);
+}
+
+/**
+ * One element at its exact bounds, with nothing hovered or focused. Its entrance animations
+ * (a popover's scale-in) finish first, and endless ones (the "Watching" pill's ping) are shown
+ * at rest. Logs its corner radius, which the site's frame for it matches.
+ */
+async function captureElement(site: DocsApp, name: string, element: Locator): Promise<void> {
+  await element.evaluate((node) =>
+    Promise.all(
+      node
+        .getAnimations({ subtree: true })
+        .filter((animation) => animation.effect?.getComputedTiming().iterations !== Infinity)
+        .map((animation) => animation.finished)
+    )
+  );
+  await settle(site.window);
+  const radius = await element.evaluate((node) => getComputedStyle(node).borderRadius);
+  console.log(`${name}: border-radius ${radius}`);
+  await element.screenshot({ path: file(name), animations: 'disabled' });
 }
 
 function mapRegion(page: Page): Locator {
@@ -197,31 +250,32 @@ test.describe('@site screenshots', () => {
     await mapRegion(window).screenshot({ path: file('explore-coast') });
   });
 
-  test('Place availability and about', async () => {
+  test('Place availability and notices', async () => {
     test.setTimeout(120_000);
     const { window } = site;
     await go(window, `${BUNGARRA}?${STAY}`);
     await expect(window.getByRole('heading', { level: 1, name: 'Bungarra' })).toBeVisible();
     const about = window.getByRole('region', { name: 'About' });
-    await expect(about.getByRole('list', { name: 'Notices from ParkStay' })).toBeVisible({
-      timeout: 30_000,
-    });
-    // The accordion opens on its first section.
-    await expect(about.getByRole('button', { expanded: true }).first()).toBeVisible();
-    await captureElement(site, 'place-about', about);
+    const notices = about.getByRole('list', { name: 'Notices from ParkStay' });
+    await expect(notices).toBeVisible({ timeout: 30_000 });
+    // From the heading down to the campground map's button: the notices, not the accordion.
+    await captureArea(site, 'place-notices', [
+      { text: about.getByRole('heading', { level: 2, name: 'About' }) },
+      ...(await notices.getByRole('listitem').all()),
+      about.getByRole('button', { name: /^Show all \d+ notices$/ }),
+      about.getByRole('button', { name: 'Campground map' }),
+    ]);
 
     const stayCard = window.getByRole('region', { name: 'Check your dates' });
     await stayCard.getByRole('button', { name: 'Check availability' }).click();
     const grid = window.getByRole('table', { name: /^Availability by night/ });
     await expect(grid).toBeVisible({ timeout: 30_000 });
-    await captureElement(
-      site,
-      'place-availability',
-      window.getByRole('region', { name: 'Availability', exact: true })
-    );
+    await captureArea(site, 'place-availability', [
+      window.getByRole('region', { name: 'Availability', exact: true }),
+    ]);
   });
 
-  test('New watch, Watches and the notification', async () => {
+  test("A watch's card and its notification", async () => {
     test.setTimeout(180_000);
     const { window } = site;
     // A watch for Bungarra, made the way a person does: the place page's stay, prefilled.
@@ -230,8 +284,6 @@ test.describe('@site screenshots', () => {
     await expect(window.getByRole('heading', { level: 2, name: /Your stay$/ })).toBeVisible({
       timeout: CATALOGUE_TIMEOUT_MS,
     });
-    await captureWindow(site, 'watch-new');
-
     await window.getByRole('button', { name: 'Continue' }).click();
     await expect(window.getByRole('heading', { level: 2, name: /Alerts$/ })).toBeVisible();
     // Keep checking after the first alert, so the card reads as a watch at work, not paused.
@@ -253,23 +305,16 @@ test.describe('@site screenshots', () => {
     await expect(
       window.getByRole('region', { name: 'Notifications' }).getByRole('listitem')
     ).toHaveCount(0, { timeout: 15_000 });
-    await captureWindow(site, 'watches');
+    await expect(card.getByText('Watching', { exact: true })).toBeVisible();
+    await expect(card.getByText('3 sites available', { exact: true })).toBeVisible();
+    await captureElement(site, 'watch-card', card);
 
     await bell.click();
     const panel = window.getByRole('dialog', { name: 'Notifications' });
     await expect(panel.getByRole('link', { name: 'Sites available at Bungarra' })).toBeVisible();
-    await captureWindow(site, 'notifications');
+    await captureElement(site, 'notification-panel', panel);
     await window.keyboard.press('Escape');
     await expect(panel).toBeHidden();
-  });
-
-  test('Settings, notifications', async () => {
-    test.setTimeout(60_000);
-    const { window } = site;
-    await go(window, '/settings/notifications');
-    await expect(window.getByRole('heading', { level: 2, name: 'Notifications' })).toBeVisible();
-    await expect(window.getByRole('heading', { level: 3, name: 'Email' })).toBeVisible();
-    await captureWindow(site, 'settings-notifications');
   });
 
   test('No provider request went unanswered, and no photo was asked for', async () => {

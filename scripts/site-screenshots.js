@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 /**
  * `npm run site:screenshots`: rebuilds the app and retakes the product website's screenshots in
- * `site/assets/screens/` (Explore and its map, a place's availability and About, a new watch,
- * Watches, the notifications panel and Settings → Notifications).
+ * `site/assets/screens/`: Explore and its map, the South West's map, a place's availability and
+ * notices, a watch's card and the notifications panel.
  *
  * 1. Needs a public Mapbox token (`MAPBOX_ACCESS_TOKEN` in the environment, else `.env`): the
  *    map is the point of most shots. The token is never printed. The build bundles it, and only
