@@ -29,10 +29,16 @@ Post-PR follow-ups on PR #42 (open, `ccr-da6e94c0-litpr7` → `main`, repo `wils
     - Open nit for the stakeholder: Bungarra's 11 notices take about 290 px above the accordion.
     - Gate: 4045 tests; e2e 21 passed (the review's run).
     - The `wip/pd2-campground-sections` backup can be deleted.
-  - **PD3 is implemented and under review:** `aeed004` on `9a44593`, backed up to `wip/pd3-campground-map`.
-    - The window module is `document-windows.ts`. It opens through `catalog.openDocument`; no URL crosses IPC.
-    - Fixture mode serves a generated PDF.
-    - Gate: 4097 tests; e2e 22 passed; `test:electron` 4/4.
+  - **PD3 is merged:** `66208db`, review fixes `aa3646a`. Review APPROVE: the reviewer's own Electron probes refused PDF links, new windows, PDF JavaScript and form submits, and allowed only the document as a download.
+    - The four nits are fixed:
+      - the fixture guard matches http/https only;
+      - loopback http is test-only;
+      - an `onBeforeRequest` allow-list on the document partition, logging origins only;
+      - a live test clicks a real PDF link annotation.
+    - Gate: 4102 tests; e2e 22 passed; `test:electron` 4/4.
+    - The `wip/pd3-campground-map` backup can be deleted.
+  - **All three stakeholder findings are done (PD1–PD3), plus the notices toggle (PD4).**
+  - **Also merged:** `8b089c3`. The macOS unit tests run Jest with `node --no-sparkplug`. The crash report showed a V8 GC fault (EXC_BAD_ACCESS in `ClearStaleLeftTrimmedPointerVisitor`, from a Sparkplug baseline prologue's stack check) on Node 24.21.0 darwin-arm64 only.
   - **Also merged:** `9a44593`. IconButton's required label is now checked by `tsc` (`IconButton.type-test.tsx`) rather than a TypeScript program in Jest, after the macOS SIGSEGV in that test twice (`10512b5`, `6921509`). The crash-report upload paths are widened, since no report was found.
   - **PD4 is merged:** `77a5d52`, review fix `6c89bdf`. Review APPROVE.
     - What it does: 3 notices shown, ordered warning, then caution, then info, with "Show all N notices" for the rest. Bungarra's row drops from about 280 px to 104 px.
