@@ -142,6 +142,7 @@ tests/
 │                            # generates each kind of provider into a temp copy of the project
 ├── e2e/                     # Electron smoke tests on the built app (Playwright _electron, not Jest)
 ├── docs/                    # The documentation screenshots (npm run docs:screenshots, not Jest)
+├── site/                    # The website screenshots (npm run site:screenshots, not Jest)
 ├── electron/                # Live tests that run inside Electron (npm run test:electron, not Jest)
 ├── manual/                  # Scripts run by hand against live services (not Jest)
 ├── fixtures/                # Test data (users, bookings, watches, site-sniper), parkstay/ (trimmed

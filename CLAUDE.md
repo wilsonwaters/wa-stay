@@ -45,9 +45,10 @@ npm run test:e2e     # Electron smoke tests on the built app (tests/e2e/; xvfb-r
 npm run test:electron # Live Electron tests (tests/electron/; xvfb on Linux; not in npm test)
 npm run smoke:packaged # Starts the packaged Linux app (after electron-builder --linux dir) and checks it quits cleanly
 npm run docs:screenshots # Rebuilds and retakes docs/images/*.png (tests/docs/)
+npm run site:screenshots # Rebuilds and retakes the website's site/assets/screens/*.webp (tests/site/; needs a Mapbox token)
 npm run provider:new -- <id> [--api|--browser] [--search] # Generates a working provider (see "Adding a provider")
 npm run lint         # ESLint (src, tests, scripts and the root configs)
-npm run type-check   # TypeScript type checking (main, renderer, tests/e2e, tests/docs)
+npm run type-check   # TypeScript type checking (main, renderer, tests/e2e, tests/docs, tests/site)
 npm run dist:win     # Package Windows installer
 ```
 
@@ -251,7 +252,7 @@ Rules:
 
 - **Framework:** Jest 30 (unit/integration), Playwright (Electron E2E)
 - **Config:** `jest.config.js` — two projects: `main` (Node: `tests/unit`, `tests/integration`, `tests/scripts`, `src/main`, `src/shared`) and `renderer` (jsdom: `src/renderer`, `tests/integration/renderer`); coverage thresholds (a ratchet just below actual coverage): branches 85%, functions 90%, lines 93%, statements 92%; dependencies that ship only ES modules (htmlparser2 and its packages, React Router 8) are compiled to CommonJS by esbuild (`ESM_ONLY_DEPENDENCIES`, `tests/utils/esm-to-cjs-transform.js`), with patterns that accept `/` and `\` (`tests/unit/build/jest-config.test.ts`)
-- **Test locations:** `tests/unit/`, `tests/integration/`, `tests/e2e/`, `tests/electron/`, `tests/docs/`, plus co-located `*.test.tsx` in `src/`
+- **Test locations:** `tests/unit/`, `tests/integration/`, `tests/e2e/`, `tests/electron/`, `tests/docs/`, `tests/site/`, plus co-located `*.test.tsx` in `src/`
 - **Fixtures:** `tests/fixtures/` (users, bookings, watches, site-sniper, `parkstay/` trimmed live samples, `providers/` the provider guide's example providers, and `db/` schema dumps for migration tests)
 - **Helpers:** `tests/utils/` (database-helper, test-helpers, core-harness, fake-provider, provider-contract, ipc-harness, parkstay-fixture-server, fake-browser (a jsdom browser for provider tests), fake-site (how a made-up site answers, and `serveFakeSite` on loopback for a real browser), fake-playwright, fake-safe-storage, `tests/utils/tailwind.ts` (the real stylesheet compiled through Tailwind, for CSS tests), `renderer/` render helpers and a strict mock `window.api`)
 - **`npm run test:tz`:** the timestamp tests with `TZ=Australia/Perth` (unzoned SQLite timestamps must read as UTC)
