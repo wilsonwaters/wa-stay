@@ -10,9 +10,10 @@
     <title>WA Stay · Find a campsite in WA’s national parks</title>
     <meta
       name="description"
-      content="See which national-park campgrounds in Western Australia have a site free on your dates, all on one map. When they’re booked out, WA Stay keeps checking and tells you when a site frees up. Free for Windows."
+      content="Find a free campsite in WA’s national parks: what’s free on your dates, on one map, and an alert if a booked-out site frees up. Free for Windows."
     />
-    <meta name="theme-color" content="#FAF7F2" />
+    <meta name="theme-color" content="#FFFFFF" />
+    <link rel="canonical" href="https://wilsonwaters.github.io/wa-stay/" />
     <link rel="icon" href="assets/brand/wa-stay-mark-small.svg" type="image/svg+xml" />
     <link rel="icon" href="assets/icons/favicon-32.png" sizes="32x32" type="image/png" />
     <link rel="apple-touch-icon" href="assets/icons/apple-touch-icon.png" />
@@ -32,6 +33,7 @@
     />
     <link rel="stylesheet" href="styles.css" />
     <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://wilsonwaters.github.io/wa-stay/" />
     <meta property="og:site_name" content="WA Stay" />
     <meta property="og:title" content="WA Stay · Find a campsite in WA’s national parks" />
     <meta
@@ -81,7 +83,7 @@
             </h1>
             <p class="lead">
               See which campgrounds have a site free on your dates, all on one map. If they’re
-              booked out, WA Stay keeps checking and tells you when a site frees up.
+              booked out, WA Stay keeps checking and lets you know if a site frees up.
             </p>
             <div class="actions">
               <a
@@ -128,7 +130,7 @@
                   srcset="assets/screens/explore-1x.webp 1440w, assets/screens/explore.webp 2880w"
                   sizes="(min-width: 1280px) 1088px, calc(100vw - 96px)"
                   width="1440"
-                  height="900"
+                  height="730"
                   alt="WA Stay’s Explore screen. A search for 10 to 12 November for 2 adults finds 33 of 169 places available, listed on the left, and a map of Western Australia on the right shows how many sites are free in each area."
                   fetchpriority="high"
                 />
@@ -143,9 +145,9 @@
           <div class="feature__copy">
             <h2 id="map-title">See what’s free before you plan the drive</h2>
             <p>
-              Pick your nights and who’s coming. Every campground on the map shows how many sites
-              are free for your whole stay, so you can weigh up Cape Range against Cape Le Grand
-              without opening a dozen tabs.
+              Pick your nights and who’s coming. Each campground you can book online shows how many
+              sites are free for your whole stay, so you can weigh up Conto against Boranup without
+              clicking through each one.
             </p>
             <p>
               Narrow it down by region, by facilities such as toilets or dogs permitted, or to the
@@ -178,7 +180,7 @@
               Closures and campground rules sit at the top, and the campground map is a click away.
             </p>
           </div>
-          <div class="feature__media panel panel--tint stack stack--sites">
+          <div class="feature__media panel panel--sand stack stack--sites">
             <img
               class="screen stack__back"
               src="assets/screens/place-notices-1x.webp"
@@ -211,16 +213,16 @@
             <div>
               <p>
                 Tell WA Stay where you’d like to stay and when. It checks as often as every 15
-                minutes and lets you know when a site frees up, with a desktop notification or an
-                email.
+                minutes and lets you know if a site frees up, with a desktop notification or an
+                email from your own email account.
               </p>
               <p>
-                It can also hold the site for you straight away, so you have time to pay for it on
-                ParkStay.
+                It can also hold the site as soon as it finds one. ParkStay then keeps it for you
+                for 30 minutes while you pay.
               </p>
             </div>
           </div>
-          <div class="feature__media panel panel--leaf stack stack--watch">
+          <div class="feature__media panel panel--sand stack stack--watch">
             <img
               class="screen stack__back screen--watch-card"
               src="assets/screens/watch-card-1x.webp"
@@ -250,77 +252,43 @@
         <div class="container">
           <h2 id="soon-title">Coming next</h2>
           <ul class="soon__list">
-            <li class="soon__item">
-              <svg class="icon icon--lg" viewBox="0 0 24 24" aria-hidden="true">
-                <path d="M16 14v2.2l1.6 1" />
-                <path d="M16 2v3" />
-                <path d="M21 7.338V5a2 2 0 00-2-2H5a2 2 0 00-2 2v14a2 2 0 002 2h2.338" />
-                <path d="M3 9h5.859" />
-                <path d="M8 2v3" />
-                <circle cx="16" cy="16" r="6" />
-              </svg>
-              <h3>Site Sniper <span class="pill pill--soon">Soon</span></h3>
+            <li>
+              <h3>
+                <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M16 14v2.2l1.6 1" />
+                  <path d="M16 2v3" />
+                  <path d="M21 7.338V5a2 2 0 00-2-2H5a2 2 0 00-2 2v14a2 2 0 002 2h2.338" />
+                  <path d="M3 9h5.859" />
+                  <path d="M8 2v3" />
+                  <circle cx="16" cy="16" r="6" />
+                </svg>
+                Site Sniper <span class="pill pill--soon">Soon</span>
+              </h3>
               <p>
-                Some sites go within seconds of opening for booking. Site Sniper will be ready at
-                the release time, wait in ParkStay’s queue for you, and hold the site while you pay.
+                ParkStay opens each date 180 days ahead, and popular sites go fast. Site Sniper will
+                be ready when bookings open, wait in ParkStay’s queue for you, and try to hold a
+                site for you to pay for.
               </p>
             </li>
-            <li class="soon__item">
-              <svg class="icon icon--lg" viewBox="0 0 24 24" aria-hidden="true">
-                <path d="M8 2v3" />
-                <path d="M16 2v3" />
-                <rect x="3" y="3" width="18" height="18" rx="2" />
-                <path d="M3 9h18" />
-                <path d="m9 15 2 2 4-4" />
-              </svg>
-              <h3>Bookings <span class="pill pill--soon">Soon</span></h3>
+            <li>
+              <h3>
+                <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M8 2v3" />
+                  <path d="M16 2v3" />
+                  <rect x="3" y="3" width="18" height="18" rx="2" />
+                  <path d="M3 9h18" />
+                  <path d="m9 15 2 2 4-4" />
+                </svg>
+                Bookings <span class="pill pill--soon">Soon</span>
+              </h3>
               <p>
-                Your trips in one list, upcoming and past, each with a link to change or cancel it
-                on ParkStay.
+                Trips you pay for through WA Stay, or add yourself, in one list, each with a link to
+                change or cancel it on ParkStay.
               </p>
             </li>
           </ul>
           <p class="soon__note">
             ParkStay WA is the first booking system WA Stay works with. More are planned.
-          </p>
-        </div>
-      </section>
-
-      <section class="facts" aria-labelledby="facts-title">
-        <div class="container">
-          <h2 id="facts-title">Good to know</h2>
-          <dl class="facts__grid">
-            <div>
-              <dt>It’s free</dt>
-              <dd>No ads, no subscription. WA Stay is open source, so anyone can read the code.</dd>
-            </div>
-            <div>
-              <dt>No sign-up</dt>
-              <dd>There’s no WA Stay account. Your watches and settings stay on your computer.</dd>
-            </div>
-            <div>
-              <dt>You pay ParkStay, as always</dt>
-              <dd>You book and pay on ParkStay’s own pages. WA Stay never sees your card.</dd>
-            </div>
-            <div>
-              <dt>One site per night</dt>
-              <dd>
-                WA Stay never holds more than one site for the same night, in line with ParkStay’s
-                terms.
-              </dd>
-            </div>
-            <div>
-              <dt>Made for Windows</dt>
-              <dd>Windows 10 or 11, 64-bit. It lets you know when an update is ready.</dd>
-            </div>
-            <div>
-              <dt>Independent</dt>
-              <dd>WA Stay isn’t made by or affiliated with DBCA or ParkStay WA.</dd>
-            </div>
-          </dl>
-          <p class="upgrade">
-            <strong>Using WA ParkStay Bookings?</strong> WA Stay is its new name. Your copy will
-            offer the update, and your watches, notifications and settings come with you.
           </p>
         </div>
       </section>
@@ -331,14 +299,14 @@
           <div class="faq__list">
             <details>
               <summary>
-                Is WA Stay really free?
+                Does it cost anything?
                 <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
                   <path d="m6 9 6 6 6-6" />
                 </svg>
               </summary>
               <p>
-                Yes. There are no ads, subscriptions or in-app purchases. You pay campground fees to
-                ParkStay, the same as booking on its website.
+                No. WA Stay is free and open source, with no ads, subscription or in-app purchases.
+                You pay campground fees to ParkStay, as you would on its website.
               </p>
             </details>
             <details>
@@ -349,21 +317,34 @@
                 </svg>
               </summary>
               <p>
-                No. It finds sites, and a watch can hold one for you, but you always finish the
-                booking and pay on ParkStay’s own pages.
+                No. It finds sites, and a watch can hold one for you, but you finish the booking on
+                ParkStay’s own pages. Card details go into ParkStay’s payment page; WA Stay doesn’t
+                read or keep them.
               </p>
             </details>
             <details>
               <summary>
-                Do I need a ParkStay account?
+                Do I need an account?
                 <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
                   <path d="m6 9 6 6 6-6" />
                 </svg>
               </summary>
               <p>
-                Not to search or set watches. ParkStay may ask you to sign in when you pay, as it
-                does on its own website. You can also sign in from WA Stay’s settings beforehand,
-                which makes paying quicker.
+                There’s no WA Stay account to make. You don’t need a ParkStay account to search or
+                set watches either. ParkStay may ask you to sign in when you pay, as it does on its
+                website, and signing in from WA Stay’s settings beforehand makes paying quicker.
+              </p>
+            </details>
+            <details>
+              <summary>
+                Will it hold more than one site at a time?
+                <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="m6 9 6 6 6-6" />
+                </svg>
+              </summary>
+              <p>
+                Not for the same night. WA Stay never holds more than one site per night across all
+                your watches, in line with ParkStay’s terms.
               </p>
             </details>
             <details>
@@ -379,7 +360,7 @@
                 taskbar.
               </p>
             </details>
-            <details>
+            <details id="installing">
               <summary>
                 Windows says it protected my PC. Is that OK?
                 <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
@@ -398,7 +379,7 @@
                   <path d="m6 9 6 6 6-6" />
                 </svg>
               </summary>
-              <p>Not yet. WA Stay runs on Windows 10 and 11 (64-bit).</p>
+              <p>No. WA Stay is for Windows 10 and 11 (64-bit).</p>
             </details>
             <details>
               <summary>
@@ -409,9 +390,9 @@
               </summary>
               <p>
                 Your watches, settings and email details stay on your computer. WA Stay talks to
-                ParkStay for campgrounds and availability, to Mapbox for the map, to GitHub to check
-                for updates, and to your email provider if you turn on email alerts. It has no
-                analytics.
+                ParkStay for campgrounds and availability, to Mapbox for the map (which also sends
+                Mapbox its standard usage data), to GitHub to check for updates, and to your email
+                provider if you turn on email alerts. WA Stay itself has no analytics.
               </p>
             </details>
             <details>
@@ -426,14 +407,29 @@
                 It isn’t made by or affiliated with DBCA, which runs ParkStay WA.
               </p>
             </details>
+            <details>
+              <summary>
+                I use WA ParkStay Bookings. What happens to it?
+                <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="m6 9 6 6 6-6" />
+                </svg>
+              </summary>
+              <p>
+                WA Stay is its new name. Your copy will offer the update, and your watches,
+                notifications and settings come with you.
+              </p>
+            </details>
           </div>
         </div>
       </section>
 
       <section id="download" class="closing" aria-labelledby="closing-title">
         <div class="container">
-          <h2 id="closing-title"><span class="swashed">Get WA Stay</span></h2>
-          <p>Free for Windows 10 and 11.</p>
+          <h2 id="closing-title">Download WA Stay</h2>
+          <p>
+            Free for Windows 10 and 11. The first time you run the installer, Windows may ask you to
+            confirm it: choose “More info”, then “Run anyway”.
+          </p>
           <a
             class="button button--primary button--lg"
             href="https://github.com/wilsonwaters/wa-stay/releases/latest"
@@ -467,13 +463,13 @@
       <div class="container site-footer__legal">
         <p>
           WA Stay is an independent app. It isn’t a Western Australian Government service, and it
-          isn’t made by or affiliated with DBCA or ParkStay WA.
+          isn’t made by or affiliated with DBCA, ParkStay WA or Tourism WA.
         </p>
         <p>
           Screenshots show example dates and availability. Maps in them © Mapbox © OpenStreetMap.
           This site sets no cookies and has no analytics.
         </p>
-        <p>© 2026 WA Stay. Open source under the MIT licence.</p>
+        <p>© 2025–2026 WA Stay. Open source under the MIT licence.</p>
       </div>
     </footer>
   </body>
