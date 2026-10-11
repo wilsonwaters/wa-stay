@@ -1,7 +1,7 @@
 {
   "name": "wa-stay",
   "productName": "WA Stay",
-  "version": "1.2.0",
+  "version": "2.0.0",
   "description": "Find and book places to stay across Western Australia",
   "main": "dist/main/main/index.js",
   "author": {

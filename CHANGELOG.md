@@ -7,15 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-To be released as **2.0.0**. WA ParkStay Bookings becomes **WA Stay**: an app for finding and
-booking places to stay across Western Australia, with ParkStay WA as its first provider.
-Existing installs upgrade in place and keep their data (see Upgrade notes).
+## [2.0.0] - 2026-10-11
+
+WA ParkStay Bookings becomes **WA Stay**: an app for finding and booking places to stay across
+Western Australia, with ParkStay WA as its first provider. Existing installs upgrade in place
+and keep their data (see Upgrade notes).
 
 ### Added
 - **Explore**, the new home screen: every place from every provider on a Mapbox map of WA and in a list, with search, filters (provider, type, region, facilities, online booking) and results that follow the map. Without a map token it works as a list (#32).
 - **Place pages**: photos, the provider's description and facilities, every site night by night with prices for your dates (with each site's description and how many people and vehicles it takes), and links to book or read more on the provider's site (#33).
+- **Campground details from ParkStay** on place pages: the campground's notices, warnings first (the first three, with "Show all" for the rest), and its "More details" sections as an accordion, read from the campground's ParkStay page.
+- **Campground map**: a place page's "Campground map" button opens ParkStay's campground map (a PDF) in a viewer window in the app that loads only that document.
 - **Availability for your dates on Explore**: free-site counts on every pin and card, and an "Available only" filter (#34).
-- **Providers**: a provider SDK and registry, so new accommodation sources plug in without changing the rest of the app, including sites with no API through browser automation of the installed Edge or Chrome (#19, #25). ParkStay WA is the first provider, rebuilt on it (#21). A developer guide with a quick start and compiling examples, `docs/providers/adding-a-provider.md` (#41), and `npm run provider:new`, which generates a working provider to start from.
+- **Providers**: a provider SDK and registry, so new accommodation sources plug in without changing the rest of the app, including sites with no API through browser automation of the installed Edge or Chrome (#19, #25), and catalogues too big to list in full, searched by map area and name as you explore. ParkStay WA is the first provider, rebuilt on it (#21). A developer guide with a quick start and compiling examples, `docs/providers/adding-a-provider.md` (#41), and `npm run provider:new`, which generates a working provider to start from.
 - **Provider accounts**: sign in to ParkStay in the app, on ParkStay's own page, from Settings → Accounts; signing in is optional (#24, #38).
 - **Paying for a held site in the app**: "Pay now" opens ParkStay's payment page on the session that holds the site; once ParkStay confirms the payment, the snipe or watch shows as booked and the booking appears under Bookings (#24, #36).
 - **Hold a site automatically when found**, for watches on providers with holds (#22, #35). The old "auto-booking" checkbox did nothing, so it is turned off on every upgraded watch: turn on the new option per watch if you want it.
