@@ -9,10 +9,11 @@
  * - `campground_map.json` is rebuilt from `tests/fixtures/catalog/parkstay-locations.json`
  *   (ParkStay's public `GET /api/campground_map/`, probed on 2026-10-02 and mapped by the
  *   provider's own `toLocationSummary`) back into the raw GeoJSON that function reads
- *   (`src/main/providers/parkstay/types.ts`). It carries no image paths at all: provider photos
- *   are never redistributed (brief O8), so no card even asks for one and every card shows the
- *   app's photo placeholder. A campground's campsites are only counted by the app, so they are
- *   listed by count, with Bungarra's five (ids 1 to 5) as its campsite view names them.
+ *   (`src/main/providers/parkstay/types.ts`), each with its photos' site paths
+ *   (`/media/parkstay/campground_images/…`), which the app loads live from ParkStay for the
+ *   website's screenshots (the documentation run keeps photos blocked). A campground's
+ *   campsites are only counted by the app, so they are listed by count, with Bungarra's five
+ *   (ids 1 to 5) as its campsite view names them.
  * - `campground_availabilty_view.json` is illustrative bulk availability for the screenshots'
  *   stay, deterministic from each campground's id: in every region about a third of the
  *   campgrounds bookable online have a few sites free and the rest are full; the ones not
@@ -110,7 +111,7 @@ export function toRawFeature(
       max_advance_booking: 180,
       description: '',
       features: location.amenities.map((name) => ({ id: FEATURE_IDS[name] ?? 0, name })),
-      images: [],
+      images: location.imageUrls.map((url) => ({ image: new URL(url).pathname })),
       info_url: location.infoUrl ?? '',
       park: {
         id: parks.get(parkName) ?? 0,

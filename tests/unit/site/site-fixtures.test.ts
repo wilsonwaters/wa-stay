@@ -21,12 +21,15 @@ import {
 const catalogue = readCatalogue();
 
 describe('website screenshot fixtures', () => {
-  it('rebuild a campground map that maps back to all 169 campgrounds unchanged, with no photos', () => {
+  it('rebuild a campground map that maps back to all 169 campgrounds unchanged, photos included', () => {
     const map = campgroundMap(catalogue);
     const summaries = map.features.map((feature) => toLocationSummary(feature));
     expect(summaries).toHaveLength(169);
-    expect(summaries).toEqual(catalogue.map((location) => ({ ...location, imageUrls: [] })));
-    expect(map.features.every((feature) => feature.properties.images.length === 0)).toBe(true);
+    expect(summaries).toEqual(catalogue);
+    // Photos are ParkStay's own site paths, which the app resolves against its site.
+    const paths = map.features.flatMap((feature) => feature.properties.images.map((i) => i.image));
+    expect(paths.length).toBeGreaterThan(0);
+    expect(paths.every((p) => p.startsWith('/media/parkstay/campground_images/'))).toBe(true);
   });
 
   it('give Bungarra the free sites its recorded campsite view has, and a few free elsewhere', () => {

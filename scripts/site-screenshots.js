@@ -1,12 +1,14 @@
 #!/usr/bin/env node
 /**
  * `npm run site:screenshots`: rebuilds the app and retakes the product website's screenshots in
- * `site/assets/screens/`: Explore and its map, the South West's map, a place's availability and
- * notices, a watch's card and the notifications panel.
+ * `site/assets/screens/`: Explore and its map, the South West's map, a place's header and
+ * availability, a watch's card and the notifications panel.
  *
  * 1. Needs a public Mapbox token (`MAPBOX_ACCESS_TOKEN` in the environment, else `.env`): the
- *    map is the point of most shots. The token is never printed. The build bundles it, and only
- *    Mapbox's API host is let through the network guard.
+ *    map is the point of most shots. The token is never printed. The build bundles it. Two hosts
+ *    are let through the network guard: Mapbox's API, and ParkStay's site for the places' photos
+ *    (anonymous GETs under `/media/` only, which the spec checks; `npm run docs:screenshots`
+ *    keeps photos blocked).
  * 2. `npm run build`, then the `@site` Playwright spec (`tests/site`,
  *    `playwright.site.config.ts`) against the built app in fixture mode, with all 169 ParkStay
  *    campgrounds (`tests/site/support/site-fixtures.ts`). The window is 1440 × 900 at 2×, so the
@@ -84,7 +86,9 @@ async function main() {
     );
     process.exit(1);
   }
-  console.log('site:screenshots: Mapbox token found; only api.mapbox.com is reached.');
+  console.log(
+    "site:screenshots: Mapbox token found; api.mapbox.com and ParkStay's photos are reached."
+  );
 
   const npm = process.platform === 'win32' ? 'npm.cmd' : 'npm';
   run(npm, ['run', 'build'], process.env);

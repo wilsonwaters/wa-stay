@@ -7,13 +7,16 @@
  * (1440 × 900 at 2× through Chromium's `--force-device-scale-factor`, a launch argument only) and
  * the site's own fixtures (`support/site-fixtures.ts`): network-free fixture mode serving all of
  * ParkStay's 169 campgrounds, illustrative availability for the stay, and Bungarra's recorded
- * campsite view, campground page and map. Only Mapbox's API host is reached, for the map.
+ * campsite view, campground page and map. Two hosts are reached: Mapbox's API, for the map, and
+ * ParkStay's site, for the places' photos only (anonymous GETs under `/media/`, checked at the
+ * end). Showing the photos is the product owner's decision for the website; the documentation
+ * run keeps them blocked.
  *
  * Only what the site shows: Explore (the window and its map), the South West's map, Bungarra's
- * availability and notices, a watch's card and the notifications panel. Every shot is of the app
+ * header and availability, a watch's card and the notifications panel. Every shot is of the app
  * as a person would see it: the stay (10–12 Nov 2026, 2 adults) is set through Explore's URL,
  * the watch is made in the New watch flow and checked with "Check now", and the notification is
- * the one that check raises. No provider photo appears (the fixtures carry none, brief O8), and
+ * the one that check raises. Every capture waits for the photos in view to finish loading, and
  * the campground map document is never opened.
  */
 
@@ -45,6 +48,8 @@ const BUNGARRA = '/places/parkstay/20';
  * Pemberton, at a zoom where most places are pills rather than clusters.
  */
 const COAST_CAMERA = '115.7,-34,8.1';
+/** ParkStay's site, where the catalogue's photos are (`/media/parkstay/campground_images/…`). */
+const PARKSTAY_HOST = 'parkstay.dbca.wa.gov.au';
 /** The catalogue syncs 5 s after launch (V5). */
 const CATALOGUE_TIMEOUT_MS = 30_000;
 
@@ -99,8 +104,73 @@ function file(name: string): string {
   return path.join(OUT_DIR, `${name}.png`);
 }
 
+/**
+ * Waits until every photo in view has loaded and faded in: each visible image complete, with
+ * pixels and fully opaque, no photo placeholder ("No photo available for …") and no skeleton
+ * shimmer left in view. Every place in the fixtures has a photo, so a placeholder means one
+ * failed to load.
+ */
+async function waitForPhotos(page: Page, timeout = 60_000): Promise<void> {
+  await expect
+    .poll(
+      () =>
+        page.evaluate(() => {
+          const inView = (element: Element | null): boolean => {
+            if (!element) return false;
+            const r = element.getBoundingClientRect();
+            return (
+              r.width > 0 &&
+              r.height > 0 &&
+              r.bottom > 0 &&
+              r.right > 0 &&
+              r.top < window.innerHeight &&
+              r.left < window.innerWidth
+            );
+          };
+          const loading = [...document.images].filter(
+            (img) =>
+              inView(img) &&
+              !(img.complete && img.naturalWidth > 0 && getComputedStyle(img).opacity === '1')
+          ).length;
+          const placeholders = [
+            ...document.querySelectorAll('[aria-label^="No photo available for"]'),
+          ].filter(inView).length;
+          const shimmering = document
+            .getAnimations()
+            .filter(
+              (a) =>
+                a instanceof CSSAnimation &&
+                a.animationName === 'shimmer' &&
+                a.effect instanceof KeyframeEffect &&
+                inView(a.effect.target)
+            ).length;
+          return { loading, placeholders, shimmering };
+        }),
+      { timeout, message: 'Photos in view did not all load' }
+    )
+    .toEqual({ loading: 0, placeholders: 0, shimmering: 0 });
+}
+
+/** The photos in view, each as its file, its own size and the size it is shown at. */
+function photoSizes(page: Page): Promise<string> {
+  return page.evaluate(() =>
+    [...document.images]
+      .filter((img) => {
+        const r = img.getBoundingClientRect();
+        return r.width > 0 && r.bottom > 0 && r.top < window.innerHeight;
+      })
+      .map((img) => {
+        const r = img.getBoundingClientRect();
+        const file = new URL(img.currentSrc).pathname.split('/').pop();
+        return `${file} ${img.naturalWidth}×${img.naturalHeight} shown ${Math.round(r.width)}×${Math.round(r.height)}`;
+      })
+      .join('; ')
+  );
+}
+
 /** The whole window. */
 async function captureWindow(site: DocsApp, name: string): Promise<void> {
+  await waitForPhotos(site.window);
   await settle(site.window);
   await site.window.screenshot({ path: file(name) });
 }
@@ -108,52 +178,48 @@ async function captureWindow(site: DocsApp, name: string): Promise<void> {
 /** Room around an area's own edges, in logical pixels, so its picture has some air. */
 const AREA_MARGIN = 24;
 
-/**
- * Part of an area: an element's box, or with `text`, only the extent of its text (a heading's
- * box spans the column however short the heading is).
- */
-type AreaPart = Locator | { text: Locator };
-
-/** A part's box in the viewport (`scrollY` 0), or in the document with `inDocument`. */
-function partBox(part: AreaPart, inDocument = false) {
-  const element = 'text' in part ? part.text : part;
-  return element.evaluate(
-    (node, { textOnly, inDocument }) => {
-      let rect = node.getBoundingClientRect();
-      if (textOnly) {
-        const range = document.createRange();
-        range.selectNodeContents(node);
-        rect = range.getBoundingClientRect();
-      }
-      const dy = inDocument ? window.scrollY : 0;
-      return { x: rect.left, y: rect.top + dy, width: rect.width, height: rect.height };
-    },
-    { textOnly: 'text' in part, inDocument }
-  );
+/** An element's box in the viewport (`scrollY` 0), or in the document with `inDocument`. */
+function boxOf(element: Locator, inDocument = false) {
+  return element.evaluate((node, inDocument) => {
+    const rect = node.getBoundingClientRect();
+    const dy = inDocument ? window.scrollY : 0;
+    return { x: rect.left, y: rect.top + dy, width: rect.width, height: rect.height };
+  }, inDocument);
 }
 
 /**
- * The area the `parts` cover together, with `AREA_MARGIN` of the page around it. The window
+ * The area the `elements` cover together, with `AREA_MARGIN` of the page around it. The window
  * grows to show the page down to it, so nothing scrolls and the sticky header never covers it,
- * then returns to its size.
+ * then returns to its size. It grows again while the area moves down as it grows (a place's
+ * photo is taller in a taller window).
  */
-async function captureArea(site: DocsApp, name: string, parts: AreaPart[]): Promise<void> {
+async function captureArea(site: DocsApp, name: string, elements: Locator[]): Promise<void> {
   const page = site.window;
-  let bottom = 0;
-  for (const part of parts) {
-    const box = await partBox(part, true);
-    bottom = Math.max(bottom, box.y + box.height);
+  let height = WINDOW.height;
+  for (let attempt = 0; attempt < 10; attempt += 1) {
+    let bottom = 0;
+    for (const element of elements) {
+      const box = await boxOf(element, true);
+      bottom = Math.max(bottom, box.y + box.height);
+    }
+    const needed = Math.ceil(bottom + 2 * AREA_MARGIN);
+    if (needed <= height) break;
+    height = needed;
+    await resize(site, height);
   }
-  const grow = bottom + 2 * AREA_MARGIN > WINDOW.height;
-  if (grow) await resize(site, Math.ceil(bottom + 2 * AREA_MARGIN));
+  const grow = height !== WINDOW.height;
   await page.evaluate(() => window.scrollTo(0, 0));
+  await waitForPhotos(page);
   await settle(page);
   const boxes = [];
-  for (const part of parts) boxes.push(await partBox(part));
+  for (const element of elements) boxes.push(await boxOf(element));
   const left = Math.min(...boxes.map((b) => b.x));
   const top = Math.min(...boxes.map((b) => b.y));
   const right = Math.max(...boxes.map((b) => b.x + b.width));
   const end = Math.max(...boxes.map((b) => b.y + b.height));
+  if (end + AREA_MARGIN > (await page.evaluate(() => window.innerHeight))) {
+    throw new Error(`${name}: the area runs past the bottom of the window`);
+  }
   await page.screenshot({
     path: file(name),
     clip: {
@@ -180,10 +246,49 @@ async function captureElement(site: DocsApp, name: string, element: Locator): Pr
         .map((animation) => animation.finished)
     )
   );
+  await waitForPhotos(site.window);
   await settle(site.window);
   const radius = await element.evaluate((node) => getComputedStyle(node).borderRadius);
   console.log(`${name}: border-radius ${radius}`);
   await element.screenshot({ path: file(name), animations: 'disabled' });
+}
+
+/** A request to ParkStay's site, as the main process saw it go out. */
+interface ParkStayRequest {
+  method: string;
+  path: string;
+  /** Which credential-bearing headers it carried. */
+  cookie: boolean;
+  authorization: boolean;
+}
+
+/**
+ * Records every request to ParkStay's site that any session sends (the window's, the
+ * provider's partition and any made later), from just after launch, before the catalogue
+ * syncs. Only the method, the path and whether credentials went with it are kept.
+ */
+async function recordParkStayRequests(site: DocsApp): Promise<void> {
+  await site.app.evaluate(({ app, session }, host) => {
+    const seen: ParkStayRequest[] = [];
+    (globalThis as unknown as { siteParkStayRequests: ParkStayRequest[] }).siteParkStayRequests =
+      seen;
+    const watch = (ses: typeof session.defaultSession): void => {
+      ses.webRequest.onSendHeaders((details) => {
+        const url = new URL(details.url);
+        if (url.hostname !== host && !url.hostname.endsWith(`.${host}`)) return;
+        const headers = Object.keys(details.requestHeaders).map((name) => name.toLowerCase());
+        seen.push({
+          method: details.method,
+          path: url.pathname,
+          cookie: headers.includes('cookie'),
+          authorization: headers.includes('authorization'),
+        });
+      });
+    };
+    watch(session.defaultSession);
+    watch(session.fromPartition('persist:provider-parkstay'));
+    app.on('session-created', watch);
+  }, PARKSTAY_HOST);
 }
 
 function mapRegion(page: Page): Locator {
@@ -206,9 +311,12 @@ test.describe('@site screenshots', () => {
     site = await launchForDocs({
       map: true,
       fixturesDir,
+      // The places' photos, live from ParkStay (the product owner's decision for the website).
+      allowHosts: [PARKSTAY_HOST],
       size: WINDOW,
       deviceScaleFactor: SCALE,
     });
+    await recordParkStayRequests(site);
     await resize(site, WINDOW.height);
     expect(await site.window.evaluate(() => window.devicePixelRatio)).toBe(SCALE);
     // The images show the app, not the platform's scrollbars (layout and content unchanged).
@@ -248,6 +356,7 @@ test.describe('@site screenshots', () => {
     ).toBeVisible({ timeout: CATALOGUE_TIMEOUT_MS });
     await waitForMap(window);
     await captureWindow(site, 'explore');
+    console.log(`explore: photos in view ${await photoSizes(window)}`);
     await resize(site, WINDOW.height);
   });
 
@@ -268,21 +377,23 @@ test.describe('@site screenshots', () => {
     await mapRegion(window).screenshot({ path: file('explore-coast') });
   });
 
-  test('Place availability and notices', async () => {
+  test('Place header and availability', async () => {
     test.setTimeout(120_000);
     const { window } = site;
     await go(window, `${BUNGARRA}?${STAY}`);
     await expect(window.getByRole('heading', { level: 1, name: 'Bungarra' })).toBeVisible();
-    const about = window.getByRole('region', { name: 'About' });
-    const notices = about.getByRole('list', { name: 'Notices from ParkStay' });
-    await expect(notices).toBeVisible({ timeout: 30_000 });
-    // From the heading down to the campground map's button: the notices, not the accordion.
-    await captureArea(site, 'place-notices', [
-      { text: about.getByRole('heading', { level: 2, name: 'About' }) },
-      ...(await notices.getByRole('listitem').all()),
-      about.getByRole('button', { name: /^Show all \d+ notices$/ }),
-      about.getByRole('button', { name: 'Campground map' }),
+    // From the back link down to the bottom of the photo: title, provider and park, photo.
+    const photo = window.getByRole('img', { name: 'Bungarra, photo 1 of 1' });
+    await expect(photo).toBeVisible({ timeout: 30_000 });
+    await captureArea(site, 'place-header', [
+      window.getByRole('main').getByRole('link', { name: 'Explore', exact: true }),
+      photo,
     ]);
+    const size = await photo.evaluate((img: HTMLImageElement) => ({
+      shown: `${Math.round(img.getBoundingClientRect().width)} × ${Math.round(img.getBoundingClientRect().height)}`,
+      natural: `${img.naturalWidth} × ${img.naturalHeight}`,
+    }));
+    console.log(`place-header: photo shown at ${size.shown} (logical), image ${size.natural}`);
 
     const stayCard = window.getByRole('region', { name: 'Check your dates' });
     await stayCard.getByRole('button', { name: 'Check availability' }).click();
@@ -325,6 +436,7 @@ test.describe('@site screenshots', () => {
     ).toHaveCount(0, { timeout: 15_000 });
     await expect(card.getByText('Watching', { exact: true })).toBeVisible();
     await expect(card.getByText('3 sites available', { exact: true })).toBeVisible();
+    await expect(card.getByRole('img', { name: 'Bungarra' })).toBeVisible();
     await captureElement(site, 'watch-card', card);
 
     await bell.click();
@@ -335,14 +447,27 @@ test.describe('@site screenshots', () => {
     await expect(panel).toBeHidden();
   });
 
-  test('No provider request went unanswered, and no photo was asked for', async () => {
+  test('ParkStay was asked only for photos; every other provider request met a fixture', async () => {
     const userData = await site.app.evaluate(({ app }) => app.getPath('userData'));
     const refused = readUnexpectedRequests(unexpectedRequestsLogPath(userData));
     // Every provider request was answered from the fixtures…
     expect(refused.filter((r) => r.source !== 'network-guard')).toEqual([]);
-    // …and nothing but Mapbox was even attempted from the window (its telemetry is refused).
-    // Only hosts are compared and reported: Mapbox's URLs carry the access token.
+    // …and the guard refused nothing but Mapbox's telemetry. Only hosts are compared and
+    // reported: Mapbox's URLs carry the access token.
     const hosts = refused.map((r) => new URL(r.url).hostname);
     expect(hosts.filter((host) => !host.endsWith('.mapbox.com'))).toEqual([]);
+    // What went to ParkStay: anonymous GETs of its photos, nothing else.
+    const sent = await site.app.evaluate(
+      () =>
+        (globalThis as unknown as { siteParkStayRequests?: ParkStayRequest[] })
+          .siteParkStayRequests ?? []
+    );
+    expect(sent.length).toBeGreaterThan(0);
+    expect(sent.filter((r) => r.method !== 'GET' || !r.path.startsWith('/media/'))).toEqual([]);
+    expect(sent.filter((r) => r.cookie || r.authorization)).toEqual([]);
+    const distinct = new Set(sent.map((r) => r.path)).size;
+    console.log(
+      `ParkStay requests: ${sent.length} GETs under /media/ (${distinct} distinct photos), on ${PARKSTAY_HOST}`
+    );
   });
 });
