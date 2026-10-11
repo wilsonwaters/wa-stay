@@ -1,5 +1,6 @@
 /**
- * Launches the built app for the documentation screenshots (`npm run docs:screenshots`).
+ * Launches the built app for the documentation screenshots (`npm run docs:screenshots`), and
+ * for the website's (`npm run site:screenshots`, `tests/site`), which pass the options below.
  *
  * It follows the Electron smoke-test harness (`tests/e2e/support/wa-stay.ts`): a temp userData
  * (`WA_STAY_USER_DATA_DIR`, checked before anything else), network-free fixture mode
@@ -22,12 +23,39 @@ import { _electron as electron, type ElectronApplication, type Page } from '@pla
 import { HTTP_FIXTURES_DIR, REPO_ROOT } from '../../e2e/support/paths';
 
 /**
- * The only host a run with a Mapbox token reaches: Mapbox's API (styles, tiles, glyphs,
- * sprites; telemetry stays blocked). Provider photos stay blocked on purpose: they are the
- * provider's (DBCA's) images, shown live in the app and never copied into the repository
- * (brief O8), so the cards show the photo placeholder.
+ * The only host the documentation run reaches, with a Mapbox token: Mapbox's API (styles,
+ * tiles, glyphs, sprites; telemetry stays blocked). Provider photos stay blocked there on
+ * purpose: they are the provider's (DBCA's) images, shown live in the app and never copied
+ * into the repository (brief O8), so the cards show the photo placeholder. Only the website
+ * run lets them through (`allowHosts`), by the product owner's decision.
  */
 export const MAPBOX_HOSTS = ['api.mapbox.com'];
+
+/** The documentation's window: its content size in logical pixels. */
+const DOCS_WINDOW = { width: 1280, height: 800 };
+
+export interface LaunchOptions {
+  /** The build has a Mapbox token: let Mapbox's API host through the network guard. */
+  map: boolean;
+  /**
+   * The provider fixtures (`WA_STAY_E2E_FIXTURES_DIR`), relative to the project or absolute.
+   * The Electron smoke tests' recorded responses by default.
+   */
+  fixturesDir?: string;
+  /**
+   * Hosts let through the network guard besides Mapbox's: anonymous requests from the window
+   * (the website run lets ParkStay's photos load). None by default.
+   */
+  allowHosts?: readonly string[];
+  /** The window's content size in logical pixels; 1280 × 800 by default. */
+  size?: { width: number; height: number };
+  /**
+   * Renders at this many device pixels per logical pixel, through Chromium's
+   * `--force-device-scale-factor` (a launch argument, never app code). By default the
+   * display's own.
+   */
+  deviceScaleFactor?: number;
+}
 
 export interface DocsApp {
   app: ElectronApplication;
@@ -50,7 +78,11 @@ async function forceOnline(window: Page): Promise<void> {
   });
 }
 
-function launchEnv(userDataDir: string, map: boolean): Record<string, string> {
+function launchEnv(
+  userDataDir: string,
+  fixturesDir: string,
+  allowHosts: readonly string[]
+): Record<string, string> {
   const env: Record<string, string> = {};
   for (const [name, value] of Object.entries(process.env)) {
     if (value === undefined) continue;
@@ -64,14 +96,20 @@ function launchEnv(userDataDir: string, map: boolean): Record<string, string> {
     TZ: 'Australia/Perth',
     LANG: 'en_AU.UTF-8',
     WA_STAY_USER_DATA_DIR: userDataDir,
-    WA_STAY_E2E_FIXTURES_DIR: HTTP_FIXTURES_DIR,
+    WA_STAY_E2E_FIXTURES_DIR: fixturesDir,
     // The images show ParkStay's fixture, however many providers are built in
     WA_STAY_PROVIDERS: 'parkstay',
-    ...(map ? { WA_STAY_E2E_ALLOW_HOSTS: MAPBOX_HOSTS.join(',') } : {}),
+    ...(allowHosts.length > 0 ? { WA_STAY_E2E_ALLOW_HOSTS: allowHosts.join(',') } : {}),
   };
 }
 
-export async function launchForDocs({ map }: { map: boolean }): Promise<DocsApp> {
+export async function launchForDocs({
+  map,
+  fixturesDir = HTTP_FIXTURES_DIR,
+  allowHosts = [],
+  size = DOCS_WINDOW,
+  deviceScaleFactor,
+}: LaunchOptions): Promise<DocsApp> {
   const userDataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'wa-stay-docs-'));
   const linux = process.platform === 'linux';
   const app = await electron.launch({
@@ -81,9 +119,10 @@ export async function launchForDocs({ map }: { map: boolean }): Promise<DocsApp>
         ? ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader']
         : []),
       ...(linux && process.env.CI ? ['--no-sandbox'] : []),
+      ...(deviceScaleFactor ? [`--force-device-scale-factor=${deviceScaleFactor}`] : []),
     ],
     cwd: REPO_ROOT,
-    env: launchEnv(userDataDir, map),
+    env: launchEnv(userDataDir, fixturesDir, [...(map ? MAPBOX_HOSTS : []), ...allowHosts]),
   });
   const close = async (): Promise<void> => {
     await app.close().catch(() => app.process().kill('SIGKILL'));
@@ -97,9 +136,9 @@ export async function launchForDocs({ map }: { map: boolean }): Promise<DocsApp>
     const window = await app.firstWindow();
     await forceOnline(window);
     // A fixed size, so the images are the same from run to run.
-    await app.evaluate(({ BrowserWindow }) => {
-      BrowserWindow.getAllWindows()[0].setContentSize(1280, 800);
-    });
+    await app.evaluate(({ BrowserWindow }, { width, height }) => {
+      BrowserWindow.getAllWindows()[0].setContentSize(width, height);
+    }, size);
     await window.getByRole('heading', { level: 1 }).first().waitFor({ timeout: 30_000 });
     return { app, window, close };
   } catch (error) {

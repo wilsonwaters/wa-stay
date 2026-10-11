@@ -52,4 +52,6 @@ Owned by the design stream; the source of truth for the UI.
   rename, the repository description.
 - [2.0 release checklist](release-checklist-2.0.md): the manual checks for 2.0.0.
 - [Code signing](code-signing.md).
+- [Website](website.md): the public page in `site/`, publishing it to GitHub Pages, and a
+  custom domain.
 - [Brand and icons](../resources/README.md).

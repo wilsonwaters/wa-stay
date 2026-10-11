@@ -78,7 +78,7 @@ module.exports = defineConfig([
   },
   {
     // Playwright: a fixture with no dependencies takes `{}`, and its `use` is not React's.
-    files: ['tests/e2e/**/*.ts', 'tests/docs/**/*.ts'],
+    files: ['tests/e2e/**/*.ts', 'tests/docs/**/*.ts', 'tests/site/**/*.ts'],
     rules: {
       'no-empty-pattern': 'off',
       'react-hooks/rules-of-hooks': 'off',
@@ -100,6 +100,14 @@ module.exports = defineConfig([
     },
     rules: {
       'no-unused-vars': ['error', { argsIgnorePattern: '^_' }],
+    },
+  },
+  {
+    // The website's script runs in the visitor's browser, not in Node.
+    files: ['site/**/*.js'],
+    languageOptions: {
+      sourceType: 'script',
+      globals: globals.browser,
     },
   },
   {

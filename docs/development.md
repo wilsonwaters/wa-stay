@@ -157,6 +157,7 @@ does), not on Linux or macOS. Releasing: [release process](release-process.md).
 | `npm run test:electron` | Live Electron tests of the HTTP transport, the ParkStay module, the provider windows and the document windows (`tests/electron`), against loopback servers |
 | `npm run smoke:packaged` | Starts the packaged Linux app and checks it opens and quits cleanly, with the test hooks ignored |
 | `npm run docs:screenshots` | Rebuilds and retakes the screenshots in `docs/images/` |
+| `npm run site:screenshots` | Rebuilds and retakes the website's screenshots in `site/assets/screens/` |
 | `npm run provider:new -- <id>` | Generates a working provider: `--api` (default) or `--browser`, `--search`, `--name`, `--no-register` ([adding a provider](providers/adding-a-provider.md#quick-start)) |
 | `npm run lint` / `lint:fix` | ESLint on `src/`, `tests/`, `scripts/` and the root configs (`eslint.config.js`) |
 | `npm run format` / `format:check` | Prettier on `src/`, `tests/` and `scripts/` |
@@ -237,6 +238,14 @@ use roles and accessible names only. More: [tests/README.md](../tests/README.md)
   `api.mapbox.com` is reached; without one the run is network-free and Explore is list-only.
   Provider photos are never loaded, so cards show the placeholder. On Linux without a display
   it runs under `xvfb-run`.
+- **Website screenshots** (`npm run site:screenshots`): the same, for the product website
+  (`tests/site/`, `playwright.site.config.ts`), and it needs the Mapbox token. Fixture mode serves
+  all 169 ParkStay campgrounds with illustrative availability (generated at run time by
+  `tests/site/support/site-fixtures.ts`). Unlike the docs run, it loads the places' photos live:
+  anonymous image requests to ParkStay's `/media/` paths, checked at the end of the run. The
+  window is 1440 × 900 at 2× (the Explore hero 1440 × 730). It keeps the raw PNGs in
+  `test-results/site/` and writes each as WebP, at 2× and at 1× (`-1x.webp`), to
+  `site/assets/screens/`. Then update the image sizes in `site/index.html` (`docs/website.md`).
 
 **No test touches live provider data that matters.** Tests use recorded fixtures; live checks
 are anonymous and read-only, and nothing ever places a real hold, booking or payment

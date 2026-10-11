@@ -9,4 +9,6 @@ this file only points into it, so there is one source of truth.
   `npm run provider:new -- <id>`, and [the provider guide](docs/providers/adding-a-provider.md)
   is the reference. `.claude/commands/add-provider.md` walks through the same steps.
 - **Before you commit:** the pre-commit checklist in [CLAUDE.md](CLAUDE.md#pre-commit-checklist).
+- **Changing what the app does or shows:** update the public website in `site/` in the same
+  change; [CLAUDE.md, "Website"](CLAUDE.md#website) says where each part of the app appears.
 - **Never** place a real hold, booking or payment on any provider, in a test or otherwise.

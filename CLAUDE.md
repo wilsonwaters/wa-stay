@@ -45,9 +45,10 @@ npm run test:e2e     # Electron smoke tests on the built app (tests/e2e/; xvfb-r
 npm run test:electron # Live Electron tests (tests/electron/; xvfb on Linux; not in npm test)
 npm run smoke:packaged # Starts the packaged Linux app (after electron-builder --linux dir) and checks it quits cleanly
 npm run docs:screenshots # Rebuilds and retakes docs/images/*.png (tests/docs/)
+npm run site:screenshots # Rebuilds and retakes the website's site/assets/screens/*.webp (tests/site/; needs a Mapbox token)
 npm run provider:new -- <id> [--api|--browser] [--search] # Generates a working provider (see "Adding a provider")
 npm run lint         # ESLint (src, tests, scripts and the root configs)
-npm run type-check   # TypeScript type checking (main, renderer, tests/e2e, tests/docs)
+npm run type-check   # TypeScript type checking (main, renderer, tests/e2e, tests/docs, tests/site)
 npm run dist:win     # Package Windows installer
 ```
 
@@ -160,6 +161,12 @@ The checklist for adding an accommodation provider. `.claude/commands/add-provid
 4. **Test:** `npx jest tests/integration/<id>-provider.test.ts` (the contract suite and the mapping).
 5. **Preview in the app** (API providers): `npm run build:e2e`, then `npx cross-env PREVIEW_PROVIDER=<id> playwright test preview-provider` (`xvfb-run -a` on Linux): `tests/e2e/preview-provider.spec.ts` launches the built app in fixture mode with only that provider, checks that Explore lists its places, sets dates (two nights from `PREVIEW_ARRIVAL=YYYY-MM-DD`, by default tomorrow; it warns, without failing, when the responses cover none of the nights, so set it to dates they cover) and checks Explore's free counts (with `bulkAvailability`) and the first place's "Check availability", visits Settings → Accounts, fails on any request fixture mode refused, and attaches screenshots (`npx playwright show-report`). Fixture mode does not serve `ctx.browser`, so a browser provider is previewed by hand against its made-up site on loopback (`scripts/serve-provider-site.mjs`; `docs/providers/browser-providers.md`, "Preview in the app").
 6. **Gate:** `npm run lint && npm run format:check && npm run type-check && npm test && npm run test:tz`, then `npm run build:e2e && npm run test:e2e` (`xvfb-run -a` on Linux). All of it, not just the provider's test.
+7. **Website, when it ships:**
+   - add the provider's row to the providers list in `site/index.html`, with `data-provider="<id>"`, its manifest name and monogram, and what WA Stay does with it;
+   - add its brand colour as `--provider-<id>` in `site/styles.css`, with a `[data-provider='<id>'] .provider__badge` rule;
+   - check that the rest of the page's copy still holds ([Website](#website)).
+
+   The site test checks the row against the manifest. A built-in provider the site doesn't list yet doesn't fail the gate (a freshly scaffolded provider has to pass it), so this step is yours to remember.
 
 Rules:
 
@@ -169,7 +176,14 @@ Rules:
 - `availability.check` and bulk `availability.search` must work without stay fields (the place page and Explore send none); refusals of a hold are results, not rejections; `isSignedIn` answers `unknown`, never `signed-out`, when it cannot tell; nothing retries in a loop (the core only logs `retryable`).
 - No `Co-Authored-By` or AI attribution in commits, code, fixtures or docs.
 
-**Done** means: no `TODO` or placeholder address left; the terms allow what it does; its tests, the full `npm test`, `test:tz` and the e2e suite pass; the preview shows it on Explore (API providers); lint, format and type-check are clean; and no real hold, booking, payment or live-site request happened along the way.
+**Done** means:
+- no `TODO` or placeholder address is left;
+- the terms allow what it does;
+- its tests, the full `npm test`, `test:tz` and the e2e suite pass;
+- the preview shows it on Explore (API providers);
+- lint, format and type-check are clean;
+- the website lists it, once it ships;
+- no real hold, booking, payment or live-site request happened along the way.
 
 ## Key Services
 
@@ -247,11 +261,40 @@ Rules:
 - **Key components:** `components/ui/` primitives (Button, Dialog, Combobox, Menu, Popover, Switch, RadioCard, Stepper, Chip, ProviderBadge, … — `docs/design/components.md`); shared blocks StepFlow, ProviderPicker, LocationCombobox, ProviderStayFields, UnitPicker, NightGrid, LocationCard, PlacePhoto, Countdown, ConnectAccountPrompt, ComingSoonBanner; shell and system surfaces TopNav, AccountMenu, Tray, NotificationBell, AccessStatusChip, UpdateCard, AboutPanel/AboutDialog, Logo (`components/brand/Logo.tsx`)
 - Renderer rules (§8): data only through `renderer/api/` hooks; UI only from `components/ui` and design tokens (`tests/unit/design/token-guard.test.ts`); lucide icons, no emoji; tests assert roles and accessible names, never class names
 
+## Website
+
+`site/` is the public website: one static page of plain HTML and CSS, published to GitHub Pages by `.github/workflows/pages.yml` (`docs/website.md`). It tells people deciding whether to use WA Stay what the app does, so it must stay true to the app.
+
+- **A change to what the app does or shows updates the website in the same PR.** That covers:
+  - a feature added, removed or renamed;
+  - a "Soon" label added or removed;
+  - a provider shipped;
+  - any claim the page makes: watch intervals, holds, accounts, what data leaves the computer, supported Windows versions, the install and update flow;
+  - a screen the screenshots show.
+
+  Where each part of the app appears in `site/index.html`:
+
+  | App | Website section |
+  | --- | --- |
+  | Explore: search, filters, the map, availability | The hero; "See what's free before you plan the drive" |
+  | A place's page | "Every site, night by night" |
+  | Watches, notifications, automatic holds | "Booked out? Set a watch" |
+  | Providers (`BUILT_IN_PROVIDERS`) | "Different providers, one app": one row per shipped provider, showing its manifest name, monogram and brand colour, and what WA Stay does with it |
+  | Site Sniper, Bookings (marked "Soon") | "Coming next". When a "Soon" pill goes, move the feature out of this section and into its own |
+  | Settings, accounts, updates, platforms, data | "Questions", and the two download sections |
+- **Screenshots:** when a screen they show changes, retake them with `npm run site:screenshots` (`tests/site/`; it needs a Mapbox token). Then update the images' sizes and alt text in `site/index.html`; the site test checks the sizes.
+- **Copy:**
+  - plain and non-technical, never the architecture;
+  - provider-neutral: a provider is named only in its providers row and in the independence notice;
+  - only what is true, in the design language's voice (`docs/design/design-language.md`);
+  - "Soon" features are described as coming.
+- **What the site test catches, and what it doesn't:** `tests/unit/site/site.test.ts` catches broken links, wrong image sizes, colours outside the app's tokens, anything loaded from another site, and provider rows that don't match their manifest. It cannot catch copy that has gone stale, so read the page against your change.
+
 ## Testing
 
 - **Framework:** Jest 30 (unit/integration), Playwright (Electron E2E)
 - **Config:** `jest.config.js` — two projects: `main` (Node: `tests/unit`, `tests/integration`, `tests/scripts`, `src/main`, `src/shared`) and `renderer` (jsdom: `src/renderer`, `tests/integration/renderer`); coverage thresholds (a ratchet just below actual coverage): branches 85%, functions 90%, lines 93%, statements 92%; dependencies that ship only ES modules (htmlparser2 and its packages, React Router 8) are compiled to CommonJS by esbuild (`ESM_ONLY_DEPENDENCIES`, `tests/utils/esm-to-cjs-transform.js`), with patterns that accept `/` and `\` (`tests/unit/build/jest-config.test.ts`)
-- **Test locations:** `tests/unit/`, `tests/integration/`, `tests/e2e/`, `tests/electron/`, `tests/docs/`, plus co-located `*.test.tsx` in `src/`
+- **Test locations:** `tests/unit/`, `tests/integration/`, `tests/e2e/`, `tests/electron/`, `tests/docs/`, `tests/site/`, plus co-located `*.test.tsx` in `src/`
 - **Fixtures:** `tests/fixtures/` (users, bookings, watches, site-sniper, `parkstay/` trimmed live samples, `providers/` the provider guide's example providers, and `db/` schema dumps for migration tests)
 - **Helpers:** `tests/utils/` (database-helper, test-helpers, core-harness, fake-provider, provider-contract, ipc-harness, parkstay-fixture-server, fake-browser (a jsdom browser for provider tests), fake-site (how a made-up site answers, and `serveFakeSite` on loopback for a real browser), fake-playwright, fake-safe-storage, `tests/utils/tailwind.ts` (the real stylesheet compiled through Tailwind, for CSS tests), `renderer/` render helpers and a strict mock `window.api`)
 - **`npm run test:tz`:** the timestamp tests with `TZ=Australia/Perth` (unzoned SQLite timestamps must read as UTC)
@@ -280,6 +323,8 @@ git tag vX.X.X
 git push origin main --tags
 ```
 
+Before tagging, check the website (`site/`) still describes the release: features, "Soon" labels, providers, supported Windows versions and screenshots ([Website](#website)).
+
 Pushing a `v*` tag triggers `.github/workflows/build.yml`: **ci** (type-check, lint, test, test:tz) -> **build-windows** (electron-builder, with `MAPBOX_ACCESS_TOKEN`) -> **release** (draft GitHub release with artifacts). Go to GitHub Releases to publish the draft. Publishing target: `wilsonwaters/wa-stay` (`electron-builder.json`); the repository must be renamed before 2.0.0 is published, and `parkstay-bookings` never recreated (v1.x installs update through the redirect).
 
 Key scripts: `npm run dist:win` (local test build), `npm run release:win` (build + publish).
@@ -292,8 +337,9 @@ Before committing any changes, **always** run these checks and fix any failures:
 2. `npm run format:check` — Prettier formatting must pass; run `npm run format` to fix
 3. `npm run type-check` — TypeScript must compile without errors
 4. `npm run test` — All unit/integration tests must pass
+5. If the change alters what the app does or shows, update the website in the same change ([Website](#website))
 
-Do NOT commit code that fails any of these checks. CI enforces all four.
+Do NOT commit code that fails any of these checks. CI enforces the first four; the fifth is on you.
 
 ## Git & PR Conventions
 
@@ -310,3 +356,4 @@ Do NOT commit code that fails any of these checks. CI enforces all four.
 - `docs/security.md` — secret storage and provider windows
 - `docs/release-process.md` — releasing; `docs/release-checklist-2.0.md` — the manual 2.0 checks
 - `docs/design/` — design language, components, shell, map
+- `docs/website.md` — the public website (`site/`, plain HTML and CSS) and publishing it to GitHub Pages (`.github/workflows/pages.yml`)
