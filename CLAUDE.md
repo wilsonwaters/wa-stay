@@ -311,3 +311,4 @@ Do NOT commit code that fails any of these checks. CI enforces all four.
 - `docs/security.md` — secret storage and provider windows
 - `docs/release-process.md` — releasing; `docs/release-checklist-2.0.md` — the manual 2.0 checks
 - `docs/design/` — design language, components, shell, map
+- `docs/website.md` — the public website (`site/`, plain HTML and CSS) and publishing it to GitHub Pages (`.github/workflows/pages.yml`)

@@ -103,6 +103,14 @@ module.exports = defineConfig([
     },
   },
   {
+    // The website's script runs in the visitor's browser, not in Node.
+    files: ['site/**/*.js'],
+    languageOptions: {
+      sourceType: 'script',
+      globals: globals.browser,
+    },
+  },
+  {
     // Node scripts written as ES modules (`scripts/new-provider.mjs`).
     files: ['**/*.mjs'],
     extends: [js.configs.recommended],
