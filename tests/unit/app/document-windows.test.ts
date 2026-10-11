@@ -13,6 +13,7 @@ import type { BrowserWindow } from 'electron';
 import {
   documentPartition,
   DocumentWindows,
+  isDocumentRequest,
   isDocumentUrl,
   isDocumentWindow,
   isSameDocument,
@@ -348,6 +349,42 @@ describe('DocumentWindows', () => {
     expect(second.destroy).toHaveBeenCalled();
   });
 
+  it('cancels every request on its partition but its documents and the viewer’s own', () => {
+    void windows.open(MAP);
+    const filter = documentSession().webRequest.onBeforeRequest.mock.lastCall![0] as (
+      details: { url: string },
+      callback: (response: { cancel?: boolean }) => void
+    ) => void;
+    const allowed = (url: string): boolean => {
+      let cancelled = false;
+      filter({ url }, (response) => (cancelled = response.cancel === true));
+      return !cancelled;
+    };
+    expect(allowed(MAP_URL)).toBe(true);
+    expect(allowed(`${PDF_VIEWER_ORIGIN}/main.js`)).toBe(true);
+    expect(allowed('https://parkstay.dbca.wa.gov.au/api/profile?token=SECRET')).toBe(false);
+    expect(allowed('https://example.com/beacon.gif')).toBe(false);
+    // Another provider's open document is not this partition's
+    void windows.open({ ...MAP, providerId: 'other', key: 'other:1#map', url: `${MAP_URL}?o` });
+    expect(allowed(`${MAP_URL}?o`)).toBe(false);
+    // Logged by origin only
+    const logged = (logger.warn as jest.Mock).mock.calls.map((c) => String(c[0])).join('\n');
+    expect(logged).toContain('refused a request to https://parkstay.dbca.wa.gov.au');
+    expect(logged).not.toContain('SECRET');
+    // Once the window closes, its document is no longer let through
+    windows.closeAll();
+    expect(allowed(MAP_URL)).toBe(false);
+  });
+
+  it('opens loopback http only with the live tests’ option', async () => {
+    await expect(windows.open({ ...MAP, url: 'http://127.0.0.1:9/map.pdf' })).rejects.toThrow(
+      'not https'
+    );
+    windows = new DocumentWindows({ devTools: false, allowLoopbackHttp: true });
+    void windows.open({ ...MAP, url: 'http://127.0.0.1:9/map.pdf' });
+    expect(lastWindow().loadURL).toHaveBeenCalledWith('http://127.0.0.1:9/map.pdf');
+  });
+
   it('refuses an address that is not https (loopback http aside)', async () => {
     await expect(
       windows.open({ ...MAP, url: 'http://parkstay.dbca.wa.gov.au/x.pdf' })
@@ -368,13 +405,31 @@ describe('DocumentWindows', () => {
 });
 
 describe('document URLs', () => {
-  it('allows https without credentials, and http only on loopback', () => {
+  it('allows https without credentials, and loopback http only when the live tests ask', () => {
     expect(isDocumentUrl(MAP_URL)).toBe(true);
-    expect(isDocumentUrl('http://127.0.0.1:8080/map.pdf')).toBe(true);
+    expect(isDocumentUrl('http://127.0.0.1:8080/map.pdf')).toBe(false);
+    expect(isDocumentUrl('http://localhost:8080/map.pdf')).toBe(false);
+    const live = { allowLoopbackHttp: true };
+    expect(isDocumentUrl('http://127.0.0.1:8080/map.pdf', live)).toBe(true);
+    expect(isDocumentUrl('http://parkstay.dbca.wa.gov.au/map.pdf', live)).toBe(false);
     expect(isDocumentUrl('http://parkstay.dbca.wa.gov.au/map.pdf')).toBe(false);
     expect(isDocumentUrl('https://user:pw@parkstay.dbca.wa.gov.au/map.pdf')).toBe(false);
     expect(isDocumentUrl('javascript:alert(1)')).toBe(false);
     expect(isDocumentUrl('not a url')).toBe(false);
+  });
+
+  it('lets a partition load its documents and the viewer’s own resources, nothing else', () => {
+    expect(isDocumentRequest(MAP_URL, [MAP_URL])).toBe(true);
+    expect(isDocumentRequest(`${MAP_URL}#page=1`, [MAP_URL])).toBe(true);
+    expect(isDocumentRequest(`${PDF_VIEWER_ORIGIN}/index.html`, [MAP_URL])).toBe(true);
+    expect(isDocumentRequest('chrome://resources/css/roboto.css', [])).toBe(true);
+    expect(isDocumentRequest(`blob:${PDF_VIEWER_ORIGIN}/0b6c`, [])).toBe(true);
+    expect(isDocumentRequest('data:image/png;base64,AAAA', [])).toBe(true);
+    expect(isDocumentRequest('https://parkstay.dbca.wa.gov.au/api/profile', [MAP_URL])).toBe(false);
+    expect(isDocumentRequest(`${MAP_URL}?other=1`, [MAP_URL])).toBe(false);
+    expect(isDocumentRequest('wss://parkstay.dbca.wa.gov.au/socket', [MAP_URL])).toBe(false);
+    expect(isDocumentRequest('file:///etc/passwd', [MAP_URL])).toBe(false);
+    expect(isDocumentRequest('not a url', [MAP_URL])).toBe(false);
   });
 
   it('compares documents without their fragment', () => {

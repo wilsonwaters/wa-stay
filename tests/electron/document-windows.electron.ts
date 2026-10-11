@@ -5,6 +5,9 @@
  * Real BrowserWindows against a loopback server check what mocks cannot:
  * - the PDF opens in the viewer, sandboxed with no Node, on the document partition (in memory,
  *   not the provider's: its cookies are never sent), under the app's title;
+ * - the partition's allow-list lets the viewer's own resources through: the page is drawn;
+ * - a real click on a link annotation inside the PDF (DevTools input, which reaches the viewer's
+ *   plugin) is refused: no navigation, no new window, no request to the link's server;
  * - a scripted navigation off the document's URL is cancelled, and `window.open` gets nothing;
  * - an answer that is not a PDF (a 200 `text/plain` "ERROR opening file"), an HTTP error, or a
  *   redirect elsewhere closes the window, never shown, and rejects with a `ProviderError`;
@@ -25,6 +28,15 @@ import {
   type DocumentWindowRequest,
 } from '../../src/main/app/document-windows';
 import { ProviderError } from '../../src/main/providers/sdk/errors';
+import { logger } from '../../src/main/utils/logger';
+
+/** Every message logged since the test started (child loggers write through the root). */
+const logged: string[] = [];
+const write = logger.write.bind(logger);
+logger.write = ((info: { message?: unknown }) => {
+  logged.push(String(info.message));
+  return write(info as never);
+}) as typeof logger.write;
 
 const PROVIDER_ID = 'etest';
 const WATCHDOG_MS = 120_000;
@@ -33,15 +45,24 @@ const userData = mkdtempSync(join(tmpdir(), 'wa-stay-electron-documents-'));
 app.setPath('userData', userData);
 app.disableHardwareAcceleration();
 
-/** A one-page PDF with a line of text. */
-function onePagePdf(): Buffer {
+/**
+ * A one-page PDF with a line of text. With `link`, a URI link annotation covers the whole page,
+ * as a link in a campground map would.
+ */
+function onePagePdf(link?: string): Buffer {
   const content = 'BT /F1 24 Tf 72 720 Td (Campground map) Tj ET';
+  const annots = link ? ' /Annots [6 0 R]' : '';
   const objects = [
     '<< /Type /Catalog /Pages 2 0 R >>',
     '<< /Type /Pages /Kids [3 0 R] /Count 1 >>',
-    '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >>',
+    `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >>${annots} >>`,
     `<< /Length ${content.length} >>\nstream\n${content}\nendstream`,
     '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>',
+    ...(link
+      ? [
+          `<< /Type /Annot /Subtype /Link /Rect [0 0 595 842] /Border [0 0 0] /A << /Type /Action /S /URI /URI (${link}) >> >>`,
+        ]
+      : []),
   ];
   let pdf = '%PDF-1.4\n';
   const offsets: number[] = [];
@@ -84,6 +105,10 @@ async function startServer(): Promise<Server> {
       cookies.push(String(req.headers.cookie ?? ''));
       res.writeHead(200, { 'content-type': 'application/pdf', 'x-frame-options': 'DENY' });
       return res.end(pdf);
+    }
+    if (path.startsWith('/linked.pdf')) {
+      res.writeHead(200, { 'content-type': 'application/pdf' });
+      return res.end(onePagePdf(`${otherOrigin}/linked-target`));
     }
     if (path.startsWith('/missing.pdf')) {
       // What ParkStay's media server may answer for a missing file
@@ -193,6 +218,72 @@ const CASES: Case[] = [
       // The viewer's own title (the file name) never replaces the app's
       await sleep(300);
       assert.equal(window.getTitle(), request.title);
+      // The partition's allow-list let the viewer's resources through: the page is drawn
+      // (a white A4 page fills a good part of the window) and nothing was refused
+      await eventually(async () => {
+        const bitmap = (await window.webContents.capturePage()).toBitmap();
+        let white = 0;
+        for (let i = 0; i < bitmap.length; i += 4) {
+          if (bitmap[i] > 245 && bitmap[i + 1] > 245 && bitmap[i + 2] > 245) white++;
+        }
+        assert.ok(white / (bitmap.length / 4) > 0.2, `only ${white} white pixels`);
+      });
+      assert.deepEqual(
+        logged.filter((m) => m.includes('refused a request')),
+        []
+      );
+    },
+  },
+  {
+    name: 'a click on a link inside the PDF is refused: no navigation, no window, no request',
+    async run({ server, windows, request }) {
+      const linked = { ...request, key: 'linked', url: `${server.origin}/linked.pdf` };
+      await windows.open(linked);
+      const window = windowTitled(request.title)!;
+      await eventually(() =>
+        assert.ok(
+          window.webContents.mainFrame.framesInSubtree.some((f) =>
+            f.url.startsWith('chrome-extension://')
+          )
+        )
+      );
+      await sleep(1_000); // the viewer draws the page and its link
+      const before = logged.length;
+      const windowCount = BrowserWindow.getAllWindows().length;
+      const [width, height] = window.getContentSize();
+      const x = Math.round(width / 2) + 60;
+      const y = Math.round(height / 2);
+
+      // A real click on the page, where the link annotation is, as the person would. Input
+      // through DevTools reaches the viewer's plugin (`sendInputEvent` does not); the viewer
+      // then shows a hand and follows the link in the top frame.
+      window.focus();
+      const cdp = window.webContents.debugger;
+      cdp.attach('1.3');
+      try {
+        for (const type of ['mouseMoved', 'mousePressed', 'mouseReleased']) {
+          await cdp.sendCommand('Input.dispatchMouseEvent', {
+            type,
+            x,
+            y,
+            button: type === 'mouseMoved' ? 'none' : 'left',
+            clickCount: 1,
+          });
+        }
+        await eventually(() => assert.ok(logged.length > before, 'the link was followed'));
+        await sleep(500);
+      } finally {
+        cdp.detach();
+      }
+
+      const refusals = logged.slice(before).filter((m) => /blocked|refused/.test(m));
+      assert.ok(
+        refusals.some((m) => m.includes('blocked a navigation to http://127.0.0.1')),
+        `the window refused the link's navigation (logged: ${refusals.join(' | ')})`
+      );
+      assert.equal(window.webContents.getURL(), linked.url);
+      assert.equal(BrowserWindow.getAllWindows().length, windowCount);
+      assert.deepEqual(server.otherPaths, []);
     },
   },
   {
@@ -275,7 +366,8 @@ const CASES: Case[] = [
 
 async function main(): Promise<number> {
   const server = await startServer();
-  const windows = new DocumentWindows({ devTools: false });
+  // Loopback http: the live tests only (the app opens https documents only)
+  const windows = new DocumentWindows({ devTools: false, allowLoopbackHttp: true });
   const request: DocumentWindowRequest = {
     key: `${PROVIDER_ID}:1#campground-map`,
     providerId: PROVIDER_ID,

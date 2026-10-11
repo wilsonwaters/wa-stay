@@ -270,9 +270,15 @@ the window gets nothing of it:
   sender.
 - It runs on its own in-memory partition, `documents-<providerId>`, never the provider's
   `persist:provider-<id>`: no provider cookie is sent, and nothing is kept after the app quits.
+- It opens https documents only (plain http on loopback only for the live Electron tests,
+  never from the app).
 - The top level shows only the document's own URL. Every other navigation and main-frame
   redirect is cancelled (a redirect before the document arrives closes the window), new
-  windows are refused, and each is logged by origin only.
+  windows are refused, and each is logged by origin only. A link clicked inside the PDF is
+  refused the same way (the live Electron tests click one).
+- The partition loads nothing but its open documents and the viewer's own resources
+  (`chrome-extension:`, `chrome:`, `blob:`, `data:`): any other request is cancelled and logged
+  by origin only.
 - Downloads are refused, except the viewer's own: the document itself, or the copy the viewer
   saves from its own extension origin.
 - Every permission request and check, and every device request, is refused; certificate errors

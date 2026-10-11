@@ -8,8 +8,8 @@
  * Nothing on that partition reaches the network:
  * - `protocol.handle` answers every http(s) request: a route's file, or a 404 for a request no
  *   route matches (appended to the unexpected-requests log);
- * - its `onBeforeRequest` lets through the routes and local resources (the PDF viewer's own)
- *   and cancels everything else, logged. A session has one such listener, so it replaces the
+ * - its `onBeforeRequest` lets through the routes (http(s) only; fixture routes carry no host)
+ *   and local resources (the PDF viewer's own) and cancels everything else, logged. A session has one such listener, so it replaces the
  *   network guard's, which would cancel the routes; the allowed hosts
  *   (`WA_STAY_E2E_ALLOW_HOSTS`) do not apply here.
  *
@@ -41,6 +41,14 @@ export interface FixtureDocumentSession extends GuardableSession {
 
 const METHODS = new Set<string>(['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE']);
 
+function protocolOf(url: string): string {
+  try {
+    return new URL(url).protocol;
+  } catch {
+    return '';
+  }
+}
+
 export function serveDocumentFixtures(
   session: FixtureDocumentSession,
   providerId: ProviderId,
@@ -61,8 +69,11 @@ export function serveDocumentFixtures(
     }
     return routes;
   };
+  /** A route answers only http(s): a route's path on another scheme (`wss:`) is refused. */
   const routeFor = (method: string, url: string): FixtureRoute | undefined =>
-    METHODS.has(method) ? matchFixtureRoute(readRoutes(), method as HttpMethod, url) : undefined;
+    METHODS.has(method) && /^https?:$/.test(protocolOf(url))
+      ? matchFixtureRoute(readRoutes(), method as HttpMethod, url)
+      : undefined;
   const refuse = (method: string, url: string): void =>
     appendUnexpectedRequest(logFile, { source: 'fixture-document', providerId, method, url });
 

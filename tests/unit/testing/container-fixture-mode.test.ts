@@ -112,10 +112,21 @@ it('fixture mode: a document window’s partition answers from the fixtures', ()
     (_r, i) => session.fromPartition.mock.calls[i][0] === 'documents-parkstay'
   )?.value as { protocol: { handle: jest.Mock }; webRequest: { onBeforeRequest: jest.Mock } };
   expect(documents.protocol.handle.mock.calls.map((c) => c[0])).toEqual(['https', 'http']);
-  expect(documents.webRequest.onBeforeRequest).toHaveBeenCalledTimes(1);
+  // The windows' allow-list, then the fixture rule, which replaces it (one listener a session)
+  expect(documents.webRequest.onBeforeRequest).toHaveBeenCalledTimes(2);
+  const last = documents.webRequest.onBeforeRequest.mock.lastCall![0] as (
+    details: { url: string; method: string },
+    callback: (response: { cancel?: boolean }) => void
+  ) => void;
+  const callback = jest.fn();
+  last({ url: 'https://parkstay.dbca.wa.gov.au/api/profile', method: 'GET' }, callback);
+  expect(callback).toHaveBeenCalledWith({ cancel: true });
+  expect(readUnexpectedRequests(logFile)).toEqual([
+    expect.objectContaining({ source: 'fixture-document', providerId: 'parkstay' }),
+  ]);
 });
 
-it('without fixture mode a document window’s partition is left to the network', () => {
+it('without fixture mode a document window’s partition keeps only its own allow-list', () => {
   container = createContainer({
     db: openDatabase(':memory:'),
     logsDir: TEST_LOGS_DIR,
@@ -130,5 +141,6 @@ it('without fixture mode a document window’s partition is left to the network'
     webRequest: { onBeforeRequest: jest.Mock };
   };
   expect(documents.protocol.handle).not.toHaveBeenCalled();
-  expect(documents.webRequest.onBeforeRequest).not.toHaveBeenCalled();
+  // Only the windows' own allow-list
+  expect(documents.webRequest.onBeforeRequest).toHaveBeenCalledTimes(1);
 });

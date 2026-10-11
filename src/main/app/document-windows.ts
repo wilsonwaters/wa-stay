@@ -8,12 +8,15 @@
  *   security on, no `<webview>`, no drag-and-drop navigation, no spellchecker, safe dialogs,
  *   DevTools only from source, no preload and no script of ours. `plugins` is on for this
  *   window only: it is what turns on the PDF viewer;
+ * - https only (loopback http only for the live tests, `allowLoopbackHttp`);
  * - its own in-memory partition (`documents-<providerId>`, no `persist:`), so it never sends
  *   or receives the provider's cookies, and nothing it gets is kept after the app quits;
  * - it is never a trusted IPC sender (`isDocumentWindow` keeps the sender guard honest);
  * - the top level shows only the document's own URL (a fragment aside): every other
  *   navigation and main-frame redirect is cancelled, a redirect before the document arrives
  *   closes the window, and new windows are refused. Each is logged by origin only;
+ * - its partition loads nothing but its documents and the viewer's own resources
+ *   (`chrome-extension:`, `chrome:`, `blob:`, `data:`): every other request is cancelled;
  * - downloads are refused, except the viewer's own: the document itself, or the copy the
  *   viewer saves from its own (extension) origin;
  * - every permission request and check, and every device request, is refused; certificate
@@ -62,21 +65,49 @@ export function isDocumentWindow(contents: unknown): boolean {
 }
 
 /**
- * The URL a document window may open: https with no user name or password. Plain http only on
- * a loopback host, which only the live Electron tests use (main resolves every real document
- * to https).
+ * The URL a document window may open: https with no user name or password. Plain http on a
+ * loopback host only with `allowLoopbackHttp`, which only the live Electron tests pass (the
+ * app never does: main resolves every real document to https).
  */
-export function isDocumentUrl(url: string): boolean {
+export function isDocumentUrl(
+  url: string,
+  { allowLoopbackHttp = false }: { allowLoopbackHttp?: boolean } = {}
+): boolean {
   try {
     const parsed = new URL(url);
     if (parsed.username || parsed.password) return false;
     return (
       parsed.protocol === 'https:' ||
-      (parsed.protocol === 'http:' && LOOPBACK_HOSTS.has(parsed.hostname))
+      (allowLoopbackHttp && parsed.protocol === 'http:' && LOOPBACK_HOSTS.has(parsed.hostname))
     );
   } catch {
     return false;
   }
+}
+
+/**
+ * Schemes a document window may load besides its document: the PDF viewer's own (an extension
+ * with Chromium's shared resources) and local data. Every other request is cancelled.
+ */
+export const VIEWER_SCHEMES: ReadonlySet<string> = new Set([
+  'chrome-extension:',
+  'chrome:',
+  'blob:',
+  'data:',
+  'devtools:',
+  'about:',
+]);
+
+/** Whether a document partition lets a request through: its documents, or the viewer's own. */
+export function isDocumentRequest(url: string, documentUrls: readonly string[]): boolean {
+  let protocol: string;
+  try {
+    protocol = new URL(url).protocol;
+  } catch {
+    return false;
+  }
+  if (VIEWER_SCHEMES.has(protocol)) return true;
+  return documentUrls.some((documentUrl) => isSameDocument(url, documentUrl));
 }
 
 /** `url` without its fragment, or undefined for an invalid URL. */
@@ -138,6 +169,11 @@ export interface DocumentWindowsOptions {
   prepareSession?: (session: Session, providerId: ProviderId) => void;
   /** Tests only: `DOCUMENT_SHOW_AFTER_MS`. */
   showAfterMs?: number;
+  /**
+   * Live Electron tests only: also open plain http documents on a loopback host. The app never
+   * sets it (`container.ts`), so a document window opens https only.
+   */
+  allowLoopbackHttp?: boolean;
 }
 
 interface OpenDocument {
@@ -174,7 +210,7 @@ export class DocumentWindows {
    * failed load.
    */
   open(request: DocumentWindowRequest): Promise<void> {
-    if (!isDocumentUrl(request.url)) {
+    if (!isDocumentUrl(request.url, { allowLoopbackHttp: this.options.allowLoopbackHttp })) {
       return Promise.reject(
         new Error(`A document window cannot open ${describeUrl(request.url)}: it is not https`)
       );
@@ -343,6 +379,20 @@ export class DocumentWindows {
     ses.setPermissionRequestHandler((_contents, _permission, callback) => callback(false));
     ses.setPermissionCheckHandler(() => false);
     ses.setDevicePermissionHandler(() => false);
+    // Only the documents open on this partition, and the viewer's own resources: the document
+    // cannot fetch anything else. Fixture mode replaces this with its own rule (one listener
+    // per session).
+    ses.webRequest.onBeforeRequest((details, callback) => {
+      const documents = [...this.windows.values()]
+        .filter((entry) => entry.request.providerId === providerId)
+        .map((entry) => entry.request.url);
+      if (isDocumentRequest(details.url, documents)) {
+        callback({});
+        return;
+      }
+      callback({ cancel: true });
+      log.warn(`A ${providerId} document window refused a request to ${describeUrl(details.url)}`);
+    });
     ses.on('will-download', (event, item, contents) => {
       const url = item.getURL();
       if (this.isViewerDownload(contents, url)) return;

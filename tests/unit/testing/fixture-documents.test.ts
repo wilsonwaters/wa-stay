@@ -96,6 +96,17 @@ it('lets through only the routes and local resources; cancels and logs the rest'
   ]);
 });
 
+it('lets a route’s path through on http(s) only, never on another scheme', () => {
+  // Fixture routes carry no host, as FixtureHttpClient's: any http(s) host matches
+  expect(allowed(`http://parkstay.dbca.wa.gov.au${MAP_PATH}`)).toBe(true);
+  expect(allowed(`wss://any-host.example${MAP_PATH}`)).toBe(false);
+  expect(allowed(`ws://any-host.example${MAP_PATH}`)).toBe(false);
+  expect(readUnexpectedRequests(logFile).map((r) => r.url)).toEqual([
+    `wss://any-host.example${MAP_PATH}`,
+    `ws://any-host.example${MAP_PATH}`,
+  ]);
+});
+
 it('serves nothing when the provider has no manifest', async () => {
   const empty: Map<string, Handler> = new Map();
   serveDocumentFixtures(
