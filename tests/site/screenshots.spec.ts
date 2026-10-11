@@ -33,6 +33,11 @@ const OUT_DIR = process.env.SITE_SCREENSHOTS_DIR ?? path.join(REPO_ROOT, 'test-r
 /** The window's content size in logical pixels, rendered at `SCALE`×. */
 const WINDOW = { width: 1440, height: 900 };
 const SCALE = 2;
+/**
+ * The Explore hero's window height: the list shows one row of cards (no second row of photo
+ * tiles), and the map, framed afresh at this size, all of WA.
+ */
+const HERO_HEIGHT = 730;
 const STAY = 'arrival=2026-11-10&departure=2026-11-12&adults=2';
 const BUNGARRA = '/places/parkstay/20';
 /**
@@ -65,7 +70,8 @@ async function resize(site: DocsApp, height: number): Promise<void> {
 
 /** No cursor, focus ring or transition in the picture. */
 async function settle(page: Page): Promise<void> {
-  await page.mouse.move(WINDOW.width - 1, WINDOW.height - 1);
+  const [width, height] = await page.evaluate(() => [window.innerWidth, window.innerHeight]);
+  await page.mouse.move(width - 1, height - 1);
   await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
   await page.waitForTimeout(800);
 }
@@ -228,9 +234,21 @@ test.describe('@site screenshots', () => {
       results.getByRole('heading', { level: 2, name: /^169 places · [1-9]\d* available for / })
     ).toBeVisible({ timeout: CATALOGUE_TIMEOUT_MS });
     await waitForMap(window);
-    await captureWindow(site, 'explore');
     await settle(window);
     await mapRegion(window).screenshot({ path: file('explore-map') });
+
+    // The hero: a shorter window, with Explore opened afresh in it so the map frames all of WA
+    // at that size (a resize alone keeps the camera).
+    await resize(site, HERO_HEIGHT);
+    await go(window, '/watches');
+    await expect(window.getByRole('heading', { level: 1, name: 'Watches' })).toBeVisible();
+    await go(window, `/?${STAY}`);
+    await expect(
+      results.getByRole('heading', { level: 2, name: /^169 places · [1-9]\d* available for / })
+    ).toBeVisible({ timeout: CATALOGUE_TIMEOUT_MS });
+    await waitForMap(window);
+    await captureWindow(site, 'explore');
+    await resize(site, WINDOW.height);
   });
 
   test('Explore, the South West and south coast', async () => {
