@@ -176,6 +176,96 @@ describe('Place detail page', () => {
     });
   });
 
+  describe('the campground map', () => {
+    const MAP = {
+      id: 'campground-map',
+      kind: 'map' as const,
+      title: 'Campground map',
+      mediaType: 'application/pdf',
+    };
+    const mapButton = () =>
+      within(screen.getByRole('region', { name: 'About' })).getByRole('button', {
+        name: /Campground map|Opening…/,
+      });
+
+    it('shows a "Campground map" button in About when the place has a map, and opens it by id', async () => {
+      let finish!: (value: unknown) => void;
+      const openDocument = jest.fn(() => new Promise((resolve) => (finish = resolve)));
+      const { user } = await renderPlace(
+        '/places/parkstay/20',
+        placeApi({ detail: placeDetail({ documents: [MAP] }), catalog: { openDocument } })
+      );
+      expect(mapButton()).toHaveAccessibleName('Campground map');
+
+      await user.click(mapButton());
+
+      // Only the place's key and the document's id: never an address
+      expect(openDocument).toHaveBeenCalledWith('parkstay:20', 'campground-map');
+      expect(await screen.findByRole('button', { name: 'Opening…' })).toHaveAttribute(
+        'aria-busy',
+        'true'
+      );
+      await act(async () => finish(ok(undefined)));
+      expect(await screen.findByRole('button', { name: 'Campground map' })).not.toHaveAttribute(
+        'aria-busy'
+      );
+    });
+
+    it('shows no map button when the place has no map, or only another kind of document', async () => {
+      const first = await renderPlace();
+      expect(
+        within(screen.getByRole('region', { name: 'About' })).queryByRole('button', {
+          name: 'Campground map',
+        })
+      ).not.toBeInTheDocument();
+      first.unmount();
+
+      const { unmount } = await renderPlace(
+        '/places/parkstay/20',
+        placeApi({
+          detail: placeDetail({
+            documents: [{ ...MAP, id: 'brochure', kind: 'document', title: 'Brochure' }],
+          }),
+        })
+      );
+      expect(screen.queryByRole('button', { name: 'Brochure' })).not.toBeInTheDocument();
+      unmount();
+    });
+
+    it("shows main's message as a toast when ParkStay did not send the map", async () => {
+      const openDocument = jest.fn(async () =>
+        fail("ParkStay didn't send the campground map. Try again later.", 'PROVIDER_ERROR')
+      );
+      const { user } = await renderPlace(
+        '/places/parkstay/20',
+        placeApi({ detail: placeDetail({ documents: [MAP] }), catalog: { openDocument } })
+      );
+
+      await user.click(mapButton());
+
+      expect(
+        await screen.findByText("ParkStay didn't send the campground map. Try again later.")
+      ).toBeInTheDocument();
+      expect(mapButton()).toHaveAccessibleName('Campground map');
+    });
+
+    it('shows a plain toast for any other failure', async () => {
+      const openDocument = jest.fn(async () =>
+        fail('There is no location parkstay:20', 'NOT_FOUND')
+      );
+      const { user } = await renderPlace(
+        '/places/parkstay/20',
+        placeApi({ detail: placeDetail({ documents: [MAP] }), catalog: { openDocument } })
+      );
+
+      await user.click(mapButton());
+
+      expect(
+        await screen.findByText("Couldn't open the campground map. Try again.")
+      ).toBeInTheDocument();
+    });
+  });
+
   it('looks as before for a provider without sections or notices: no list, no accordion', async () => {
     await renderPlace();
     const about = screen.getByRole('region', { name: 'About' });

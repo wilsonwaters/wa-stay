@@ -251,6 +251,18 @@ export function useLocationDetail(key: string | null, options: { enabled?: boole
 }
 
 /**
+ * `catalog.openDocument`: opens a place's document (its campground map) in a window of its
+ * own. Only the place's key and the document's id go to main, which finds the address.
+ * Resolves once the document has arrived.
+ */
+export function useOpenLocationDocument() {
+  return useMutation({
+    mutationFn: ({ locationKey, documentId }: { locationKey: string; documentId: string }) =>
+      unwrap((api) => api.catalog.openDocument(locationKey, documentId)),
+  });
+}
+
+/**
  * Reloads the detail of `key`, in place, when its provider's catalogue syncs. Only the detail:
  * a sync never re-checks availability (each check is a request to the provider).
  */

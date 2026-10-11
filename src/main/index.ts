@@ -30,6 +30,7 @@ import {
 } from './app/login-item';
 import { createMainWindow, denyWebviews, refuseClientCertificates } from './app/main-window';
 import { getBrandIconPath } from './app/paths';
+import { isDocumentWindow } from './app/document-windows';
 import { isProviderWindow } from './app/provider-windows';
 import { installQuitHold } from './app/quit-hold';
 import { createAppUrlMatcher, resolveRendererEntry } from './app/renderer-entry';
@@ -104,8 +105,9 @@ function createWindow(startMinimised: boolean): void {
     icon: process.platform === 'linux' || !app.isPackaged ? getBrandIconPath() : undefined,
   });
   mainWindow = window;
-  // Provider sign-in and payment windows sit above it and close with it
+  // Provider sign-in and payment windows, and document windows, sit above it and close with it
   container.providerWindows.attachMainWindow(window);
+  container.documentWindows.attachMainWindow(window);
   window.on('closed', () => {
     if (mainWindow !== window) return;
     mainWindow = null;
@@ -188,7 +190,8 @@ async function start(): Promise<void> {
     isTrustedSender: createSenderGuard({
       isTrustedWebContents: (id) => trusted.isTrusted(id),
       isAppUrl: createAppUrlMatcher(rendererEntry),
-      isProviderWindow,
+      // Never a provider or document window, even one registered by mistake
+      isProviderWindow: (sender) => isProviderWindow(sender) || isDocumentWindow(sender),
     }),
   });
 

@@ -3,12 +3,14 @@ import {
   ChevronDown,
   Clock,
   Info,
+  Map as MapIcon,
   OctagonAlert,
   TriangleAlert,
   type LucideIcon,
 } from 'lucide-react';
 import type {
   LocationDetail,
+  LocationDocument,
   LocationNotice,
   LocationNoticeLevel,
   LocationSection,
@@ -18,7 +20,8 @@ import { amenityIcon } from '../../components/amenityIcons';
 import { ExternalLink } from '../../components/ExternalLink';
 import { unitCountLabel, unitNoun } from '../../components/locationFormat';
 import { RichText } from '../../components/RichText';
-import { Button, Disclosure, Notice, VisuallyHidden } from '../../components/ui';
+import { ApiError, useOpenLocationDocument } from '../../api';
+import { Button, Disclosure, Notice, useToast, VisuallyHidden } from '../../components/ui';
 import { BADGE_TONE_CLASS } from '../../components/ui/Badge';
 import { cx } from '../../components/ui/cx';
 import { guestRangeLabel, unitTypeBreakdown, type PlaceLinks } from './placeModel';
@@ -175,26 +178,77 @@ export function DescriptionSections({ sections }: { sections: readonly LocationS
 }
 
 /**
- * About: the provider's notices, then its description in sections (an accordion), or as one
- * text (sanitised by main), or its summary, or a plain sentence that it has none, with the
- * link to read more.
+ * A button that opens the place's map document (its campground map) in a window of its own:
+ * "Opening…" until it has arrived, and a toast when it could not be opened.
+ */
+export function MapDocumentButton({
+  locationKey,
+  document,
+}: {
+  locationKey: string;
+  document: LocationDocument;
+}) {
+  const open = useOpenLocationDocument();
+  const toast = useToast();
+  return (
+    <Button
+      variant="secondary"
+      size="sm"
+      leadingIcon={<MapIcon size={16} aria-hidden="true" />}
+      loading={open.isPending}
+      onClick={() =>
+        open.mutate(
+          { locationKey, documentId: document.id },
+          {
+            onError: (error) =>
+              toast.error(
+                error instanceof ApiError && error.code === 'PROVIDER_ERROR'
+                  ? error.message
+                  : `Couldn't open the ${document.title.toLowerCase()}. Try again.`
+              ),
+          }
+        )
+      }
+    >
+      {open.isPending ? 'Opening…' : document.title}
+    </Button>
+  );
+}
+
+/**
+ * About: the provider's notices, its map documents (the campground map), then its description in
+ * sections (an accordion), or as one text (sanitised by main), or its summary, or a plain
+ * sentence that it has none, with the link to read more.
  */
 export function AboutSection({
   detail,
   shortName,
   links,
 }: {
-  detail: Pick<LocationDetail, 'descriptionHtml' | 'summary' | 'sections' | 'notices'>;
+  detail: Pick<
+    LocationDetail,
+    'key' | 'descriptionHtml' | 'summary' | 'sections' | 'notices' | 'documents'
+  >;
   shortName: string;
   links: PlaceLinks;
 }) {
   const sections = Array.isArray(detail.sections) ? detail.sections : [];
   const notices = Array.isArray(detail.notices) ? detail.notices : [];
+  const maps = Array.isArray(detail.documents)
+    ? detail.documents.filter((document) => document.kind === 'map')
+    : [];
   return (
     <PlaceSection title="About">
       {notices.length > 0 && (
         <div className="mb-6">
           <PlaceNotices notices={notices} shortName={shortName} />
+        </div>
+      )}
+      {maps.length > 0 && (
+        <div className="mb-6 flex flex-wrap gap-2">
+          {maps.map((document) => (
+            <MapDocumentButton key={document.id} locationKey={detail.key} document={document} />
+          ))}
         </div>
       )}
       {sections.length > 0 ? (

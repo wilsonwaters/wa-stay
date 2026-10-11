@@ -11,7 +11,8 @@
  * 2. `selectProviders(hooks, BUILT_IN_PROVIDERS)` after `ready`, for the providers the
  *    container registers (`WA_STAY_PROVIDERS`);
  * 3. `startFixtureMode(hooks, …)` after `ready` and before the container, which gives every
- *    provider a `FixtureHttpClient` when it returns a config.
+ *    provider a `FixtureHttpClient` when it returns a config, and the document windows
+ *    `serveDocumentFixtures`.
  */
 
 import type { FixtureHttpClientOptions } from './fixture-http-client';
@@ -20,6 +21,7 @@ import { installNetworkGuard, type GuardableSession, type SessionSource } from '
 import { unexpectedRequestsLogPath } from './request-log';
 
 export * from './env';
+export * from './fixture-documents';
 export * from './fixture-http-client';
 export * from './network-guard';
 export * from './request-log';

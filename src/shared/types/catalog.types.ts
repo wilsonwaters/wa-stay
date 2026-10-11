@@ -77,6 +77,24 @@ export interface LocationNotice {
   text: string;
 }
 
+/** What a location document is: its map (ParkStay's campground map), or another document. */
+export type LocationDocumentKind = 'map' | 'document';
+
+/**
+ * A document the provider publishes about a location, such as ParkStay's campground map (a
+ * PDF). Its address never crosses IPC: main keeps it with the cached detail and opens the
+ * document itself (`catalog.openDocument`), by the location's key and this `id`.
+ */
+export interface LocationDocument {
+  /** Stable within the location, e.g. `campground-map`. */
+  id: string;
+  kind: LocationDocumentKind;
+  /** Plain text, e.g. "Campground map". */
+  title: string;
+  /** The media type the provider serves it as, e.g. `application/pdf`. */
+  mediaType: string;
+}
+
 export interface LocationDetail extends LocationSummary {
   /** Sanitised in main before it crosses IPC. */
   descriptionHtml?: string;
@@ -87,6 +105,8 @@ export interface LocationDetail extends LocationSummary {
   sections?: LocationSection[];
   /** The provider's notices about the location, in its order. */
   notices?: LocationNotice[];
+  /** Documents about the location (its map), opened by main; absent when there are none. */
+  documents?: LocationDocument[];
   units: UnitSummary[];
   /** A human sentence, e.g. "Bookings open 180 days ahead at midnight AWST". */
   releaseInfo?: string;

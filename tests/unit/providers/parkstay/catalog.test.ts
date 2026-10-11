@@ -3,7 +3,12 @@
  * kind heuristic, and a campground's detail from `campsite_availablity_view`.
  */
 
-import { kindFromName, toLocationSummary, toUnitSummary } from '@main/providers/parkstay/catalog';
+import {
+  campgroundMapDocument,
+  kindFromName,
+  toLocationSummary,
+  toUnitSummary,
+} from '@main/providers/parkstay/catalog';
 import { toClassUnitSummary } from '@main/providers/parkstay/site-classes';
 import type {
   RawCampgroundFeature,
@@ -158,6 +163,21 @@ describe('ParkStay catalogue', () => {
       expect(detail.releaseInfo).toBe(
         'Bookable up to 31 March 2027; later dates are released in blocks — use a scheduled snipe'
       );
+    });
+
+    it('gives the view’s map as the campground map document, at its https address on ParkStay', async () => {
+      const detail = await parkstay.provider.catalog.getLocation('20');
+      expect(detail.documents).toEqual([
+        {
+          id: 'campground-map',
+          kind: 'map',
+          title: 'Campground map',
+          mediaType: 'application/pdf',
+          url: 'https://parkstay.dbca.wa.gov.au/media/parkstay/campground_maps/20/Bungarra_Campground_mud_map.pdf',
+        },
+      ]);
+      // The map is not fetched with the detail
+      expect(server.requestsTo('/media/')).toHaveLength(0);
     });
 
     it('reads the campground page once per detail, with the ParkStay Referer', async () => {
@@ -386,6 +406,45 @@ describe('toLocationSummary', () => {
     const feature = bungarra();
     feature.properties.description = '  A quiet bay.  ';
     expect(toLocationSummary(feature)!.summary).toBe('A quiet bay.');
+  });
+});
+
+describe('campgroundMapDocument', () => {
+  const MAP = '/media/parkstay/campground_maps/20/Bungarra_Campground_mud_map.pdf';
+
+  it('resolves the site-relative path against ParkStay, taking the name as given', () => {
+    expect(campgroundMapDocument(MAP)?.url).toBe(`https://parkstay.dbca.wa.gov.au${MAP}`);
+    expect(campgroundMapDocument(`https://parkstay.dbca.wa.gov.au${MAP}`)?.url).toBe(
+      `https://parkstay.dbca.wa.gov.au${MAP}`
+    );
+    expect(campgroundMapDocument('/media/parkstay/campground_maps/43/Lucky Bay.pdf')?.url).toBe(
+      'https://parkstay.dbca.wa.gov.au/media/parkstay/campground_maps/43/Lucky%20Bay.pdf'
+    );
+  });
+
+  it('gives nothing for a campground without a map', () => {
+    expect(campgroundMapDocument(null)).toBeUndefined();
+    expect(campgroundMapDocument('')).toBeUndefined();
+    expect(campgroundMapDocument('   ')).toBeUndefined();
+    expect(campgroundMapDocument(42)).toBeUndefined();
+  });
+
+  it('refuses an address off ParkStay’s origin or not https, logged by origin only', () => {
+    const logger = createMemoryLogger();
+    for (const map of [
+      'https://evil.example/map.pdf?token=SECRET',
+      '//evil.example/map.pdf',
+      'http://parkstay.dbca.wa.gov.au/map.pdf',
+      'https://parkstay.dbca.wa.gov.au:8443/map.pdf',
+      'https://user:pw@parkstay.dbca.wa.gov.au/map.pdf',
+      'https://parkstay.dbca.wa.gov.au.evil.example/map.pdf',
+      'javascript:alert(1)',
+      'file:///etc/passwd',
+    ]) {
+      expect(campgroundMapDocument(map, logger)).toBeUndefined();
+    }
+    expect(logger.lines.filter((line) => line.level === 'warn')).toHaveLength(8);
+    expect(JSON.stringify(logger.lines)).not.toContain('SECRET');
   });
 });
 

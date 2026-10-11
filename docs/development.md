@@ -154,7 +154,7 @@ does), not on Linux or macOS. Releasing: [release process](release-process.md).
 | `npm run test:coverage` | Jest with coverage (thresholds in `jest.config.js`) |
 | `npm run test:tz` | The timestamp tests with the clock in Perth time (`TZ=Australia/Perth`) |
 | `npm run test:e2e` | The Electron smoke tests on the built app (`tests/e2e`); `:ui`, `:headed`, `:debug` variants |
-| `npm run test:electron` | Live Electron tests of the HTTP transport, the ParkStay module and the provider windows (`tests/electron`), against loopback servers |
+| `npm run test:electron` | Live Electron tests of the HTTP transport, the ParkStay module, the provider windows and the document windows (`tests/electron`), against loopback servers |
 | `npm run smoke:packaged` | Starts the packaged Linux app and checks it opens and quits cleanly, with the test hooks ignored |
 | `npm run docs:screenshots` | Rebuilds and retakes the screenshots in `docs/images/` |
 | `npm run provider:new -- <id>` | Generates a working provider: `--api` (default) or `--browser`, `--search`, `--name`, `--no-register` ([adding a provider](providers/adding-a-provider.md#quick-start)) |
@@ -190,9 +190,9 @@ npm run build:e2e            # no Mapbox token: Explore is list-only, determinis
 xvfb-run -a npm run test:e2e # or just npm run test:e2e with a display
 ```
 
-Playwright's `_electron` launcher drives the **built** app through 21 journeys in 10 specs
+Playwright's `_electron` launcher drives the **built** app through 22 journeys in 11 specs
 (`tests/e2e/*.spec.ts`): launch, navigation, Explore and its dates, resizing the window, a place
-to a watch, creating a watch and a snipe, a held snipe paid from its notification, bookings, the
+to a watch, a place's campground map, creating a watch and a snipe, a held snipe paid from its notification, bookings, the
 v1.x upgrade, and a lifecycle walk through every page and Settings section with a relaunch. One
 more check is opt-in: with a Mapbox token in the build and `E2E_MAP=1`, resizing the window must
 not count as a map move (`explore-resize.spec.ts`). The harness
@@ -215,8 +215,9 @@ use roles and accessible names only. More: [tests/README.md](../tests/README.md)
 ### Other checks
 
 - **Live Electron tests** (`npm run test:electron`, not part of `npm test`):
-  `ElectronSessionHttpClient` on a real partition, the ParkStay module through it, and the
-  provider sign-in and payment windows, all against loopback servers.
+  `ElectronSessionHttpClient` on a real partition, the ParkStay module through it, the
+  provider sign-in and payment windows, and the document windows (the campground map in the
+  PDF viewer), all against loopback servers.
 - **The packaged app** (`npx electron-builder --linux dir --publish never`, then
   `xvfb-run -a npm run smoke:packaged`): first reads `app.asar`'s index (the main, preload and
   renderer builds are there, no `.d.ts` or `.map` file under `dist/`, and every packed file has

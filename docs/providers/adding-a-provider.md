@@ -704,7 +704,11 @@ The rules the normalised types carry (`src/shared/types/provider.types.ts`,
   the place page shows them as an accordion, the first open, instead of `descriptionHtml`), and
   short notices `notices` (`{ level: 'warning' | 'caution' | 'info', text }`, plain text). Main
   sanitises each section too, its headings from `h4`, and drops a section with no title or text
-  and a notice with another level. `getLocation`'s `options.previous` is the detail main stored
+  and a notice with another level. A map of the location can be a document in `documents`
+  (`{ id, kind: 'map', title, mediaType, url }`, `url` an absolute https address on your own
+  site): the place page shows a button for it, and main opens it in a document window. The
+  address stays in main and never reaches the renderer; main drops a document without an https
+  address. `getLocation`'s `options.previous` is the detail main stored
   last, however old: reuse part of it when one of your sources fails (ParkStay keeps the
   sections when its campground page cannot be read).
 - **Availability.** `check` returns a `LocationAvailability`: one `UnitAvailability` per unit,

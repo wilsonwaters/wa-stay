@@ -80,6 +80,7 @@ export {
   useLocationDetail,
   useLocationDetailUpdates,
   useLocationSearch,
+  useOpenLocationDocument,
   type BulkAvailability,
   type BulkAvailabilityStatus,
 } from './catalog';

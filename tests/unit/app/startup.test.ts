@@ -106,6 +106,9 @@ jest.mock('@main/app/container', () => ({
       providerWindows: {
         attachMainWindow: () => mockOrder.push('providerWindows.attachMainWindow'),
       },
+      documentWindows: {
+        attachMainWindow: () => mockOrder.push('documentWindows.attachMainWindow'),
+      },
       autoUpdater: { scheduleUpdateCheck: jest.fn() },
       notificationService: { notifyError: mockContainer.notifyError },
       repositories: {
@@ -238,8 +241,9 @@ describe('main process startup', () => {
       'registerIpcHandlers',
       'scheduler.start',
       'createMainWindow',
-      // Provider sign-in and payment windows sit above the main window
+      // Provider sign-in and payment windows, and document windows, sit above the main window
       'providerWindows.attachMainWindow',
+      'documentWindows.attachMainWindow',
       // The catalogue's automatic sync starts once the window exists (it then waits 5 s)
       'catalogService.start',
       // So does the quiet check of accounts not checked for 6 h

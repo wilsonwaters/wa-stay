@@ -60,10 +60,11 @@ import { ElectronSessionHttpClient } from '../providers/sdk/http-electron';
 import { legacyMachineId } from '../security/legacy-decryptors';
 import { migrateLegacySecrets, removeRetiredGmailStore } from '../security/legacy-migration';
 import { FileLocalKeyStore, SecretVault, type SafeStorageLike } from '../security/secret-vault';
-import { FixtureHttpClient, type FixtureModeOptions } from '../testing';
+import { FixtureHttpClient, serveDocumentFixtures, type FixtureModeOptions } from '../testing';
 import { logger } from '../utils/logger';
 import { runsFromSource } from './app-source';
 import { getEmailLogoPath } from './paths';
+import { DocumentWindows } from './document-windows';
 import { createLocalProfile, LocalProfile } from './profile';
 import { ProviderWindows } from './provider-windows';
 import { readSetting } from './settings-values';
@@ -108,6 +109,8 @@ export interface AppContainer {
   readonly notifierDispatcher: NotificationDispatcher;
   /** Provider sign-in and payment windows, and their session partitions. */
   readonly providerWindows: ProviderWindows;
+  /** A location's documents (ParkStay's campground map), in windows of their own. */
+  readonly documentWindows: DocumentWindows;
   /** The person's account with each provider: status, in-app sign-in, sign-out. */
   readonly accounts: ProviderAccountService;
   /** Paying for a snipe's or watch's hold in a payment window (`*.openPayment`). */
@@ -254,6 +257,16 @@ export function createContainer({
 
   // Sign-in and payment windows share each provider's session partition with its HTTP client.
   const providerWindows = new ProviderWindows({ devTools: fromSource });
+  // A location's documents, each on an in-memory partition of its provider's documents; in
+  // fixture mode (from source only) those partitions answer from the fixtures
+  const documentWindows = new DocumentWindows({
+    devTools: fromSource,
+    ...(fixtureMode
+      ? {
+          prepareSession: (ses, providerId) => serveDocumentFixtures(ses, providerId, fixtureMode),
+        }
+      : {}),
+  });
   const accounts = new ProviderAccountService({
     providers,
     accounts: repositories.providerAccounts,
@@ -349,6 +362,7 @@ export function createContainer({
     accounts.dispose();
     holdPayments.dispose();
     providerWindows.closeAll();
+    documentWindows.closeAll();
     // Aborts every job in flight at once; resolves when they settle (bounded).
     const stopping = scheduler.stop();
     // Aborts a catalogue sync in flight, so it writes nothing once the database closes.
@@ -375,6 +389,7 @@ export function createContainer({
     catalogService,
     notifierDispatcher,
     providerWindows,
+    documentWindows,
     accounts,
     holdPayments,
     bookingService,

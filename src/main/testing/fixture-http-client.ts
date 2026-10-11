@@ -49,6 +49,9 @@ const routeSchema = z.strictObject({
 
 const manifestSchema = z.object({ routes: z.array(routeSchema) });
 
+/** Validates a fixture `manifest.json`. */
+export const fixtureManifestSchema = manifestSchema;
+
 export type FixtureRoute = z.infer<typeof routeSchema>;
 export type FixtureManifest = z.infer<typeof manifestSchema>;
 
@@ -57,7 +60,17 @@ export const FIXTURE_MANIFEST = 'manifest.json';
 const CONTENT_TYPES: Record<string, string> = {
   '.json': 'application/json',
   '.html': 'text/html; charset=utf-8',
+  '.pdf': 'application/pdf',
 };
+
+/** A route's content type: its own, else from its file's extension, else plain text. */
+export function fixtureContentType(route: FixtureRoute): string {
+  return (
+    route.contentType ??
+    CONTENT_TYPES[path.extname(route.file).toLowerCase()] ??
+    'text/plain; charset=utf-8'
+  );
+}
 
 /** The first route `method` and `url` match, if any. */
 export function matchFixtureRoute(
@@ -153,10 +166,7 @@ export class FixtureHttpClient extends BaseHttpClient {
     }
     if (hop.signal.aborted) throw hop.signal.reason;
 
-    const contentType =
-      route.contentType ??
-      CONTENT_TYPES[path.extname(route.file).toLowerCase()] ??
-      'text/plain; charset=utf-8';
+    const contentType = fixtureContentType(route);
     return {
       status: route.status ?? 200,
       headers: new Headers({ 'content-type': contentType }),

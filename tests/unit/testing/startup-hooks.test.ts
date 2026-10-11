@@ -88,6 +88,7 @@ jest.mock('@main/app/container', () => ({
       trustedWebContents: { isTrusted: () => true },
       scheduler: { start: jest.fn() },
       providerWindows: { attachMainWindow: jest.fn() },
+      documentWindows: { attachMainWindow: jest.fn() },
       catalogService: { start: jest.fn() },
       accounts: { startRefresh: jest.fn() },
       autoUpdater: { scheduleUpdateCheck: jest.fn() },

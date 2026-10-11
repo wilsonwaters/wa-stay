@@ -127,6 +127,7 @@ const api: WindowApi = {
     checkLocation: (key, stay) => ({ key, stay }),
     refresh: (providerId) => ({ providerId }),
     status: none,
+    openDocument: (locationKey, documentId) => ({ locationKey, documentId }),
   }),
 
   accounts: bind('accounts', {

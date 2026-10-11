@@ -173,11 +173,22 @@ export function electron(): Record<string, unknown> {
 }
 
 /**
- * A session partition (`session.fromPartition`): providers' HTTP clients are built on it, and
- * provider windows harden and clear it.
+ * A session partition (`session.fromPartition`): providers' HTTP clients are built on it,
+ * provider windows harden and clear it, and document windows harden it and check its answers.
  */
 export function fakeSession(): Record<string, unknown> {
+  // Session events (`will-download`): a test emits them with `emit`
+  const events = new EventEmitter();
+  // One session per partition lives for a whole test file, through many containers
+  events.setMaxListeners(0);
   return {
+    on: jest.fn((event: string, listener: (...args: unknown[]) => void) => {
+      events.on(event, listener);
+    }),
+    emit: (event: string, ...args: unknown[]) => events.emit(event, ...args),
+    // A test reads the listeners from the mocks' calls
+    webRequest: { onHeadersReceived: jest.fn(), onBeforeRequest: jest.fn() },
+    protocol: { handle: jest.fn() },
     setUserAgent: jest.fn(),
     setPermissionRequestHandler: jest.fn(),
     setPermissionCheckHandler: jest.fn(),

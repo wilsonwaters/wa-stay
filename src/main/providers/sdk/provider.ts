@@ -24,7 +24,12 @@ import type {
   StayParams,
   StayQuery,
 } from '@shared/types/provider.types';
-import type { BoundingBox, LocationDetail, LocationSummary } from '@shared/types/catalog.types';
+import type {
+  BoundingBox,
+  LocationDetail,
+  LocationDocument,
+  LocationSummary,
+} from '@shared/types/catalog.types';
 import type { SnipeReleaseMode } from '@shared/types/common.types';
 import type { BrowserAutomation } from './browser';
 import type { ProviderContext } from './context';
@@ -45,6 +50,24 @@ export interface CatalogAreaPage {
   nextCursor?: string;
 }
 
+/**
+ * A document as the provider gives it: what the place page sees, plus its address. The core
+ * keeps `url` main-side, with the cached detail, and opens it in a document window; it never
+ * crosses IPC. It must be an absolute https URL on the provider's own site (ParkStay refuses
+ * any other); the core drops a document without one.
+ */
+export interface ProviderLocationDocument extends LocationDocument {
+  url: string;
+}
+
+/**
+ * `catalog.getLocation`'s answer with documents: a `LocationDetail` whose documents carry their
+ * address. A plain `LocationDetail` is accepted too; documents without an address are dropped.
+ */
+export interface ProviderLocationDetail extends Omit<LocationDetail, 'documents'> {
+  documents?: ProviderLocationDocument[];
+}
+
 /** What the caller already knows about a location it asks the detail of. */
 export interface GetLocationOptions {
   /**
@@ -56,7 +79,7 @@ export interface GetLocationOptions {
    * The detail the core last stored for the location, however old. A provider may reuse part
    * of it when one of its sources fails (ParkStay keeps its campground page's sections).
    */
-  previous?: LocationDetail;
+  previous?: ProviderLocationDetail;
 }
 
 /**
@@ -85,7 +108,7 @@ export interface CatalogModule {
     externalId: string,
     signal?: AbortSignal,
     options?: GetLocationOptions
-  ): Promise<LocationDetail>;
+  ): Promise<ProviderLocationDetail | LocationDetail>;
 }
 
 /** A catalogue a `full` provider has: `listLocations` is there. */

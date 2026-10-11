@@ -81,6 +81,7 @@ export const CHANNELS = {
     checkLocation: 'catalog:check-location',
     refresh: 'catalog:refresh',
     status: 'catalog:status',
+    openDocument: 'catalog:open-document',
   },
   accounts: {
     list: 'accounts:list',

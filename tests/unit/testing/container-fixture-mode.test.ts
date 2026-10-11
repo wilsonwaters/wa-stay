@@ -86,3 +86,49 @@ it('without fixture mode each provider keeps its session-partition client', () =
   expect(parkstayContext().http).toBeInstanceOf(ElectronSessionHttpClient);
   expect(session.fromPartition).toHaveBeenCalledWith('persist:provider-parkstay');
 });
+
+const MAP_REQUEST = {
+  key: 'parkstay:20#campground-map',
+  providerId: 'parkstay',
+  providerName: 'ParkStay',
+  url: 'https://parkstay.dbca.wa.gov.au/media/parkstay/campground_maps/20/map.pdf',
+  title: 'Bungarra · Campground map',
+  documentName: 'campground map',
+  mediaType: 'application/pdf',
+};
+
+it('fixture mode: a document window’s partition answers from the fixtures', () => {
+  const logFile = path.join(dir, 'e2e-unexpected-requests.log');
+  container = createContainer({
+    db: openDatabase(':memory:'),
+    logsDir: TEST_LOGS_DIR,
+    ...containerSecrets(),
+    fixtureMode: { fixturesDir: path.join(dir, 'fixtures'), logFile },
+  });
+
+  void container.documentWindows.open(MAP_REQUEST);
+
+  const documents = session.fromPartition.mock.results.find(
+    (_r, i) => session.fromPartition.mock.calls[i][0] === 'documents-parkstay'
+  )?.value as { protocol: { handle: jest.Mock }; webRequest: { onBeforeRequest: jest.Mock } };
+  expect(documents.protocol.handle.mock.calls.map((c) => c[0])).toEqual(['https', 'http']);
+  expect(documents.webRequest.onBeforeRequest).toHaveBeenCalledTimes(1);
+});
+
+it('without fixture mode a document window’s partition is left to the network', () => {
+  container = createContainer({
+    db: openDatabase(':memory:'),
+    logsDir: TEST_LOGS_DIR,
+    ...containerSecrets(),
+  });
+
+  void container.documentWindows.open({ ...MAP_REQUEST, providerId: 'nofixtures' });
+
+  const index = session.fromPartition.mock.calls.findIndex((c) => c[0] === 'documents-nofixtures');
+  const documents = session.fromPartition.mock.results[index].value as {
+    protocol: { handle: jest.Mock };
+    webRequest: { onBeforeRequest: jest.Mock };
+  };
+  expect(documents.protocol.handle).not.toHaveBeenCalled();
+  expect(documents.webRequest.onBeforeRequest).not.toHaveBeenCalled();
+});

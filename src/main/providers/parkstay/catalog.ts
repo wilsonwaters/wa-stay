@@ -14,18 +14,27 @@
  * type and booking window from the map, and its release and site-class facts from the
  * latest availability view. Availability, the release policy and holds read it.
  *
+ * The view's `map` is the campground's map, a one-page PDF on ParkStay's own site: it becomes
+ * the detail's one document (`campgroundMapDocument`), whose address stays in main.
+ *
  * The map is the one large download (1.2 MB). The detail of a campground the caller already
  * has a summary of (the core's stored catalogue) is built from that summary, so the first
  * detail after a launch does not download the map again.
  */
 
-import type { LocationDetail, LocationSummary, UnitSummary } from '@shared/types/catalog.types';
+import type { LocationSummary, UnitSummary } from '@shared/types/catalog.types';
 import type { BookingMode, LocationKind, StayQuery } from '@shared/types/provider.types';
 import { addDays, todayIn } from '@shared/utils/calendar-date';
 import { makeLocationKey } from '@shared/utils/location-key';
 import type { ProviderContext, ProviderLogger } from '../sdk/context';
 import { ProviderError, ProviderParseError, throwIfAborted } from '../sdk/errors';
-import type { CatalogModule, GetLocationOptions } from '../sdk/provider';
+import type {
+  CatalogModule,
+  GetLocationOptions,
+  ProviderLocationDetail,
+  ProviderLocationDocument,
+} from '../sdk/provider';
+import { describeUrl } from '../sdk/url-patterns';
 import type { CampsiteViews } from './availability';
 import { fetchCampgroundPage } from './campground-page';
 import type { ParkStayClient } from './client';
@@ -148,6 +157,45 @@ function imageUrls(images: RawCampgroundFeature['properties']['images']): string
     }
   }
   return [...urls];
+}
+
+/** The campground map's id among a detail's documents. */
+export const CAMPGROUND_MAP_DOCUMENT_ID = 'campground-map';
+
+/**
+ * The availability view's `map` (a site-relative path, or null) as the campground map
+ * document: its address resolved against ParkStay's site, and refused (undefined, logged by
+ * origin only) unless it is https on ParkStay's own origin. Its name is taken as given, never
+ * built.
+ */
+export function campgroundMapDocument(
+  map: unknown,
+  logger?: Pick<ProviderLogger, 'warn'>
+): ProviderLocationDocument | undefined {
+  if (typeof map !== 'string' || !map.trim()) return undefined;
+  let url: URL;
+  try {
+    url = new URL(map.trim(), PARKSTAY_BASE_URL);
+  } catch {
+    logger?.warn('ParkStay campground map: an unreadable address was left out');
+    return undefined;
+  }
+  if (
+    url.protocol !== 'https:' ||
+    url.origin !== PARKSTAY_BASE_URL ||
+    url.username !== '' ||
+    url.password !== ''
+  ) {
+    logger?.warn(`ParkStay campground map: an address on ${describeUrl(url.href)} was left out`);
+    return undefined;
+  }
+  return {
+    id: CAMPGROUND_MAP_DOCUMENT_ID,
+    kind: 'map',
+    title: 'Campground map',
+    mediaType: 'application/pdf',
+    url: url.href,
+  };
 }
 
 /**
@@ -306,7 +354,7 @@ export function createCatalog({ ctx, client, facts, views, release }: CatalogDep
     externalId: string,
     signal?: AbortSignal,
     options?: GetLocationOptions
-  ): Promise<LocationDetail> {
+  ): Promise<ProviderLocationDetail> {
     throwIfAborted(signal);
     const summary = await summaryOf(externalId, signal, options?.summary);
     if (!summary) {
@@ -315,7 +363,7 @@ export function createCatalog({ ctx, client, facts, views, release }: CatalogDep
         message: `${ctx.id}: there is no campground ${externalId}`,
       });
     }
-    const detail: LocationDetail = { ...summary, units: [] };
+    const detail: ProviderLocationDetail = { ...summary, units: [] };
     // A stored summary may carry a link in an older form; the link is always today's.
     if (summary.bookingMode === 'online') detail.bookingUrl = parkstayLinks.location(externalId)!;
     // Only online and offline campgrounds have an availability view (types 2 and 4 are 400).
@@ -339,6 +387,8 @@ export function createCatalog({ ctx, client, facts, views, release }: CatalogDep
       detail.units = isClassListing(view)
         ? view.sites.map(toClassUnitSummary)
         : view.sites.map((site) => toUnitSummary(site, view.classes));
+      const map = campgroundMapDocument(view.map, ctx.logger);
+      if (map) detail.documents = [map];
     }
     const releaseInfo = await release.describe(externalId, signal);
     if (releaseInfo) detail.releaseInfo = releaseInfo;

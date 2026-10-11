@@ -11,7 +11,9 @@
  *   `catalog:updated`.
  * - **Search** runs on the cache (FTS5, filters, facets): `LocationRepository.search`.
  * - **Detail** is cached for 6 h; when the provider fails, the cached copy (or the summary)
- *   comes back marked `stale`.
+ *   comes back marked `stale`. A detail's documents (ParkStay's campground map) are cached
+ *   with their address, which never leaves main: `get` returns them without it, and
+ *   `resolveDocument` reads it back from the cache for `catalog.openDocument`.
  * - **Availability** fans out to every `bulkAvailability` provider (5 min cache) and reports
  *   each provider's failure separately. It never waits in a provider's queue: a gated
  *   provider answers with an `access-gate` error entry at once, and that error (or a
@@ -61,6 +63,7 @@ import {
   type CatalogSearchResult,
   type CatalogStatus,
   type LocationDetail,
+  type LocationDocument,
   type LocationNotice,
   type LocationSection,
   type LocationSummary,
@@ -88,6 +91,8 @@ import { sanitizeProviderHtml } from '../../providers/sdk/html';
 import type {
   AccommodationProvider,
   FullCatalogModule,
+  ProviderLocationDetail,
+  ProviderLocationDocument,
   SearchCatalogModule,
 } from '../../providers/sdk/provider';
 import { AppError } from '../../utils/app-error';
@@ -212,6 +217,22 @@ export const DEFAULT_CATALOG_TIMINGS: Readonly<CatalogTimings> = Object.freeze({
   emptyRetryMs: Object.freeze([60_000, 2 * 60_000, 5 * 60_000]),
 });
 
+/**
+ * A location's document with its address, resolved in main from the cached detail for
+ * `catalog.openDocument`. Never sent to the renderer.
+ */
+export interface ResolvedLocationDocument extends LocationDocument {
+  /** `${locationKey}#${id}`: one document window per document. */
+  key: string;
+  providerId: ProviderId;
+  /** The provider's short name ("ParkStay"), for messages. */
+  providerName: string;
+  /** The location's name, for the window title. */
+  locationName: string;
+  /** Absolute https. */
+  url: string;
+}
+
 export interface SyncOptions {
   /** Sync even when the last success is still fresh. */
   force?: boolean;
@@ -266,7 +287,7 @@ export class LocationCatalogService {
   private readonly retriesUsed = new Map<ProviderId, number>();
 
   private readonly syncs = new Map<ProviderId, Promise<void>>();
-  private readonly details = new Map<string, Promise<LocationDetail>>();
+  private readonly details = new Map<string, Promise<ProviderLocationDetail>>();
   private readonly bulk = new Map<string, Promise<BulkAvailabilityEntry[]>>();
   private readonly bulkCache = new Map<string, Cached<BulkAvailabilityEntry[]>>();
   /** `access-gate` and `timeout` failures of bulk availability, by provider and stay. */
@@ -832,7 +853,7 @@ export class LocationCatalogService {
 
     const cached = this.locations.getDetail(providerId, externalId);
     if (cached && this.within(cached.fetchedAt.getTime(), this.timings.detailTtlMs)) {
-      return { ...cached.detail, fetchedAt: cached.fetchedAt.toISOString() };
+      return publicDetail({ ...cached.detail, fetchedAt: cached.fetchedAt.toISOString() });
     }
 
     const cacheKey = makeLocationKey(providerId, externalId);
@@ -844,22 +865,57 @@ export class LocationCatalogService {
       this.details.set(cacheKey, pending);
     }
     try {
-      return await pending;
+      return publicDetail(await pending);
     } catch (error) {
       if (this.stopped) throw error;
       this.logger.warn(`Detail of ${cacheKey} could not be fetched; serving the cache`, error);
       if (cached) {
-        return { ...cached.detail, fetchedAt: cached.fetchedAt.toISOString(), stale: true };
+        return publicDetail({
+          ...cached.detail,
+          fetchedAt: cached.fetchedAt.toISOString(),
+          stale: true,
+        });
       }
       return { ...summary, units: [], stale: true };
     }
   }
 
+  /**
+   * A location's document, with its address, from the cached detail (fetched first when none
+   * is cached). The renderer names the document by the location's key and the document's id;
+   * the address only ever comes from here. `NOT_FOUND` for an unknown location or document,
+   * or one whose address is not https.
+   */
+  async resolveDocument(key: string, documentId: string): Promise<ResolvedLocationDocument> {
+    const { providerId, externalId } = parseLocationKey(key);
+    let cached = this.locations.getDetail(providerId, externalId);
+    if (!cached) {
+      // Throws NOT_FOUND for a location that is not in a registered catalogue
+      await this.get(key);
+      cached = this.locations.getDetail(providerId, externalId);
+    }
+    const provider = this.registry.tryGet(providerId);
+    if (!provider?.catalog || !cached) {
+      throw new AppError('NOT_FOUND', `There is no location ${key}`);
+    }
+    const document = cleanDocuments(cached.detail.documents).find((d) => d.id === documentId);
+    if (!document) {
+      throw new AppError('NOT_FOUND', `${key} has no document ${documentId}`);
+    }
+    return {
+      ...document,
+      key: `${makeLocationKey(providerId, externalId)}#${document.id}`,
+      providerId,
+      providerName: provider.manifest.shortName,
+      locationName: cached.detail.name,
+    };
+  }
+
   private async fetchDetail(
     provider: AccommodationProvider,
     summary: LocationSummary,
-    previous: LocationDetail | undefined
-  ): Promise<LocationDetail> {
+    previous: ProviderLocationDetail | undefined
+  ): Promise<ProviderLocationDetail> {
     const { providerId, externalId } = summary;
     const fetched = await withDeadline(
       providerId,
@@ -880,13 +936,15 @@ export class LocationCatalogService {
       : undefined;
     const sections = cleanSections(fetched.sections, provider.manifest.website, dropImages);
     const notices = cleanNotices(fetched.notices);
-    const detail: LocationDetail = {
+    const documents = cleanDocuments(fetched.documents);
+    const detail: ProviderLocationDetail = {
       ...fetched,
       key: summary.key,
       providerId,
       externalId,
       units: Array.isArray(fetched.units) ? fetched.units : [],
       fetchedAt: at.toISOString(),
+      documents,
     };
     if (descriptionHtml) detail.descriptionHtml = descriptionHtml;
     else delete detail.descriptionHtml;
@@ -894,6 +952,8 @@ export class LocationCatalogService {
     else delete detail.sections;
     if (notices.length > 0) detail.notices = notices;
     else delete detail.notices;
+    if (documents.length > 0) detail.documents = documents;
+    else delete detail.documents;
     delete detail.stale;
 
     if (this.stopped) return detail;
@@ -1078,6 +1138,51 @@ function cleanNotices(notices: unknown): LocationNotice[] {
     }
   }
   return clean;
+}
+
+const DOCUMENT_KINDS: ReadonlySet<string> = new Set(['map', 'document']);
+
+/**
+ * A provider's documents with an id (unique), a known kind, a title, a media type and an
+ * absolute https address with no user name or password; the others are dropped.
+ */
+function cleanDocuments(documents: unknown): ProviderLocationDocument[] {
+  if (!Array.isArray(documents)) return [];
+  const clean: ProviderLocationDocument[] = [];
+  for (const document of documents as Array<Partial<ProviderLocationDocument> | null>) {
+    const id = typeof document?.id === 'string' ? document.id.trim() : '';
+    const title = typeof document?.title === 'string' ? document.title.trim() : '';
+    const mediaType = typeof document?.mediaType === 'string' ? document.mediaType.trim() : '';
+    const kind = document?.kind;
+    const url = httpsUrl(document?.url);
+    if (!id || !title || !mediaType || !url || clean.some((d) => d.id === id)) continue;
+    if (typeof kind !== 'string' || !DOCUMENT_KINDS.has(kind)) continue;
+    clean.push({ id, kind, title, mediaType, url });
+  }
+  return clean;
+}
+
+/** `value` as an absolute https URL without credentials, or undefined. */
+function httpsUrl(value: unknown): string | undefined {
+  if (typeof value !== 'string') return undefined;
+  try {
+    const url = new URL(value);
+    return url.protocol === 'https:' && !url.username && !url.password ? url.href : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * The detail as it crosses IPC: its documents without their address (or no `documents` when
+ * none is left).
+ */
+function publicDetail(detail: ProviderLocationDetail): LocationDetail {
+  const { documents, ...rest } = detail;
+  const listed: LocationDocument[] = cleanDocuments(documents).map(
+    ({ id, kind, title, mediaType }) => ({ id, kind, title, mediaType })
+  );
+  return listed.length > 0 ? { ...rest, documents: listed } : rest;
 }
 
 function safeParseKey(key: unknown): ReturnType<typeof parseLocationKey> | undefined {

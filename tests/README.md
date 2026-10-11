@@ -292,9 +292,10 @@ The `launchWaStay()` fixture starts the app with:
   the profile before the app starts (see "Seeding data" below).
 - **Fixture mode** (`WA_STAY_E2E_FIXTURES_DIR=tests/e2e/fixtures/http`): every provider's
   `HttpClient` is a `FixtureHttpClient` that answers from recorded responses, and a network
-  guard cancels every other http(s)/ws(s) request any Electron session makes. Each refusal is
-  written to `<userData>/e2e-unexpected-requests.log`; the lifecycle spec requires it to be
-  empty. `WA_STAY_E2E_ALLOW_HOSTS` (comma-separated hosts, subdomains included) lets some
+  guard cancels every other http(s)/ws(s) request any Electron session makes. A document
+  window's partition (the campground map) answers from the same provider routes, a PDF
+  included, and refuses everything else. Each refusal is written to
+  `<userData>/e2e-unexpected-requests.log`; the lifecycle spec requires it to be empty. `WA_STAY_E2E_ALLOW_HOSTS` (comma-separated hosts, subdomains included) lets some
   through, for documentation screenshots.
 - **Only the providers the journey was written for** (`WA_STAY_PROVIDERS`, comma-separated
   provider ids): `parkstay` (`DEFAULT_PROVIDERS`) unless the launch passes `{ providers }`. The

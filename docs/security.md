@@ -253,6 +253,42 @@ Signing out clears the partition (cookies, storage, HTTP auth cache) and nothing
 local profile, watches, snipes and bookings stay. It is refused while a snipe or hold needs
 the session.
 
+## Document windows (the campground map)
+
+A location's document, such as ParkStay's campground map (a one-page PDF served with
+`X-Frame-Options: DENY`), opens in a window of its own, in Electron's built-in PDF viewer
+(`src/main/app/document-windows.ts`, `catalog.openDocument`). The document is not the app's, so
+the window gets nothing of it:
+
+- **The address never comes from the renderer.** The renderer sends the location's key and the
+  document's id; main takes the address from the detail it cached. ParkStay keeps only an https
+  address on its own origin, and the catalogue drops any document whose address is not https.
+  `catalog.get` returns documents without their address.
+- It runs sandboxed, with context isolation, no Node integration (frames and workers included),
+  web security on, no `<webview>`, no preload and no script of the app. `plugins` is on for
+  document windows only: it turns on the PDF viewer. Its webContents is never a trusted IPC
+  sender.
+- It runs on its own in-memory partition, `documents-<providerId>`, never the provider's
+  `persist:provider-<id>`: no provider cookie is sent, and nothing is kept after the app quits.
+- The top level shows only the document's own URL. Every other navigation and main-frame
+  redirect is cancelled (a redirect before the document arrives closes the window), new
+  windows are refused, and each is logged by origin only.
+- Downloads are refused, except the viewer's own: the document itself, or the copy the viewer
+  saves from its own extension origin.
+- Every permission request and check, and every device request, is refused; certificate errors
+  are rejected; no client certificate or HTTP credentials are offered; the document cannot stop
+  the window closing.
+- The answer must be the document's media type (`application/pdf`) with a 2xx status, checked on
+  the response headers before anything renders. Anything else (ParkStay may answer a missing
+  file with a 200 `text/plain` "ERROR opening file") closes the window, and the place page shows
+  the `PROVIDER_ERROR` message.
+- The title is "<place> · Campground map", which the document cannot change. A second open of
+  the same document focuses its window. Document windows close with the main window and on
+  quit.
+
+In fixture mode (test-only, from source only) the document partition answers from the provider's
+fixtures (`src/main/testing/fixture-documents.ts`) and refuses, and logs, everything else.
+
 ## The main window's permissions
 
 Electron grants every permission a page asks for unless its session has handlers. The main
@@ -265,7 +301,7 @@ on the error screen) and fails without it. Desktop notifications are shown by th
 permission and the page's origin only. The Electron smoke tests check, in the built app, that
 the clipboard write is granted, that other permissions read as denied, and that copying works.
 
-Provider windows refuse everything, the clipboard included ([above](#provider-sign-in-and-payment-windows)).
+Provider windows and document windows refuse everything, the clipboard included ([above](#provider-sign-in-and-payment-windows)).
 
 No request the app makes offers a client certificate. Since Electron 44, `app` emits
 `select-client-certificate` for `net` requests as well (every provider's HTTP client and the

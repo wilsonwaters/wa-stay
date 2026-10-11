@@ -52,6 +52,7 @@ import {
   startParkStayFixtureServer,
   type ParkStayFixtureServer,
 } from '@tests/utils/parkstay-fixture-server';
+import type { FakeBrowserWindow } from '@tests/utils/electron-mocks';
 import { BUNGARRA_STAY, createTestParkStay } from '@tests/utils/parkstay-provider';
 
 jest.mock('electron', () => jest.requireActual('@tests/utils/electron-mocks').electron());
@@ -358,6 +359,33 @@ describe('the location catalogue on a real database', () => {
       ]);
     });
 
+    it("lists Bungarra's campground map without its address, which stays in the cache", async () => {
+      const { catalog, locations } = await build({ parkstay: true });
+      await catalog.sync('parkstay');
+      const mapUrl =
+        'https://parkstay.dbca.wa.gov.au/media/parkstay/campground_maps/20/Bungarra_Campground_mud_map.pdf';
+
+      const detail = await catalog.get('parkstay:20');
+
+      expect(detail.documents).toEqual([
+        {
+          id: 'campground-map',
+          kind: 'map',
+          title: 'Campground map',
+          mediaType: 'application/pdf',
+        },
+      ]);
+      expect(JSON.stringify(detail)).not.toContain('campground_maps');
+      expect(locations.getDetail('parkstay', '20')?.detail.documents?.[0].url).toBe(mapUrl);
+      await expect(catalog.resolveDocument('parkstay:20', 'campground-map')).resolves.toMatchObject(
+        {
+          url: mapUrl,
+          providerName: 'ParkStay',
+          locationName: 'Bungarra',
+        }
+      );
+    });
+
     it('after the TTL, keeps the stored sections when the campground page shows "Oops!"', async () => {
       const { catalog } = await build({ parkstay: true });
       await catalog.sync('parkstay');
@@ -551,11 +579,12 @@ describe('catalog.* over IPC (P3 harness, real container)', () => {
     removeUserData(userDataDir);
   });
 
-  it('registers the six catalog handlers and no parkstay ones', () => {
+  it('registers the seven catalog handlers and no parkstay ones', () => {
     expect(ipc.registrations.filter((c) => c.startsWith('catalog:')).sort()).toEqual([
       'catalog:availability',
       'catalog:check-location',
       'catalog:get',
+      'catalog:open-document',
       'catalog:refresh',
       'catalog:search',
       'catalog:status',
@@ -674,7 +703,7 @@ describe('catalog.* over IPC (P3 harness, real container)', () => {
     });
   });
 
-  it('all six handlers reject invalid payloads with VALIDATION', async () => {
+  it('all seven handlers reject invalid payloads with VALIDATION', async () => {
     const cases: Array<[string, unknown, string[]]> = [
       ['catalog:search', { limit: 0 }, ['limit']],
       ['catalog:search', { limit: 5001 }, ['limit']],
@@ -690,6 +719,8 @@ describe('catalog.* over IPC (P3 harness, real container)', () => {
       ],
       ['catalog:refresh', { providerId: 'Bad Id' }, ['providerId']],
       ['catalog:status', { anything: true }, ['(root)']],
+      ['catalog:open-document', { locationKey: 'nokey', documentId: 'x' }, ['locationKey']],
+      ['catalog:open-document', { locationKey: 'fake:1', documentId: '' }, ['documentId']],
     ];
     for (const [channel, payload, issues] of cases) {
       expect([channel, await call(channel, payload)]).toEqual([
@@ -698,6 +729,147 @@ describe('catalog.* over IPC (P3 harness, real container)', () => {
       ]);
     }
     expect(fake.calls).toEqual([]);
+  });
+});
+
+describe('catalog.openDocument over IPC (real container, mocked windows)', () => {
+  const MAP_URL = 'https://fake.example/media/maps/1/map.pdf';
+  let container: AppContainer;
+  let ipc: FakeIpcMain;
+  let userDataDir: string;
+  let fake: FakeProvider;
+  const windowsMock = jest.requireMock('electron') as {
+    BrowserWindow: typeof FakeBrowserWindow;
+    session: { fromPartition: jest.Mock };
+  };
+  const call = <T = unknown>(channel: string, payload?: unknown): Promise<APIResponse<T>> =>
+    ipc.invoke(channel, fakeEvent(), payload) as Promise<APIResponse<T>>;
+  const newestWindow = (): FakeBrowserWindow =>
+    windowsMock.BrowserWindow.instances[windowsMock.BrowserWindow.instances.length - 1];
+  /** Waits (up to 5 s) for the handler to open its window. */
+  const opened = async (count: number): Promise<FakeBrowserWindow> => {
+    const until = Date.now() + 5_000;
+    while (windowsMock.BrowserWindow.instances.length < count && Date.now() < until) {
+      await new Promise((resolve) => setTimeout(resolve, 10));
+    }
+    expect(windowsMock.BrowserWindow.instances).toHaveLength(count);
+    return newestWindow();
+  };
+
+  beforeEach(async () => {
+    windowsMock.BrowserWindow.instances.length = 0;
+    const secrets = containerSecrets();
+    userDataDir = secrets.userDataDir;
+    container = createContainer({
+      db: openDatabase(':memory:'),
+      logsDir: TEST_LOGS_DIR,
+      ...secrets,
+      providerFactories: [parkstayFactory],
+    });
+    fake = createFakeProvider();
+    container.providers.register(fake.factory, createTestProviderContext);
+    const catalog = container.providers.get('fake').catalog!;
+    const original = catalog.getLocation.bind(catalog);
+    jest.spyOn(catalog, 'getLocation').mockImplementation(async (id, signal) => ({
+      ...(await original(id, signal)),
+      documents: [
+        {
+          id: 'campground-map',
+          kind: 'map',
+          title: 'Campground map',
+          mediaType: 'application/pdf',
+          url: MAP_URL,
+        },
+      ],
+    }));
+    container.trustedWebContents.register(fakeWebContents(TRUSTED_SENDER_ID));
+    ipc = new FakeIpcMain();
+    registerIpcHandlers(container, { isTrustedSender: () => true, ipc });
+    await call('catalog:refresh', { providerId: 'fake' });
+  });
+
+  afterEach(async () => {
+    await container.dispose();
+    removeUserData(userDataDir);
+  });
+
+  it('lists the map without its address, then opens it at the address main cached', async () => {
+    const detail = await call<LocationDetail>('catalog:get', { key: 'fake:1' });
+    expect(detail.data!.documents).toEqual([
+      { id: 'campground-map', kind: 'map', title: 'Campground map', mediaType: 'application/pdf' },
+    ]);
+    expect(JSON.stringify(detail)).not.toContain('fake.example/media');
+
+    // A URL in the payload is no part of the contract: it is never used
+    const opening = call('catalog:open-document', {
+      locationKey: 'fake:1',
+      documentId: 'campground-map',
+      url: 'https://evil.example/x.pdf',
+    });
+    const window = await opened(1);
+    expect(window.loadURL).toHaveBeenCalledWith(MAP_URL);
+    expect(window.options).toMatchObject({ title: 'Banksia Camp · Campground map' });
+    expect(window.options.webPreferences).toMatchObject({
+      partition: 'documents-fake',
+      plugins: true,
+    });
+    window.webContents.navigate(MAP_URL);
+    await expect(opening).resolves.toEqual({ success: true, data: undefined });
+
+    // A second open focuses the same window
+    await expect(
+      call('catalog:open-document', { locationKey: 'fake:1', documentId: 'campground-map' })
+    ).resolves.toEqual({ success: true, data: undefined });
+    expect(windowsMock.BrowserWindow.instances).toHaveLength(1);
+    expect(window.focus).toHaveBeenCalled();
+
+    // The quit path closes it
+    await container.dispose();
+    expect(window.destroy).toHaveBeenCalled();
+  });
+
+  it('PROVIDER_ERROR, and the window closes, when the answer is not a PDF', async () => {
+    const opening = call('catalog:open-document', {
+      locationKey: 'fake:1',
+      documentId: 'campground-map',
+    });
+    const window = await opened(1);
+    const ses = windowsMock.session.fromPartition('documents-fake') as {
+      webRequest: { onHeadersReceived: jest.Mock };
+    };
+    // The partition outlives each test's container: this container's check is the latest
+    const check = ses.webRequest.onHeadersReceived.mock.lastCall![0] as (
+      details: Record<string, unknown>,
+      callback: (response: { cancel?: boolean }) => void
+    ) => void;
+    const callback = jest.fn();
+    check(
+      {
+        url: MAP_URL,
+        resourceType: 'mainFrame',
+        webContentsId: window.webContents.id,
+        statusCode: 200,
+        responseHeaders: { 'Content-Type': ['text/plain'] },
+      },
+      callback
+    );
+    expect(callback).toHaveBeenCalledWith({ cancel: true });
+    await expect(opening).resolves.toEqual({
+      success: false,
+      code: 'PROVIDER_ERROR',
+      error: "Fake didn't send the campground map. Try again later.",
+    });
+    expect(window.destroy).toHaveBeenCalled();
+  });
+
+  it('NOT_FOUND for a document or location that does not exist, with no window', async () => {
+    expect(
+      await call('catalog:open-document', { locationKey: 'fake:1', documentId: 'brochure' })
+    ).toMatchObject({ success: false, code: 'NOT_FOUND' });
+    expect(
+      await call('catalog:open-document', { locationKey: 'fake:999', documentId: 'campground-map' })
+    ).toMatchObject({ success: false, code: 'NOT_FOUND' });
+    expect(windowsMock.BrowserWindow.instances).toHaveLength(0);
   });
 });
 

@@ -16,11 +16,11 @@ import type {
   CatalogQuery,
   CatalogSearchResult,
   FacetCount,
-  LocationDetail,
   LocationSummary,
   ProviderId,
 } from '@shared/types';
 import { CATALOG_MAX_LIMIT, locationKeyOf } from '@shared/types';
+import type { ProviderLocationDetail } from '../../providers/sdk/provider';
 import { BaseRepository, readInstant } from './base.repository';
 
 /**
@@ -95,7 +95,8 @@ export interface MergeLocationsResult {
 }
 
 export interface CachedLocationDetail {
-  detail: LocationDetail;
+  /** As the provider gave it (cleaned): its documents carry their address, for main only. */
+  detail: ProviderLocationDetail;
   fetchedAt: Date;
 }
 
@@ -220,7 +221,7 @@ export class LocationRepository extends BaseRepository<LocationSummary> {
   setDetail(
     providerId: ProviderId,
     externalId: string,
-    detail: LocationDetail,
+    detail: ProviderLocationDetail,
     fetchedAt: Date
   ): boolean {
     const { changes } = this.db
@@ -241,7 +242,7 @@ export class LocationRepository extends BaseRepository<LocationSummary> {
   /** The cached detail and when it was fetched, or null when none is cached. */
   getDetail(providerId: ProviderId, externalId: string): CachedLocationDetail | null {
     const row = this.findRow(providerId, externalId);
-    const detail = row ? this.parseJson<LocationDetail>(row.detail) : undefined;
+    const detail = row ? this.parseJson<ProviderLocationDetail>(row.detail) : undefined;
     if (!row || !detail) return null;
     return { detail, fetchedAt: readInstant(row.detail_fetched_at) ?? new Date(0) };
   }

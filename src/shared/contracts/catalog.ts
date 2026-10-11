@@ -55,6 +55,15 @@ export interface CatalogRefreshRequest {
   providerId?: ProviderId;
 }
 
+/**
+ * The `catalog.openDocument` payload: a location's document by the location's key and the
+ * document's id (`LocationDocument.id`). Never its address: main resolves it.
+ */
+export interface CatalogOpenDocumentRequest {
+  locationKey: string;
+  documentId: string;
+}
+
 const getRequest = z.object({ key: LocationKeySchema });
 const availabilityRequest = z.object({
   stay: StayQuerySchema,
@@ -63,6 +72,10 @@ const availabilityRequest = z.object({
 });
 const checkLocationRequest = z.object({ key: LocationKeySchema, stay: StayQuerySchema });
 const refreshRequest = z.object({ providerId: ProviderIdSchema.optional() });
+const openDocumentRequest = z.object({
+  locationKey: LocationKeySchema,
+  documentId: z.string().min(1).max(64),
+});
 
 assertTypeEquals<z.input<typeof getRequest>, CatalogGetRequest>(true);
 assertTypeEquals<z.output<typeof getRequest>, CatalogGetRequest>(true);
@@ -72,6 +85,8 @@ assertTypeEquals<z.input<typeof checkLocationRequest>, CatalogCheckLocationReque
 assertTypeEquals<z.output<typeof checkLocationRequest>, CatalogCheckLocationRequest>(true);
 assertTypeEquals<z.input<typeof refreshRequest>, CatalogRefreshRequest>(true);
 assertTypeEquals<z.output<typeof refreshRequest>, CatalogRefreshRequest>(true);
+assertTypeEquals<z.input<typeof openDocumentRequest>, CatalogOpenDocumentRequest>(true);
+assertTypeEquals<z.output<typeof openDocumentRequest>, CatalogOpenDocumentRequest>(true);
 
 const C = CHANNELS.catalog;
 
@@ -109,4 +124,17 @@ export const catalog = {
     response: {} as CatalogStatus,
   },
   status: { channel: C.status, request: z.void(), args: {} as [], response: {} as CatalogStatus },
+  /**
+   * Opens a location's document (`LocationDetail.documents`, such as ParkStay's campground
+   * map) in a document window, or focuses its window when it is open. Main takes the address
+   * from the cached detail. Resolves once the document has arrived; `NOT_FOUND` for an unknown
+   * location or document, `PROVIDER_ERROR` when the provider did not send it (the window
+   * closes).
+   */
+  openDocument: {
+    channel: C.openDocument,
+    request: openDocumentRequest,
+    args: {} as [locationKey: string, documentId: string],
+    response: undefined as void,
+  },
 } satisfies Namespace;

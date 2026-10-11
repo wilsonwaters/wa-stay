@@ -36,6 +36,12 @@
         "queue_group": "parkstayv2"
       },
       "file": "queue-active.json"
+    },
+    {
+      "method": "GET",
+      "path": "/media/parkstay/campground_maps/20/Bungarra_Campground_mud_map.pdf",
+      "file": "campground_map_20.pdf",
+      "contentType": "application/pdf"
     }
   ]
 }

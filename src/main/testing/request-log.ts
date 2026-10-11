@@ -2,7 +2,8 @@
  * The unexpected-requests log of fixture mode: `<userData>/e2e-unexpected-requests.log`.
  *
  * One JSON object per line, appended by `FixtureHttpClient` (a provider request with no
- * fixture route) and by the network guard (a request it cancelled). The Electron smoke tests
+ * fixture route), by the network guard (a request it cancelled) and by a document window's
+ * partition (`fixture-documents.ts`: a request with no fixture route). The Electron smoke tests
  * read it after each run; an empty or missing file means the app stayed off the network.
  */
 
@@ -15,10 +16,10 @@ export interface UnexpectedRequest {
   /** ISO time. */
   time: string;
   /** Who stopped the request. */
-  source: 'fixture-http' | 'network-guard';
+  source: 'fixture-http' | 'network-guard' | 'fixture-document';
   method: string;
   url: string;
-  /** `fixture-http`: the provider that asked. */
+  /** `fixture-http`, `fixture-document`: the provider that asked. */
   providerId?: string;
   /** `network-guard`: Chromium's resource type (`image`, `xhr`, `mainFrame`, …). */
   resourceType?: string;

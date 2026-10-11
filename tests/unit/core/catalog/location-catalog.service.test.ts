@@ -766,6 +766,139 @@ describe('detail', () => {
   });
 });
 
+describe('documents (the campground map): addresses stay in main', () => {
+  const MAP_URL = 'https://fake.example/media/maps/1/map.pdf';
+  const MAP = {
+    id: 'campground-map',
+    kind: 'map' as const,
+    title: 'Campground map',
+    mediaType: 'application/pdf',
+    url: MAP_URL,
+  };
+  const listed = { id: MAP.id, kind: MAP.kind, title: MAP.title, mediaType: MAP.mediaType };
+
+  /** The fake's detail, with these documents. */
+  function withDocuments(s: Setup, documents: unknown[]): void {
+    const original = s.fake.catalog!.getLocation.bind(s.fake.catalog);
+    jest.spyOn(s.fake.catalog!, 'getLocation').mockImplementation(async (id, signal) => ({
+      ...(await original(id, signal)),
+      documents: documents as never,
+    }));
+  }
+
+  it('returns the documents without their address, fresh, cached and stale, and caches the address', async () => {
+    const s = setup();
+    await s.catalog.sync();
+    withDocuments(s, [MAP]);
+
+    const fresh = await s.catalog.get('fake:1');
+    expect(fresh.documents).toEqual([listed]);
+    expect(JSON.stringify(fresh)).not.toContain(MAP_URL);
+    // The cache holds the address, main-side
+    expect(s.locations.getDetail('fake', '1')?.detail.documents).toEqual([MAP]);
+
+    const cached = await s.catalog.get('fake:1');
+    expect(cached.documents).toEqual([listed]);
+    expect(JSON.stringify(cached)).not.toContain(MAP_URL);
+
+    advance(s, 7 * HOUR);
+    s.fake.failNext('catalog', new ProviderError({ providerId: 'fake', message: 'down' }));
+    const stale = await s.catalog.get('fake:1');
+    expect(stale).toMatchObject({ stale: true, documents: [listed] });
+    expect(JSON.stringify(stale)).not.toContain(MAP_URL);
+  });
+
+  it('keeps only documents with an id, a known kind, a title, a media type and an https address', async () => {
+    const s = setup();
+    await s.catalog.sync();
+    withDocuments(s, [
+      { ...MAP, id: ' campground-map ', title: ' Campground map ' },
+      { ...MAP, title: 'A second with the same id' },
+      { ...MAP, id: 'plain', url: 'http://fake.example/map.pdf' },
+      { ...MAP, id: 'credentials', url: 'https://user:pw@fake.example/map.pdf' },
+      { ...MAP, id: 'script', url: 'javascript:alert(1)' },
+      { ...MAP, id: 'relative', url: '/media/map.pdf' },
+      { ...MAP, id: 'kind', kind: 'video' },
+      { ...MAP, id: '' },
+      { ...MAP, id: 'untitled', title: ' ' },
+      { ...MAP, id: 'untyped', mediaType: undefined },
+      null,
+    ]);
+
+    const detail = await s.catalog.get('fake:1');
+
+    expect(detail.documents).toEqual([listed]);
+    expect(s.locations.getDetail('fake', '1')?.detail.documents).toEqual([MAP]);
+  });
+
+  it('leaves documents out of a detail that has none, or only invalid ones', async () => {
+    const s = setup();
+    await s.catalog.sync();
+    withDocuments(s, [{ ...MAP, url: 'ftp://fake.example/map.pdf' }]);
+    const detail = await s.catalog.get('fake:1');
+    expect(detail).not.toHaveProperty('documents');
+    expect(s.locations.getDetail('fake', '1')?.detail).not.toHaveProperty('documents');
+    expect(await s.catalog.get('fake:2')).not.toHaveProperty('documents');
+  });
+
+  it('resolves a document’s address from the cached detail, with the window’s names', async () => {
+    const s = setup();
+    await s.catalog.sync();
+    withDocuments(s, [MAP]);
+    await s.catalog.get('fake:1');
+    const calls = callsTo(s.fake, 'getLocation');
+
+    await expect(s.catalog.resolveDocument('fake:1', 'campground-map')).resolves.toEqual({
+      ...MAP,
+      key: 'fake:1#campground-map',
+      providerId: 'fake',
+      providerName: 'Fake',
+      locationName: 'Banksia Camp',
+    });
+    // From the cache: the provider is not asked again
+    expect(callsTo(s.fake, 'getLocation')).toBe(calls);
+  });
+
+  it('fetches the detail first when none is cached', async () => {
+    const s = setup();
+    await s.catalog.sync();
+    withDocuments(s, [MAP]);
+    expect(s.locations.getDetail('fake', '1')).toBeNull();
+
+    const document = await s.catalog.resolveDocument('fake:1', 'campground-map');
+
+    expect(document.url).toBe(MAP_URL);
+    expect(callsTo(s.fake, 'getLocation')).toBe(1);
+  });
+
+  it('NOT_FOUND for an unknown document, location or provider, or a cached address that is not https', async () => {
+    const s = setup();
+    await s.catalog.sync();
+    withDocuments(s, [MAP]);
+    await s.catalog.get('fake:1');
+    const notFound = { name: 'AppError', code: 'NOT_FOUND' };
+
+    await expect(s.catalog.resolveDocument('fake:1', 'other')).rejects.toMatchObject(notFound);
+    await expect(s.catalog.resolveDocument('fake:999', 'campground-map')).rejects.toMatchObject(
+      notFound
+    );
+    await expect(s.catalog.resolveDocument('nope:1', 'campground-map')).rejects.toMatchObject(
+      notFound
+    );
+    // A row changed behind the service's back still never yields a non-https address
+    const cached = s.locations.getDetail('fake', '1')!;
+    s.locations.setDetail(
+      'fake',
+      '1',
+      { ...cached.detail, documents: [{ ...MAP, url: 'file:///etc/passwd' }] },
+      cached.fetchedAt
+    );
+    await expect(s.catalog.resolveDocument('fake:1', 'campground-map')).rejects.toBeInstanceOf(
+      AppError
+    );
+  });
+});
+
 describe('bulk availability filtering and errors', () => {
   const keysOf = (entries: BulkAvailabilityEntry[]): string[] => entries.map((e) => e.key).sort();
 
