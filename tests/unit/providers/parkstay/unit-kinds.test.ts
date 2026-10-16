@@ -55,6 +55,7 @@ describe('unitKindOf (the unit rule)', () => {
     ['Sal Salis eco retreat', 'glamping'],
     ['CAMPSITE 01', 'campsite'],
     ['Shutters', 'campsite'],
+    ['Bunker Bay', 'campsite'],
   ])('without camping gear, %s is a %s', (name, kind) => {
     expect(unitKindOf(NO_GEAR, name)).toBe(kind);
   });

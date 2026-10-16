@@ -18,7 +18,7 @@ const CAMPING_GEAR = ['tent', 'campervan', 'caravan'];
 
 /** Words in a site's or class's name, in the order they are tried. */
 const BY_NAME: ReadonlyArray<[RegExp, UnitKind]> = [
-  [/\b(?:huts?\b|bunk)/i, 'dorm'],
+  [/\b(?:huts?|bunk(?:s|house|room)?)\b/i, 'dorm'],
   [/\b(?:cabins?|cottages?|chalets?)\b/i, 'cabin'],
   [/\b(?:eco[\s-]*tents?|safari[\s-]*tents?|eco[\s-]*retreats?)\b/i, 'glamping'],
 ];
