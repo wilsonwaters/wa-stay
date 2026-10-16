@@ -11,7 +11,7 @@ Confidence labels: **verified live** (seen in a live response), **from JS** (rea
 - **Availability:** one anonymous `POST` to `availability-ajax.php` with `blog_id`, dates and guests returns every category of that park, per night: free site count, a status code, and every rate (Standard and RAC Member) with per-night prices. Plain HTTP works. It needs `X-Requested-With: XMLHttpRequest` (otherwise `No direct file access`). No cookie, nonce or CSRF token is needed.
 - **Bulk:** one request covers all categories of one park for a date range. There is no all-parks query: one request per park.
 - **Inventory is per category**, not per site. Site selection is off (`site_selection_allowed: false`). The engine reports a count of free sites per night and a count of sites free for the whole stay.
-- **Booking window:** 364 days. The last bookable night is today + 364 days (Perth). Later nights return site code 9 "Maximum Advance Days has been exceeded". See section 4 for the midnight roll-over test.
+- **Booking window:** 364 days, rolling daily. The last bookable night is today + 364 days (Perth); later nights return site code 9 "Maximum Advance Days has been exceeded". The next night opened around midnight AWST (closed at 23:42, open at 00:01). School-holiday periods are held back and released on fixed dates.
 - **Member early access:** school-holiday periods are released on fixed dates, 48 h early for RAC members, at 7, 8 or 9 am depending on the park. Members prove membership by entering their RAC member number in NewBook's checkout ("Existing RAC member" → "Member Number" → "Verify member details"). Member prices are visible anonymously as the "RAC Member Rate" tariff.
 - **Cart and checkout** run on the RAC domain (`/<slug>/booking/`, the NewBook online engine rendered server-side). "Book now" navigates to an `online_cart_url` that the availability response already contains. Card details go straight to `apiau.newbook.cloud/cc_secure/<id>`. NewBook's JS supports timed holds with an "Extend" link; whether RAC turns them on, and for how long, is unknown.
 - **Accounts:** an optional NewBook guest account per park (`/<slug>/booking/?login`, email and password, CSRF token, reCAPTCHA). It is also the only "manage booking" route found. There is no public lookup by reference and surname.
@@ -21,7 +21,7 @@ Confidence labels: **verified live** (seen in a live response), **from JS** (rea
 
 **Findings (verified live).**
 
-The home page location picker lists the parks and links each to its book-now page (`data-path`). The `blog_id` is on the book-now page's search button (`<button id="availability__search" data-blog-id="6">`) for the five parks that use RAC's own widget. For the three parks that embed NewBook's native engine on book-now, the `blog_id` comes from the upload path (`/<slug>/wp-content/uploads/sites/<blog_id>/`) and was confirmed by a successful availability query (Exmouth 3, Monkey Mia 2). Karri Valley (7) is confirmed in section 4.
+The home page location picker lists the parks and links each to its book-now page (`data-path`). The `blog_id` is on the book-now page's search button (`<button id="availability__search" data-blog-id="6">`) for the five parks that use RAC's own widget. For the three parks that embed NewBook's native engine on book-now, the `blog_id` comes from the upload path (`/<slug>/wp-content/uploads/sites/<blog_id>/`) and was confirmed by a successful availability query (Exmouth 3, Monkey Mia 2, Karri Valley 7).
 
 | Park | Slug | blog_id | Book-now widget | NewBook `cc_secure` id | Address | Lat, lng |
 | --- | --- | --- | --- | --- | --- | --- |
@@ -38,9 +38,9 @@ The home page location picker lists the parks and links each to its book-now pag
 - Region names ("South West, Western Australia", "Coral Coast, …") are in `<span class="page-banner__location">` on each park page and on `/locations/`.
 - Ningaloo's book-now page says "Bookings for RAC Ningaloo Reef Resort are not yet open" (redevelopment).
 - "Rose Gardens Holiday Park" (`https://rosegardensholidaypark.com.au/book-now/`) is in the same multisite, the same location picker and the footer's "Our locations", but is not RAC-branded and is excluded from the school-holiday process. Not researched further.
-- **Ids.** A park's stable id for us is its slug (or `blog_id`). The NewBook instance is not exposed by a single id: each park has its own NewBook proxy file (`/<slug>/wp-content/themes/parks-and-resorts/inc/newbook/api/rac-<park-name>.php`) and its own `cc_secure/<id>` number, which is probably the NewBook instance id (inferred). Category ids repeat across parks, so a category key must be `(park, category_id)`. Example: category 3 is "Studio Room" at Busselton and "Powered Tent Site" at Cervantes; category type 2 means cabins at Cable Beach and Margaret River but sites at Busselton.
+- **Ids.** A park's stable id for us is its slug (or `blog_id`). Each park also has its own NewBook instance key (`instances_<32 hex>`, in its image URLs and echoed as `api_key`), its own NewBook proxy file (`/<slug>/wp-content/themes/parks-and-resorts/inc/newbook/api/rac-<park-name>.php`) and its own `cc_secure/<id>` number (probably the numeric NewBook instance id, inferred). Category ids repeat across parks, so a category key must be `(park, category_id)`. Example: category 3 is "Studio Room" at Busselton and "Powered Tent Site" at Cervantes; category type 2 means cabins at Cable Beach and Margaret River but sites at Busselton.
 - **Address and coordinates:** `/<slug>/contact-us/` has "Address: …", phone, a reservations email and a "View on Google Maps" link `https://www.google.com/maps/search/?api=1&query=<lat>,<lng>`. Verified for the 8 open parks.
-- **Photos:** NewBook-hosted images, `https://driveau.newbook.cloud/crop_800_450/instances_d895bd707965db25abb932aba767878f_<id>.jpg`, with `alt` text, in each category's gallery on the book-now page. The hash is shared by all parks.
+- **Photos:** NewBook-hosted images, `https://driveau.newbook.cloud/crop_800_450/instances_<hash>_<id>.jpg` (Busselton: `instances_d895bd707965db25abb932aba767878f`), with `alt` text, in each category's gallery on the book-now page. The hash differs per park (Busselton `d895bd…`, Cable Beach `6e36ae…`, Cervantes `c56e16…`, Esperance `80cde5…`, Margaret River `52c8cf…`): it is the park's NewBook instance key (see `api_key` in section 3). The native-engine book-now pages showed no category photos.
 - **Descriptions:** the book-now page has a short description excerpt and a feature list per category, plus a link to the category page `/<slug>/accommodation/<post-slug>/` (`data-post-link`). The WordPress REST API also lists the category posts: `GET /<slug>/wp-json/wp/v2/accommodation?per_page=50` returned 11 posts for Busselton (`x-wp-total: 11`), with feature taxonomy terms (`newbook_features`, slugs like `power`, `water`, `sullage_point`, `bathroom`, `wheelchair_accessible` in `class_list`) but no NewBook category id and an empty `content`.
 
 Evidence: `GET https://parksandresorts.rac.com.au/busselton/contact-us/` → `Address: 97 Caves Road, Abbey, WA 6280` and `…/maps/search/?api=1&query=-33.6611769,115.2487607`.
@@ -56,7 +56,7 @@ Evidence: `GET https://parksandresorts.rac.com.au/busselton/contact-us/` → `Ad
   data-allowed-equipment="2,1,15,12,6,5,4,10,3,14,11,13,7,9">
 ```
 
-- `data-cat-id` is the NewBook category id. `data-cat-type-id` is the NewBook category type (per park: Busselton 5 = Cabins, 2 = Sites; Cervantes 1 = Cabins, 2 = Sites; Margaret River 2 = Cabins, 4 = Dorm, 5 = Sites; Monkey Mia uses 1, 2 and 7 = dorms). The type filter on the page lists the types with their ids.
+- `data-cat-id` is the NewBook category id. `data-cat-type-id` is the NewBook category type (per park: Busselton 5 = Cabins, 2 = Sites; Cervantes 1 = Cabins, 2 = Sites; Margaret River 2 = Cabins, 4 = Dorm, 5 = Sites; Monkey Mia uses 1, 2 and 7 = dorms; Karri Valley 2 = chalets and rooms, 7 = sites). The type filter on the page lists the types with their ids.
 - `data-max-guests`, `data-max-animals` (0 = no pets), `data-bedrooms`, `data-accessible`.
 - `data-allowed-equipment`: equipment type ids the site category accepts, or `false` for cabins. Equipment ids are the same list in every park: 1 Caravan with Awning, 2 Caravan Without Awning, 3 Campervan, 4/5/6 Camper Trailer small/medium/large, 7 Car and Multiroom Tent, 8 5th Wheeler, 9 Bus, 10 Motorhome, 11 Car & Swag (with trailer), 12 Rooftop Tent, 13 Car and Single Room Tent, 14 Car & Swag (no trailer), 15 Caravan with Slideout.
 - Sites need equipment details to book: the "Book now" button on a site opens an equipment modal (type, length, width, unit `m` or feet) and re-checks availability with them. Searching itself does not need them.
@@ -121,7 +121,7 @@ blog_id=6&available_from=6+Nov+2026&available_to=8+Nov+2026&adults=2&children=0&
 - **Sold out vs closed vs not yet open:** site codes per night (`sites_code`): 0 ok, 2 closed ("This Site is closed as of …"), 3 no availability, 9 beyond the booking window. Stay-through code 4: special date ("Bookings are not allowed to Arrive on <strong>20 Nov 2027</strong> - School leavers 2027"). Tariff codes: 0 ok, 5 beyond the tariff's advance limit, 6 minimum nights, 8 special date, 11 stop sold ("This Rate is Stop Sold"). Messages can join several reasons with `; ` and contain HTML (`<strong>`). The full code lists are in the JS (below).
 - When `tariff_success` is `"false"`, `tariff_total` can be a placeholder (`999` for the blocked Leavers date), so ignore prices on refused tariffs.
 - **Deposit and cancellation** terms per tariff (`deposits`, `adjustment_fees`, `tariff_inclusions` HTML).
-- `api_key`: the response echoes a 42-character key. It is presumably RAC's NewBook API key. It is redacted from every sample. WA Stay must never read, store or use it.
+- `api_key`: the response echoes a 42-character `instances_<32 hex>` value, different per park. For Busselton it is the same string as in the park's public image URLs, so it is the NewBook instance key, which NewBook's own API pairs with separate credentials (inferred). It is not a secret by itself, but WA Stay must not use it to call NewBook directly. Samples redact it anyway.
 
 Code lists, from `availability-filters.js` comments (from JS):
 
@@ -171,15 +171,16 @@ Confidence: verified live (request, headers, fields, codes 0/2/3/5/6/9/11); from
 | 16 Oct 23:41 | Exmouth (3) | nights 13–19 Oct 2027 | same boundary: last open night 15 Oct |
 | 16 Oct 23:42 | Monkey Mia (2) | nights 14–17 Oct 2027 | same boundary in 15 of 16 categories. "Budget Room Shared Bathroom" had sites on 16 Oct, but both tariffs refused with code 5 "This Rate must be Booked at most 364 days in advance" |
 | 16 Oct 23:49 | Busselton (6) | night 20 Nov 2027 (400 d) | site code 9 in all categories; also stay-through code 4 and tariff code 8 "Bookings are not allowed to Arrive on 20 Nov 2027 - School leavers 2027" (a special date already set beyond the window) |
-| MIDNIGHT_ROWS |
+| 17 Oct 00:01:40 | Busselton (6) | nights 15–17 Oct 2027 | 15 and 16 Oct open (code 0); 17 Oct code 9. The night of 16 Oct 2027 opened between 23:37 and 00:01:40 |
+| 17 Oct 00:01:43 | Karri Valley (7) | nights 14–17 Oct 2027 | 14, 15, 16 Oct open; 17 Oct code 9 (also confirms `blog_id` 7) |
 
 So: the last bookable night is today + 364 days in Perth time. It is enforced twice: by the instance setting (site code 9) and by each tariff's `max_days_in_advance: "364"` (tariff code 5).
 
-MIDNIGHT_FINDINGS
+**Rolling daily window (verified live).** A new night opens every day at midnight Perth time: at 23:37 AWST on 16 Oct 2026 the last open night was 15 Oct 2027; at 00:01:40 AWST on 17 Oct 2026 it was 16 Oct 2027. The exact moment was not measured: the edge night was still closed at 23:42 (Monkey Mia) and open at 00:01:40 (Busselton, Karri Valley). NewBook reports `timezone: "Australia/West"` and Perth-local timestamps, so the date maths uses Perth dates. So, outside fixed releases, the night at the edge of the window becomes bookable around 00:00 AWST, 364 days ahead (midnight itself is inferred).
 
-**Fixed releases.** Some periods inside the window are held back and released on a fixed date and time (section 5). Before release those nights must be blocked by a rule in NewBook (probably tariff code 8 "special date" or 11 "stop sold"). This was not observed: no held-back period is inside the window today (the Sept/Oct 2027 holidays went on public sale today; the next release covers Dec 2027, which is beyond the window). Other blocks seen on book-now pages, by date range: per-park notices with `data-date-from`/`data-date-to` (e.g. Busselton Leavers week 21–28 Nov 2026: "does not accept Leavers attendees", phone bookings only).
+**Fixed releases.** Some periods inside the window are held back and released on a fixed date and time (section 5). Before release those nights must be blocked by a rule in NewBook. A special-date block that is already configured (Leavers 2027, 400 days ahead) returns stay-through code 4 and tariff code 8 with a named message, so pre-release blocks probably look similar (or tariff code 11 "stop sold"). This was not observed: no held-back period is inside the window today (the Sept/Oct 2027 holidays went on public sale today; the next release covers Dec 2027, which is beyond the window). Other blocks seen on book-now pages, by date range: per-park notices with `data-date-from`/`data-date-to` (e.g. Busselton Leavers week 21–28 Nov 2026: "does not accept Leavers attendees", phone bookings only).
 
-Sample: `samples/availability-busselton-window-edge-2027-10-13-6n.json`.
+Samples: `samples/availability-busselton-window-edge-2027-10-13-6n.json`, `samples/availability-busselton-window-after-midnight-2027-10-15-3n.json`, `samples/availability-busselton-leavers-special-date-2027-11-20-1n.json`.
 
 ## 5. RAC member early access
 
@@ -284,7 +285,7 @@ Stable links for the system browser:
 1. **Bot protection.** Cloudflare challenged one User-Agent and runs JS detections. Electron's `net.request` on a provider partition sends a Chrome User-Agent and keeps cookies, so it will probably pass like the headless browser did, but this is untested from the app. A challenge must be treated as "unavailable", never solved or evaded. Release mornings are the most likely time for stricter rules or a waiting room.
 2. **Undocumented endpoint.** `availability-ajax.php` is a theme file, not a public API. It can change with any theme update (`ver=2.0.9`). Its guard (`X-Requested-With`) shows it is meant for the page only. It is slow (4–8 s), heavy (up to 400 KB) and returned one transient 520, so watches should poll gently (robots.txt asks for 10 s between requests) and treat 5xx as "try later".
 3. **Holds and member pre-sale unseen.** Whether adding to the cart holds a site (and for how long), and how pre-sale nights look in the API before and during release, could not be observed anonymously or today. Site Sniper for RAC needs both. The next chance to observe a release is 3 Feb 2027 (member pre-sale) and 5 Feb 2027 (public), read-only.
-4. The response contains an `api_key`. Never store, log or use it; samples have it redacted.
+4. The response contains an `api_key` (the park's NewBook instance key, also public in image URLs). Do not use it to reach NewBook's API directly: that would bypass RAC's site and is not what the terms allow.
 5. Terms: "personal non-commercial home use" only. Confirm with the stakeholder that a desktop app used by one person fits, and do not ship RAC photos or descriptions in fixtures or the website.
 6. Each park is a separate NewBook instance: separate accounts, separate category ids, and possibly different rules (picker limits differed by park).
 7. Rose Gardens Holiday Park (other domain, same multisite) was not researched.
@@ -294,7 +295,8 @@ Stable links for the system browser:
 Folder: `/tmp/claude-0/-home-user/e72a82ef-d2a5-54f7-81bf-ebe78d68796c/scratchpad/rac-research/samples/` (copy into `tests/fixtures/providers/<id>/` when the provider is built).
 
 - `availability-busselton-2026-11-06-2n.json`: two categories (bookable powered site with Standard, Member and promo tariffs; sold-out ensuite site).
-- `availability-busselton-window-edge-2027-10-13-6n.json`: nights 13–18 Oct 2027, code 9 from 16 Oct.
+- `availability-busselton-window-edge-2027-10-13-6n.json`: nights 13–18 Oct 2027 at 23:36 AWST, code 9 from 16 Oct.
+- `availability-busselton-window-after-midnight-2027-10-15-3n.json`: nights 15–17 Oct 2027 at 00:01 AWST, 16 Oct now open, code 9 from 17 Oct.
 - `availability-busselton-schoolhol-min-stay-2027-09-25-2n.json`: tariff code 6 with minimum-stay and closed-to-arrival message.
 - `availability-exmouth-stop-sold-closed-2027-10-13-7n.json`: closed category (site code 2) with stop-sold tariffs (code 11).
 - `availability-busselton-leavers-special-date-2027-11-20-1n.json`: 400 days ahead; site code 9, stay-through code 4 and tariff code 8 (special date), placeholder total 999.
@@ -307,4 +309,10 @@ All trimmed; `api_key`, cart ids and the client IP are redacted. No personal dat
 
 ## Request count used
 
-REQUEST_COUNT
+63 requests in total, all logged with time, status and URL, spaced at least 1.1 s apart:
+
+- 59 to `parksandresorts.rac.com.au`: 10 availability POSTs by curl (one refused by the guard, one transient 520); 20 from the single headless page load (the document, 15 same-origin scripts, its one availability POST, Cloudflare's 2 detection requests and the favicon; images, fonts, CSS and third-party hosts were blocked); 9 book-now pages; 8 park contact pages; the home, locations, contact, school-holiday, booking-policy, booking and login pages (7); `robots.txt`; one WordPress REST call; 3 theme scripts.
+- 3 to `driveau.newbook.cloud` (NewBook scripts).
+- 1 to `rac.com.au` (website disclaimer).
+
+No request created a cart, quote, hold, booking or account, and no form was submitted.

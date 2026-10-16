@@ -1,0 +1,623 @@
+{
+ "success": "true",
+ "data": {
+  "4": {
+   "category_id": 4,
+   "category_type_id": "2",
+   "category_name": "Powered Site",
+   "sites_available": {
+    "2026-11-06": 53,
+    "2026-11-07": 55
+   },
+   "sites_message": {
+    "2026-11-06": "",
+    "2026-11-07": ""
+   },
+   "sites_code": {
+    "2026-11-06": 0,
+    "2026-11-07": 0
+   },
+   "sites_extra_info": {
+    "2026-11-06": "",
+    "2026-11-07": ""
+   },
+   "online_booking_url": "https://parksandresorts.rac.com.au/busselton/booking/?available_from=2026-11-06&available_to=2026-11-08&force_category_id=4&adults=2&children=0&infants=0&animals=0",
+   "tariffs_available": [
+    {
+     "tariff_label": "Standard Rate",
+     "site_selection_allowed": false,
+     "site_selection_fee": 0,
+     "site_selection_fee_type": null,
+     "site_selection_inventory_item_id": null,
+     "site_selection_type": null,
+     "tariff_short_description": "Our most flexible rate",
+     "tariff_success": "true",
+     "tariff_message": "",
+     "tariff_code": 0,
+     "tariff_extra_info": "",
+     "base_min_combined": 0,
+     "base_max_combined": 0,
+     "base_max_adults": null,
+     "base_max_children": null,
+     "base_max_infants": null,
+     "base_max_animals": null,
+     "membership_discount_pricing": [
+      {
+       "membership_id": "2",
+       "membership_name": "RAC",
+       "membership_description": "<p><strong>Membership type: RAC member</strong></p>\r\n<p>If you selected &ldquo;RAC member&rdquo; as your membership type when searching for accommodation, pleas…",
+       "membership_icon": "https://driveau.newbook.cloud/images/no_image.png",
+       "service_class": "Membership_Service_RAC",
+       "service_level": null,
+       "discount_id": "226",
+       "discount_name": "Applied in Rate",
+       "discount_amount": 0
+      }
+     ],
+     "inventory_items": [],
+     "deposits": [
+      {
+       "minimum": "0.00",
+       "maximum": "0.00",
+       "amount": "75.00",
+       "original_amount": "75.00",
+       "due_date": "19 Oct 2026",
+       "amount_text": "1.00",
+       "type_text": "Number of Nights (Average)",
+       "due_date_text": "3 Days After Booking Placed",
+       "from_type": "bookings_rule_templates_deposits",
+       "from_type_id": "9"
+      }
+     ],
+     "adjustment_fees": [
+      {
+       "template_name": "Cancellation LESS THAN 72 Hours",
+       "type": "cancellation",
+       "template_id": "8",
+       "inventory_item_id": "65",
+       "gl_category_id": "1",
+       "gl_account_id": "76",
+       "description": "Cancellation Fee",
+       "tax_free": "0",
+       "override_tax_rate_ids": [],
+       "membership_ids": [],
+       "start_billing_from": "2026-11-04",
+       "computed_amount": 75
+      }
+     ],
+     "tariffs_quoted": {
+      "2026-11-06": {
+       "label": "Standard Rate",
+       "type_id": "53",
+       "tariff_id": "1660",
+       "tariff_name": "Powered Site ALPHA",
+       "stop_sell": 0,
+       "minimum_periods": "1",
+       "maximum_periods": "0",
+       "tariffs_period_name": "Mid Season",
+       "amount": 75,
+       "base_amount": 75,
+       "min_days_in_advance": "0",
+       "max_days_in_advance": "0",
+       "special_deal": "0",
+       "close_arrival": "0",
+       "close_departure": "0"
+      },
+      "2026-11-07": {
+       "label": "Standard Rate",
+       "type_id": "53",
+       "tariff_id": "1660",
+       "tariff_name": "Powered Site ALPHA",
+       "stop_sell": 0,
+       "minimum_periods": "1",
+       "maximum_periods": "0",
+       "tariffs_period_name": "Mid Season",
+       "amount": 75,
+       "base_amount": 75,
+       "min_days_in_advance": "0",
+       "max_days_in_advance": "0",
+       "special_deal": "0",
+       "close_arrival": "0",
+       "close_departure": "0"
+      }
+     },
+     "original_tariff_total": 150,
+     "tariff_total": 150,
+     "original_average_nightly_tariff": 75,
+     "average_nightly_tariff": 75,
+     "tariff_inclusions": [
+      {
+       "dates": "6 Nov 2026 to 7 Nov 2026",
+       "html": "<p><strong>Rate inclusions</strong></p>\r\n<ul><!-- adjust category per rate -->\r\n<li>Site only rate</li>\r\n<li>Free Wi-Fi</li>\r\n<!-- remove parking inclusion for sites -->\r\n<li>Site size allocated based…"
+      }
+     ],
+     "special_deal": "0",
+     "online_cart_url": "https://parksandresorts.rac.com.au/busselton/booking/?cart&rest_api_data_id=<redacted>&rand=12345"
+    },
+    {
+     "tariff_label": "RAC Member Rate",
+     "site_selection_allowed": false,
+     "site_selection_fee": 0,
+     "site_selection_fee_type": null,
+     "site_selection_inventory_item_id": null,
+     "site_selection_type": null,
+     "tariff_short_description": "Exclusive to RAC WA members",
+     "tariff_success": "true",
+     "tariff_message": "",
+     "tariff_code": 0,
+     "tariff_extra_info": "",
+     "base_min_combined": 0,
+     "base_max_combined": 0,
+     "base_max_adults": null,
+     "base_max_children": null,
+     "base_max_infants": null,
+     "base_max_animals": null,
+     "membership_discount_pricing": [
+      {
+       "membership_id": "2",
+       "membership_name": "RAC",
+       "membership_description": "<p><strong>Membership type: RAC member</strong></p>\r\n<p>If you selected &ldquo;RAC member&rdquo; as your membership type when searching for accommodation, pleas…",
+       "membership_icon": "https://driveau.newbook.cloud/images/no_image.png",
+       "service_class": "Membership_Service_RAC",
+       "service_level": null,
+       "discount_id": "226",
+       "discount_name": "Applied in Rate",
+       "discount_amount": 0
+      }
+     ],
+     "inventory_items": [],
+     "deposits": [
+      {
+       "minimum": "0.00",
+       "maximum": "0.00",
+       "amount": "68.00",
+       "original_amount": "68.00",
+       "due_date": "19 Oct 2026",
+       "amount_text": "1.00",
+       "type_text": "Number of Nights (Average)",
+       "due_date_text": "3 Days After Booking Placed",
+       "from_type": "bookings_rule_templates_deposits",
+       "from_type_id": "9"
+      }
+     ],
+     "adjustment_fees": [
+      {
+       "template_name": "Cancellation LESS THAN 72 Hours",
+       "type": "cancellation",
+       "template_id": "8",
+       "inventory_item_id": "65",
+       "gl_category_id": "1",
+       "gl_account_id": "76",
+       "description": "Cancellation Fee",
+       "tax_free": "0",
+       "override_tax_rate_ids": [],
+       "membership_ids": [],
+       "start_billing_from": "2026-11-04",
+       "computed_amount": 68
+      }
+     ],
+     "tariffs_quoted": {
+      "2026-11-06": {
+       "label": "RAC Member Rate",
+       "type_id": "131",
+       "tariff_id": "1830",
+       "tariff_name": "Powered Site RAC_EX",
+       "stop_sell": 0,
+       "minimum_periods": "1",
+       "maximum_periods": "0",
+       "tariffs_period_name": "Mid Season",
+       "amount": 68,
+       "base_amount": 68,
+       "min_days_in_advance": "0",
+       "max_days_in_advance": "0",
+       "special_deal": "0",
+       "close_arrival": "0",
+       "close_departure": "0"
+      },
+      "2026-11-07": {
+       "label": "RAC Member Rate",
+       "type_id": "131",
+       "tariff_id": "1830",
+       "tariff_name": "Powered Site RAC_EX",
+       "stop_sell": 0,
+       "minimum_periods": "1",
+       "maximum_periods": "0",
+       "tariffs_period_name": "Mid Season",
+       "amount": 68,
+       "base_amount": 68,
+       "min_days_in_advance": "0",
+       "max_days_in_advance": "0",
+       "special_deal": "0",
+       "close_arrival": "0",
+       "close_departure": "0"
+      }
+     },
+     "original_tariff_total": 136,
+     "tariff_total": 136,
+     "original_average_nightly_tariff": 68,
+     "average_nightly_tariff": 68,
+     "tariff_inclusions": [
+      {
+       "dates": "6 Nov 2026 to 7 Nov 2026",
+       "html": "<p><strong>Rate inclusions</strong></p>\r\n<ul><!-- adjust category per rate -->\r\n<li>Site only rate</li>\r\n<li>Free Wi-Fi</li>\r\n<!-- remove parking inclusion for sites -->\r\n<li>Site size allocated based…"
+      }
+     ],
+     "special_deal": "0",
+     "online_cart_url": "https://parksandresorts.rac.com.au/busselton/booking/?cart&rest_api_data_id=<redacted>&rand=12345"
+    },
+    {
+     "tariff_label": "Stay & Save This Spring",
+     "site_selection_allowed": false,
+     "site_selection_fee": 0,
+     "site_selection_fee_type": null,
+     "site_selection_inventory_item_id": null,
+     "site_selection_type": null,
+     "tariff_short_description": "Stay & Save This Spring",
+     "tariff_success": "false",
+     "tariff_message": "This Rate has a 3 Night Minimum",
+     "tariff_code": 6,
+     "tariff_extra_info": "3",
+     "base_min_combined": 0,
+     "base_max_combined": 0,
+     "base_max_adults": null,
+     "base_max_children": null,
+     "base_max_infants": null,
+     "base_max_animals": null,
+     "membership_discount_pricing": [
+      {
+       "membership_id": "2",
+       "membership_name": "RAC",
+       "membership_description": "<p><strong>Membership type: RAC member</strong></p>\r\n<p>If you selected &ldquo;RAC member&rdquo; as your membership type when searching for accommodation, pleas…",
+       "membership_icon": "https://driveau.newbook.cloud/images/no_image.png",
+       "service_class": "Membership_Service_RAC",
+       "service_level": null,
+       "discount_id": "226",
+       "discount_name": "Applied in Rate",
+       "discount_amount": 0
+      }
+     ],
+     "inventory_items": [],
+     "deposits": [
+      {
+       "minimum": "0.00",
+       "maximum": "0.00",
+       "amount": "75.00",
+       "original_amount": "75.00",
+       "due_date": "19 Oct 2026",
+       "amount_text": "1.00",
+       "type_text": "Number of Nights (Average)",
+       "due_date_text": "3 Days After Booking Placed",
+       "from_type": "bookings_rule_templates_deposits",
+       "from_type_id": "9"
+      }
+     ],
+     "adjustment_fees": [
+      {
+       "template_name": "1 night penalty any time",
+       "type": "cancellation",
+       "template_id": "7",
+       "inventory_item_id": "65",
+       "gl_category_id": "1",
+       "gl_account_id": "76",
+       "description": "Cancellation Fee",
+       "tax_free": "0",
+       "override_tax_rate_ids": [],
+       "membership_ids": [],
+       "start_billing_from": "2026-10-16",
+       "computed_amount": 75
+      }
+     ],
+     "tariffs_quoted": {
+      "2026-11-06": {
+       "label": "Stay & Save This Spring",
+       "type_id": "164",
+       "tariff_id": "1932",
+       "tariff_name": "WAONSALE26 Powered",
+       "stop_sell": 0,
+       "minimum_periods": "3",
+       "maximum_periods": "89",
+       "tariffs_period_name": "WA On Sale Promo 2026",
+       "amount": 75,
+       "base_amount": 75,
+       "min_days_in_advance": "0",
+       "max_days_in_advance": "0",
+       "special_deal": "3",
+       "close_arrival": "0",
+       "close_departure": "0"
+      },
+      "2026-11-07": {
+       "label": "Stay & Save This Spring",
+       "type_id": "164",
+       "tariff_id": "1932",
+       "tariff_name": "WAONSALE26 Powered",
+       "stop_sell": 0,
+       "minimum_periods": "3",
+       "maximum_periods": "89",
+       "tariffs_period_name": "WA On Sale Promo 2026",
+       "amount": 75,
+       "base_amount": 75,
+       "min_days_in_advance": "0",
+       "max_days_in_advance": "0",
+       "special_deal": "3",
+       "close_arrival": "0",
+       "close_departure": "0"
+      }
+     },
+     "original_tariff_total": 150,
+     "tariff_total": 150,
+     "original_average_nightly_tariff": 75,
+     "average_nightly_tariff": 75,
+     "tariff_inclusions": [
+      {
+       "dates": "6 Nov 2026 to 7 Nov 2026",
+       "html": "<p><span style=\"font-family: arial, helvetica, sans-serif;\"><strong>Rate Information</strong></span></p>\r\n<ul>\r\n<li>1-night deposit non-refundable</li>\r\n<li>Cancellations at any time see a forfeiture …"
+      }
+     ],
+     "special_deal": "3",
+     "rules_engine_message": "",
+     "can_override_rules_engine_messages": false
+    }
+   ],
+   "stay_through_sites_available": 51,
+   "stay_through_sites_message": "",
+   "stay_through_sites_code": 0,
+   "stay_through_sites_extra_info": "",
+   "sort": 5
+  },
+  "7": {
+   "category_id": 7,
+   "category_type_id": "2",
+   "category_name": "Ensuite Site",
+   "sites_available": {
+    "2026-11-06": 0,
+    "2026-11-07": 0
+   },
+   "sites_message": {
+    "2026-11-06": "There is no availability for this date",
+    "2026-11-07": "There is no availability for this date"
+   },
+   "sites_code": {
+    "2026-11-06": 3,
+    "2026-11-07": 3
+   },
+   "sites_extra_info": {
+    "2026-11-06": "",
+    "2026-11-07": ""
+   },
+   "online_booking_url": "https://parksandresorts.rac.com.au/busselton/booking/?available_from=2026-11-06&available_to=2026-11-08&force_category_id=7&adults=2&children=0&infants=0&animals=0",
+   "tariffs_available": [
+    {
+     "tariff_label": "Standard Rate",
+     "site_selection_allowed": false,
+     "site_selection_fee": 0,
+     "site_selection_fee_type": null,
+     "site_selection_inventory_item_id": null,
+     "site_selection_type": null,
+     "tariff_short_description": "Our most flexible rate",
+     "tariff_success": "true",
+     "tariff_message": "",
+     "tariff_code": 0,
+     "tariff_extra_info": "",
+     "base_min_combined": 0,
+     "base_max_combined": 0,
+     "base_max_adults": null,
+     "base_max_children": null,
+     "base_max_infants": null,
+     "base_max_animals": null,
+     "membership_discount_pricing": [
+      {
+       "membership_id": "2",
+       "membership_name": "RAC",
+       "membership_description": "<p><strong>Membership type: RAC member</strong></p>\r\n<p>If you selected &ldquo;RAC member&rdquo; as your membership type when searching for accommodation, pleas…",
+       "membership_icon": "https://driveau.newbook.cloud/images/no_image.png",
+       "service_class": "Membership_Service_RAC",
+       "service_level": null,
+       "discount_id": "226",
+       "discount_name": "Applied in Rate",
+       "discount_amount": 0
+      }
+     ],
+     "inventory_items": [],
+     "deposits": [
+      {
+       "minimum": "0.00",
+       "maximum": "0.00",
+       "amount": "130.00",
+       "original_amount": "130.00",
+       "due_date": "19 Oct 2026",
+       "amount_text": "1.00",
+       "type_text": "Number of Nights (Average)",
+       "due_date_text": "3 Days After Booking Placed",
+       "from_type": "bookings_rule_templates_deposits",
+       "from_type_id": "9"
+      }
+     ],
+     "adjustment_fees": [
+      {
+       "template_name": "Cancellation LESS THAN 72 Hours",
+       "type": "cancellation",
+       "template_id": "8",
+       "inventory_item_id": "65",
+       "gl_category_id": "1",
+       "gl_account_id": "76",
+       "description": "Cancellation Fee",
+       "tax_free": "0",
+       "override_tax_rate_ids": [],
+       "membership_ids": [],
+       "start_billing_from": "2026-11-04",
+       "computed_amount": 130
+      }
+     ],
+     "tariffs_quoted": {
+      "2026-11-06": {
+       "label": "Standard Rate",
+       "type_id": "53",
+       "tariff_id": "1502",
+       "tariff_name": "Ensuite Site ALPHA",
+       "stop_sell": 0,
+       "minimum_periods": "2",
+       "maximum_periods": "0",
+       "tariffs_period_name": "Mid Season",
+       "amount": 130,
+       "base_amount": 130,
+       "min_days_in_advance": "0",
+       "max_days_in_advance": "0",
+       "special_deal": "0",
+       "close_arrival": 0,
+       "close_departure": 0
+      },
+      "2026-11-07": {
+       "label": "Standard Rate",
+       "type_id": "53",
+       "tariff_id": "1502",
+       "tariff_name": "Ensuite Site ALPHA",
+       "stop_sell": 0,
+       "minimum_periods": "2",
+       "maximum_periods": "0",
+       "tariffs_period_name": "Mid Season",
+       "amount": 130,
+       "base_amount": 130,
+       "min_days_in_advance": "0",
+       "max_days_in_advance": "0",
+       "special_deal": "0",
+       "close_arrival": 0,
+       "close_departure": 0
+      }
+     },
+     "original_tariff_total": 260,
+     "tariff_total": 260,
+     "original_average_nightly_tariff": 130,
+     "average_nightly_tariff": 130,
+     "tariff_inclusions": [
+      {
+       "dates": "6 Nov 2026 to 7 Nov 2026",
+       "html": "<p><strong>Rate inclusions</strong></p>\r\n<ul><!-- adjust category per rate -->\r\n<li>Site only rate</li>\r\n<li>Free Wi-Fi</li>\r\n<!-- remove parking inclusion for sites -->\r\n<li>Site size allocated based…"
+      }
+     ],
+     "special_deal": "0"
+    },
+    {
+     "tariff_label": "RAC Member Rate",
+     "site_selection_allowed": false,
+     "site_selection_fee": 0,
+     "site_selection_fee_type": null,
+     "site_selection_inventory_item_id": null,
+     "site_selection_type": null,
+     "tariff_short_description": "Exclusive to RAC WA members",
+     "tariff_success": "true",
+     "tariff_message": "",
+     "tariff_code": 0,
+     "tariff_extra_info": "",
+     "base_min_combined": 0,
+     "base_max_combined": 0,
+     "base_max_adults": null,
+     "base_max_children": null,
+     "base_max_infants": null,
+     "base_max_animals": null,
+     "membership_discount_pricing": [
+      {
+       "membership_id": "2",
+       "membership_name": "RAC",
+       "membership_description": "<p><strong>Membership type: RAC member</strong></p>\r\n<p>If you selected &ldquo;RAC member&rdquo; as your membership type when searching for accommodation, pleas…",
+       "membership_icon": "https://driveau.newbook.cloud/images/no_image.png",
+       "service_class": "Membership_Service_RAC",
+       "service_level": null,
+       "discount_id": "226",
+       "discount_name": "Applied in Rate",
+       "discount_amount": 0
+      }
+     ],
+     "inventory_items": [],
+     "deposits": [
+      {
+       "minimum": "0.00",
+       "maximum": "0.00",
+       "amount": "116.00",
+       "original_amount": "116.00",
+       "due_date": "19 Oct 2026",
+       "amount_text": "1.00",
+       "type_text": "Number of Nights (Average)",
+       "due_date_text": "3 Days After Booking Placed",
+       "from_type": "bookings_rule_templates_deposits",
+       "from_type_id": "9"
+      }
+     ],
+     "adjustment_fees": [
+      {
+       "template_name": "Cancellation LESS THAN 72 Hours",
+       "type": "cancellation",
+       "template_id": "8",
+       "inventory_item_id": "65",
+       "gl_category_id": "1",
+       "gl_account_id": "76",
+       "description": "Cancellation Fee",
+       "tax_free": "0",
+       "override_tax_rate_ids": [],
+       "membership_ids": [],
+       "start_billing_from": "2026-11-04",
+       "computed_amount": 116
+      }
+     ],
+     "tariffs_quoted": {
+      "2026-11-06": {
+       "label": "RAC Member Rate",
+       "type_id": "131",
+       "tariff_id": "1832",
+       "tariff_name": "Ensuite Site RAC_EX",
+       "stop_sell": 0,
+       "minimum_periods": "2",
+       "maximum_periods": "0",
+       "tariffs_period_name": "Mid Season",
+       "amount": 115,
+       "base_amount": 115,
+       "min_days_in_advance": "0",
+       "max_days_in_advance": "0",
+       "special_deal": "0",
+       "close_arrival": 0,
+       "close_departure": 0
+      },
+      "2026-11-07": {
+       "label": "RAC Member Rate",
+       "type_id": "131",
+       "tariff_id": "1832",
+       "tariff_name": "Ensuite Site RAC_EX",
+       "stop_sell": 0,
+       "minimum_periods": "2",
+       "maximum_periods": "0",
+       "tariffs_period_name": "Mid Season",
+       "amount": 117,
+       "base_amount": 117,
+       "min_days_in_advance": "0",
+       "max_days_in_advance": "0",
+       "special_deal": "0",
+       "close_arrival": 0,
+       "close_departure": 0
+      }
+     },
+     "original_tariff_total": 232,
+     "tariff_total": 232,
+     "original_average_nightly_tariff": 116,
+     "average_nightly_tariff": 116,
+     "tariff_inclusions": [
+      {
+       "dates": "6 Nov 2026 to 7 Nov 2026",
+       "html": "<p><strong>Rate inclusions</strong></p>\r\n<ul><!-- adjust category per rate -->\r\n<li>Site only rate</li>\r\n<li>Free Wi-Fi</li>\r\n<!-- remove parking inclusion for sites -->\r\n<li>Site size allocated based…"
+      }
+     ],
+     "special_deal": "0"
+    }
+   ],
+   "stay_through_sites_available": 0,
+   "stay_through_sites_message": "There is no longer availability for the dates given (<strong>6 Nov 2026 14:00</strong> to <strong>8 Nov 2026 10:00</strong>)",
+   "stay_through_sites_code": 3,
+   "stay_through_sites_extra_info": "",
+   "sort": 0
+  }
+ },
+ "message": "",
+ "timestamp": "2026-10-16 23:35:15",
+ "timezone": "Australia/West",
+ "newbook_version": "2025.03.12-6acd5eef54202",
+ "api_key": "<redacted>",
+ "_fixture_note": "Trimmed: subset of categories/tariffs, per-night tariff objects reduced to key fields, HTML shortened, api_key and cart ids redacted."
+}

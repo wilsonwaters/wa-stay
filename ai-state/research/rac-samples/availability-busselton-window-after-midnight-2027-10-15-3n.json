@@ -1,0 +1,171 @@
+{
+ "success": "true",
+ "data": {
+  "4": {
+   "category_id": 4,
+   "category_type_id": "2",
+   "category_name": "Powered Site",
+   "sites_available": {
+    "2027-10-15": 104,
+    "2027-10-16": 104,
+    "2027-10-17": 0
+   },
+   "sites_message": {
+    "2027-10-15": "",
+    "2027-10-16": "",
+    "2027-10-17": "Maximum Advance Days has been exceeded, so there are no Sites available"
+   },
+   "sites_code": {
+    "2027-10-15": 0,
+    "2027-10-16": 0,
+    "2027-10-17": 9
+   },
+   "sites_extra_info": {
+    "2027-10-15": "",
+    "2027-10-16": "",
+    "2027-10-17": "364"
+   },
+   "online_booking_url": "https://parksandresorts.rac.com.au/busselton/booking/?available_from=2027-10-15&available_to=2027-10-18&force_category_id=4&adults=2&children=0&infants=0&animals=0",
+   "tariffs_available": [
+    {
+     "tariff_label": "Standard Rate",
+     "site_selection_allowed": false,
+     "site_selection_fee": 0,
+     "site_selection_fee_type": null,
+     "site_selection_inventory_item_id": null,
+     "site_selection_type": null,
+     "tariff_short_description": "Our most flexible rate",
+     "tariff_success": "true",
+     "tariff_message": "",
+     "tariff_code": 0,
+     "tariff_extra_info": "",
+     "base_min_combined": 0,
+     "base_max_combined": 0,
+     "base_max_adults": null,
+     "base_max_children": null,
+     "base_max_infants": null,
+     "base_max_animals": null,
+     "membership_discount_pricing": [
+      {
+       "membership_id": "2",
+       "membership_name": "RAC",
+       "membership_description": "<p><strong>Membership type: RAC member</strong></p>\r\n<p>If you selected &ldquo;RAC member&rdquo; as your membership type when searching for accommodation, pleas…",
+       "membership_icon": "https://driveau.newbook.cloud/images/no_image.png",
+       "service_class": "Membership_Service_RAC",
+       "service_level": null,
+       "discount_id": "226",
+       "discount_name": "Applied in Rate",
+       "discount_amount": 0
+      }
+     ],
+     "inventory_items": [],
+     "deposits": [
+      {
+       "minimum": "0.00",
+       "maximum": "0.00",
+       "amount": "690.33",
+       "original_amount": "690.33",
+       "due_date": "20 Oct 2026",
+       "amount_text": "1.00",
+       "type_text": "Number of Nights (Average)",
+       "due_date_text": "3 Days After Booking Placed",
+       "from_type": "bookings_rule_templates_deposits",
+       "from_type_id": "9"
+      }
+     ],
+     "adjustment_fees": [
+      {
+       "template_name": "Cancellation LESS THAN 72 Hours",
+       "type": "cancellation",
+       "template_id": "8",
+       "inventory_item_id": "65",
+       "gl_category_id": "1",
+       "gl_account_id": "76",
+       "description": "Cancellation Fee",
+       "tax_free": "0",
+       "override_tax_rate_ids": [],
+       "membership_ids": [],
+       "start_billing_from": "2027-10-13",
+       "computed_amount": 690.33
+      }
+     ],
+     "tariffs_quoted": {
+      "2027-10-15": {
+       "label": "Standard Rate",
+       "type_id": "53",
+       "tariff_id": "1660",
+       "tariff_name": "Powered Site ALPHA",
+       "stop_sell": "0",
+       "minimum_periods": "1",
+       "maximum_periods": "0",
+       "tariffs_period_name": "Low Season",
+       "amount": 73,
+       "base_amount": 73,
+       "min_days_in_advance": "0",
+       "max_days_in_advance": "0",
+       "special_deal": "0",
+       "close_arrival": 0,
+       "close_departure": 0
+      },
+      "2027-10-16": {
+       "label": "Standard Rate",
+       "type_id": "53",
+       "tariff_id": "1660",
+       "tariff_name": "Powered Site ALPHA",
+       "stop_sell": "0",
+       "minimum_periods": "1",
+       "maximum_periods": "0",
+       "tariffs_period_name": "Low Season",
+       "amount": 999,
+       "base_amount": 999,
+       "min_days_in_advance": "0",
+       "max_days_in_advance": "0",
+       "special_deal": "0",
+       "close_arrival": 0,
+       "close_departure": 0
+      },
+      "2027-10-17": {
+       "label": "Standard Rate",
+       "type_id": "53",
+       "tariff_id": "1660",
+       "tariff_name": "Powered Site ALPHA",
+       "stop_sell": "0",
+       "minimum_periods": "1",
+       "maximum_periods": "0",
+       "tariffs_period_name": "Low Season",
+       "amount": 999,
+       "base_amount": 999,
+       "min_days_in_advance": "0",
+       "max_days_in_advance": "0",
+       "special_deal": "0",
+       "close_arrival": 0,
+       "close_departure": 0
+      }
+     },
+     "original_tariff_total": 2071,
+     "tariff_total": 2071,
+     "original_average_nightly_tariff": 690.33,
+     "average_nightly_tariff": 690.33,
+     "tariff_inclusions": [
+      {
+       "dates": "15 Oct 2027 to 17 Oct 2027",
+       "html": "<p><strong>Rate inclusions</strong></p>\r\n<ul><!-- adjust category per rate -->\r\n<li>Site only rate</li>\r\n<li>Free Wi-Fi</li>\r\n<!-- remove parking inclusion for sites -->\r\n<li>Site size allocated based…"
+      }
+     ],
+     "special_deal": "0"
+    }
+   ],
+   "stay_through_sites_available": 0,
+   "stay_through_sites_message": "Maximum Advance Days has been exceeded, so there are no Sites available",
+   "stay_through_sites_code": 9,
+   "stay_through_sites_extra_info": "364",
+   "sort": 5
+  }
+ },
+ "message": "",
+ "timestamp": "2026-10-17 00:01:40",
+ "timezone": "Australia/West",
+ "newbook_version": "2025.03.12-6acd5eef54202",
+ "api_key": "<redacted>",
+ "_fixture_note": "Trimmed: subset of categories/tariffs, per-night tariff objects reduced to key fields, HTML shortened, api_key and cart ids redacted."
+}

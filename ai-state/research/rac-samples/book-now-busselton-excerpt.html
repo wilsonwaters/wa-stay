@@ -1,0 +1,171 @@
+<!-- Trimmed excerpt of https://parksandresorts.rac.com.au/busselton/book-now/ (2026-10-16): booking widget, one notice, two category items -->
+<div id="booking_engine_container" class="booking-engine-container">
+      <div class="availability">
+                <div class="availability__single">
+          <label for="date_of_stay">Dates of stay</label>
+          <input type="hidden" id="date_of_stay" value="17 Oct 2026 - 18 Oct 2026">
+          <div id="available_from_div" class="availability__field field_icon--cal">17 Oct 2026 - 18 Oct 2026</div>
+          <label for="available_from" style="display: none;">Checkin Date</label>
+          <input type="text" id="available_from" class="availability__checkin availability--hide" value="17 Oct 2026" readonly>
+          <label for="available_to" style="display: none;">Checkout Date</label>
+          <input type="text" id="available_to" class="availability__checkout availability--hide" value="18 Oct 2026" readonly>
+        </div>
+        <div class="availability__col">
+          <label>Accommodation type</label>
+          <div id="accommodation-filters__type" class="availability__field field_icon--drop">
+            All
+          </div>
+          <div class="accommodation-filters__type drop-box" style="display: none;">
+                          <div class="custom-checkbox">
+                <input
+                    type="checkbox" id="cabins"
+                    class="accommodation-filters__type__checkbox"
+                    data-name="Cabins"
+                    value="5"
+                  >
+                <label class="accommodation-filters__type__label custom-checkbox" for="cabins">
+                  Cabins                </label>
+              </div>
+                          <div class="custom-checkbox">
+                <input
+                    type="checkbox" id="sites"
+                    class="accommodation-filters__type__checkbox"
+                    data-name="Sites"
+                    value="2"
+                  >
+                <label class="accommodation-filters__type__label custom-checkbox" for="sites">
+                  Sites                </label>
+              </div>
+                        <div class="drop-down-controls">
+              <div id="type-reset" class="drop-down-controls__reset">Reset</div>
+              <div id="filter-apply-type" class="drop-down-controls__apply">Apply</div>
+            </div>
+          </div>
+        </div>
+        <div class="availability__col">
+                    <label for="total_guests">Guests</label>
+          <input type="hidden" id="total_guests" value="">
+          <div class="availability__field field_icon--drop" id="guest-total"></div>
+          <div class="availability__guests drop-box" style="display: none;">
+            <div class="availability__guests__adults">
+              <label for="adults"><span>Adults<span>18+ Yrs</span></span></label>
+              <div class="guests_buttons">
+                <div class="guests_buttons__button guests_buttons__button--minus">-</div>
+                <input type="number" name="adults" id="adults" min="1" max="10" value="2" class="availability__guests_input" readonly>
+                <div class="guests_buttons__button guests_buttons__button--plus">+</div>
+              </div>
+            </div>
+            <div class="availability__guests__children">
+              <label for="adults"><span>Children <span>4-17 Yrs</span></span></label>
+              <div class="guests_buttons">
+                <div class="guests_buttons__button guests_buttons__button--minus">-</div>
+                <input type="number" name="children" id="children" min="0" max="10" value="0" class="availability__guests_input" readonly>
+                <div class="guests_buttons__button guests_buttons__button--plus">+</div>
+              </div>
+            </div>
+            <div class="availability__guests__infants">
+              <label for="adults"><span>Infants <span>0-3 Yrs</span></span></label>
+              <div class="guests_buttons">
+                <div class="guests_buttons__button guests_buttons__button--minus">-</div>
+                <input type="number" name="infants" id="infants" min="0" max="10" value="0" class="availability__guests_input" readonly>
+                <div class="guests_buttons__button guests_buttons__button--plus">+</div>
+              </div>
+            </div>
+                        <div class="availability__guests__pets">
+              <label for="pets"><span>Pets <span></span></span></label>
+              <div class="guests_buttons">
+                <div class="guests_buttons__button guests_buttons__button--minus">-</div>
+                <input type="number" name="pets" id="pets" min="0" max="10" value="0" class="availability__guests_input" readonly>
+                <div class="guests_buttons__button guests_buttons__button--plus">+</div>
+              </div>
+            </div>
+            <div class="drop-down-controls">
+              <div id="guest-reset" class="drop-down-controls__reset">Reset</div>
+              <div class="drop-down-controls__apply">Apply</div>
+            </div>
+          </div>
+        </div>
+        <div class="availability__col">
+          <label for="accommodation-filters__membership__value">Membership type</label>
+          <div id="accommodation-filters__membership" class="availability__field field_icon--drop">
+            No RAC membership
+          </div>
+          <select name="membership_type" id="accommodation-filters__membership__value" style="display: none;">
+            <option value="non-member">No RAC membership</option>
+            <option value="member">RAC member</option>
+          </select>
+          <div class="accommodation-filters__membership drop-box" style="display: none;">
+            <div class="custom-checkbox">
+              <div
+                  class="accommodation-filters__membership__label"
+                  data-value="non-member"
+                  data-select-id="accommodation-filters__membership__value"
+                  data-select-value-id="accommodation-filters__membership"
+              >
+                No RAC membership
+              </div>
+            </div>
+            <div class="custom-checkbox">
+              <div
+                  class="accommodation-filters__membership__label"
+                  data-value="member"
+                  data-select-id="accommodation-filters__membership__value"
+                  data-select-value-id="accommodation-filters__membership"
+              >
+                RAC member
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="availability__col">
+          <label for="availability__search"></label>
+          <button  aria-label="Search"
+  class="action-button availability__search action-button--alt"
+            id="availability__search"
+              data-blog-id="6"
+        >Search</button>
+        </div>
+      </div>
+<!-- ... -->
+<!-- ... -->
+<div
+            id="accommodation_item_765"
+            class="accommodation-item"
+            data-title="Powered Site"
+            data-cat-id="4"
+            data-cat-type-id="2"
+            data-max-guests="6"
+            data-bedrooms="0"
+            data-bathrooms="false"
+            data-max-animals="2"
+            data-accessible="false"
+            data-features="53,55,54"
+            data-menu-order="12"
+            data-active="true"
+            data-standard-rate="false"
+            data-member-rate="false"
+            data-allowed-equipment="2,1,15,12,6,5,4,10,3,14,11,13,7,9"
+          >
+              <!-- item body trimmed -->
+</div>
+<!-- ... -->
+<div
+            id="accommodation_item_763"
+            class="accommodation-item"
+            data-title="Ensuite Site"
+            data-cat-id="7"
+            data-cat-type-id="2"
+            data-max-guests="6"
+            data-bedrooms="0"
+            data-bathrooms="1"
+            data-max-animals="2"
+            data-accessible="false"
+            data-features="4,53,55,54"
+            data-menu-order="10"
+            data-active="true"
+            data-standard-rate="false"
+            data-member-rate="false"
+            data-allowed-equipment="2,1,15,12,6,5,4,10,3,14,11,13,7"
+          >
+              <!-- item body trimmed -->
+</div>

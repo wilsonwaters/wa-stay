@@ -1,0 +1,87 @@
+{
+ "_note": "Trimmed from GET /busselton/wp-json/wp/v2/accommodation?per_page=50 (x-wp-total: 11) on 2026-10-16; 2 of 11 items, yoast_head and _links removed.",
+ "items": [
+  {
+   "id": 765,
+   "slug": "powered-site",
+   "type": "accommodation",
+   "link": "https://parksandresorts.rac.com.au/busselton/accommodation/powered-site/",
+   "title": {
+    "rendered": "Powered Site"
+   },
+   "content": {
+    "rendered": "",
+    "protected": false
+   },
+   "featured_media": 0,
+   "newbook_category_type_ids": [
+    42
+   ],
+   "newbook_features": [
+    101,
+    103,
+    102
+   ],
+   "class_list": [
+    "post-765",
+    "accommodation",
+    "type-accommodation",
+    "status-publish",
+    "hentry",
+    "newbook_category_type_ids-sites",
+    "newbook_features-power",
+    "newbook_features-sullage_point",
+    "newbook_features-water"
+   ],
+   "acf": []
+  },
+  {
+   "id": 762,
+   "slug": "studio-triple",
+   "type": "accommodation",
+   "link": "https://parksandresorts.rac.com.au/busselton/accommodation/studio-triple/",
+   "title": {
+    "rendered": "Studio Room"
+   },
+   "content": {
+    "rendered": "",
+    "protected": false
+   },
+   "featured_media": 0,
+   "newbook_category_type_ids": [
+    41
+   ],
+   "newbook_features": [
+    96,
+    97,
+    81,
+    62,
+    39,
+    98,
+    30,
+    31,
+    36,
+    82
+   ],
+   "class_list": [
+    "post-762",
+    "accommodation",
+    "type-accommodation",
+    "status-publish",
+    "hentry",
+    "newbook_category_type_ids-cabins",
+    "newbook_features-air-conditioning",
+    "newbook_features-bathroom",
+    "newbook_features-cooktop",
+    "newbook_features-fridge",
+    "newbook_features-kitchenette",
+    "newbook_features-microwave",
+    "newbook_features-queen_bed",
+    "newbook_features-single_bed",
+    "newbook_features-tv",
+    "newbook_features-veranda"
+   ],
+   "acf": []
+  }
+ ]
+}

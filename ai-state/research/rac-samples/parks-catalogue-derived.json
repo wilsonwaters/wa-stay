@@ -1,0 +1,14 @@
+{
+  "_note": "Derived 2026-10-16 from /<slug>/book-now/ (blog id, widget), /<slug>/contact-us/ (address, Google Maps lat/lng) and /<slug>/booking/ (NewBook cc_secure id; only fetched for busselton, others from the native book-now pages). Ningaloo is not open for bookings (redevelopment).",
+  "parks": [
+    { "slug": "busselton", "name": "RAC Busselton Holiday Park", "region": "South West", "blogId": 6, "widget": "rac-availability-ajax", "newbookCcSecureId": 1230, "address": "97 Caves Road, Abbey, WA 6280", "lat": -33.6611769, "lng": 115.2487607, "phone": "08 9755 4241" },
+    { "slug": "cable-beach", "name": "RAC Cable Beach Holiday Park", "region": "North West", "blogId": 9, "widget": "rac-availability-ajax", "address": "1 Murray Road, Cable Beach, WA 6726", "lat": -17.9356448, "lng": 122.2141982, "phone": "08 9192 3336" },
+    { "slug": "cervantes", "name": "RAC Cervantes Holiday Park", "region": "Coral Coast", "blogId": 5, "widget": "rac-availability-ajax", "address": "35 Aragon Street, Cervantes, WA 6511", "lat": -30.4979022, "lng": 115.0669404, "phone": "08 9652 7060" },
+    { "slug": "esperance", "name": "RAC Esperance Holiday Park", "region": "South East Coast", "blogId": 10, "widget": "rac-availability-ajax", "address": "Goldfields Road, Esperance, WA 6450", "lat": -33.8448715, "lng": 121.9017562, "phone": "08 9071 1251" },
+    { "slug": "exmouth", "name": "RAC Exmouth Cape Holiday Park", "region": "Coral Coast", "blogId": 3, "widget": "newbook-native", "newbookCcSecureId": 1048, "address": "3 Truscott Cres, Exmouth, WA 6707", "lat": -21.9385751, "lng": 114.1323242, "phone": "08 9949 1101" },
+    { "slug": "karri-valley", "name": "RAC Karri Valley Resort", "region": "Southern Forests", "blogId": 7, "widget": "newbook-native", "newbookCcSecureId": 1686, "address": "11342 Vasse Highway, Beedelup, WA 6260", "lat": -34.4205734, "lng": 115.850881, "phone": "08 9776 2020" },
+    { "slug": "margaret-river", "name": "RAC Margaret River Nature Park", "region": "South West", "blogId": 8, "widget": "rac-availability-ajax", "address": "Lot 352 McQueen Road, Margaret River, WA 6285", "lat": -33.9346726, "lng": 115.077829, "phone": "08 9758 8227" },
+    { "slug": "monkey-mia", "name": "RAC Monkey Mia Dolphin Resort", "region": "Coral Coast", "blogId": 2, "widget": "newbook-native", "newbookCcSecureId": 1042, "address": "1 Monkey Mia Road, Monkey Mia, WA 6537", "lat": -25.7936732, "lng": 113.7183656, "phone": "08 9948 1320" },
+    { "slug": "ningaloo", "name": "RAC Ningaloo Reef Resort", "region": "Coral Coast", "blogId": 4, "widget": "newbook-native (closed: 'Bookings ... are not yet open')", "newbookCcSecureId": 1041 }
+  ]
+}
