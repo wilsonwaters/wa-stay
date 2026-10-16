@@ -6,15 +6,19 @@
  * the places that would match if that option were added, given every other chip (the usual
  * "disjunctive" faceting), so ticking an option never shows a count that disagrees with the
  * results it gives.
+ *
+ * Stay types match a place's unit kinds as main's catalogue search does (`unitKindsOf`: its
+ * own, or those its kind gives), so the chip's counts agree with the results main returns.
  */
 
 import type { LocationSummary } from '../../../../shared/types/catalog.types';
-import type { BookingMode, LocationKind } from '../../../../shared/types/provider.types';
-import { kindLabel } from '../../../components/locationFormat';
+import type { BookingMode, UnitKind } from '../../../../shared/types/provider.types';
+import { STAY_TYPES, unitKindsOf } from '../../../../shared/utils/unit-kinds';
 
 export interface ExploreFilters {
   providerIds: string[];
-  kinds: LocationKind[];
+  /** Places with any of these unit kinds (`CatalogQuery.unitKinds`). */
+  stayTypes: UnitKind[];
   regions: string[];
   amenities: string[];
   bookingModes: BookingMode[];
@@ -22,7 +26,7 @@ export interface ExploreFilters {
 
 export const NO_FILTERS: Readonly<ExploreFilters> = Object.freeze({
   providerIds: [],
-  kinds: [],
+  stayTypes: [],
   regions: [],
   amenities: [],
   bookingModes: [],
@@ -40,7 +44,12 @@ export function matchesFilters(
   except?: FacetDimension
 ): boolean {
   if (except !== 'providerIds' && !includesAny(filters.providerIds, item.providerId)) return false;
-  if (except !== 'kinds' && !includesAny(filters.kinds, item.kind)) return false;
+  if (
+    except !== 'stayTypes' &&
+    filters.stayTypes.length > 0 &&
+    !unitKindsOf(item).some((kind) => filters.stayTypes.includes(kind))
+  )
+    return false;
   if (except !== 'regions' && !includesAny(filters.regions, item.area?.region)) return false;
   if (except !== 'bookingModes' && !includesAny(filters.bookingModes, item.bookingMode))
     return false;
@@ -75,8 +84,9 @@ export function facetCounts(
       case 'providerIds':
         bump(item.providerId);
         break;
-      case 'kinds':
-        bump(item.kind);
+      case 'stayTypes':
+        // A place with sites and cabins counts once for each.
+        for (const kind of unitKindsOf(item)) bump(kind);
         break;
       case 'regions':
         bump(item.area?.region);
@@ -98,8 +108,11 @@ const byLabel = (a: FacetOption, b: FacetOption) =>
 export interface ExploreFacets {
   /** Every catalogue provider, in the order given (even one alone, §12.9). */
   providers: FacetOption[];
-  /** Hidden when the whole catalogue has only one kind. */
-  kinds: FacetOption[];
+  /**
+   * The `STAY_TYPES` the catalogue has, in group order (never `other`), and any chosen that it
+   * lacks (with no places). None while the catalogue is empty.
+   */
+  stayTypes: FacetOption[];
   regions: FacetOption[];
   amenities: FacetOption[];
   /** Places bookable online, given the other chips. */
@@ -131,17 +144,24 @@ export function buildFacets(
   };
 
   const providerCounts = facetCounts(base, filters, 'providerIds');
+  const unitKinds = new Set(values((i) => unitKindsOf(i)));
+  const stayTypeCounts = facetCounts(base, filters, 'stayTypes');
   return {
     providers: providers.map((p) => ({
       value: p.id,
       label: p.name,
       count: providerCounts.get(p.id) ?? 0,
     })),
-    kinds: options(
-      'kinds',
-      values((i) => i.kind),
-      kindLabel
-    ).sort(byLabel),
+    stayTypes:
+      catalogue.length === 0
+        ? []
+        : STAY_TYPES.filter(
+            ({ kind }) => unitKinds.has(kind) || filters.stayTypes.includes(kind)
+          ).map(({ kind, label }) => ({
+            value: kind,
+            label,
+            count: stayTypeCounts.get(kind) ?? 0,
+          })),
     regions: options(
       'regions',
       values((i) => i.area?.region),

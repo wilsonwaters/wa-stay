@@ -1,4 +1,11 @@
-import { clampStayParams, hasDates, parseStayParams, stayParamsQuery } from './stayParams';
+import {
+  clampStayParams,
+  hasDates,
+  isStayType,
+  parseStayParams,
+  parseStayTypes,
+  stayParamsQuery,
+} from './stayParams';
 
 describe('parseStayParams', () => {
   it('reads the dates and the party', () => {
@@ -99,5 +106,20 @@ describe('clampStayParams', () => {
 
   it('keeps the party whatever happens to the dates', () => {
     expect(clampStayParams(stay('2020-01-01', '2020-01-03'), RULES).adults).toBe(2);
+  });
+});
+
+describe('stay types', () => {
+  it('knows the five stay types, and not "other"', () => {
+    expect(['campsite', 'cabin', 'room', 'dorm', 'glamping'].every(isStayType)).toBe(true);
+    expect(isStayType('other')).toBe(false);
+    expect(isStayType('castle')).toBe(false);
+    expect(isStayType(undefined)).toBe(false);
+  });
+
+  it('reads a `stay` value in its order, without unknown values, "other", blanks or repeats', () => {
+    expect(parseStayTypes('glamping, cabin,,other,cabin,castle')).toEqual(['glamping', 'cabin']);
+    expect(parseStayTypes('')).toEqual([]);
+    expect(parseStayTypes(null)).toEqual([]);
   });
 });

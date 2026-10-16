@@ -50,6 +50,14 @@ describe('normaliseCatalogQuery', () => {
     ).toEqual({ text: 'Cape', regions: ['Kimberley', 'Pilbara'], limit: 5000 });
   });
 
+  it('sends the stay types as sorted unit kinds, and none when none are chosen', () => {
+    expect(normaliseCatalogQuery({ unitKinds: ['room', 'cabin'] })).toEqual({
+      unitKinds: ['cabin', 'room'],
+      limit: 5000,
+    });
+    expect(normaliseCatalogQuery({ unitKinds: [] })).toEqual({ limit: 5000 });
+  });
+
   it('never sends the map area: Explore filters by area itself', () => {
     expect(normaliseCatalogQuery({ bbox: [112, -35, 129, -13] })).toEqual({ limit: 5000 });
   });

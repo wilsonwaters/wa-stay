@@ -133,6 +133,25 @@ describe('handoffPrefill', () => {
       location: 'a/b',
     });
   });
+
+  it('keeps the stay types chosen on Explore as `stay`, and leaves none out', () => {
+    expect(
+      handoffPrefill('parkstay', '20', { arrival: '2026-11-06', departure: '2026-11-08' }, [
+        'cabin',
+        'room',
+      ])
+    ).toEqual({
+      provider: 'parkstay',
+      location: '20',
+      arrival: '2026-11-06',
+      departure: '2026-11-08',
+      stay: ['cabin', 'room'],
+    });
+    expect(handoffPrefill('parkstay', '20', {}, [])).toEqual({
+      provider: 'parkstay',
+      location: '20',
+    });
+  });
 });
 
 describe('stayQueryOf and sameStay', () => {

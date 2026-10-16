@@ -9,7 +9,7 @@ import {
   Store,
 } from 'lucide-react';
 import type { LocationSummary } from '../../../../shared/types/catalog.types';
-import type { StayParams } from '../../../app/stayParams';
+import type { PlaceLinkQuery } from '../../../app/routes';
 import { LocationCard, type CardAvailability } from '../../../components/LocationCard';
 import { placesLabel } from '../../../components/locationFormat';
 import { Button, EmptyState, Skeleton } from '../../../components/ui';
@@ -63,7 +63,7 @@ export interface ResultsListProps {
   /** Notices shown above the heading (offline, search error, list-only). */
   notices?: ReactNode;
   /** The stay each card's detail link carries. Keep it stable. */
-  stay?: Partial<StayParams>;
+  stay?: PlaceLinkQuery;
   /** The history state each card's detail link carries. Keep it stable. */
   linkState?: unknown;
   /** How many cards to start with (more than 40 when coming back to a longer list). */
@@ -98,7 +98,7 @@ const ResultCard = memo(function ResultCard({
   selected: boolean;
   layout: 'stack' | 'row';
   onHighlight: (key: string | null) => void;
-  stay?: Partial<StayParams>;
+  stay?: PlaceLinkQuery;
   linkState?: unknown;
   availability: CardAvailability | null;
 }) {

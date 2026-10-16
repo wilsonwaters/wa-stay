@@ -2,7 +2,8 @@
  * The stay a page is opened with, in its query string: `arrival`, `departure` (calendar dates
  * `YYYY-MM-DD`), `adults`, `children` and `infants`. Explore passes its stay to a place's
  * detail page this way (E2), and the create flows read the same keys from the prefill query
- * (architecture-notes §12.10). Pure.
+ * (architecture-notes §12.10). The stay types chosen on Explore travel the same way, as
+ * `stay=cabin,room` (`parseStayTypes`). Pure.
  */
 
 import {
@@ -11,6 +12,7 @@ import {
   isCalendarDate,
   nightsBetween,
 } from '../../shared/utils/calendar-date';
+import { STAY_TYPES, type StayTypeKind } from '../../shared/utils/unit-kinds';
 import { DEFAULT_GUEST_LIMITS } from '../components/ui/GuestsField';
 
 export interface StayParams {
@@ -112,4 +114,20 @@ export function hasDates(
   stay: Pick<StayParams, 'arrival' | 'departure'>
 ): stay is { arrival: string; departure: string } {
   return Boolean(stay.arrival && stay.departure);
+}
+
+const STAY_TYPE_KINDS: ReadonlySet<string> = new Set(STAY_TYPES.map((type) => type.kind));
+
+/** Whether `value` is the kind of one of the `STAY_TYPES` (any unit kind but `other`). */
+export function isStayType(value: unknown): value is StayTypeKind {
+  return typeof value === 'string' && STAY_TYPE_KINDS.has(value);
+}
+
+/**
+ * The stay types in a `stay` query value (`cabin,room`), in its order: unknown values, `other`
+ * and repeats are left out. `[]` for no value.
+ */
+export function parseStayTypes(raw: string | null | undefined): StayTypeKind[] {
+  if (!raw) return [];
+  return [...new Set(raw.split(',').map((item) => item.trim()))].filter(isStayType);
 }

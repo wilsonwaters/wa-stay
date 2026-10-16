@@ -31,8 +31,8 @@ import {
   useProviders,
   useProvidersWith,
 } from '../../api';
-import type { PlaceLinkState } from '../../app/routes';
-import type { StayParams } from '../../app/stayParams';
+import type { PlaceLinkQuery, PlaceLinkState } from '../../app/routes';
+import { parseStayTypes } from '../../app/stayParams';
 import type { CardAvailability } from '../../components/LocationCard';
 import { hasMapLocation, placesLabel } from '../../components/locationFormat';
 import { stayRangeLabel } from '../../components/nightGridModel';
@@ -151,17 +151,24 @@ export default function ExplorePage() {
 
   const { params, update, setCamera } = useExploreParams(known);
 
-  // A place's detail page opens with Explore's stay, and Back on it returns here as it was.
+  // The stay types chosen, the same array until they change (not at each camera move), so the
+  // cards' links and availability keep.
+  const stayTypesKey = params.stayTypes.join(',');
+  const stayTypes = useMemo(() => parseStayTypes(stayTypesKey), [stayTypesKey]);
+
+  // A place's detail page opens with Explore's stay and stay types, and Back on it returns here
+  // as it was.
   const { search: currentSearch } = useLocation();
-  const detailStay = useMemo<Partial<StayParams>>(
+  const detailStay = useMemo<PlaceLinkQuery>(
     () => ({
       arrival: params.arrival,
       departure: params.departure,
       adults: params.adults,
       children: params.children,
       infants: params.infants,
+      stayTypes,
     }),
-    [params.arrival, params.departure, params.adults, params.children, params.infants]
+    [params.arrival, params.departure, params.adults, params.children, params.infants, stayTypes]
   );
   const detailState = useMemo<PlaceLinkState>(
     () => ({ from: 'explore', search: currentSearch }),
@@ -171,14 +178,18 @@ export default function ExplorePage() {
   const filters: ExploreFilters = useMemo(
     () => ({
       providerIds: params.providers,
-      kinds: params.kinds,
+      stayTypes,
       regions: params.regions,
       amenities: params.amenities,
       bookingModes: params.online ? ['online'] : [],
     }),
-    [params.providers, params.kinds, params.regions, params.amenities, params.online]
+    [params.providers, stayTypes, params.regions, params.amenities, params.online]
   );
-  const query: CatalogQuery = useMemo(() => ({ text: params.q, ...filters }), [params.q, filters]);
+  // Main filters by unit kind (`unitKinds`), as the chip counts do here.
+  const query: CatalogQuery = useMemo(() => {
+    const { stayTypes: unitKinds, ...rest } = filters;
+    return { text: params.q, ...rest, unitKinds };
+  }, [params.q, filters]);
   const queryKey = JSON.stringify(normaliseCatalogQuery(query));
   const searching = Boolean(params.q) || hasActiveFilters(params);
 
@@ -298,11 +309,12 @@ export default function ExplorePage() {
           status: statuses[item.providerId],
           errorCode: bulk.errors[item.providerId]?.code,
           entry: bulk.byKey.get(item.key),
+          stayTypes,
         })
       );
     }
     return out;
-  }, [stay, results, manifests, statuses, bulk.errors, bulk.byKey]);
+  }, [stay, results, manifests, statuses, bulk.errors, bulk.byKey, stayTypes]);
 
   /** How each result's availability reads on its card and its map pill. */
   const { cardAvailability, pinAvailability } = useMemo(() => {
@@ -482,7 +494,7 @@ export default function ExplorePage() {
   // ---- Actions ---------------------------------------------------------------------------
   const NO_FILTERS = {
     providers: [],
-    kinds: [],
+    stayTypes: [],
     regions: [],
     amenities: [],
     online: false,
@@ -765,7 +777,7 @@ export default function ExplorePage() {
             <FilterRow
               params={params}
               facets={facets}
-              showKinds={facets.kinds.length > 1}
+              showStayTypes={facets.stayTypes.length > 1}
               onChange={updateSearch}
               onClearAll={clearFilters}
               availableOnlyUnavailable={availableOnlyUnavailable}

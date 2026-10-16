@@ -35,11 +35,14 @@ monogram (ParkStay's is "PS" on green).
 
 - **Search.** The pill at the top takes **Where** (a place, park or region), **When** (your
   dates) and **Who** (guests). Results update as you type.
-- **Filters.** **Provider**, **Type** (campground, cabin, holiday park…), **Region**,
-  **Facilities**, **Book online** and, once you have dates, **Available only**.
+- **Filters.** **Provider**, **Stay type** (Camping, Cabins & villas, Rooms, Dorms, Glamping:
+  places with any you tick), **Region**, **Facilities**, **Book online** and, once you have
+  dates, **Available only**.
 - **Availability.** With dates, every card and map pin shows how many sites are free for your
   whole stay ("2 of 3 sites available", "No site free every night", "Info only" for places
-  that are not booked online), and the heading counts the places available.
+  that are not booked online), and the heading counts the places available. With a stay type
+  ticked, a place that also has other kinds counts only the ones you chose, or says "Check
+  dates on the place page" when its provider doesn't count them separately.
 - **The map** shows every place from every provider. With **Search as I move the map** on, the
   list narrows to the area you are looking at. Pins cluster when zoomed out; the key explains
   the colours. If WA Stay was built without a map token, Explore shows the list only and says

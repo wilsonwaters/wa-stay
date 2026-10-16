@@ -34,8 +34,9 @@ bookings: ParkStay is now one **provider** among the ones to come, and existing 
 ## Features
 
 - **Explore.** Every place from every provider on a map of WA and in a list: search by place,
-  park or region; filter by provider, type, region, facilities, online booking and
-  availability; add your dates and guests to see how many sites are free on every pin and card.
+  park or region; filter by provider, stay type (camping, cabins, rooms, dorms, glamping),
+  region, facilities, online booking and availability; add your dates and guests to see how
+  many sites are free on every pin and card.
   Without a map token it works as a list.
 - **Place pages.** Photos, the provider's description and facilities, the park and region,
   every site night by night with prices for your dates, and links to book or read more on the

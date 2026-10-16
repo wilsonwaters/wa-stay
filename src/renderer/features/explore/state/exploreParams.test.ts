@@ -17,7 +17,7 @@ describe('exploreParams', () => {
     const full = params({
       q: 'Cape Range',
       providers: ['parkstay'],
-      kinds: ['campground', 'hut'],
+      stayTypes: ['cabin', 'dorm'],
       regions: ['Pilbara', 'Kimberley'],
       amenities: ['Dogs permitted', 'Road access for 2WD/SUV'],
       online: true,
@@ -34,7 +34,7 @@ describe('exploreParams', () => {
     });
     const search = serialiseExploreParams(full);
     expect(search).toBe(
-      '?q=Cape+Range&providers=parkstay&kinds=campground,hut&regions=Pilbara,Kimberley' +
+      '?q=Cape+Range&providers=parkstay&stay=cabin,dorm&regions=Pilbara,Kimberley' +
         '&amenities=Dogs+permitted,Road+access+for+2WD%2FSUV&online=1&arrival=2026-12-01' +
         '&departure=2026-12-04&adults=2&children=1&infants=0&avail=1&map=121.5,-26.25,4.5&follow=0' +
         '&view=map&sel=parkstay%3A20'
@@ -56,11 +56,11 @@ describe('exploreParams', () => {
 
   it('drops invalid values and says so through the canonical query', () => {
     const { params: parsed, canonical } = parseExploreParams(
-      '?q=bay&kinds=campground,castle&online=yes&arrival=2026-02-30&adults=0&children=11' +
+      '?q=bay&stay=campsite,castle&online=yes&arrival=2026-02-30&adults=0&children=11' +
         '&infants=x&map=200,-30,5&follow=no&view=grid&sel=nope'
     );
-    expect(parsed).toEqual(params({ q: 'bay', kinds: ['campground'] }));
-    expect(canonical).toBe('?q=bay&kinds=campground');
+    expect(parsed).toEqual(params({ q: 'bay', stayTypes: ['campsite'] }));
+    expect(canonical).toBe('?q=bay&stay=campsite');
   });
 
   it('drops both dates when the arrival is on or after the departure', () => {
@@ -138,7 +138,48 @@ describe('exploreParams', () => {
 
   it('counts only real filters as active (not the text, map or stay)', () => {
     expect(hasActiveFilters(params({ q: 'bay', map: { lng: 1, lat: 1, zoom: 3 } }))).toBe(false);
+    expect(hasActiveFilters(params({ arrival: '2026-12-01', adults: 2 }))).toBe(false);
     expect(hasActiveFilters(params({ online: true }))).toBe(true);
     expect(hasActiveFilters(params({ regions: ['Pilbara'] }))).toBe(true);
+    expect(hasActiveFilters(params({ stayTypes: ['cabin'] }))).toBe(true);
+  });
+
+  describe('stay types (`stay`)', () => {
+    it('reads the five stay types, dropping unknown values, "other" and repeats', () => {
+      const { params: parsed, canonical } = parseExploreParams(
+        '?stay=cabin,castle,other,campsite,cabin,glamping,room,dorm'
+      );
+      expect(parsed.stayTypes).toEqual(['cabin', 'campsite', 'glamping', 'room', 'dorm']);
+      expect(canonical).toBe('?stay=cabin,campsite,glamping,room,dorm');
+      expect(parseExploreParams('?stay=other').canonical).toBe('');
+      expect(parseExploreParams('?stay=').params.stayTypes).toEqual([]);
+    });
+
+    it('keeps a stay type no place has: the lists it is checked against are the five groups', () => {
+      expect(
+        parseExploreParams('?stay=room', { regions: ['Pilbara'], providers: ['parkstay'] }).params
+          .stayTypes
+      ).toEqual(['room']);
+    });
+
+    it('no longer reads `kinds`, and drops it from the address', () => {
+      const { params: parsed, canonical } = parseExploreParams(
+        '?kinds=holiday-park&stay=cabin,castle,other'
+      );
+      expect(parsed).toEqual(params({ stayTypes: ['cabin'] }));
+      expect(canonical).toBe('?stay=cabin');
+      expect(parseExploreParams('?kinds=hut&devFixture=50').canonical).toBe('?devFixture=50');
+      expect(replaceExploreParams('?kinds=hut&devFixture=50', params({ q: 'bay' }))).toBe(
+        '?q=bay&devFixture=50'
+      );
+    });
+
+    it('writes `stay` after the providers, in the order chosen', () => {
+      expect(
+        serialiseExploreParams(
+          params({ providers: ['parkstay'], stayTypes: ['glamping', 'cabin'], online: true })
+        )
+      ).toBe('?providers=parkstay&stay=glamping,cabin&online=1');
+    });
   });
 });

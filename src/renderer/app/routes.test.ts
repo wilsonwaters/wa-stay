@@ -1,4 +1,5 @@
 import { matchPath } from 'react-router';
+import type { UnitKind } from '../../shared/types/provider.types';
 import {
   buildPath,
   LEGACY_REDIRECTS,
@@ -29,6 +30,15 @@ describe('buildPath', () => {
       buildPath(PATTERNS.watchNew, {}, { provider: 'parkstay', location: '12', adults: 2, x: '' })
     ).toBe('/watches/new?provider=parkstay&location=12&adults=2');
     expect(buildPath(PATTERNS.explore, {}, { q: undefined })).toBe('/');
+  });
+
+  it('writes a list as one comma list, each item encoded, and leaves out an empty one', () => {
+    expect(
+      buildPath(PATTERNS.watchNew, {}, { location: 'a b', stay: ['cabin', 'room'], x: [] })
+    ).toBe('/watches/new?location=a+b&stay=cabin,room');
+    expect(buildPath(PATTERNS.explore, {}, { tags: ['a,b', 'c&d', ''] })).toBe(
+      '/?tags=a%2Cb,c%26d'
+    );
   });
 });
 
@@ -87,6 +97,17 @@ describe('ROUTES', () => {
       })
     ).toBe('/places/parkstay/20?arrival=2026-11-06&departure=2026-11-08&adults=2&infants=0');
     expect(ROUTES.placeDetail('parkstay', '20', {})).toBe('/places/parkstay/20');
+  });
+
+  it("adds Explore's stay types to a place's address, after the stay", () => {
+    expect(
+      ROUTES.placeDetail('parkstay', '20', {
+        arrival: '2026-11-06',
+        departure: '2026-11-08',
+        stayTypes: ['cabin', 'room'],
+      })
+    ).toBe('/places/parkstay/20?arrival=2026-11-06&departure=2026-11-08&stay=cabin,room');
+    expect(ROUTES.placeDetail('parkstay', '20', { stayTypes: [] })).toBe('/places/parkstay/20');
   });
 
   it('round-trips an external id with "/", ":" and spaces through the route pattern', () => {
@@ -159,6 +180,22 @@ describe('parseCreatePrefill', () => {
       )
     ).toEqual({ arrival: '2026-11-08' });
     expect(parseCreatePrefill('')).toEqual({});
+  });
+
+  it('reads the stay types (`stay`), dropping unknown values, "other" and repeats', () => {
+    expect(parseCreatePrefill('?stay=cabin,castle')).toEqual({ stay: ['cabin'] });
+    expect(parseCreatePrefill('?stay=room,other,room,dorm')).toEqual({ stay: ['room', 'dorm'] });
+    expect(parseCreatePrefill('?stay=cabin%2Croom')).toEqual({ stay: ['cabin', 'room'] });
+    expect(parseCreatePrefill('?stay=castle')).toEqual({});
+    expect(parseCreatePrefill('?stay=')).toEqual({});
+  });
+
+  it('round-trips the stay types, written stay=cabin,room', () => {
+    const prefill = { provider: 'parkstay', location: '20', stay: ['cabin', 'room'] as UnitKind[] };
+    const path = ROUTES.watchNew(prefill);
+    expect(path).toBe('/watches/new?provider=parkstay&location=20&stay=cabin,room');
+    expect(parseCreatePrefill(path.split('?')[1])).toEqual(prefill);
+    expect(parseCreatePrefill(ROUTES.snipeNew(prefill).split('?')[1])).toEqual(prefill);
   });
 });
 
