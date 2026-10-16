@@ -1,7 +1,8 @@
 /**
  * The composition root in fixture mode (test-only): every provider context gets a
- * `FixtureHttpClient` and no session partition. Without `fixtureMode` (always when
- * packaged) providers get their `ElectronSessionHttpClient` as before.
+ * `FixtureHttpClient`, no session partition and no request pacing. Without `fixtureMode`
+ * (always when packaged) providers get their `ElectronSessionHttpClient` as before, paced when
+ * their manifest says so.
  */
 
 import fs from 'fs';
@@ -11,7 +12,9 @@ import { openDatabase } from '@main/database/connection';
 import { createContainer, type AppContainer } from '@main/app/container';
 import { createProviderContext, type ProviderContext } from '@main/providers/sdk';
 import { ElectronSessionHttpClient } from '@main/providers/sdk/http-electron';
+import { parkstayFactory } from '@main/providers/parkstay';
 import { FixtureHttpClient, readUnexpectedRequests } from '@main/testing';
+import { createFakePacedProvider } from '@tests/utils/fake-paced-provider';
 import { TEST_LOGS_DIR } from '@tests/utils/ipc-harness';
 import { containerSecrets } from '@tests/utils/fake-safe-storage';
 
@@ -85,6 +88,41 @@ it('without fixture mode each provider keeps its session-partition client', () =
 
   expect(parkstayContext().http).toBeInstanceOf(ElectronSessionHttpClient);
   expect(session.fromPartition).toHaveBeenCalledWith('persist:provider-parkstay');
+});
+
+it('fixture mode: contexts are unpaced, even for a provider whose manifest paces it', () => {
+  const paced = createFakePacedProvider();
+  container = createContainer({
+    db: openDatabase(':memory:'),
+    logsDir: TEST_LOGS_DIR,
+    ...containerSecrets(),
+    fixtureMode: { fixturesDir: path.join(dir, 'fixtures'), logFile: path.join(dir, 'log') },
+    providerFactories: [parkstayFactory, paced.factory],
+  });
+
+  expect(paced.ctx?.limits.minRequestIntervalMs).toBe(10_000);
+  expect(paced.ctx?.http).toBeInstanceOf(FixtureHttpClient);
+  const deps = jest.mocked(createProviderContext).mock.calls.map(([, d]) => d);
+  expect(deps).toHaveLength(2);
+  expect(deps.every((d) => d.unpaced === true)).toBe(true);
+});
+
+it('without fixture mode a paced provider’s session-partition client is paced', () => {
+  const paced = createFakePacedProvider();
+  container = createContainer({
+    db: openDatabase(':memory:'),
+    logsDir: TEST_LOGS_DIR,
+    ...containerSecrets(),
+    providerFactories: [parkstayFactory, paced.factory],
+  });
+
+  const deps = jest.mocked(createProviderContext).mock.calls.map(([, d]) => d);
+  expect(deps.every((d) => d.unpaced === false)).toBe(true);
+  expect(session.fromPartition).toHaveBeenCalledWith('persist:provider-paced');
+  // Wrapped: the paced client, not the partition client itself
+  expect(paced.ctx?.http).not.toBeInstanceOf(ElectronSessionHttpClient);
+  expect(paced.ctx?.http.providerId).toBe('paced');
+  expect(parkstayContext().http).toBeInstanceOf(ElectronSessionHttpClient);
 });
 
 const MAP_REQUEST = {

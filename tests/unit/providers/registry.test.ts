@@ -23,7 +23,11 @@ import {
   type ProviderAuth,
   type ProviderContext,
 } from '@main/providers/sdk';
-import type { ProviderManifest } from '@shared/types/provider.types';
+import {
+  DEFAULT_PROVIDER_LIMITS,
+  ProviderLimitsSchema,
+  type ProviderManifest,
+} from '@shared/types/provider.types';
 import {
   createFakeProvider,
   createMemoryLogger,
@@ -31,6 +35,11 @@ import {
   testManifest,
   type FakeProvider,
 } from '@tests/utils/fake-provider';
+import {
+  createFakePacedProvider,
+  pacedContext,
+  RecordingHttpClient,
+} from '@tests/utils/fake-paced-provider';
 
 function register(registry: ProviderRegistry, provider: FakeProvider): AccommodationProvider {
   return registry.register(provider.factory, createTestProviderContext);
@@ -217,6 +226,11 @@ describe('ProviderRegistry.register', () => {
           {},
           /release mode daily_rollover, scheduled uses the access gate but capability accessGate is off/,
         ],
+        [
+          'minRequestIntervalMs needs maxConcurrentRequests 1',
+          {},
+          /limits\.minRequestIntervalMs needs limits\.maxConcurrentRequests 1, not 4/,
+        ],
       ];
 
     it('covers every manifest rule', () => {
@@ -235,12 +249,64 @@ describe('ProviderRegistry.register', () => {
           usesAccessGate: mode.id !== 'cancellation',
         }));
       }
+      if (rule === 'minRequestIntervalMs needs maxConcurrentRequests 1') {
+        fake.manifest.limits = {
+          ...fake.manifest.limits!,
+          minRequestIntervalMs: 10_000,
+          maxConcurrentRequests: 4,
+        };
+      }
       expectRegistrationError(fake, message);
     });
 
     it('snipes also needs availability on', () => {
       const fake = createFakeProvider({ capabilities: { availability: false } });
       expectRegistrationError(fake, /snipes needs capabilities holds and availability/);
+    });
+
+    it('a paced provider with maxConcurrentRequests 1, or an interval of 0 with any, registers', () => {
+      const paced = createFakeProvider();
+      paced.manifest.limits = {
+        ...paced.manifest.limits!,
+        minRequestIntervalMs: 10_000,
+        maxConcurrentRequests: 1,
+      };
+      expect(() => register(new ProviderRegistry(), paced)).not.toThrow();
+      const unpaced = createFakeProvider();
+      unpaced.manifest.limits = { ...unpaced.manifest.limits!, minRequestIntervalMs: 0 };
+      expect(() => register(new ProviderRegistry(), unpaced)).not.toThrow();
+    });
+
+    it.each([-1, 1.5, 60_001])(
+      'the schema rejects minRequestIntervalMs %s, and registration names it',
+      (value) => {
+        expect(
+          ProviderLimitsSchema.safeParse({
+            ...DEFAULT_PROVIDER_LIMITS,
+            minRequestIntervalMs: value,
+          }).success
+        ).toBe(false);
+        const fake = createFakeProvider();
+        fake.manifest.limits = {
+          ...fake.manifest.limits!,
+          maxConcurrentRequests: 1,
+          minRequestIntervalMs: value,
+        };
+        expectRegistrationError(fake, /invalid manifest \(limits\.minRequestIntervalMs: /);
+      }
+    );
+
+    it('the schema accepts 0 and 60 000, and a manifest without the limit', () => {
+      for (const value of [0, 60_000]) {
+        expect(
+          ProviderLimitsSchema.safeParse({
+            ...DEFAULT_PROVIDER_LIMITS,
+            minRequestIntervalMs: value,
+          }).success
+        ).toBe(true);
+      }
+      expect(ProviderLimitsSchema.safeParse(DEFAULT_PROVIDER_LIMITS).success).toBe(true);
+      expect(DEFAULT_PROVIDER_LIMITS).not.toHaveProperty('minRequestIntervalMs');
     });
 
     it('modes that do not use the gate are fine without one', () => {
@@ -487,6 +553,25 @@ describe('ProviderRegistry lookups', () => {
     expect(registry.httpOf('fake')).toBe(fake.ctx?.http);
     expect(registry.httpOf('fake').providerId).toBe('fake');
     expect(() => registry.httpOf('nope')).toThrow(UnknownProviderError);
+  });
+
+  it("httpOf of a paced provider is its paced client, so the account check waits in the provider's queue", async () => {
+    jest.useFakeTimers();
+    try {
+      const inner = new RecordingHttpClient({ providerId: 'paced', delayMs: 3_000 });
+      const paced = createFakePacedProvider();
+      registry.register(paced.factory, (manifest) => pacedContext(manifest, inner));
+
+      const http = registry.httpOf('paced');
+      expect(http).toBe(paced.ctx?.http);
+      expect(http).not.toBe(inner);
+      void paced.ctx!.http.getJson('https://paced.example/sync');
+      void http.getJson('https://paced.example/api/profile');
+      await jest.advanceTimersByTimeAsync(60_000);
+      expect(inner.requests[1].sentAt - inner.requests[0].endedAt!).toBe(10_000);
+    } finally {
+      jest.useRealTimers();
+    }
   });
 
   it('get("nope") throws UnknownProviderError; tryGet returns undefined', () => {

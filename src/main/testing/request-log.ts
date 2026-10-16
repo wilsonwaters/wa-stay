@@ -21,6 +21,8 @@ export interface UnexpectedRequest {
   url: string;
   /** `fixture-http`, `fixture-document`: the provider that asked. */
   providerId?: string;
+  /** `fixture-http`: the request's form fields, when it had a body (a route's `form`). */
+  form?: Record<string, string>;
   /** `network-guard`: Chromium's resource type (`image`, `xhr`, `mainFrame`, …). */
   resourceType?: string;
 }

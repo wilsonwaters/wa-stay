@@ -50,6 +50,7 @@ Accounts opens; without the route the request is refused and logged, and the pre
       "query": { "gear_type": "all" },
       "file": "availability.json"
     },
+    { "method": "POST", "path": "/api/availability/", "form": { "park": "3" }, "file": "park-3.json" },
     { "method": "GET", "path": "/queue", "status": 200, "file": "queue.html", "contentType": "text/html" }
   ]
 }
@@ -60,15 +61,19 @@ Accounts opens; without the route the request is refused and logged, and the pre
 | `method` | `GET`, `HEAD`, `POST`, `PUT`, `PATCH` or `DELETE`. |
 | `path` | The URL path, exactly, trailing slash included. The host is not compared. |
 | `query` | Optional. Every parameter listed must have exactly this value; parameters not listed may have any value. Without `query`, any query string matches. |
+| `form` | Optional. The request's body, read as a form (`application/x-www-form-urlencoded`, what `postForm` sends), must have every field listed with exactly this value (a string); fields not listed may have any value. A route with `form` never matches a request without a body, so POSTs to one path are told apart by their form. Without `form`, any body matches. With both `query` and `form`, both must match. |
 | `status` | Optional, default 200. |
 | `file` | The response body, relative to the provider's folder. |
 | `contentType` | Optional. Defaults from the extension: `.json` → `application/json`, `.html` → `text/html`, anything else → `text/plain`. |
 
-The first matching route wins, so put specific routes (with `query`) before general ones.
+The first matching route wins, so put specific routes (with `query` or `form`) before general
+ones.
 
 A request that no route matches is not sent. It fails with `no fixture for GET <url>; add a
-route to <manifest>`, and is appended to `<userData>/e2e-unexpected-requests.log`. A failed
-test attaches that log as `unexpected-requests`, which lists exactly the routes to add.
+route to <manifest>` (for a request with a body, `no fixture for POST <url> with form {…}`), and
+is appended to `<userData>/e2e-unexpected-requests.log`, with its `form` fields when it had a
+body. A failed test attaches that log as `unexpected-requests`, which lists exactly the routes
+to add.
 
 ## Provenance and rules
 

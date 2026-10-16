@@ -2,8 +2,14 @@
  * Concurrency caps, so a provider never sends more parallel requests than it should.
  */
 
+import { AsyncResource } from 'async_hooks';
+
 export interface Limiter {
-  /** Runs `task` once fewer than `n` tasks are running; queued tasks start in call order. */
+  /**
+   * Runs `task` once fewer than `n` tasks are running; queued tasks start in call order. A
+   * task runs in its caller's async context, whichever task's end starts it, so the request
+   * priority it was asked with (`withRequestPriority`) holds inside it.
+   */
   <T>(task: () => Promise<T>): Promise<T>;
   readonly activeCount: number;
   readonly pendingCount: number;
@@ -23,11 +29,12 @@ export function createLimiter(n: number): Limiter {
 
   const limit = <T>(task: () => Promise<T>): Promise<T> =>
     new Promise<T>((resolve, reject) => {
+      const inCallerContext = AsyncResource.bind(task);
       queue.push(() => {
         active++;
         let result: Promise<T>;
         try {
-          result = Promise.resolve(task());
+          result = Promise.resolve(inCallerContext());
         } catch (error) {
           result = Promise.reject(error);
         }

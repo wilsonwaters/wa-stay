@@ -1,8 +1,9 @@
 /**
  * createLimiter and mapWithConcurrency: the cap holds, queued work starts in call order,
- * and results keep input order.
+ * a queued task runs in its caller's async context, and results keep input order.
  */
 
+import { AsyncLocalStorage } from 'async_hooks';
 import { createLimiter, mapWithConcurrency } from '@main/providers/sdk';
 
 interface Deferred {
@@ -69,6 +70,25 @@ describe('createLimiter', () => {
     await expect(failing).rejects.toThrow('nope');
     await expect(throwing).rejects.toThrow('sync');
     await expect(after).resolves.toBe('ran');
+  });
+
+  it("runs a queued task in its caller's async context, not in that of the task whose end starts it", async () => {
+    const limit = createLimiter(1);
+    const caller = new AsyncLocalStorage<string>();
+    const gate = deferred();
+    const seen: Array<string | undefined> = [];
+    const first = caller.run('first', () =>
+      limit(async () => {
+        seen.push(caller.getStore());
+        await gate.promise;
+      })
+    );
+    const second = caller.run('second', () => limit(async () => seen.push(caller.getStore())));
+    const third = limit(async () => seen.push(caller.getStore()));
+
+    gate.resolve();
+    await Promise.all([first, second, third]);
+    expect(seen).toEqual(['first', 'second', undefined]);
   });
 
   it('rejects a concurrency below 1', () => {

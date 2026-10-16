@@ -1,7 +1,7 @@
 /**
  * FixtureHttpClient (test-only fixture mode): answers provider requests from
- * `<dir>/<providerId>/manifest.json`, matching by method, path and query; logs and rejects
- * anything no route matches, without sending it.
+ * `<dir>/<providerId>/manifest.json`, matching by method, path, query and form fields; logs
+ * and rejects anything no route matches, without sending it.
  */
 
 import fs from 'fs';
@@ -9,6 +9,7 @@ import os from 'os';
 import path from 'path';
 import {
   FixtureHttpClient,
+  fixtureManifestSchema,
   matchFixtureRoute,
   readUnexpectedRequests,
   UnexpectedNetworkRequestError,
@@ -47,6 +48,16 @@ beforeEach(() => {
         { method: 'GET', path: '/api/avail/', query: { gear: 'tent' }, file: 'tent.json' },
         { method: 'GET', path: '/api/avail/', query: { gear: 'van' }, file: 'van.json' },
         { method: 'GET', path: '/page', file: 'page.html' },
+        // One availability path, told apart by the park's blog_id in the form
+        { method: 'POST', path: '/booking/', form: { blog_id: '3' }, file: 'busselton.json' },
+        { method: 'POST', path: '/booking/', form: { blog_id: '7' }, file: 'esperance.json' },
+        {
+          method: 'POST',
+          path: '/search/',
+          query: { lang: 'en' },
+          form: { kind: 'cabin' },
+          file: 'cabins.json',
+        },
         { method: 'GET', path: '/gone', status: 404, file: 'gone.txt', contentType: 'text/x-gone' },
       ],
     },
@@ -56,6 +67,9 @@ beforeEach(() => {
       'tent.json': '{"gear":"tent"}',
       'van.json': '{"gear":"van"}',
       'page.html': '<p>queue</p>',
+      'busselton.json': '{"park":"Busselton"}',
+      'esperance.json': '{"park":"Esperance"}',
+      'cabins.json': '{"kind":"cabin"}',
       'gone.txt': 'not here',
     }
   );
@@ -112,6 +126,98 @@ describe('FixtureHttpClient', () => {
     await expect(http.getJson(`${BASE}/api/avail/`)).rejects.toBeInstanceOf(
       UnexpectedNetworkRequestError
     );
+  });
+
+  it('a form route matches the fields of a form body; fields it leaves out may be anything', async () => {
+    const http = client();
+
+    await expect(http.postForm(`${BASE}/booking/`, { blog_id: 3 })).resolves.toEqual({
+      park: 'Busselton',
+    });
+    await expect(
+      http.postForm(`${BASE}/booking/`, {
+        action: 'search',
+        arrive: '2026-11-10',
+        blog_id: '3',
+        depart: '2026-11-12',
+      })
+    ).resolves.toEqual({ park: 'Busselton' });
+    // A body sent with request() is read as a form too
+    const raw = await http.request('POST', `${BASE}/booking/`, {
+      body: new URLSearchParams({ x: '1', blog_id: '3' }),
+    });
+    await expect(raw.json()).resolves.toEqual({ park: 'Busselton' });
+  });
+
+  it('two routes on one path are told apart by blog_id', async () => {
+    const http = client();
+
+    await expect(http.postForm(`${BASE}/booking/`, { blog_id: 7 })).resolves.toEqual({
+      park: 'Esperance',
+    });
+    await expect(http.postForm(`${BASE}/booking/`, { blog_id: 3 })).resolves.toEqual({
+      park: 'Busselton',
+    });
+    await expect(http.postForm(`${BASE}/booking/`, { blog_id: 9 })).rejects.toBeInstanceOf(
+      UnexpectedNetworkRequestError
+    );
+  });
+
+  it('a form route never matches a request without a body', async () => {
+    const http = client();
+
+    await expect(http.request('POST', `${BASE}/booking/?blog_id=3`)).rejects.toBeInstanceOf(
+      UnexpectedNetworkRequestError
+    );
+    expect(
+      matchFixtureRoute([{ method: 'GET', path: '/x', form: {}, file: 'f' }], 'GET', `${BASE}/x`)
+    ).toBeUndefined();
+    expect(
+      matchFixtureRoute(
+        [{ method: 'GET', path: '/x', form: {}, file: 'f' }],
+        'GET',
+        `${BASE}/x`,
+        ''
+      )
+    ).toMatchObject({ file: 'f' });
+  });
+
+  it('a route with both query and form needs both to match', async () => {
+    const http = client();
+
+    await expect(
+      http.postForm(`${BASE}/search/`, { kind: 'cabin' }, { query: { lang: 'en' } })
+    ).resolves.toEqual({ kind: 'cabin' });
+    await expect(
+      http.postForm(`${BASE}/search/`, { kind: 'cabin' }, { query: { lang: 'fr' } })
+    ).rejects.toBeInstanceOf(UnexpectedNetworkRequestError);
+    await expect(
+      http.postForm(`${BASE}/search/`, { kind: 'site' }, { query: { lang: 'en' } })
+    ).rejects.toBeInstanceOf(UnexpectedNetworkRequestError);
+  });
+
+  it('names the form fields of a refused request in its log entry and its message', async () => {
+    const http = client();
+
+    const error = await http
+      .postForm(`${BASE}/booking/`, { blog_id: 9, arrive: '2026-11-10' })
+      .catch((e: unknown) => e);
+
+    expect(error).toBeInstanceOf(UnexpectedNetworkRequestError);
+    expect(error).toMatchObject({ form: { blog_id: '9', arrive: '2026-11-10' } });
+    expect((error as Error).message).toContain(
+      `POST ${BASE}/booking/ with form {"blog_id":"9","arrive":"2026-11-10"}; add a route to`
+    );
+    expect(readUnexpectedRequests(logFile)).toEqual([
+      {
+        time: expect.any(String),
+        source: 'fixture-http',
+        providerId: 'fake',
+        method: 'POST',
+        url: `${BASE}/booking/`,
+        form: { blog_id: '9', arrive: '2026-11-10' },
+      },
+    ]);
   });
 
   it('logs and rejects an unmatched request, naming the manifest, and never sends it', async () => {
@@ -210,11 +316,40 @@ describe('matchFixtureRoute', () => {
   const routes: FixtureRoute[] = [
     { method: 'GET', path: '/a', query: { x: '1' }, file: 'first' },
     { method: 'GET', path: '/a', file: 'fallback' },
+    { method: 'POST', path: '/a', form: { y: '2' }, file: 'form' },
+    { method: 'POST', path: '/a', file: 'any-post' },
   ];
 
   it('returns the first route that matches', () => {
     expect(matchFixtureRoute(routes, 'GET', `${BASE}/a?x=1`)?.file).toBe('first');
     expect(matchFixtureRoute(routes, 'GET', `${BASE}/a?x=2`)?.file).toBe('fallback');
-    expect(matchFixtureRoute(routes, 'POST', `${BASE}/a`)).toBeUndefined();
+    expect(matchFixtureRoute(routes, 'PUT', `${BASE}/a`)).toBeUndefined();
   });
+
+  it('matches a form route by the body, and without a body (a document request) never', () => {
+    expect(matchFixtureRoute(routes, 'POST', `${BASE}/a`, 'y=2&z=3')?.file).toBe('form');
+    expect(matchFixtureRoute(routes, 'POST', `${BASE}/a`, 'y=1')?.file).toBe('any-post');
+    expect(matchFixtureRoute(routes, 'POST', `${BASE}/a`)?.file).toBe('any-post');
+    // A route without form matches any body
+    expect(matchFixtureRoute(routes, 'GET', `${BASE}/a`, 'y=2')?.file).toBe('fallback');
+  });
+});
+
+describe('fixtureManifestSchema', () => {
+  const route = { method: 'POST', path: '/booking/', file: 'a.json' };
+
+  it('accepts string form values', () => {
+    expect(
+      fixtureManifestSchema.safeParse({ routes: [{ ...route, form: { blog_id: '3' } }] }).success
+    ).toBe(true);
+  });
+
+  it.each([{ blog_id: 3 }, { blog_id: true }, { blog_id: null }, { blog_id: ['3'] }, 'blog_id=3'])(
+    'rejects non-string form values (%j)',
+    (form) => {
+      const parsed = fixtureManifestSchema.safeParse({ routes: [{ ...route, form }] });
+      expect(parsed.success).toBe(false);
+      expect(parsed.error?.issues[0].path.slice(0, 3)).toEqual(['routes', 0, 'form']);
+    }
+  );
 });

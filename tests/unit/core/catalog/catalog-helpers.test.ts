@@ -1,15 +1,19 @@
 /**
- * The catalogue service's pure helpers: the FTS5 query builder, deadlines on provider calls,
- * error codes for per-provider failures, stay cache keys and derived summaries.
+ * The catalogue service's pure helpers: the FTS5 query builder, deadlines on provider calls
+ * (and how a paced provider's grow), error codes for per-provider failures, stay cache keys
+ * and derived summaries.
  */
 
 import {
   catalogErrorCode,
   DERIVED_SUMMARY_LENGTH,
+  PACED_REQUEST_ALLOWANCE_MS,
+  pacedDeadlineMs,
   stayCacheKey,
   summaryFromHtml,
   withDeadline,
 } from '@main/core/catalog/catalog-helpers';
+import { INTERACTIVE_REQUEST_GAP_MS } from '@main/providers/sdk/pacing';
 import { searchWords, toFtsQuery } from '@main/database/repositories/location.repository';
 import {
   AccessGateError,
@@ -134,6 +138,54 @@ describe('withDeadline', () => {
         throw failure;
       })
     ).rejects.toBe(failure);
+  });
+});
+
+describe('pacedDeadlineMs', () => {
+  const PACED = { minRequestIntervalMs: 10_000 };
+
+  it('is the base deadline for an unpaced provider, whatever the requests', () => {
+    for (const limits of [{}, { minRequestIntervalMs: 0 }]) {
+      expect(pacedDeadlineMs(20_000, limits, { requests: 8, priority: 'background' })).toBe(20_000);
+      expect(pacedDeadlineMs(60_000, limits, { requests: 200, priority: 'interactive' })).toBe(
+        60_000
+      );
+    }
+  });
+
+  it('adds, per request, the interactive gap (1 s) and the 10 s allowance', () => {
+    expect(INTERACTIVE_REQUEST_GAP_MS).toBe(1_000);
+    expect(PACED_REQUEST_ALLOWANCE_MS).toBe(10_000);
+    // A place's detail or check: its own request and one in flight ahead of it
+    expect(pacedDeadlineMs(20_000, PACED, { requests: 2, priority: 'interactive' })).toBe(42_000);
+    // Explore's bulk availability over 8 stored places
+    expect(pacedDeadlineMs(20_000, PACED, { requests: 8, priority: 'interactive' })).toBe(108_000);
+  });
+
+  it('adds, per request, the background gap (the provider’s interval) and the allowance', () => {
+    expect(pacedDeadlineMs(60_000, PACED, { requests: 8, priority: 'background' })).toBe(220_000);
+    expect(
+      pacedDeadlineMs(
+        60_000,
+        { minRequestIntervalMs: 30_000 },
+        { requests: 2, priority: 'background' }
+      )
+    ).toBe(140_000);
+  });
+
+  it('counts at least one request (a paced provider with no stored places)', () => {
+    expect(pacedDeadlineMs(60_000, PACED, { requests: 0, priority: 'background' })).toBe(80_000);
+    expect(pacedDeadlineMs(20_000, PACED, { requests: 0, priority: 'interactive' })).toBe(31_000);
+  });
+
+  it('never gives an interactive request a longer gap than the provider’s own', () => {
+    expect(
+      pacedDeadlineMs(
+        20_000,
+        { minRequestIntervalMs: 400 },
+        { requests: 2, priority: 'interactive' }
+      )
+    ).toBe(20_000 + 2 * (400 + 10_000));
   });
 });
 

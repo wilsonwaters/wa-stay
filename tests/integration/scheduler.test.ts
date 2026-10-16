@@ -5,8 +5,9 @@
  * Covers: no overlapping snipe checks and a single hold, abort on unschedule, the generation
  * token, access-gate ref counting, the long-timer re-arm, past releases and windows, hold
  * expiry, resume after sleep (snipes re-armed or expired, watches expired), the watch due-loop
- * spacing, the per-provider cap, the startup stagger, legacy intervals, run-now joins,
- * restart after a stop mid-hold, unknown providers, and `*:updated` events.
+ * spacing, the per-provider cap, the startup stagger, legacy intervals, run-now joins, the
+ * request priority of "Check now" and of the due loop, restart after a stop mid-hold, unknown
+ * providers, and `*:updated` events.
  *
  * Sleep is simulated with `jest.setSystemTime` alone: fake timers keep their remaining delay,
  * as a monotonic clock does while a computer sleeps, until `powerMonitor` says it resumed.
@@ -463,6 +464,51 @@ describe('JobScheduler (fake timers, FakeProvider, real database)', () => {
 
       expect(await first).toBe(await second);
       expect(checks()).toHaveLength(1);
+    });
+
+    it('"Check now" sends interactive requests and the due loop sends background ones', async () => {
+      setUp(createFakeProvider({ availability: { '1': { u1: 'booked' } } }));
+      const watch = await h.watches.create(h.userId, h.watchInput());
+      h.scheduler.start();
+      await jest.advanceTimersByTimeAsync(SECOND);
+      expect(checks().map((c) => c.priority)).toEqual(['background']);
+
+      await settle(h.scheduler.runWatchNow(watch.id));
+      expect(checks().map((c) => c.priority)).toEqual(['background', 'interactive']);
+
+      // The next due checks are background again
+      await jest.advanceTimersByTimeAsync(2 * HOUR);
+      expect(checks().length).toBeGreaterThan(2);
+      expect(
+        checks()
+          .slice(2)
+          .every((c) => c.priority === 'background')
+      ).toBe(true);
+    });
+
+    it('a check queued behind another keeps its own priority, whichever check’s end starts it', async () => {
+      // One check at a time for the provider; each takes 40 s
+      setUp(
+        createFakeProvider({
+          limits: { maxConcurrentRequests: 1 },
+          delays: { availability: 40 * SECOND },
+          availability: { '1': { u1: 'booked' } },
+        })
+      );
+      const [, now] = [
+        await h.watches.create(h.userId, h.watchInput({ name: 'First' })),
+        await h.watches.create(h.userId, h.watchInput({ name: 'Now' })),
+        await h.watches.create(h.userId, h.watchInput({ name: 'Due' })),
+      ];
+      // The three are due at 0, 20 and 40 s (the startup stagger); the first runs at once
+      h.scheduler.start();
+      await jest.advanceTimersByTimeAsync(SECOND);
+      // "Check now" waits behind the first; the third falls due and waits behind it
+      void h.scheduler.runWatchNow(now.id).catch(() => undefined);
+      await jest.advanceTimersByTimeAsync(3 * MINUTE);
+
+      expect(h.fake.peakInFlight('availability')).toBe(1);
+      expect(checks().map((c) => c.priority)).toEqual(['background', 'interactive', 'background']);
     });
 
     it('emits watch:updated after each run', async () => {

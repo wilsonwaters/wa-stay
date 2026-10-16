@@ -228,6 +228,8 @@ export function createContainer({
     providersDir: path.join(app.getPath('userData'), 'providers'),
     // Development only (§12.34): a packaged build always detects Edge or Chrome itself.
     browserExecutablePath: fromSource ? process.env.WA_STAY_BROWSER_PATH : undefined,
+    // Recorded answers need no pacing: fixture mode stays fast for the smoke tests.
+    unpaced: Boolean(fixtureMode),
   };
   const providers = new ProviderRegistry({ logger });
   registerBuiltInProviders(providers, (manifest) => createProviderContext(manifest, providerDeps), {
