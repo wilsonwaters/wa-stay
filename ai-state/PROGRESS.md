@@ -10,8 +10,9 @@ Branch `ccr-573ddb1d-hir0sq` (from `main` at `4bd5d62`, the v2.0.0 release). The
 Phase 3–4 (task specs, then execution). The stakeholder approved the 20-task plan and decided R6–R8 (alert clicks for every provider, a phone booking link in alert emails, interactive pacing).
 
 ## Currently in flight
-- Reconciliation agent: applying orchestrator decisions D-a…D-l across the 20 specs, then filing issues R1→R20 (`ai-planning`, `stream:rac`).
-- **R1** (stay-type foundation): implementation agent in `/home/user/lanes/r1` on `lane/r1` (cut at `10aaf89`).
+- **R1 (#48)** done on `lane/r1` (`924ea34`, `d95b5ec`; gate: 4203 tests, e2e 22). Independent review running.
+- **R2 (#49), R3 (#50), R4 (#51)**: implementation agents in `/home/user/lanes/r2|r3|r4`, cut from `lane/r1` (`d9da364`, which also merged the reconciled specs).
+- Spec-maintenance agent: applying RS1, RS10–RS13 (RS12 changed by the stakeholder: RAC places show "N free" with no total) to the plan, specs and issues.
 
 ## Completed
 - 2026-10-16: kickoff research, three parallel read-only agents.
@@ -25,7 +26,8 @@ Phase 3–4 (task specs, then execution). The stakeholder approved the 20-task p
   - `ai-state/research/rac-terms.md` (31 requests): not links-only; personal non-commercial use; 10 s crawl delay; 16 rules.
   - `ai-state/research/rac-sdk-gaps.md`: watches need only the module; changes for stay types, member number, minimum stay and release alerts.
 - 2026-10-16: the stakeholder decided R1–R5 (brief). Brief written.
-- 2026-10-16: master plan (`ai-state/streams/rac/master-plan.md`, R1–R20, lanes S/U/P) approved; decisions R6–R8. 20 specs written by four parallel agents. Baseline gate recorded in RUNBOOK.
+- 2026-10-16: master plan (`ai-state/streams/rac/master-plan.md`, R1–R20, lanes S/U/P) approved; decisions R6–R8. 20 specs written by four parallel agents, reconciled (decisions D-a…D-l), filed as issues #48–#67. Baseline gate recorded in RUNBOOK (the true unit baseline is 4128 + 6 skipped once Electron's binary is installed).
+- 2026-10-16: stakeholder decided RS1 (Experimental switch for everyone, off), RS10/RS11 (as proposed), RS12 (**free units only**, no total), RS13 (digits only; never use real numbers in tests or docs).
 
 ## Next
 1. Review the master plan, then spec-writing agents (parallel), then GitHub issues (`ai-planning`, `stream:rac`).
