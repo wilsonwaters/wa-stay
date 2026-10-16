@@ -199,8 +199,8 @@ All additive and optional unless marked. The orchestrator records them as archit
 | # | Question | Proposed default | Blocks |
 |---|---|---|---|
 | RS1 | Should every user see the Experimental auto-cart switch, or only a developer build? | Shown to everyone, off, under "Experimental", with a warning and a confirm dialog | R17 |
-| RS2 | Rule 2 makes Explore's RAC free counts take about 1.5 minutes after dates are chosen (eight paced requests). Treat a person's date choice as interactive (one at a time, no 10 s gap, about 40–60 s)? | Follow rule 2 as written; Explore shows "Still checking RAC…" | R2, R11 |
-| RS3 | A desktop alert click now opens the booking page in the browser for every provider, ParkStay included. | Yes (one click, R1); the watch page opens in the app too | R7 |
+| RS2 | Rule 2 makes Explore's RAC free counts take about 1.5 minutes after dates are chosen. | **Decided 2026-10-16 (brief R8):** what the person triggers is interactive (one at a time, short gap, about 40–60 s for eight parks); background work keeps 10 s. Explore still shows "Still checking RAC…" while counts arrive. | R2, R11 |
+| RS3 | A desktop alert click now opens the booking page in the browser for every provider, ParkStay included. | **Decided 2026-10-16 (brief R6): yes, every provider.** Plus brief R7: the alert email carries a public, prefilled "Book on {shortName}" link (never a cart URL) so the person can book from a phone; an auto-hold email says the hold is in the app on the computer and gives the public link as a fallback. | R7 |
 | RS4 | RAC checkout's top-level origins (NewBook card store, Stripe 3-D Secure) are unknown. | RAC's host only; blocked hosts logged; confirmed in RQ2 | R19 |
 | RS5 | Cart expiry and the confirmation page are unseen, so a paid cart cannot be marked booked. | 10-minute estimate unless the cart page shows one; no `bookedReference`; the person checks RAC's email | R19 |
 | RS6 | ParkStay lists "RAC Margaret River Nature Park" (id 116) as an external place, so it shows twice. | Keep both; the ParkStay one is info-only | R5 |
@@ -211,3 +211,4 @@ All additive and optional unless marked. The orchestrator records them as archit
 ## Changelog
 
 - **2026-10-16:** Created with R1–R20. Decisions answer the planning brief's ten questions. RS1–RS9 go to OPEN-QUESTIONS.md.
+- 2026-10-16: stakeholder decisions R6–R8 (brief): alert clicks open the booking page for every provider; alert emails carry a public prefilled booking link for booking from a phone (R7 task); interactive pacing for person-triggered requests (R2, R11). RS2 and RS3 resolved.
