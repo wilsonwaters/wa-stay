@@ -10,11 +10,11 @@ Branch `ccr-573ddb1d-hir0sq` (from `main` at `4bd5d62`, the v2.0.0 release). The
 Phase 3–4 (task specs, then execution). The stakeholder approved the 20-task plan and decided R6–R8 (alert clicks for every provider, a phone booking link in alert emails, interactive pacing).
 
 ## Currently in flight
-- **R1 (#48)** done on `lane/r1` (`924ea34`, `d95b5ec`; gate: 4203 tests, e2e 22). Independent review running.
 - **R2 (#49), R3 (#50), R4 (#51)**: implementation agents in `/home/user/lanes/r2|r3|r4`, cut from `lane/r1` (`d9da364`, which also merged the reconciled specs).
 - Spec-maintenance agent: applying RS1, RS10–RS13 (RS12 changed by the stakeholder: RAC places show "N free" with no total) to the plan, specs and issues.
 
 ## Completed
+- **R1 (#48) merged** (`8455c07`): unit kinds, five stay types, migration v11, catalogue filter and facet, ParkStay mapping. Commits `924ea34`, `d95b5ec`, review fix `6084c96` (bunk word boundary). Review APPROVE, nits only (read/filter mismatch on hand-edited rows; v11 backfill uses the live table). Gate: 4203 tests, test:tz 7, e2e 22.
 - 2026-10-16: kickoff research, three parallel read-only agents.
   - `ai-state/research/rac-booking-flow.md` (63 anonymous requests; samples in `ai-state/research/rac-samples/`):
     - NewBook behind Cloudflare;

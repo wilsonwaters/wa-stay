@@ -18,7 +18,7 @@ RAC Parks & Resorts becomes WA Stay's second provider (brief, Project 2), togeth
 
 | ID | Task | Size | Depends on | Status |
 |---|---|---|---|---|
-| R1 (#48) | [Stay-type foundation](tasks/R1-stay-type-foundation.md): `UnitKind` and its five groups; `unitKind` on units, `unitKinds` on locations, `byKind` on bulk entries; v11 (add columns); catalogue filter and facet; ParkStay maps its units and places | M | — | ⬜ |
+| R1 (#48) | [Stay-type foundation](tasks/R1-stay-type-foundation.md): `UnitKind` and its five groups; `unitKind` on units, `unitKinds` on locations, `byKind` on bulk entries; v11 (add columns); catalogue filter and facet; ParkStay maps its units and places | M | — | ✅ |
 | R2 (#49) | [Polite request pacing](tasks/R2-polite-request-pacing.md): `limits.minRequestIntervalMs`, a paced `HttpClient` (one in flight, priority for checks), catalogue deadlines that scale with it, unpaced fixture mode, fixture routes that match form fields | M | R1 | ⬜ |
 | R3 (#50) | [Stay-type criteria for watches and snipes](tasks/R3-stay-type-criteria-core.md): `unitKinds` on watches and snipes (types, contracts, repositories); `wantedUnits` and the snipe's unit choice apply it; no automatic hold of "any unit" across mixed kinds | M | R1 | ⬜ |
 | R4 (#51) | [Explore "Stay type" chip](tasks/R4-explore-stay-type-chip.md): replaces "Type"; `stay` URL param; facet counts; prefill `&stay=` into create flows; free counts follow the chosen types (`byKind`, else "Check dates" at mixed places) | M | R1 | ⬜ |
