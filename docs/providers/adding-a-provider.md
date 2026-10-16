@@ -715,11 +715,12 @@ The rules the normalised types carry (`src/shared/types/provider.types.ts`,
   Set it when the place has other kinds than that (a campground with glamping tents, a holiday
   park with cabins only). Main drops unknown values and duplicates, and uses the derived list
   when nothing is left, so a location always has at least one. Each unit can say what it is
-  with `unitKind`, on `UnitSummary` and on `UnitAvailability`; main drops a value that is not
-  a unit kind and keeps the unit.
+  with `unitKind`, on `UnitSummary` and on `UnitAvailability`; on a detail's units, main drops
+  a value that is not a unit kind and keeps the unit.
 - **`LocationDetail`** adds `units` (`UnitSummary[]`), and optionally `descriptionHtml` and a
-  `releaseInfo` sentence. Its `unitKinds`, when you give none, are the stored summary's. Return the provider's HTML as you found it: main sanitises it
-  (`sanitizeProviderHtml`) before it crosses IPC, and its links open in the system browser.
+  `releaseInfo` sentence. Its `unitKinds`, when you give none, are the stored summary's.
+  Return the provider's HTML as you found it: main sanitises it (`sanitizeProviderHtml`)
+  before it crosses IPC, and its links open in the system browser.
   A description in titled parts can be `sections` (`{ title, html }`, in the provider's order;
   the place page shows them as an accordion, the first open, instead of `descriptionHtml`), and
   short notices `notices` (`{ level: 'warning' | 'caution' | 'info', text }`, plain text). Main

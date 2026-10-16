@@ -939,6 +939,25 @@ describe('bulk availability filtering and errors', () => {
     });
   });
 
+  it("passes an entry's byKind on as the provider gave it, odd counts included", async () => {
+    const s = setup();
+    await s.catalog.sync();
+    const byKind = {
+      campsite: { availableUnits: 2, bookableUnits: 5 },
+      cabin: { availableUnits: -1, bookableUnits: Number.NaN },
+    };
+    jest
+      .spyOn(s.fake.availability!, 'search')
+      .mockResolvedValueOnce([{ key: 'fake:1', availableUnits: 2, bookableUnits: 5, byKind }]);
+
+    const result = await s.catalog.availability(STAY, { providerIds: ['fake'] });
+
+    expect(result.entries).toEqual([
+      { key: 'fake:1', availableUnits: 2, bookableUnits: 5, byKind },
+    ]);
+    expect(Number.isNaN(result.entries[0].byKind?.cabin?.bookableUnits)).toBe(true);
+  });
+
   it('keeps only entries inside the bbox when one is given', async () => {
     const s = setup();
     await s.catalog.sync();
