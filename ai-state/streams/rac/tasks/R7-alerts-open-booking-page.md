@@ -24,7 +24,7 @@ R2 (lane order only: both edit `provider.types.ts`)
 2. **Core:** a new `src/main/core/booking-link.ts`. R12 reuses it for snipe alerts.
    - `isProviderBookingLink(manifest, url)`:
      - https, with no username or password;
-     - the host equals `new URL(manifest.website).host`, or is a subdomain of it with a leading `www.` dropped.
+     - the host equals `new URL(manifest.website).host`, or is a subdomain of that host without its leading `www.` (a website `www.example.com` allows `book.example.com`).
      - A cart URL cannot be recognised generically: the doc rule, the contract suite and each provider's tests cover it (R10 for RAC).
    - `firstBookingLink(manifest, candidates)`: the first candidate that passes. A refused one is skipped and logged once per call with `describeUrl` (the origin only), never the path or query. R12 calls it with its own candidates.
    - `matchedStayLink(provider, watch, match, units)` → `{ url, arrival, departure } | undefined`, with these candidates in order:
@@ -42,7 +42,7 @@ R2 (lane order only: both edit `provider.types.ts`)
    - **Desktop click** (`openFromDesktop`, `:391-401`), when the alert carries a booking URL (a found or partial alert, or later R12's snipe alert):
      - the in-app page opens as today (`app:navigate`);
      - then `openExternal(url)` opens the browser. It is a new option, wired like `showMainWindow` (`container.ts:167,178,296-300`; `index.ts:86,166`) to `shell.openExternal`.
-   - Held alerts open the watch only, because payment happens in the app.
+   - An alert with `heldInApp` (a held watch) opens the in-app page only, because payment happens in the app.
    - When `showMainWindow()` returns false, the click opens nothing. A rejected `openExternal` is logged with the origin only.
 5. **Email** (`email-smtp.notifier.ts`):
    - `NotificationMessage` (`notifier.types.ts:128-139`) gains `bookingUrl?: string` and `heldInApp?: boolean`. The dispatcher passes them through.

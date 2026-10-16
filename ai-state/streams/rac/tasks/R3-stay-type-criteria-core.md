@@ -14,7 +14,7 @@ R1 (the v11 `unit_kinds` columns and `UnitKind`).
    - `src/shared/types/watch.types.ts`: `Watch.unitKinds: UnitKind[]` and `WatchInput.unitKinds?` (so `WatchUpdate` has it too).
    - `src/shared/types/site-sniper.types.ts`: the same for `SiteSnipe` and `SiteSnipeInput`.
    - Empty means any kind.
-2. **Contracts:** `watchInputSchema` (`src/shared/contracts/watches.ts:37`) and `snipeInputSchema` (`src/shared/contracts/snipes.ts:31-48`) gain `unitKinds: z.array(UnitKindSchema).optional()`. Updates inherit it, and `assertTypeEquals` still holds. The services drop duplicates.
+2. **Contracts:** `watchInputSchema` (`src/shared/contracts/watches.ts:37`) and `snipeInputSchema` (`src/shared/contracts/snipes.ts:33`) gain `unitKinds: z.array(UnitKindSchema).optional()`. Updates inherit it, and `assertTypeEquals` still holds. The services drop duplicates.
 3. **Repositories:** `watch.repository.ts` (insert `:59-72`, update `:115`, map `:384`) and `site-sniper.repository.ts` (insert `:60-74`, update `:115`, map `:435`) write and read `unit_kinds`. Unknown or unreadable entries are dropped when read.
 4. **Matching** (`src/main/core/watches/matching.ts:24-35`):
    - `wantedUnits({ unitIds, unitKinds }, units)`:
