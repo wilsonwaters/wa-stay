@@ -287,8 +287,18 @@ describe('ParkStay availability', () => {
       const entries = await parkstay.provider.availability.search(BUNGARRA_STAY);
       // (Object keys that look like numbers come back in numeric order.)
       expect(entries).toEqual([
-        { key: 'parkstay:18', availableUnits: 6, bookableUnits: 26 },
-        { key: 'parkstay:20', availableUnits: 3, bookableUnits: 5 },
+        {
+          key: 'parkstay:18',
+          availableUnits: 6,
+          bookableUnits: 26,
+          byKind: { campsite: { availableUnits: 6, bookableUnits: 26 } },
+        },
+        {
+          key: 'parkstay:20',
+          availableUnits: 3,
+          bookableUnits: 5,
+          byKind: { campsite: { availableUnits: 3, bookableUnits: 5 } },
+        },
       ]);
       // 85, 5, 16, 182 and the unknown 1 have no totals (not bookable online).
       expect(entries.map((e) => e.key)).not.toContain('parkstay:85');
@@ -313,8 +323,18 @@ describe('ParkStay availability', () => {
       const entries = await parkstay.provider.availability.search(BUNGARRA_STAY);
       server.overrides.clear();
       expect(entries).toEqual([
-        { key: 'parkstay:18', availableUnits: 0, bookableUnits: 0 },
-        { key: 'parkstay:20', availableUnits: 2, bookableUnits: 5 },
+        {
+          key: 'parkstay:18',
+          availableUnits: 0,
+          bookableUnits: 0,
+          byKind: { campsite: { availableUnits: 0, bookableUnits: 0 } },
+        },
+        {
+          key: 'parkstay:20',
+          availableUnits: 2,
+          bookableUnits: 5,
+          byKind: { campsite: { availableUnits: 2, bookableUnits: 5 } },
+        },
       ]);
       for (const entry of entries)
         expect(entry.availableUnits).toBeLessThanOrEqual(entry.bookableUnits);

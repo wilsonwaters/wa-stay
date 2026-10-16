@@ -19,7 +19,8 @@ import type {
   LocationSummary,
   ProviderId,
 } from '@shared/types';
-import { CATALOG_MAX_LIMIT, locationKeyOf } from '@shared/types';
+import { CATALOG_MAX_LIMIT, locationKeyOf, UNIT_KINDS } from '@shared/types';
+import { unitKindsOf } from '@shared/utils/unit-kinds';
 import type { ProviderLocationDetail } from '../../providers/sdk/provider';
 import { BaseRepository, readInstant } from './base.repository';
 
@@ -45,7 +46,7 @@ export function toFtsQuery(text: string | undefined): string | undefined {
 }
 
 /** The facet a search counts with every filter but its own. */
-type Facet = 'providers' | 'kinds' | 'regions' | 'amenities';
+type Facet = 'providers' | 'kinds' | 'unitKinds' | 'regions' | 'amenities';
 
 interface SqlPart {
   sql: string;
@@ -55,6 +56,11 @@ interface SqlPart {
 /** FTS5 column weights for `bm25`: name, area, region, summary. A name match ranks first. */
 const BM25 = 'bm25(locations_fts, 8.0, 4.0, 2.0, 1.0)';
 const BY_NAME = 'l.name COLLATE NOCASE, l.provider_id, l.external_id';
+/**
+ * A row's `unit_kinds`, for `json_each`: unreadable JSON (only ever written by hand) reads as
+ * none, so it can never fail a search. Every writer stores a non-empty list.
+ */
+const UNIT_KINDS_JSON = "CASE WHEN json_valid(l.unit_kinds) THEN l.unit_kinds ELSE '[]' END";
 
 interface LocationRow {
   id: number;
@@ -71,6 +77,7 @@ interface LocationRow {
   description_html: string | null;
   image_urls: string | null;
   amenities: string | null;
+  unit_kinds: string | null;
   unit_count: number | null;
   info_url: string | null;
   booking_url: string | null;
@@ -101,7 +108,7 @@ export interface CachedLocationDetail {
 }
 
 /** The column each single-valued facet counts. Code constants. */
-const FACET_COLUMN: Record<Exclude<Facet, 'amenities'>, string> = {
+const FACET_COLUMN: Record<Exclude<Facet, 'amenities' | 'unitKinds'>, string> = {
   providers: 'l.provider_id',
   kinds: 'l.kind',
   regions: 'l.region',
@@ -170,8 +177,8 @@ export class LocationRepository extends BaseRepository<LocationSummary> {
     const upsert = this.db.prepare(`
       INSERT INTO locations (
         provider_id, external_id, name, kind, booking_mode, lat, lng, area_name, region,
-        summary, image_urls, amenities, unit_count, info_url, booking_url, fetched_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        summary, image_urls, amenities, unit_kinds, unit_count, info_url, booking_url, fetched_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT (provider_id, external_id) DO UPDATE SET
         name = excluded.name,
         kind = excluded.kind,
@@ -184,6 +191,7 @@ export class LocationRepository extends BaseRepository<LocationSummary> {
         summary = COALESCE(NULLIF(excluded.summary, ''), locations.summary),
         image_urls = excluded.image_urls,
         amenities = excluded.amenities,
+        unit_kinds = excluded.unit_kinds,
         unit_count = excluded.unit_count,
         info_url = excluded.info_url,
         booking_url = excluded.booking_url,
@@ -203,6 +211,8 @@ export class LocationRepository extends BaseRepository<LocationSummary> {
         s.summary ?? null,
         JSON.stringify(s.imageUrls),
         JSON.stringify(s.amenities),
+        // Cleaned, or derived from the kind: never empty
+        JSON.stringify(unitKindsOf(s)),
         s.unitCount ?? null,
         s.infoUrl ?? null,
         s.bookingUrl ?? null,
@@ -277,8 +287,8 @@ export class LocationRepository extends BaseRepository<LocationSummary> {
    * - `text`: every word as an FTS5 prefix (`toFtsQuery`); ranked by `bm25` unless `sort` is
    *   `name`. Without words the text is ignored and results are sorted by name.
    * - `providerIds` (ids outside `scope` are ignored), `kinds`, `regions` and `bookingModes`
-   *   match any value; `amenities` must all be present; `bbox` is `[west, south, east, north]`.
-   *   An empty list is no filter.
+   *   match any value; `unitKinds` matches a place with any of them; `amenities` must all be
+   *   present; `bbox` is `[west, south, east, north]`. An empty list is no filter.
    * - `limit` (default and maximum 5000) and `offset` page the items; `total` counts every
    *   match.
    * - `facets` count values over what every *other* filter matches, so a chip can show how
@@ -316,6 +326,7 @@ export class LocationRepository extends BaseRepository<LocationSummary> {
         regions: this.facet('regions', query, scope, fts),
         amenities: this.facet('amenities', query, scope, fts),
         kinds: this.facet('kinds', query, scope, fts),
+        unitKinds: this.facet('unitKinds', query, scope, fts),
         providers: this.facet('providers', query, scope, fts),
       },
     };
@@ -329,19 +340,29 @@ export class LocationRepository extends BaseRepository<LocationSummary> {
     fts: string | undefined
   ): FacetCount[] {
     const where = this.filters(query, scope, fts, facet);
-    const sql =
-      facet === 'amenities'
-        ? `SELECT a.value AS value, COUNT(DISTINCT l.id) AS count
+    const params = [...where.params];
+    let sql: string;
+    if (facet === 'amenities') {
+      sql = `SELECT a.value AS value, COUNT(DISTINCT l.id) AS count
            FROM locations l, json_each(l.amenities) a
            WHERE ${where.sql} AND a.type = 'text'
-           GROUP BY a.value`
-        : `SELECT ${FACET_COLUMN[facet]} AS value, COUNT(*) AS count
+           GROUP BY a.value`;
+    } else if (facet === 'unitKinds') {
+      // Only real unit kinds, as a location reads (a row is written cleaned anyway)
+      sql = `SELECT k.value AS value, COUNT(DISTINCT l.id) AS count
+           FROM locations l, json_each(${UNIT_KINDS_JSON}) k
+           WHERE ${where.sql} AND k.value IN (SELECT value FROM json_each(?))
+           GROUP BY k.value`;
+      params.push(JSON.stringify(UNIT_KINDS));
+    } else {
+      sql = `SELECT ${FACET_COLUMN[facet]} AS value, COUNT(*) AS count
            FROM locations l
            WHERE ${where.sql} AND ${FACET_COLUMN[facet]} IS NOT NULL
            GROUP BY ${FACET_COLUMN[facet]}`;
+    }
     return this.db
       .prepare(`${sql} ORDER BY count DESC, value COLLATE NOCASE`)
-      .all(...where.params) as FacetCount[];
+      .all(...params) as FacetCount[];
   }
 
   /** The WHERE clause for `query` (minus the filter of `except`), as code-literal SQL. */
@@ -363,6 +384,16 @@ export class LocationRepository extends BaseRepository<LocationSummary> {
         : scope;
     parts.push(inList('l.provider_id', providers));
     if (except !== 'kinds' && query.kinds?.length) parts.push(inList('l.kind', query.kinds));
+    if (except !== 'unitKinds' && query.unitKinds?.length) {
+      // Any of the wanted kinds is one of the location's.
+      parts.push({
+        sql: `EXISTS (
+          SELECT 1 FROM json_each(${UNIT_KINDS_JSON}) have
+          WHERE have.value IN (SELECT value FROM json_each(?))
+        )`,
+        params: [JSON.stringify(query.unitKinds)],
+      });
+    }
     if (except !== 'regions' && query.regions?.length) {
       parts.push(inList('l.region', query.regions));
     }
@@ -416,12 +447,13 @@ export class LocationRepository extends BaseRepository<LocationSummary> {
       const value = this.parseJson<unknown>(json);
       return Array.isArray(value) ? value.filter((v): v is string => typeof v === 'string') : [];
     };
+    const kind = row.kind as LocationSummary['kind'];
     return {
       key: locationKeyOf(row.provider_id, row.external_id),
       providerId: row.provider_id,
       externalId: row.external_id,
       name: row.name,
-      kind: row.kind as LocationSummary['kind'],
+      kind,
       bookingMode: row.booking_mode as LocationSummary['bookingMode'],
       lat: row.lat,
       lng: row.lng,
@@ -431,6 +463,8 @@ export class LocationRepository extends BaseRepository<LocationSummary> {
       ...(row.summary !== null ? { summary: row.summary } : {}),
       imageUrls: strings(row.image_urls),
       amenities: strings(row.amenities),
+      // Empty or unreadable: derived from the kind until the next sync rewrites it
+      unitKinds: unitKindsOf({ kind, unitKinds: this.parseJson<unknown>(row.unit_kinds) }),
       ...(row.unit_count !== null ? { unitCount: row.unit_count } : {}),
       ...(row.info_url !== null ? { infoUrl: row.info_url } : {}),
       ...(row.booking_url !== null ? { bookingUrl: row.booking_url } : {}),

@@ -317,6 +317,7 @@ describe('ParkStay campgrounds listed by class (Lucky Bay, 43)', () => {
         {
           unitId: LUCKY_BAY_CLASS,
           unitName: 'One site - select on arrival',
+          unitKind: 'campsite',
           minPeople: 1,
           maxPeople: 8,
           maxVehicles: 2,

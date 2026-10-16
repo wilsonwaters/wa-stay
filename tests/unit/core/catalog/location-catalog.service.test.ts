@@ -766,6 +766,25 @@ describe('detail', () => {
   });
 });
 
+describe('unit kinds on details', () => {
+  it("gives a detail cached without unit kinds (before they existed) the summary's, fresh or stale", async () => {
+    const s = setup();
+    await s.catalog.sync();
+    // As an older build cached it: no unitKinds on the detail
+    const { unitKinds: _none, ...older } = s.locations.get('fake', '2') as LocationDetail;
+    s.locations.setDetail('fake', '2', { ...older, units: [] }, s.clock.now);
+    expect(s.locations.getDetail('fake', '2')?.detail.unitKinds).toBeUndefined();
+
+    expect((await s.catalog.get('fake:2')).unitKinds).toEqual(['campsite']);
+    expect(callsTo(s.fake, 'getLocation')).toBe(0);
+
+    advance(s, 7 * HOUR);
+    s.fake.failNext('catalog', new ProviderError({ providerId: 'fake', message: 'down' }));
+    const stale = await s.catalog.get('fake:2');
+    expect([stale.stale, stale.unitKinds]).toEqual([true, ['campsite']]);
+  });
+});
+
 describe('documents (the campground map): addresses stay in main', () => {
   const MAP_URL = 'https://fake.example/media/maps/1/map.pdf';
   const MAP = {

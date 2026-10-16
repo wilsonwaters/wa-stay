@@ -110,7 +110,7 @@ All migrations must be added to the `runMigrations()` function in `connection.ts
 
 `connection.ts` exports `openDatabase(filePath)` (enables foreign keys and WAL, then migrates), `closeDatabase(db)` and `runMigrations(db)`. It has no module singleton: repositories receive the `Database` through their constructor (`repositories/base.repository.ts`), and services receive their repositories.
 
-### Current migrations (version 10)
+### Current migrations (version 11)
 
 1. **v1** — Initial schema (users, bookings, watches, skip_the_queue_entries, notifications, job_logs, settings)
 2. **v2** — Add `last_availability` JSON column to watches
@@ -122,11 +122,12 @@ All migrations must be added to the `runMigrations()` function in `connection.ts
 8. **v8** — Provider-aware data model (architecture-notes §5): rebuild `watches`, `site_snipes` and `bookings` with `provider_id`, generic location/stay/unit columns (`location_external_id`, `location_name`, `area_name`, `num_adults`…, `unit_ids` JSON, `stay_params` JSON for ParkStay's park id, gear type, vehicles and postcode) and calendar dates `YYYY-MM-DD`; bookings unique per `(provider_id, booking_reference)`; `watches.auto_book` (auto-hold) starts at 0, as 1.x never acted on it; `site_snipes` drops the `release_mode` CHECK and renames `queue_enabled` → `access_gate_enabled`, `held_*` → `hold_*`; `notifications.provider_id`; `users` credential columns nullable plus the seeded local profile row (id 1); new `provider_accounts`, `provider_state` (the queue session moves there as `('parkstay', 'queue.session')`, `queue_session` dropped) and `locations` with the FTS5 index `locations_fts`
 9. **v9** — Retire the legacy ParkStay credentials (architecture-notes §12.32): rebuild `users` without `encrypted_password` and the `encryption_*` columns (the email moved to the ParkStay account in v8); add `hold_reference`, `hold_expires_at`, `hold_unit_id`, `payment_url` and `last_error` to `watches` (§12.31) and `last_checked_at` to `provider_accounts`; create `maintenance` with a `vacuum-freed-pages` task. The runner sets `secure_delete` on around all steps, then VACUUMs the file (and truncates the WAL) and clears the task, so the dropped ciphertext is not left in free pages; a failed VACUUM is retried at each start while the task stays and the file has free pages
 10. **v10** — Drop the never-written `job_logs` table and its indexes (P7, architecture-notes §12.26); any rows it held are counted in the log
+11. **v11** — Unit kinds (stay types): add `unit_kinds JSON NOT NULL DEFAULT '[]'` to `locations`, `watches` and `site_snipes`; backfill `locations.unit_kinds` from each row's `kind` (`deriveUnitKinds`, `src/shared/utils/unit-kinds.ts`) so the catalogue's SQL filter sees every cached place; watches and snipes keep `'[]'` (any kind)
 
 ### Adding a new migration
 
 1. Open `src/main/database/connection.ts`
-2. Bump `LATEST_SCHEMA_VERSION` to the new version N (currently 10)
+2. Bump `LATEST_SCHEMA_VERSION` to the new version N (currently 11)
 3. Find the `runMigrations()` function
 4. Add a new `if (pending(N))` block at the bottom (`runMigrations(db, target)` stops at `target`; tests use it to build an older schema)
 5. Wrap its body in `applyMigration(db, N, [tables it creates or rebuilds], () => { ... })`. It runs the body, `PRAGMA foreign_key_check` and the `INSERT INTO migrations` in one transaction, and throws `MigrationError(N)` on failure. The listed tables must be completely free of foreign-key violations when the step commits, and the step may not introduce a violation in any other table; violations that were already there only log a warning (rule in `assertForeignKeys`). Do not insert the version yourself, and do not set `PRAGMA foreign_keys` inside the body (it is a no-op in a transaction; the runner turns it off around all steps)

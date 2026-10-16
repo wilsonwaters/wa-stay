@@ -695,10 +695,30 @@ The rules the normalised types carry (`src/shared/types/provider.types.ts`,
   stable id as `externalId`, never a position in a list.
 - **`LocationSummary`** needs a `kind` from your `locationKinds`, a `bookingMode` (`online`,
   `offline`, `external` or `application`), coordinates, `imageUrls` (absolute https only) and
-  `amenities` (plain words). `area`, `summary`, `unitCount`, `infoUrl` and `bookingUrl` are
-  optional.
+  `amenities` (plain words). `area`, `summary`, `unitKinds`, `unitCount`, `infoUrl` and
+  `bookingUrl` are optional.
+- **Unit kinds** say what a person sleeps in, the same words for every provider: `campsite`
+  (a site for a tent, caravan or campervan), `cabin` (a cabin, chalet, cottage or villa),
+  `room`, `dorm` (a bed in a shared room or hut), `glamping` or `other` (`UNIT_KINDS` in
+  `src/shared/types/provider.types.ts`). People filter places by them. A place's `unitKinds`
+  lists every kind it has. Leave it out and main derives it from `kind`:
+
+  | `kind` | Derived `unitKinds` |
+  | --- | --- |
+  | `campground`, `caravan-park` | `campsite` |
+  | `holiday-park` | `campsite`, `cabin` |
+  | `cabin` | `cabin` |
+  | `hut` | `dorm` |
+  | `glamping` | `glamping` |
+  | `farm-stay`, `home`, `other` | `other` |
+
+  Set it when the place has other kinds than that (a campground with glamping tents, a holiday
+  park with cabins only). Main drops unknown values and duplicates, and uses the derived list
+  when nothing is left, so a location always has at least one. Each unit can say what it is
+  with `unitKind`, on `UnitSummary` and on `UnitAvailability`; main drops a value that is not
+  a unit kind and keeps the unit.
 - **`LocationDetail`** adds `units` (`UnitSummary[]`), and optionally `descriptionHtml` and a
-  `releaseInfo` sentence. Return the provider's HTML as you found it: main sanitises it
+  `releaseInfo` sentence. Its `unitKinds`, when you give none, are the stored summary's. Return the provider's HTML as you found it: main sanitises it
   (`sanitizeProviderHtml`) before it crosses IPC, and its links open in the system browser.
   A description in titled parts can be `sections` (`{ title, html }`, in the provider's order;
   the place page shows them as an accordion, the first open, instead of `descriptionHtml`), and
@@ -737,6 +757,7 @@ it has an answer for:
 | `key` | The place's location key, `makeLocationKey(ctx.id, externalId)`. Main keeps only entries for places of this provider that are in the stored catalogue (and in the area Explore shows). |
 | `availableUnits` | How many units are free on **every** night of the stay. A unit free on some nights only does not count. |
 | `bookableUnits` | How many units can be booked online for these dates at all, free or not: the place's total, or 0 when none can be booked (not released yet, closed, or past the provider's booking window). |
+| `byKind` | Optional: the same two counts for each unit kind the place has, e.g. `{ campsite: { availableUnits: 2, bookableUnits: 5 }, cabin: { availableUnits: 0, bookableUnits: 3 } }`, so a filter on cabins counts only the cabins. Set it for a place with more than one kind. Main passes it on as you give it. |
 
 The names invite a swap: `availableUnits` is the smaller number, the free ones, and
 `bookableUnits` the total. Explore reads them as:

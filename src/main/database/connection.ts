@@ -18,10 +18,12 @@
 import Database from 'better-sqlite3';
 import * as fs from 'fs';
 import * as path from 'path';
+import { deriveUnitKinds } from '@shared/utils/unit-kinds';
+import type { LocationKind } from '@shared/types/provider.types';
 import { logger } from '../utils/logger';
 
 /** Schema version this build creates and understands. */
-export const LATEST_SCHEMA_VERSION = 10;
+export const LATEST_SCHEMA_VERSION = 11;
 
 /** A migration step failed. Its transaction was rolled back, so the database is still at the previous version. */
 export class MigrationError extends Error {
@@ -1023,6 +1025,41 @@ function v10DropJobLogs(db: Database.Database): void {
   logger.info(`Migration 010: dropped job_logs (${rows} row(s))`);
 }
 
+// ---------------------------------------------------------------------------------------
+// Migration 011 helpers: unit kinds (stay types)
+// ---------------------------------------------------------------------------------------
+
+/** The tables that gain `unit_kinds` in v11. */
+const UNIT_KINDS_TABLES = ['locations', 'watches', 'site_snipes'] as const;
+
+/**
+ * `unit_kinds`, a JSON array of `UnitKind`s: what a location offers, and (empty: any kind)
+ * what a watch or snipe wants. Added in place to each table that does not have it yet.
+ */
+function v11AddUnitKinds(db: Database.Database): void {
+  for (const table of UNIT_KINDS_TABLES) {
+    addColumns(db, table, [['unit_kinds', "JSON NOT NULL DEFAULT '[]'"]]);
+  }
+}
+
+/**
+ * Fills `locations.unit_kinds` from each row's `kind` (`deriveUnitKinds`), so the catalogue's
+ * SQL filter sees every cached place before its next sync. Only rows with no unit kinds are
+ * written; watches and snipes keep `[]`, which means any kind.
+ */
+function v11BackfillLocationUnitKinds(db: Database.Database): void {
+  const empty = 'json_valid(unit_kinds) = 0 OR json_array_length(unit_kinds) = 0';
+  const kinds = db.prepare(`SELECT DISTINCT kind FROM locations WHERE ${empty}`).all() as {
+    kind: string;
+  }[];
+  const update = db.prepare(`UPDATE locations SET unit_kinds = ? WHERE kind = ? AND (${empty})`);
+  let rows = 0;
+  for (const { kind } of kinds) {
+    rows += update.run(JSON.stringify(deriveUnitKinds(kind as LocationKind)), kind).changes;
+  }
+  if (rows > 0) logger.info(`Migration 011: derived unit kinds for ${rows} location(s)`);
+}
+
 /**
  * Brings the database up to `targetVersion`, LATEST_SCHEMA_VERSION unless given. A lower
  * target stops after that version (tests use it to build a database of an older shape).
@@ -1492,6 +1529,17 @@ export function runMigrations(
       applyMigration(database, 10, [], () => {
         logger.info('Running migration 010: Drop job_logs');
         v10DropJobLogs(database);
+      });
+    }
+
+    // Migration 011 (R1): unit kinds. `unit_kinds JSON NOT NULL DEFAULT '[]'` added to
+    // locations, watches and site_snipes; locations' rows filled from their kind. Watches and
+    // snipes keep '[]' (any kind).
+    if (pending(11)) {
+      applyMigration(database, 11, [...UNIT_KINDS_TABLES], () => {
+        logger.info('Running migration 011: Unit kinds');
+        v11AddUnitKinds(database);
+        v11BackfillLocationUnitKinds(database);
       });
     }
   } finally {

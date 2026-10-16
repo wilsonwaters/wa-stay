@@ -67,6 +67,7 @@ import {
   type LocationNotice,
   type LocationSection,
   type LocationSummary,
+  type UnitSummary,
 } from '@shared/types/catalog.types';
 import {
   providerLimits,
@@ -79,6 +80,7 @@ import type { EventSink } from '@shared/contracts/events';
 import { bboxContains, catalogSearchArea } from '@shared/utils/catalog-area';
 import { makeLocationKey, parseLocationKey } from '@shared/utils/location-key';
 import { stayKeyFor } from '@shared/utils/stay-key';
+import { cleanUnitKinds, isUnitKind, unitKindsOf } from '@shared/utils/unit-kinds';
 import {
   searchWords,
   type LocationRepository,
@@ -853,7 +855,9 @@ export class LocationCatalogService {
 
     const cached = this.locations.getDetail(providerId, externalId);
     if (cached && this.within(cached.fetchedAt.getTime(), this.timings.detailTtlMs)) {
-      return publicDetail({ ...cached.detail, fetchedAt: cached.fetchedAt.toISOString() });
+      return publicDetail(
+        withUnitKinds({ ...cached.detail, fetchedAt: cached.fetchedAt.toISOString() }, summary)
+      );
     }
 
     const cacheKey = makeLocationKey(providerId, externalId);
@@ -870,11 +874,12 @@ export class LocationCatalogService {
       if (this.stopped) throw error;
       this.logger.warn(`Detail of ${cacheKey} could not be fetched; serving the cache`, error);
       if (cached) {
-        return publicDetail({
-          ...cached.detail,
-          fetchedAt: cached.fetchedAt.toISOString(),
-          stale: true,
-        });
+        return publicDetail(
+          withUnitKinds(
+            { ...cached.detail, fetchedAt: cached.fetchedAt.toISOString(), stale: true },
+            summary
+          )
+        );
       }
       return { ...summary, units: [], stale: true };
     }
@@ -937,15 +942,18 @@ export class LocationCatalogService {
     const sections = cleanSections(fetched.sections, provider.manifest.website, dropImages);
     const notices = cleanNotices(fetched.notices);
     const documents = cleanDocuments(fetched.documents);
-    const detail: ProviderLocationDetail = {
-      ...fetched,
-      key: summary.key,
-      providerId,
-      externalId,
-      units: Array.isArray(fetched.units) ? fetched.units : [],
-      fetchedAt: at.toISOString(),
-      documents,
-    };
+    const detail: ProviderLocationDetail = withUnitKinds(
+      {
+        ...fetched,
+        key: summary.key,
+        providerId,
+        externalId,
+        units: Array.isArray(fetched.units) ? fetched.units : [],
+        fetchedAt: at.toISOString(),
+        documents,
+      },
+      summary
+    );
     if (descriptionHtml) detail.descriptionHtml = descriptionHtml;
     else delete detail.descriptionHtml;
     if (sections.length > 0) detail.sections = sections;
@@ -1171,6 +1179,26 @@ function httpsUrl(value: unknown): string | undefined {
   } catch {
     return undefined;
   }
+}
+
+/**
+ * The detail with its own unit kinds cleaned, or else the summary's (never empty), and each
+ * unit whose `unitKind` is not a `UnitKind` without it (the unit is kept).
+ */
+function withUnitKinds<T extends ProviderLocationDetail>(detail: T, summary: LocationSummary): T {
+  const own = cleanUnitKinds(detail.unitKinds);
+  const cleanUnit = (unit: UnitSummary): UnitSummary => {
+    if (unit === null || typeof unit !== 'object' || !('unitKind' in unit)) return unit;
+    if (isUnitKind(unit.unitKind)) return unit;
+    const kept = { ...unit };
+    delete kept.unitKind;
+    return kept;
+  };
+  return {
+    ...detail,
+    unitKinds: own.length > 0 ? own : unitKindsOf(summary),
+    ...(Array.isArray(detail.units) ? { units: detail.units.map(cleanUnit) } : {}),
+  };
 }
 
 /**

@@ -44,6 +44,7 @@ import type {
   RawCampsiteAvailabilityView,
   RawNightTuple,
 } from './types';
+import { unitKindOf } from './unit-kinds';
 
 /** The gear types ParkStay accepts (`serialisers.py`: a `ChoiceField`; anything else is HTTP 500). */
 const GEAR_TYPES = ['all', 'tent', 'campervan', 'caravan'];
@@ -286,6 +287,8 @@ export function createAvailability({
         unitId,
         unitName: site.name,
         ...(className ? { unitType: className } : {}),
+        // At a class listing the entry's name is its class's
+        unitKind: unitKindOf(site.gearType, site.name, className),
         ...(aliases.length > 0 ? { aliases } : {}),
         nights: unitNights,
         fullyAvailable,
@@ -349,10 +352,15 @@ export function createAvailability({
       // ParkStay's names read the other way round (`api.py:1100-1169`): `total_available` is
       // how many sites the campground has, `total_bookable` how many are free on every night
       // (its `sites`). Both are 0 past the 180-day horizon and for stays over 28 nights.
-      entries.push({
-        key: makeLocationKey(ctx.id, id),
+      // Every campground ParkStay books is camping (`unit-kinds.ts`).
+      const counts = {
         availableUnits: value.total_bookable!,
         bookableUnits: value.total_available!,
+      };
+      entries.push({
+        key: makeLocationKey(ctx.id, id),
+        ...counts,
+        byKind: { campsite: { ...counts } },
       });
     }
     return entries;

@@ -8,6 +8,9 @@
  *   fixtures and a fresh v9 database migrated to v10.
  * - Rows `job_logs` somehow holds are dropped with it and counted in the log.
  * - Re-running is a no-op.
+ *
+ * The fixture tests pin the target to v10 (`runMigrations(db, 10)`) so they keep testing
+ * exactly what v10 does; later versions have their own tests.
  */
 
 import Database from 'better-sqlite3';
@@ -77,13 +80,13 @@ describe.each(FIXTURES)('migration v10 from the %s fixture', (fixture) => {
     db = loadFixture(fixture);
     runMigrations(db, 9);
     atV9 = snapshot(db);
-    runMigrations(db);
+    runMigrations(db, 10);
   });
 
   afterEach(() => disposeFixture(db));
 
   it('drops job_logs with its indexes; every other table is unchanged', () => {
-    expect(LATEST_SCHEMA_VERSION).toBe(10);
+    expect(LATEST_SCHEMA_VERSION).toBeGreaterThanOrEqual(10);
     expect(version(db)).toBe(10);
     // Not vacuous: the fixture at v9 still had the table and its four indexes
     expect(atV9.job_logs).toEqual([]);
@@ -104,7 +107,7 @@ describe.each(FIXTURES)('migration v10 from the %s fixture', (fixture) => {
   it('changes nothing when run again', () => {
     const schema = normalisedSchema(db);
     const data = snapshot(db);
-    runMigrations(db);
+    runMigrations(db, 10);
     expect(version(db)).toBe(10);
     expect(normalisedSchema(db)).toEqual(schema);
     expect(snapshot(db)).toEqual(data);
@@ -133,7 +136,7 @@ describe('migration v10', () => {
   it('a fresh database has no job_logs', () => {
     const db = openDatabase(':memory:');
     try {
-      expect(version(db)).toBe(10);
+      expect(version(db)).toBe(LATEST_SCHEMA_VERSION);
       expect(jobLogsObjects(db)).toEqual([]);
       expect(db.pragma('foreign_key_check')).toEqual([]);
     } finally {
