@@ -17,10 +17,7 @@ R12, for lane order only: both edit `src/shared/types/provider.types.ts`. There 
 1. **SDK and types:**
    - `CredentialsAuth.confirmations?: readonly AccountConfirmation[]`, where `AccountConfirmation = { key; label }`: statements the person must tick to save (R16 adds RAC's three, rule 11);
    - `AccountFieldDescriptor.copyable?: boolean`, default false. Only these fields can be copied, so a future password field is never put on the clipboard;
-   - `ProviderAccount` gains:
-     - `authKind`;
-     - `fields?` and `confirmations?` (credentials only);
-     - `savedFields?: string[]`: the keys that have a stored value, never a value;
+   - `ProviderAccount` gains `authKind`, `fields?` and `confirmations?` (credentials only), and `savedFields?: string[]`: the keys that have a stored value, never a value;
    - schemas and type-equality tests for each;
    - `registry.secretsOf(id)` returns the provider's `ScopedSecretVault` (its context's `secrets`), like `httpOf` (`registry.ts:380-384`).
 2. **`ProviderAccountService`:**
@@ -35,18 +32,13 @@ R12, for lane order only: both edit `src/shared/types/provider.types.ts`. There 
        - `unknown`: `PROVIDER_ERROR` "Couldn't check these details. Try again." Nothing is stored.
      - Saving again replaces every value.
      - Saves are single-flight per provider.
-   - **Status** of a credentials account:
-     - `signed-in` when every field has a stored value, otherwise `signed-out`;
-     - worked out main-side. `auth.isSignedIn` is never called, so no request is made;
-     - `refreshStale` and the start-up check skip these providers.
-   - **`signOut`** for credentials:
-     - deletes every `account.<key>` and stores `signed-out`;
-     - no partition clear and no `ACCOUNT_BUSY`: there is no session to lose.
+   - **Status** of a credentials account: `signed-in` when every field has a stored value, otherwise `signed-out`. It is worked out main-side: `auth.isSignedIn` is never called, so no request is made. `refreshStale` and the start-up check skip these providers.
+   - **`signOut`** for credentials deletes every `account.<key>` and stores `signed-out`. No partition clear and no `ACCOUNT_BUSY`: there is no session to lose.
    - **`copyCredential(providerId, key)`**:
      - the field must be declared, copyable and saved. Otherwise `VALIDATION`, or `NOT_FOUND` when it is not saved;
      - main reads the value and writes it through a `Clipboard` port (Electron `clipboard.writeText`, wired in `app/container.ts`; faked in tests);
      - it returns nothing.
-   - **Snipes:** after a save or a removal, that provider's active snipes are armed again (the container calls `JobScheduler.scheduleSnipe` for each). A release time that depends on the account is then asked again (R14).
+   - **Change hook:** `ProviderAccountServiceDeps.onCredentialsChanged?(providerId)` is called after a save, a replace and a removal, with the provider id only. R16 wires it in the container: it drops RAC's availability caches and re-arms snipes, so R14's instants are asked again.
    - **`signIn` (the window)** stays `NOT_IMPLEMENTED` for credentials: the renderer never calls it.
 3. **IPC:**
    - `accounts.saveCredentials({ providerId, values, confirmed })` returns a `ProviderAccount`;
@@ -67,11 +59,7 @@ R12, for lane order only: both edit `src/shared/types/provider.types.ts`. There 
    - The strings go in `accountText.ts`. Build from `components/ui`, following `SecretField.tsx`'s saved and replace pattern.
 5. **Test support:** `tests/utils/fake-provider.ts` gets an option for a `credentials` auth, with fields, a confirmation, a copyable field, and a scripted `signIn` answer.
 6. **Docs:**
-   - **CLAUDE.md:**
-     - the IPC table's `accounts` row;
-     - the ProviderAccountService row;
-     - the Provider SDK `auth` bullet (`credentials` implemented);
-     - Secrets (account values are kept as `account.<key>` in the provider's vault, write-only over IPC).
+   - **CLAUDE.md:** the IPC table's `accounts` row; the ProviderAccountService row; the Provider SDK `auth` bullet (`credentials` implemented); Secrets (account values are kept as `account.<key>` in the provider's vault, write-only over IPC).
    - **`docs/providers/adding-a-provider.md`**, the sign-in section: fields, `confirmations`, `copyable`, what `signIn` checks, and where values live. A code block only if it is a source region of a compiling example (the docs test).
    - **`docs/security.md`.**
    - **`ai-state/architecture-notes.md`:** a credentials item in §12.35 (R12 created it), amending §12.30's "declared and validated only".
@@ -100,7 +88,7 @@ R12, for lane order only: both edit `src/shared/types/provider.types.ts`. There 
 
   The clipboard port receives it exactly once, on copy.
 - [ ] `copyCredential` refuses a field that is not copyable, and one that is not saved.
-- [ ] Saving and removing each arm that provider's active snipes again (a scheduler spy).
+- [ ] Saving, replacing and removing each call `onCredentialsChanged` once, with the provider id and nothing else.
 - [ ] The contract parity tests (`tests/unit/ipc/contract.test.ts`) and the preload tests pass with both channels.
 - [ ] `tests/integration/accounts-ipc.test.ts` and `AccountsSection.test.tsx` pass for `browser-session` providers. They change only to accept the new `ProviderAccount` fields.
 - [ ] `AccountsSection.test.tsx`, credentials cases:
@@ -128,15 +116,15 @@ R12, for lane order only: both edit `src/shared/types/provider.types.ts`. There 
 - **Odd values:** spaces and dashes are trimmed by the core; reformatting belongs to the provider's `signIn` (R16 strips dashes, as RAC's own page does). Unicode is kept. Over 256 characters is `VALIDATION`.
 - **Wrong provider:** `saveCredentials` for a `browser-session` provider is `VALIDATION`. For an unknown id it is `UNKNOWN_PROVIDER`; for a provider with no account, `CAPABILITY`.
 - **A value inside an error message:** zod and handler messages never quote a value (the leak test checks it).
-- **Removing while a snipe is armed:** the snipe is armed again with the public timing (R14). Nothing in flight is lost.
+- **Removing while a snipe is armed:** the hook fires, and R16's wiring re-arms it with the public timing. Nothing in flight is lost.
 - **Clipboard:** it is not cleared later by itself. Copy is an explicit action by the person.
 - **Linux CI:** the clipboard port is faked, and no real clipboard is touched.
 - **No migration:** values live in `provider_state`, which already exists.
 
 ## Test Strategy
-- **Unit (~14):** service save, replace, remove, refusals, status, copy and re-arm; schemas; registry `secretsOf`; `accountText`.
+- **Unit (~14):** service save, replace, remove, refusals, status, copy and the change hook; schemas; registry `secretsOf`; `accountText`.
 - **Component (~10):** the credentials row states; the dialog's focus, labels, confirmations, errors and reset; remove; copy and its announcement.
-- **Integration (~4):** the leak test; IPC parity; `accounts-ipc` with a credentials FakeProvider; the container wiring of the clipboard and the scheduler re-arm.
+- **Integration (~4):** the leak test; IPC parity; `accounts-ipc` with a credentials FakeProvider; the container wiring of the clipboard.
 - **E2E:** none new. No built-in provider has credentials until R16. The suite still runs, because the renderer and IPC change.
 
 ## Context Files to Read First
@@ -153,7 +141,7 @@ R12, for lane order only: both edit `src/shared/types/provider.types.ts`. There 
 
 ## Notes
 - **Why main writes the clipboard.** The renderer never receives the value, so the copy button is a request to main, not a read.
-- **Contract additions beyond the master plan:** `AccountFieldDescriptor.copyable` and re-arming snipes on a change. Both are needed for R16 to meet terms rule 12 and for R14's member timing (brief R3).
+- **Contract additions beyond the master plan:** `AccountFieldDescriptor.copyable` and the `onCredentialsChanged` hook. R16 relies on both: the first for terms rule 12, the second for R14's member timing (brief R3).
 
 ## Assumptions
 1. Removing credentials does not clear the provider's session partition, and is never `ACCOUNT_BUSY`.

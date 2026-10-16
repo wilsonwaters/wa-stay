@@ -13,8 +13,9 @@ R3, R4
 
 ## Scope
 1. **Stay-type chips** on the stay steps: watch create and Edit (`watches/form/WatchStayFields.tsx`, shared by both) and snipe create (`snipes/create/steps/StayStep.tsx`).
-   - The kinds offered are the distinct `unitKind`s of the place's units (`useLocationDetail(…).data.units`), without `other`, in `STAY_TYPES` order and with its labels. They show only when there are two or more.
-   - A ParkStay campground whose units are all campsites shows none, so its flows look as today.
+   - The place is **mixed** when its units (`useLocationDetail(…).data.units`) span two or more kinds, a unit with no kind counting as `other`. This is R3's `kindsAmbiguous` rule applied to the whole place.
+   - At a mixed place, the chips are the distinct kinds of its units, without `other`, in `STAY_TYPES` order and with its labels. With campsites and `other` units that is the single chip "Camping", so the person can still meet the hold rule in 4.
+   - A ParkStay campground whose units are all campsites is not mixed and shows none, so its flows look as today.
    - Markup: a `role="group"` named "Stay type", one `Chip` per kind with `pressed` (`components/ui/Chip.tsx`), and the hint "Leave all off for any stay type." It sits above the UnitPicker.
    - Form value `unitKinds: UnitKind[]`:
      - in `watchFormSchema.ts` (`shape`, `:28-47`) and `snipeForm.ts` (`:45`);
@@ -24,25 +25,25 @@ R3, R4
    - With two or more kinds: a first level by stay type (`fieldset`, legend "Cabins & villas"), then `unitType` as today. Units without a kind go last, under "Other".
    - With one kind: exactly today's markup.
    - New prop `kinds?: readonly UnitKind[]`. When stay types are chosen, it lists only units of those kinds.
-   - Ticked units of a kind that is turned off are removed from `unitIds`. A polite status line says so, e.g. "2 cabins unticked: not in the chosen stay types".
-3. **Explore's prefill** (`stay`, written by R4: a comma-separated list of `UnitKind`s, e.g. `stay=campsite,cabin`):
-   - Read in `parseWatchPrefill` (`watches/create/prefill.ts`) and `parseSnipePrefill` (`snipes/create/prefill.ts`) through `parseCreatePrefill` (`app/routes.ts:107-120`). Reuse R4's parsing if it added `CreatePrefill.stay`; otherwise add it here.
-   - Unknown values, `other` and duplicates are dropped. If any were dropped, the notice reads "The link's stay type couldn't be used, so choose one."
+   - R3 matches by `unitIds` alone when units are chosen, ignoring `unitKinds`. So ticked units of a kind that is turned off are removed from `unitIds`, and a polite status line says so, e.g. "2 cabins unticked: not in the chosen stay types". The two choices never contradict each other.
+3. **Explore's prefill:** R4 adds `CreatePrefill.stay?: UnitKind[]` (`stay=cabin,room`), parsed by `parseCreatePrefill` (`app/routes.ts:107-120`), which drops unknown values.
+   - Apply it in `parseWatchPrefill` (`watches/create/prefill.ts`) and `parseSnipePrefill` (`snipes/create/prefill.ts`) as the form's initial `unitKinds`, without `other` and duplicates.
+   - If the raw `stay` value had entries that were dropped, the notice reads "The link's stay type couldn't be used, so choose one."
    - Once the place's units load:
      - kinds the place has are kept;
      - if it has none of them, they are cleared, with "{Place} has no {Cabins & villas}, so choose a stay type.";
      - a single-kind place clears them silently, since there is nothing to filter.
-4. **A kind or a unit to hold at a mixed place.** This mirrors R3's core rule. "Mixed" means the place's units have two or more kinds, counted as in 1.
+4. **A kind or a unit to hold at a mixed place.** This mirrors R3's core rule, which otherwise places no hold (a watch alerts with a note; a snipe ends FAILED). "Mixed" is as in 1.
    - **Watch:** with `autoHold` on, no `unitKinds` and no `unitIds`, the Alerts step refuses Continue. The error under "Hold a {noun} automatically when found" (`AutoHoldField.tsx`) reads "{Place} has more than one stay type. Choose a stay type or a {noun} on the Stay step to hold one automatically."
    - **Snipe:** snipes always hold until R12 and R13. The Stay step refuses Continue with "Choose a stay type or a {noun}. At a place with more than one stay type, Site Sniper holds only what you choose."
    - The schema context gains `placeKinds` (`WatchFormContext`, `watchFormSchema.ts:114-122`, and the snipe equivalent), passed by the flows and the Edit page. `stepFields` checks `autoHold` on the watch Alerts step and `unitKinds` on the snipe Stay step.
 5. **Showing the choice:** a "Stay type" item ("Cabins & villas, Rooms", or "Any") when the place is mixed or kinds are stored, in:
    - the Review steps (`watches/create/steps/ReviewStep.tsx:158`, `snipes/create/steps/ReviewStep.tsx:123`);
    - the summaries (`watches/detail/WatchSummary.tsx:85`, `snipes/detail/SnipeSummary.tsx:64`).
-6. **CLAUDE.md:** the create-flow prefill query in "UI Status" (and §12.10's line in the routes list) names `&stay=`, if R4 has not done so.
+6. **CLAUDE.md:** R4 adds `&stay=` to the prefill query in "UI Status". Check that nothing else there about the flows is now stale.
 
 ## Non-goals
-- Explore's chip, the `stay` param on Explore and the create links that carry it (R4).
+- Explore's chip, the `stay` param on Explore, `CreatePrefill.stay` and the create links that carry it (R4).
 - Core filtering, contracts, repositories, and the runtime "alert instead of hold" rule (R3).
 - Unit nouns: use today's `noun` prop. R9 replaces the helper.
 - "Alert me" or "Hold it" for snipes, after which only a hold needs a kind (R13).
@@ -78,7 +79,7 @@ R3, R4
 ## Edge Cases
 - The detail is still loading (search placeholder) or failed: no chips and no UnitPicker, as today. The hold rule is not enforced in the form; R3's runtime rule alerts instead of holding.
 - Units with no `unitKind` go under "Other"; `other` is never a chip.
-- One real kind plus `other` units counts as one kind: no chips.
+- Only `other` units, or no units: not mixed, no chips.
 - A ParkStay campground with a hut (R1 maps it to `dorm`) and campsites is mixed: the chips show, and the hold rule applies there too.
 - Edit, where a stored kind is no longer offered by the place: its chip still shows, pressed, so it can be turned off.
 - Kinds chosen but no unit of them listed: the picker says "No {cabins} listed", and the watch is still valid.
@@ -108,6 +109,5 @@ R3, R4
 - The flows send no request for this: the units come from the detail the flow already loads.
 
 ## Assumptions
-- "Mixed" ignores `other`, consistent with the chips. If R3 counts `other` as a kind for its runtime rule, follow R3 and say so in the hold message.
-- R4 writes `stay` as a comma-separated list of `UnitKind` values. Whichever of R4 and R6 lands first adds `CreatePrefill.stay`.
-- A chosen kind and chosen units combine as R3 defines. This spec assumes units of an unchosen kind can never match, which is why they are unticked.
+- "Mixed" is computed from the place's listed units (the detail). R3 applies its rule to the wanted units of each check, so a place could become mixed between the form and a check; R3's runtime rule covers that case.
+- A place with campsites and `other` units shows a single "Camping" chip. It looks sparse, but it is the only way to meet the hold rule without ticking units.

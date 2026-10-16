@@ -63,6 +63,7 @@ R1–R19 (all)
      - Settings → Accounts: the RAC member number (save, replace, remove, copy) and Experimental (auto-cart, restart);
      - Good to know: what the app sends RAC and how often; booking responsibly with RAC (a member's own number, at most two bookings per period).
    - **`docs/watches-and-notifications.md`:** the alert click for every provider; the email link (never a cart page); the auto-hold email's wording; minimum stays; RAC's pacing.
+   - The same page covers letting a hold go: "Let it go"; closing the payment window, where the provider then lets it go; and expiries shown as "about" when the provider can only estimate them.
    - **`docs/site-sniper.md`:** alerts vs holds; how RAC releases; the 30-minute window and 10 s polls; a block ends the snipe.
    - **`docs/security.md`:**
      - the member number: a credentials secret, write-only, copied by main, never logged or sent;

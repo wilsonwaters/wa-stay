@@ -1,10 +1,7 @@
 # R12: Release-alert snipes: core
 
 ## Description
-Today a snipe must hold a place:
-- `snipes` needs `holds` in both registry rule sets (`registry.ts:86-91`, `:208-215`);
-- `plan()` drops a provider without snipes (`snipe.service.ts:316`);
-- `execute` always ends in `holds.create` (`:506-511`).
+Today a snipe must hold a place: `snipes` needs `holds` in both registry rule sets (`registry.ts:86-91`, `:208-215`), `plan()` drops a provider without snipes (`snipe.service.ts:316`), and `execute` always ends in `holds.create` (`:506-511`).
 
 RAC's holds stay off (brief R2), so an RAC snipe must **alert** instead (brief R3). It starts at the release, checks gently for a bounded window, and when the wanted dates are free it raises a desktop and email alert with a link to the provider's prefilled booking page.
 
@@ -50,7 +47,7 @@ L. The master plan says M, but this task amends a binding contract rule, adds a 
    - **On a match** (`:447`):
      - `alert`: no night guard and no hold. Store the alert, set status and result to ALERTED, make the snipe inactive, return `next: 'done'`, and notify.
      - `hold` on a provider that has lost holds (R17's switch turned off): the same, with the note "Automatic holds are off for {shortName}, so Site Sniper alerted you instead."
-     - `hold` that R3's rule forbids (any unit across several kinds): the same, with R3's note.
+     - `hold` that R3 ends FAILED as ambiguous (free units of several kinds, no kind or unit chosen): it alerts instead, with R3's note in `alert.note`. The alert replaces R3's warning notification, and R3's ambiguous-snipe test changes to this rule.
      - Any other `hold`: unchanged.
    - **Booking link**, first available of:
      - the matched unit's `bookingUrl` (R7);
@@ -63,10 +60,7 @@ L. The master plan says M, but this task amends a binding contract rule, adds a 
      - In the `catch` of `execute` (`:592-603`), a block marks the snipe FAILED with result ERROR and returns `next: 'done'`.
      - `lastError` reads "{shortName} refused the check (HTTP {status}). Site Sniper stopped and won't try again by itself."
      - Today a 429 is retryable (`errors.ts:96-107`), so the snipe would poll on (terms rule 5).
-   - **Lifecycle:**
-     - `TERMINAL_SNIPE_STATUSES` (`:60-66`) gains ALERTED.
-     - Activating an ALERTED snipe is allowed, because it holds nothing. It clears `alert`.
-     - A snipe deleted during its attempt sends no alert.
+   - **Lifecycle:** `TERMINAL_SNIPE_STATUSES` (`:60-66`) gains ALERTED. Activating an ALERTED snipe is allowed, because it holds nothing; it clears `alert`. A snipe deleted during its attempt sends no alert.
 5. **Notification:** `notifySnipeAlert(snipe)` (`notification.service.ts`, beside `notifySnipeHeld`, `:241`):
    - type `snipe_alert`;
    - title "{Noun} free at {where}", with R9's noun for the matched unit;
@@ -74,20 +68,9 @@ L. The master plan says M, but this task amends a binding contract rule, adds a 
    - `actionUrl` is the snipe's page;
    - the booking link travels with it as R7's watch alert does: a desktop click opens it in the browser and the snipe in the app, and the email has "Book on {shortName}" (brief R6, R7);
    - the copy never says held, secured or reserved.
-6. **Renderer, only what the new enum members break:**
-   - `statusPresets.ts` (`:47-67`): "Alert sent", `BellRing`, tone `available`;
-   - `snipeState.ts`: finished, step id, sort order;
-   - `NotificationItem.tsx`'s `TYPE_ICONS` (`:21`): `BellRing`.
-
-   The screens are R13.
+6. **Renderer, only what the new enum members break:** `statusPresets.ts` (`:47-67`: "Alert sent", `BellRing`, tone `available`); `snipeState.ts` (finished, step id, sort order); `NotificationItem.tsx`'s `TYPE_ICONS` (`:21`: `BellRing`). The screens are R13.
 7. **Docs:**
-   - **`ai-state/architecture-notes.md`:** add §12.35 "Release-alert snipes (RAC stream)". It says:
-     - `snipes` needs `availability` and release modes that `release.supports()` accepts; `holds` is optional;
-     - a per-snipe `action`, where `hold` needs `capabilities.holds`;
-     - ALERTED reserves no night;
-     - a 403 or 429 ends a snipe as FAILED;
-     - `maxWindowMinutes`;
-     - `ReleaseComputeInput.unitIds` and `unitKinds`.
+   - **`ai-state/architecture-notes.md`:** add §12.35 "Release-alert snipes (RAC stream)": `snipes` needs `availability` and release modes that `release.supports()` accepts, and `holds` is optional; a per-snipe `action`, where `hold` needs `capabilities.holds`; ALERTED reserves no night; a 403 or 429 ends a snipe as FAILED; `maxWindowMinutes`; `ReleaseComputeInput.unitIds` and `unitKinds`.
 
      Mark §12.30's `snipes ⇒ holds` bullet "amended by §12.35". If §12.35 already exists, because the orchestrator recorded the stream's contract additions there, add this as its R12 item instead.
    - **`docs/providers/adding-a-provider.md`:** the `snipes` row of the capability table (`:303`) and `maxWindowMinutes`.
@@ -107,6 +90,7 @@ L. The master plan says M, but this task amends a binding contract rule, adds a 
 - [ ] `tests/unit/core/snipe-alert.test.ts` covers each of these:
   - an alert snipe that finds a free unit ends ALERTED with its link, and calls neither `holds.create` nor `nightGuard.tryReserve`;
   - a hold snipe whose provider has no holds alerts, with the note;
+  - an ambiguous hold snipe (R3) alerts with R3's note, and sends no warning notification;
   - creating a hold snipe for a provider without holds is `VALIDATION` on `action`;
   - the defaults per provider;
   - the window is clamped at create and in `plan()`;
@@ -115,15 +99,11 @@ L. The master plan says M, but this task amends a binding contract rule, adds a 
 - [ ] `tests/unit/scheduler/snipe-runner.test.ts` (fake timers) covers each of these:
   - a 403 or a 429 ends the snipe FAILED with the message, and no further check is made;
   - an ALERTED snipe is not armed by `start()` or `rescheduleAll()`.
-- [ ] `tests/integration/migration-v12.test.ts` passes:
-  - from the v5 and v6 fixtures, every row has `action = 'hold'` and `alert IS NULL`;
-  - `foreign_key_check` and `integrity_check` are clean;
-  - a second run changes nothing;
-  - a fresh database has the same schema.
+- [ ] `tests/integration/migration-v12.test.ts` passes: from the v5 and v6 fixtures every row has `action = 'hold'` and `alert IS NULL`; `foreign_key_check` and `integrity_check` are clean; a second run changes nothing; a fresh database has the same schema.
 - [ ] `tests/unit/database/timestamps.test.ts` (`npm run test:tz`) shows that `alert.at` survives a round trip in Perth time.
 - [ ] Notification tests show the stored `providerId`, an unprefixed title and the desktop title `Fake · …`. A desktop click opens the link through the shell port and navigates to `/site-sniper/:id`. The email dispatch carries the link.
 - [ ] A night-guard test shows that an ALERTED snipe reserves no night.
-- [ ] `tests/integration/sitesniper-parkstay.test.ts`, `snipe-execute.test.ts` and `snipe-create.test.ts` pass unchanged.
+- [ ] `tests/integration/sitesniper-parkstay.test.ts`, `snipe-execute.test.ts` and `snipe-create.test.ts` pass unchanged, apart from R3's ambiguous-snipe case.
 - [ ] §12.35 is in the architecture notes, and §12.30 points to it.
 - [ ] The full gate passes: `npm run lint && npm run format:check && npm run type-check && npm test && npm run test:tz`, then `npm run build:e2e && xvfb-run -a npm run test:e2e`. It touches IPC and the renderer.
 - [ ] CLAUDE.md lines this task makes stale are updated (the migration list and version, the SiteSniperService row).

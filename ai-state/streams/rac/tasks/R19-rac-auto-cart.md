@@ -23,6 +23,7 @@ R13 (alert or hold snipes), R16 (member number and tariff choice), R18 (release 
    - The description: when a watch or snipe finds your stay, WA Stay adds it to your RAC cart; you check out and pay on RAC's page.
    - The warning: experimental and not yet checked with a real booking; a cart is not a booking, and only a paid booking secures the stay.
    - The factory builds `holds`, and gives the RAC client cart access, only when `ctx.manifest.capabilities.holds` is on.
+   - The manifest sets `holdRelease: true` (R18). The registry accepts it while `holds` is off.
 2. **Cart guard** (`src/main/providers/rac/cart-guard.ts`, applied by R5's RAC client before anything is sent):
    - **Always refused** (rule 8), experiment or not:
      - any request to `apiau.newbook.cloud` (the `cc_secure` card store);
@@ -31,7 +32,7 @@ R13 (alert or hold snipes), R16 (member number and tariff choice), R18 (release 
      - NewBook proxy (`inc/newbook/api/`) queries other than `remove_item_from_cart`: `extend_multiple_holds`, `online_checkout_membership_fields`, `modify_booking_guests` and the rest.
    - **Refused unless the cart is enabled:** a GET whose query has `cart` and `rest_api_data_id` (an `online_cart_url`), and the proxy's `remove_item_from_cart`.
    - A refusal is a `ProviderError`, and nothing is sent. Logs name the path only, never the query (the cart id is a token).
-3. **Holds module** (`providers/rac/holds.ts`, with `providers/rac/cart-page.ts`). Every hold request goes through R2's paced client, one at a time, at the interactive priority: a hold is one booking attempt, not polling.
+3. **Holds module** (`providers/rac/holds.ts`, with `providers/rac/cart-page.ts`). Every hold request goes through R2's paced client, one at a time. The core runs `create` and `release` at R2's interactive priority (R18; the orchestrator's decision): a hold is one booking attempt the person opted into. The module sets no priority of its own.
    - **`create({ externalId, unitId, stay })`:**
      1. One cart at a time: while the module's record (`ctx.state` `cart.current`) is unexpired, refuse `in-progress` with "Your RAC cart already holds a stay. Pay for it or let it go first."
      2. A site category needs equipment. Add hold-only stay fields `equipmentType` (NewBook's 15 equipment types), `equipmentLength` and `equipmentWidth` (metres), with `appliesTo: ['hold']`. If any is missing, refuse `invalid` with "Add your equipment (type, length and width) to hold a site at RAC", before any request.
@@ -43,17 +44,18 @@ R13 (alert or hold snipes), R16 (member number and tariff choice), R18 (release 
      8. Store `cart.current` (park, stay, category, expiry). Return `{ ok, reference, expiresAt, expiresAtEstimated?, unitId }`, with an opaque reference `rac-cart:<slug>:<arrival>:<random>`.
    - The cart URL and its `rest_api_data_id` live only in memory during `create`. They are never stored, returned, logged, or put in a notification or an email.
    - **`paymentUrl(hold)`** is `https://parksandresorts.rac.com.au/<slug>/booking/`, the cart page. It is never the `online_cart_url`: opening that again would add a second stay. `paymentOrigins` is RAC's origin only (RS4). There is no `bookedReference` (RS5), so an RAC hold is never marked booked or "secured".
-   - **`release(hold)`** (R18; `releaseOnPaymentClose: true`):
-     - GET the cart page. If it still holds this stay (found by dates and category), POST `remove_item_from_cart` with `item_offset` and `cart_type=booking` to the page's `newbook_api_path`. That path is accepted only on RAC's host, under `/<slug>/wp-content/themes/parks-and-resorts/inc/newbook/api/`.
-     - Always clear `cart.current`.
-     - A cart that no longer holds the stay (paid, expired, removed in the window) is left alone, so a release never touches a booking (rule 10).
-     - If RAC cannot be reached (an error, 403 or 429), clear the RAC partition's cookies (`ctx.http.cookies.clear()`) so the app's session no longer carries the cart. Log that, without the token.
+   - **`release(hold)`** (R18; `releaseOnPaymentClose: true`). RAC decides, because the core never treats a closed window as unpaid:
+     - GET the cart page. If it still holds this stay (found by dates and category), POST `remove_item_from_cart` with `item_offset` and `cart_type=booking` to the page's `newbook_api_path`, and answer `{ outcome: 'released' }`. That path is accepted only on RAC's host, under `/<slug>/wp-content/themes/parks-and-resorts/inc/newbook/api/`.
+     - A cart that no longer holds the stay (paid, expired, removed in the window) is left alone, and the answer is `{ outcome: 'gone' }`. So a release never touches a booking (rule 10).
+     - Both answers clear `cart.current`.
+     - If RAC cannot be reached (an error, 403 or 429), reject with the typed error. The record and the cookies stay, so the hold stays payable until it lapses (R18). Log it without the token.
    - An abort after the cart GET was sent also clears the partition's cookies, then rejects with the abort.
 4. **Synthetic fixtures** (`tests/fixtures/providers/rac/cart/`): an empty cart page; a cart page with one stay and hold fields; one with no hold fields; a refused cart (0 nights); an availability answer whose cart URL has `rest_api_data_id=00000000000000000000000000000000`; the proxy's removal answer. Each file starts with "Synthetic: written from RAC's NewBook scripts, not recorded". They hold only the variables and inputs the module reads, with no RAC copy, images or logo, and they pass R5's fixture guard.
 5. **E2E fixtures stay cart-free:** `tests/e2e/fixtures/http/rac/manifest.json` has no route for a cart URL, the cart page, the NewBook proxy or `apiau.newbook.cloud`.
 
 ## Non-goals
-- The switch, its stored state and its dialog (R17). Release triggers, storing `expiresAtEstimated`, and the "about" wording (R18).
+- The switch, its stored state and its dialog (R17).
+- The `hold_expires_estimated` column (R12, v12). The release triggers, "Let it go", the "about" wording and the interactive priority (R18).
 - Snipe "Alert me" or "Hold it" screens (R13). The member number, tariff choice and copy button (R16).
 - Marking an RAC cart booked, extending a hold, checkout, ticking RAC's terms box, payment, cancellation: never.
 - Any live verification. The stakeholder's genuine booking (RQ2) is outside every task.
@@ -88,19 +90,20 @@ R13 (alert or hold snipes), R16 (member number and tariff choice), R18 (release 
   - **the token stays private:** the cart URL and its id are never in the result, `ctx.state`, the captured logs or error messages.
 - [ ] `paymentUrl` is the cart page for every park slug, with no `cart` query and no `rest_api_data_id`.
 - [ ] `release`:
-  - while the cart holds the stay: one GET, then one POST with `item_offset` and `cart_type=booking` to the page's proxy path;
-  - an emptied cart: the GET only;
-  - a proxy path off RAC's host or path: refused, and the cookies are cleared;
-  - RAC unreachable: the cookies and the record are cleared, and it is logged.
+  - while the cart holds the stay: one GET, then one POST with `item_offset` and `cart_type=booking` to the page's proxy path; it answers `released` and clears the record;
+  - an emptied cart (the synthetic "paid" case): the GET only; it answers `gone` and clears the record;
+  - a proxy path off RAC's host or path: refused and rejected, with the record kept;
+  - RAC unreachable, or a 403 or 429: rejects with the typed error, keeps the record and the cookies, and logs without the token.
 - [ ] Core integration (core harness, experiment on, synthetic fixtures):
   - an auto-hold RAC watch ends HELD, with RAC's cart page as its payment URL; its notification and email carry no cart URL;
   - a hold snipe (`action: 'hold'`) ends HELD at release;
   - **rule 13 and RO8:** a second overlapping RAC hold (a watch, then a snipe) is refused with `NIGHT_CONFLICT_MESSAGE`; a non-overlapping one is refused by the one-cart rule;
-  - closing the payment window unpaid (fake windows) calls `release` once, and so does declining (R18's paths);
+  - closing the payment window with no confirmation (fake windows) calls `release` once, and so does "Let it go" (R18's paths). A synthetic paid cart answers `gone`, and the row says to check RAC's confirmation email;
+  - `holds.create` and `holds.release` run at the `interactive` priority, inside a background poll;
   - no page the window loads ever marks an RAC hold booked.
 - [ ] E2E `tests/e2e/rac-auto-cart.spec.ts` (`providers: ['parkstay', 'rac']`):
   - in Settings → Accounts → RAC, turn on "Put stays in my RAC cart automatically", confirm, and relaunch on the same profile (as `lifecycle.spec.ts` does). The switch reads on, and the RAC watch form now offers the automatic hold;
-  - in a launch seeded with a held RAC watch (a made-up reference; no cart is created), "Pay now" makes the network guard cancel RAC's `/<slug>/booking/` page, and the page says the window could not open, as in `held-snipe.spec.ts`;
+  - in a launch seeded with a held RAC watch (a made-up reference; no cart is created), the hold panel shows "Pay now" and "Let it go". "Pay now" makes the network guard cancel RAC's `/<slug>/booking/` page, and the page says the window could not open, as in `held-snipe.spec.ts`. A first page that failed releases nothing (R18), so the hold stays;
   - no recorded request, guarded or refused by fixtures, has `cart&` or `rest_api_data_id` in its URL, and none went to `apiau.newbook.cloud`.
 - [ ] A11y: the e2e reaches the switch, the dialog and "Pay now" by role and name only (R17 and `HoldPanel` own their a11y).
 - [ ] CLAUDE.md: "No live holds" names RAC carts, and the Key Services line on hold payment says RAC has no `bookedReference`.
@@ -112,7 +115,7 @@ R13 (alert or hold snipes), R16 (member number and tariff choice), R18 (release 
 - **A cart redirect off RAC's host:** refused by R5's host allow-list.
 - **Odd hold fields** (hold fields but no `hold_ids`, or a 0, negative or huge `earliest_hold_expires_when`): the 10-minute estimate.
 - **Expiry unknown:** the estimate is flagged. NightGuard and `HOLD_EXPIRED` use it as is.
-- **The person adds another stay in the payment window:** the release removes only this stay's item, found by dates and category. If it cannot tell which item is this stay's, it removes nothing and clears the record.
+- **The person adds another stay in the payment window:** the release removes only this stay's item, found by dates and category. If it cannot tell which item is this stay's, it removes nothing and rejects, and the hold stays until it lapses (R18).
 - **The local record expired but RAC still shows the stay:** step 3 refuses `in-progress` until RAC drops it.
 - **The app quits with a cart:** the row stays HELD until `expiresAt`. The partition is persistent, so "Pay now" opens the same session's cart.
 - **Turning the switch off while a cart is held:** refused (R17, `ACCOUNT_BUSY`).
@@ -149,5 +152,7 @@ R13 (alert or hold snipes), R16 (member number and tariff choice), R18 (release 
 ## Assumptions
 - `/<slug>/booking/` with no query shows the session's cart (`page_action = 'cart'` in the excerpt), and a cart holding a stay carries `cart_breakdown` with its nights. Seen on an empty cart only.
 - The 10-minute estimate stands until the stakeholder's genuine booking shows the real timer (RS5).
-- A hold's requests use R2's interactive priority, not the 10 s background spacing: a hold is one person's booking attempt (rac-terms ambiguity 4). Background polling keeps 10 s.
-- R18 calls `release` when the window closes without a recognised confirmation. With no `bookedReference`, RAC cannot tell paid from unpaid, so its `release` checks the cart first and leaves a missing stay alone.
+- Settled by the orchestrator, not assumed:
+  - hold requests run at interactive pace (R18 sets the priority);
+  - the core never treats a closed window as unpaid, so RAC's `release` checks the cart first and answers `gone` when the stay has left it;
+  - the estimate is stored in R12's `hold_expires_estimated` column.

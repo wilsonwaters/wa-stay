@@ -26,11 +26,10 @@ R2 (lane order only: both edit `provider.types.ts`)
      - https, with no username or password;
      - the host equals `new URL(manifest.website).host`, or is a subdomain of it with a leading `www.` dropped.
      - A cart URL cannot be recognised generically: the doc rule, the contract suite and each provider's tests cover it (R10 for RAC).
-   - `bookingLinkFor({ provider, externalId, stay, unitId?, unit?, fallbackUrl? })`. It returns the first candidate that passes `isProviderBookingLink`, from:
-     1. the unit's `bookingUrl`, only when `stay` is the asked stay;
-     2. `links.booking(externalId, stay, unitId)`;
-     3. `fallbackUrl` (R12 passes the availability's `bookingUrl`).
-   - A refused candidate is skipped and logged once per call with `describeUrl` (the origin only), never the path or query.
+   - `firstBookingLink(manifest, candidates)`: the first candidate that passes. A refused one is skipped and logged once per call with `describeUrl` (the origin only), never the path or query. R12 calls it with its own candidates.
+   - `matchedStayLink(provider, watch, match, units)` → `{ url, arrival, departure } | undefined`, with these candidates in order:
+     1. for a full match, the matched unit's `bookingUrl`;
+     2. `links.booking(externalId, matchedStay, match.unitId)`, where a partial match's stay has the run's dates.
    - `matching.ts`: export `longestRun(matches)` (the longest run, the first on a tie). `notifyWatchPartialFound` (`notification.service.ts:185-209`) uses it, so the message and the link name the same run.
 3. **WatchService** (`watch.service.ts:274-318`):
    - **At alert time:** the link for `full[0]` (the unit an auto-hold takes), or for `longestRun(partial)` with the run's dates. It is passed to `notifyWatchFound`, `notifyWatchPartialFound` and `notifyWatchHeld`.

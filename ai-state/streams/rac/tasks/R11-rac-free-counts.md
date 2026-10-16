@@ -23,7 +23,7 @@ R4 (the Stay type chip reads `byKind`) and R10 (category mapping, booking links,
    - **Requests:**
      - one POST per park in R5's seed (`parks.ts`), in seed order;
      - built by the same request builder as `availability.check` (headers, host allow-list, R5's client);
-     - each POST uses R2's interactive priority, because Explore's dates are person-triggered (R8). Nothing else calls it.
+     - each POST runs under the interactive priority the core sets around `catalog.availability` (R2's ambient priority), because Explore's dates are person-triggered (R8). The module sets no priority itself, and nothing else calls `search`.
    - **Counts:** each park's answer goes through R10's mapping. The counts come from the units it returns:
      - `availableUnits`: categories `fullyAvailable` for the stay (R10's rule);
      - `bookableUnits`: categories bookable online for these dates at all, free or not. A category does not count when it is closed (site code 2), beyond the window (code 9), or refused by every tariff for a special date or stop-sell (codes 4, 8, 11);
@@ -43,7 +43,7 @@ R4 (the Stay type chip reads `byKind`) and R10 (category mapping, booking links,
    - **A newer search starts** (the person changed dates):
      - the older search sends no more POSTs and resolves with the parks it has;
      - only one RAC bulk search sends at a time (terms rule 4).
-4. **Deadline:** R2 scales the core's availability deadline with the provider's spacing (`location-catalog.service.ts:208-217`). Check that it covers eight interactive POSTs at the slowest latency seen live (8 s). If it does not, fix R2's formula; add no RAC special case.
+4. **Deadline:** R2's `pacedDeadlineMs` scales the core's availability deadline with the provider's spacing (`location-catalog.service.ts:208-217`). Check that it covers eight interactive POSTs at the slowest latency seen live (8 s). If it does not, fix R2's formula; add no RAC special case.
 5. **Fixtures:**
    - **Jest** (`tests/fixtures/providers/rac/`): one trimmed availability response per park for one stay, routed by the `blog_id` form field (R2).
      - Reuse R10's recorded files.
@@ -75,9 +75,9 @@ R4 (the Stay type chip reads `byKind`) and R10 (category mapping, booking links,
 - [ ] **Exmouth closed category** (site code 2): it counts in neither number.
 - [ ] **Pacing** (`interactive pacing`), on a fake clock with R2's paced client and a fake 5 s latency:
   - eight POSTs, never two in flight;
-  - each POST at least R2's interactive gap after the previous one ended;
+  - each POST at least `INTERACTIVE_REQUEST_GAP_MS` (R2) after the previous one ended;
   - done in 60 s or less;
-  - every request carries the interactive priority.
+  - every request is interactive (`currentRequestPriority()`, R2).
 - [ ] `block stops the search`:
   - a 403 on the third park rejects with R5's typed error after exactly three POSTs;
   - a second search within the cool-down sends nothing.
@@ -140,7 +140,7 @@ R4 (the Stay type chip reads `byKind`) and R10 (category mapping, booking links,
 - `tests/e2e/preview-provider.spec.ts`; `tests/e2e/support/wa-stay.ts`; `tests/utils/provider-contract.ts`
 
 ## Notes
-- **Timing.** One POST takes 4–8 s (research §3). Add R2's interactive gap and eight parks take about 40–60 s. Explore already shows "Still checking RAC…" after 10 s (`SLOW_AVAILABILITY_MS`, `ExplorePage.tsx:81`).
+- **Timing.** One POST takes 4–8 s (research §3). Add R2's 1 s interactive gap and eight parks take about 40–70 s. Explore already shows "Still checking RAC…" after 10 s (`SLOW_AVAILABILITY_MS`, `ExplorePage.tsx:81`).
 - **Caching.** The core reuses an answer for 5 minutes per stay key and the renderer for 15, so moving the map costs no request.
 - **No live holds.** Nothing here opens `online_cart_url` or any cart (§12.33). Fixtures redact cart ids.
 
