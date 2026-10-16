@@ -24,10 +24,8 @@ R5, R7, R8 (and R6, for the e2e journey's stay-type step)
      - `unitType` and `unitKind` from R5's rule (`rac/unit-kinds.ts`), also for categories the book-now page leaves out (Busselton 30).
      - `options.unitIds` is honoured: only those categories are returned.
    - **Tariffs:**
-     - Only public tariffs count: labels not matching `/\bRAC Member\b/i`. R16 adds member tariffs.
-     - A tariff counts when `tariff_success === "true"`.
-     - Prices come from the cheapest counting tariff: `tariffs_quoted[date].amount` per night, and `total` from `tariff_total`.
-     - A refused tariff never gives a price (its total can be a placeholder `999`).
+     - A tariff counts when `tariff_success === "true"` and it is public: its label does not match `/\bRAC Member\b/i`. R16 adds member tariffs.
+     - Prices come from the cheapest counting tariff: `tariffs_quoted[date].amount` per night, and `total` from `tariff_total`. A refused tariff never gives a price (its total can be a placeholder `999`).
      - `priceNote` is the tariff's label when it is not "Standard Rate".
    - **Nights**, from `sites_code[date]` and `sites_available[date]`:
 

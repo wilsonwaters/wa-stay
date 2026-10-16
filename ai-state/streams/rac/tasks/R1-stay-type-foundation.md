@@ -22,8 +22,8 @@ None (first in Lane S).
    - One `if (pending(11))` block: `applyMigration(database, 11, ['locations', 'watches', 'site_snipes'], …)`. It adds `unit_kinds JSON NOT NULL DEFAULT '[]'` to the three tables with `addColumns` (`:930`), then backfills `locations.unit_kinds` from `kind` with `deriveUnitKinds`, so SQL filters see every cached row.
    - Watches and snipes keep `'[]'` ("any kind"). R3 reads and writes them.
 4. **Catalogue** (`src/main/database/repositories/location.repository.ts`, `src/main/core/catalog/location-catalog.service.ts`):
-   - `upsertRows` (`:162`) writes `unitKindsOf(summary)`. `mapRow` (`:418`) reads the column; an empty or unreadable value reads as `deriveUnitKinds(kind)`. Every `LocationSummary` main returns has a non-empty `unitKinds`.
-   - `filters` (`:345`): `unitKinds` matches any value, as `kinds` does, over `json_each(l.unit_kinds)`. `facet('unitKinds')` counts like `amenities` (`:330-340`).
+   - `upsertRows` (`:164`) writes `unitKindsOf(summary)`. `mapRow` (`:414`) reads the column; an empty or unreadable value reads as `deriveUnitKinds(kind)`. Every `LocationSummary` main returns has a non-empty `unitKinds`.
+   - `filters` (`:348`): `unitKinds` matches any value, as `kinds` does, over `json_each(l.unit_kinds)`. `facet('unitKinds')` counts like `amenities` (`facet`, `:325-344`).
    - `fetchDetail` (`:914`) gives the detail the provider's cleaned `unitKinds`, else the stored summary's. A unit whose `unitKind` is not a `UnitKind` loses it.
 5. **ParkStay** (provider-only, new `src/main/providers/parkstay/unit-kinds.ts`):
    - Units: `toUnitSummary` (`catalog.ts:252`), `toClassUnitSummary` (`site-classes.ts:85`) and `check` (`availability.ts:264-293`). `campsite` when the gear allows tent, campervan or caravan. Otherwise by the site's or class's name: hut or bunk → `dorm`; cabin, cottage or chalet → `cabin`; eco tent, safari tent or eco retreat → `glamping`; anything else → `campsite`.

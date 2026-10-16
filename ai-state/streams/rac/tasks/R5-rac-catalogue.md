@@ -75,8 +75,7 @@ R2 (pacing; R1's unit kinds come with it).
 9. **Docs:** CLAUDE.md gets an "RAC provider" row in Key Services (catalogue for now) and the new journey count, as does `tests/README.md`. In `docs/providers/README.md` the RAC row reads "In progress: Explore".
 
 ## Non-goals
-- Availability, tariffs, codes, prices, the native parks' units, and turning watches on (R10).
-- Bulk free counts, and a passing `PREVIEW_PROVIDER=rac` (R11).
+- Availability, tariffs, codes, prices, the native parks' units, and turning watches on (R10). Bulk free counts and a passing `PREVIEW_PROVIDER=rac` (R11).
 - Release policy and snipes (R14). The member number (R16). Auto-cart (R19).
 - `docs/providers/rac/`, and the website's row and colour (R20).
 - Contact-us and wp-json requests: the facts are in the seed.
