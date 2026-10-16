@@ -13,3 +13,13 @@
 | PQ5 | Which hosts are allowed at the top level of the payment window. | V6 | Default: `*.dbca.wa.gov.au` plus the B2C hosts at top level; subframes unrestricted and sandboxed. Confirm with a real hold. |
 | PQ6 | Minimum watch interval. | V4, U1 | Default: options 15/30/60/240/720/1440 min, default 60; legacy values below 15 are clamped when scheduled. |
 | UQ1 | "Start minimised" on Windows (U4, master plan OQ8): a login launch with `--hidden` calls `minimize()` on a window that was never shown. Electron should show it minimised in the taskbar without taking focus; the sandbox only checks this on Linux (xvfb). | U4 sign-off | **Stakeholder manual check** on the `windows-artifacts` build: in Settings → App turn on "Start WA Stay when you sign in" and "Start minimised", sign out of Windows and back in. Expect a WA Stay taskbar button, no window on screen and focus left where it was; clicking the taskbar button restores the window. Then turn "Start minimised" off, sign in again: the window opens normally. Also: a v1.x upgrade that had launch at login gets "Start minimised" on (its Run value keeps `--hidden`). |
+
+## Project 2 — RAC Parks & Resorts
+
+| # | Question | Blocks | Status |
+|---|---|---|---|
+| RQ1 | Should WA Stay ask RAC in writing for a "no objection" (or an API)? It would settle the terms ambiguities (holds, the crawl delay for a person's own clicks, "third party booking" in 8.6). | nothing (not required) | Stakeholder's call; suggested |
+| RQ2 | Auto-cart (R2) cannot be verified without a real cart. The stakeholder verifies it with one genuine booking of their own before switching it on. | switching R2 on | Stakeholder action after release |
+| RQ3 | How pre-sale nights look in the availability response before and during a member pre-sale has not been seen. The next chances, read-only, are 3 Feb 2027 (members) and 5 Feb 2027 (public). | snipe accuracy at pre-sale | Default: treat any free night as bookable for a profile with a member number, and leave it to RAC's engine otherwise |
+| RQ4 | Is WA Stay "non-commercial", and will it stay so? The RAC site terms allow only personal non-commercial use. | nothing today | Stakeholder confirms |
+| RQ5 | Within 72 h of arrival, the flexible terms (lose the first night) and the booking terms (lose the deposit) disagree. | nothing | Default: the app quotes neither; it links RAC's terms |

@@ -1,6 +1,41 @@
 # Project Progress — WA Stay
 
-_Last updated: 2026-10-11 (orchestrator)_
+_Last updated: 2026-10-16 (orchestrator)_
+
+# Project 2 — RAC Parks & Resorts provider
+
+Branch `ccr-573ddb1d-hir0sq` (from `main` at `4bd5d62`, the v2.0.0 release). The brief is the Project 2 section of `ai-state/brief.md`.
+
+## Phase
+Phase 2 (stream planning). Kickoff is done: research is committed and the stakeholder answered the three product decisions (R2 auto-cart built but shipped off, R3 release-alert snipes, R4 five stay types replacing "Type").
+
+## Currently in flight
+- Stream-planning agent writing `ai-state/streams/rac/master-plan.md` and the `streams.md` section.
+
+## Completed
+- 2026-10-16: kickoff research, three parallel read-only agents.
+  - `ai-state/research/rac-booking-flow.md` (63 anonymous requests; samples in `ai-state/research/rac-samples/`):
+    - NewBook behind Cloudflare;
+    - plain-HTTP availability per park with `X-Requested-With`;
+    - a 364-day window rolling at midnight Perth;
+    - school holidays released on fixed dates, 48 h earlier for members;
+    - category inventory, no queue;
+    - opening `online_cart_url` creates a cart.
+  - `ai-state/research/rac-terms.md` (31 requests): not links-only; personal non-commercial use; 10 s crawl delay; 16 rules.
+  - `ai-state/research/rac-sdk-gaps.md`: watches need only the module; changes for stay types, member number, minimum stay and release alerts.
+- 2026-10-16: the stakeholder decided R1–R5 (brief). Brief written.
+
+## Next
+1. Review the master plan, then spec-writing agents (parallel), then GitHub issues (`ai-planning`, `stream:rac`).
+2. Execution loop per the plan's lanes.
+
+## Environment notes
+- Node 24 is linked into `/root/.local/bin` (the container's default is Node 22); `npm ci` is done.
+- Commits are authored as the stakeholder (`git config` set locally in the repo), with no tool attribution (D1).
+
+---
+
+# Project 1 — WA Stay 2.0 (complete)
 
 ## Phase
 Post-PR follow-ups on PR #42 (open, `ccr-da6e94c0-litpr7` → `main`, repo `wilsonwaters/wa-stay`). Phase 6 is done: the final review fixes are merged and the PR is open. The stakeholder asked for CI fixes, Node 24, hardening, dependency upgrades and developer-experience fixes on the same PR.
