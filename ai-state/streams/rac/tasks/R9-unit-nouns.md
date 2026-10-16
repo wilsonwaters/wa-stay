@@ -37,7 +37,7 @@ R6, R7, R8 (their new copy is converted too)
    - Replace every call of `unitNoun(`, `unitNounFor(` and `unitCountLabel(`: 31 lines in 23 files (`grep -rn "unitNoun(\|unitNounFor(\|unitCountLabel(" src --include=*.ts --include=*.tsx`).
    - Delete `UNIT_NOUNS`, `unitNoun`, both `unitNounFor` and `unitCountLabel`'s kind parameter.
    - `unitLabel` (`snipeState.ts:183-197`) and `unitNameOf` (`watchState.ts:57-62`) ("Site 12", "A site") take the new noun.
-   - Explore's availability label (`deriveAvailability.ts:141`) takes the kinds it counts: the chosen stay types the place has (R4), else the place's kinds. So a mixed park reads "3 of 11 spots", and with "Cabins & villas" chosen, "cabins".
+   - Explore's availability label (`deriveAvailability.ts:141`) takes the kinds it counts: the chosen stay types the place has (R4), else the place's kinds. So a mixed park reads "spots" (an RAC park: "27 spots free", R11), and with "Cabins & villas" chosen, "cabins".
 3. **Core copy:**
    - `WatchMatch` gains `unitKind?`, copied by `toMatch` (`matching.ts:52-68`).
    - `notifySnipeHeld` and `notifySnipeBooked` receive the held unit's kind from `snipe.service.ts`.

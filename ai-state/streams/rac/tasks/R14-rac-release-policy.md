@@ -80,9 +80,10 @@ It reads R5's park seed.
   - Busselton, 20–23 Dec 2027, no number (`isMember` false): `2027-02-05T00:00:00.000Z`. With a number: `2027-02-03T00:00:00.000Z` (`pre-sale only for members`, terms rule 14);
   - Esperance, the same stay: `2027-02-04T23:00:00.000Z`, or `2027-02-02T23:00:00.000Z` with a number. Exmouth: `2027-02-05T01:00:00.000Z`;
   - Margaret River with a number: dorms only gives `2027-02-04T23:00:00.000Z`; any category gives `2027-02-02T23:00:00.000Z`;
-  - Cable Beach, the same stay: the rolling instant `2026-12-22T16:00:00.000Z`;
+  - Cable Beach, the same stay, with or without a number: the rolling instant `2026-12-22T16:00:00.000Z` (RS10);
   - period edges: departure 2027-12-17 (last night the 16th) is rolling only, `2026-12-16T16:00:00.000Z`. A stay with the night of 17 Dec 2027 or of 31 Jan 2028 gets the holiday instant;
   - April 2028, Busselton: `2027-04-30T00:00:00.000Z`, or `2027-04-28T00:00:00.000Z` with a number;
+  - for every announced release and every park in the pre-sale, the member instant is exactly 48 h before the public one, at the park's time (RS11);
   - member window passed, public window ahead: returns the public instant;
   - midnight: for departure 2027-10-17, with now at `2026-10-16T15:59:59Z` it returns the instant; at `2026-10-16T16:30:00Z` it refuses as already open;
   - an `'unannounced'` period, and a night after `CALENDAR_COVERS_UNTIL`, each refuse with their message;
@@ -113,7 +114,7 @@ It reads R5's park seed.
 - **Calendar gaps:** a period missing from the calendar, or one RAC hasn't announced, is refused. The person is offered a watch or a time they set.
 - **Calendar changes:** RAC moves a release, and an app update ships the new calendar. The snipe asks again at its next arm: start, resume, a daily re-arm, or R16's re-arm through R15's hook.
 - **Member number** saved during the pre-sale window: the member instant, and the snipe checks at once. Saved after that window: the public instant. Unreadable (vault key lost): R16's `hasMemberNumber` answers false, so the public instant.
-- **Pre-sale times:** RAC gives no time zone. AWST is assumed (rac-terms ambiguity 8). `describe` says AWST.
+- **Pre-sale times** (RS11, decided 2026-10-16): the member pre-sale opens at the park's own public release time (7, 8 or 9 am, Australia/Perth), 48 h before the public release. `describe` says AWST.
 - **Rolling boundary:** the exact moment is not measured. Closed at 23:42 and open at 00:01:40, so polling from 00:00:00 for 30 minutes covers it.
 - **Blocks:** a Cloudflare challenge, 403 or 429 at release ends the snipe FAILED (R12). R5's 30-minute cool-down means nothing more is sent.
 - **Two RAC snipes on the same instant:** R2 serialises them, so each checks about every 20 s. That stays within the rules.
@@ -141,10 +142,9 @@ It reads R5's park seed.
 - **Why "departure − 365".** The last bookable night is today + 364. A stay can be booked when its last night, departure − 1, is open, so on day departure − 365.
 - **Why the later instant.** Holiday nights come into the rolling window before their release. For example, 17 Dec 2027 is inside the window from 18 Dec 2026, but held back until 5 Feb 2027.
 - **No live holds or carts** (§12.33). RAC holds stay off.
+- **Decided 2026-10-16:** Cable Beach's school-holiday nights follow only the rolling 364-day window (RS10). The member pre-sale opens at the park's own public release time, Australia/Perth, 48 h before the public release (RS11).
 
 ## Assumptions
-1. **Cable Beach's school-holiday nights follow the rolling window** (it is not in the school-holiday list). *Needs stakeholder confirmation* (RS10).
-2. **The member pre-sale opens at the same park time as the public release, in AWST.** *Needs stakeholder confirmation* (RS11).
-3. A period's first and last days are both nights in the period.
-4. A member who missed the pre-sale window is better served by the public instant than by a refusal.
-5. The WA school-holiday dates for 2027–2028 come from the Department of Education's published term dates. The implementer reads them once and cites them.
+1. A period's first and last days are both nights in the period.
+2. A member who missed the pre-sale window is better served by the public instant than by a refusal.
+3. The WA school-holiday dates for 2027–2028 come from the Department of Education's published term dates. The implementer reads them once and cites them.

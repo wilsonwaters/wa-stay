@@ -57,7 +57,7 @@ R15 (the Accounts row it extends; the `provider.types.ts` edit order in Lane S)
 - RAC's `autoCart` and everything behind it (R19). Hold release (R18).
 - A "Restart now" button, or applying an experiment without a restart.
 - Remote or per-user feature flags. Experiments on `account` or `catalogMode`.
-- Hiding the switch in packaged builds (RS1's default: shown to everyone, off).
+- Hiding the switch in packaged builds: RS1 (decided 2026-10-16) shows it to everyone, off by default.
 
 ## Completion Criteria
 - [ ] Schema and rule tests (~8):
@@ -78,6 +78,7 @@ R15 (the Accounts row it extends; the `provider.types.ts` edit order in Lane S)
 - [ ] The parity tests pass for both new methods.
 - [ ] Renderer tests (`features/settings/accounts/Experiments.test.tsx`), with a manifest that declares one experiment:
   - ParkStay's row has no "Experimental" group;
+  - with no stored row the switch is off, and the group shows with no developer flag (RS1);
   - on → dialog → "Turn on" → `setExperiment` is called and the pending line shows;
   - Cancel leaves the switch off and makes no call;
   - a refused turn-off shows the alert, and the switch stays on.
@@ -121,9 +122,9 @@ R15 (the Accounts row it extends; the `provider.types.ts` edit order in Lane S)
 - **Why a restart:** the manifest is frozen at registration and read by the renderer. A runtime gate would show options that then fail, and the provider's factory decides at build time which modules exist.
 - **Why off acts at once for holds:** without it, an auto-hold watch could still put a stay in the cart between the turn-off and the restart, and the app could not pay for that hold or release it afterwards.
 - `core.` is already the core's prefix in `provider_state` (`core.catalog.sync`, `core.catalog.search`).
+- **Decided 2026-10-16 (RS1):** the switch is shown to everyone, in Settings → Accounts on the provider's row under "Experimental", off by default, with a warning and a confirm dialog, and takes effect after a restart. It is not gated on `runsFromSource`.
 
 ## Assumptions
 - `providers.experiments` (a read method) is needed beside the plan's `providers.setExperiment`, so a pending change still shows after the page reloads. It is in the master plan's contract table.
 - The turn-off refusal reuses `ACCOUNT_BUSY` (its meaning widens to "a hold or snipe needs this") rather than adding a new error code.
 - Stopping new holds while a turn-off is pending is this spec's addition to the plan. It needs a one-line check in the watch and snipe hold paths.
-- RS1 is still open: the switch is shown to everyone, off, with a warning and a confirm dialog. If the stakeholder wants it in developer builds only, gate the group on `runsFromSource` instead.

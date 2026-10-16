@@ -16,7 +16,8 @@ R11 (the bulk search whose tariff rule changes), R13 (the alerted-snipe panel th
    - `kind: 'credentials'`. The manifest's `capabilities.account` becomes `'optional'` (R5 shipped `'none'`). Nothing waits on it: `ensureForHolds` stays a no-op.
    - One field: `{ key: 'memberNumber', label: 'RAC member number', secret: true }`, with help text: "On your RAC card or in myRAC. Kept encrypted on this computer and never sent. You type it at RAC's checkout." It sets `copyable: true` (R15's flag).
    - `confirmations` (rule 11; booking policy 8.3–8.5): "This is my own RAC member number", "I will stay at the park myself", "I will book in the name on my RAC card". R15 refuses a save without all three.
-   - `signIn(values)`: a local format check only, with **no request**. Spaces and hyphens are ignored (RAC's checkout strips `-`), then 4–16 digits are required. Otherwise it refuses with "That doesn't look like an RAC member number".
+   - `signIn(values)`: a local format check only, with **no request**. Spaces and hyphens are ignored (RAC's checkout strips `-`), then 4–16 digits, and nothing else, are required (RS13, decided 2026-10-16). Otherwise it refuses with "That doesn't look like an RAC member number".
+   - The number stays a string end to end (never `Number` or `parseInt`), so a leading zero survives saving and copying.
    - `isSignedIn`: `signed-in` when a number is saved, else `signed-out`. No request.
 2. **Membership as a boolean** (`providers/rac/membership.ts`): `hasMemberNumber(ctx)` reads `ctx.secrets.get('account.memberNumber')` and returns only whether it is set. Every RAC module asks it. No other RAC file reads the secret (a source guard checks this). An unreadable secret (`SecretUnreadableError`) counts as no number, with a warning that names no value.
 3. **Tariffs** (R10's mapping, `providers/rac/`):
@@ -24,7 +25,7 @@ R11 (the bulk search whose tariff rule changes), R13 (the alerted-snipe panel th
    - **Without a number** (rule 14), a stay is free only through a bookable non-member tariff. Its price is the cheapest bookable non-member tariff.
    - **With a number**, member tariffs count too. The price is the cheapest bookable tariff. When that is a member tariff, `priceNote: 'RAC member rate'` (R8). When only member tariffs are bookable (a pre-sale, RS8), the stay is free.
    - The same rule applies everywhere: `availability.check`, bulk `availability.search` (`byKind` too), and so watch matching and `maxPrice`.
-4. **Release instants** (R14's policy): R16 feeds `hasMemberNumber` into R14's school-holiday computation. With a number, at a park and category that take part, the pre-sale instant applies. Otherwise the public one. Cable Beach, Ningaloo and Margaret River dorms never move. `release.opensAt` from `availability.check` follows the same rule.
+4. **Release instants** (R14's policy): R16 feeds `hasMemberNumber` into R14's school-holiday computation. With a number, at a park and category that take part, the pre-sale instant applies: the park's own release time, Perth, 48 h before the public release (RS11). Otherwise the public one. Cable Beach, Ningaloo and Margaret River dorms never move. `release.opensAt` from `availability.check` follows the same rule.
 5. **Links:** `links.booking` (the prefilled book-now page) sets `membership_type=member` when a number is saved, else `non-member`. The number itself never goes in a link.
 6. **When the number changes** (save, replace, remove), wired through R15's `onCredentialsChanged` hook in the container (`src/main/app/container.ts`), never from the provider:
    - RAC's cached availability is dropped: the catalogue's bulk and per-location caches for RAC in main, and RAC's availability queries in the renderer (on `account:updated`);
@@ -39,9 +40,10 @@ R11 (the bulk search whose tariff rule changes), R13 (the alerted-snipe panel th
 - User docs, the providers README and the website (R20).
 
 ## Completion Criteria
-- [ ] `tests/unit/providers/rac/auth.test.ts`: one secret field, three confirmations; accepts `1234 5678` and `1234-5678`, refuses `abc` and `12`; `signIn` and `isSignedIn` send **no request** (an `HttpClient` fake that fails the test on any call).
+- [ ] `tests/unit/providers/rac/auth.test.ts`: one secret field, three confirmations; accepts `1234 5678`, `1234-5678`, `012345678` and `1234567890123`; refuses `abc`, `12AB34`, `123` and 17 digits; `signIn` and `isSignedIn` send **no request** (an `HttpClient` fake that fails the test on any call).
+- [ ] **Made-up numbers only** (RS13): tests, fixtures and docs use invented numbers such as `1234567890123` and `012345678`, never a real member number.
 - [ ] RAC's manifest test: `capabilities.account === 'optional'`; the registry accepts `auth.kind === 'credentials'`; RAC's contract suite passes.
-- [ ] `tests/integration/rac-member-number.test.ts` (rule 12, RO4). It uses the number `98765432`, saved through `accounts.saveCredentials`, and checks that neither `98765432` nor `9876-5432` appears in:
+- [ ] `tests/integration/rac-member-number.test.ts` (rule 12, RO4). It uses the made-up number `1234567890123`, saved through `accounts.saveCredentials`, and checks that neither `1234567890123` nor `1234-5678-90123` appears in:
   - any RAC request's URL, query, headers or body: a catalogue `get`, a check, a bulk search, `computeReleaseAt`;
   - any captured log line (logger fake);
   - any IPC answer: `accounts.list`, `accounts.status`, `providers.list`, `catalog.checkLocation`, `catalog.get` (IPC harness);
@@ -63,7 +65,7 @@ R11 (the bulk search whose tariff rule changes), R13 (the alerted-snipe panel th
 - [ ] E2E `tests/e2e/rac-member-number.spec.ts` (`providers: ['parkstay', 'rac']`):
   - in Settings → Accounts → RAC, Save stays disabled until all three boxes are ticked;
   - after saving, "Member number saved" shows, the input is empty and the number is nowhere in the page;
-  - an RAC place page shows "Copy RAC member number" beside "Book on RAC", and clicking it puts the number in the clipboard (`electronApp.evaluate(({ clipboard }) => clipboard.readText())`);
+  - an RAC place page shows "Copy RAC member number" beside "Book on RAC", and clicking it puts the made-up number `012345678` in the clipboard, leading zero kept (`electronApp.evaluate(({ clipboard }) => clipboard.readText())`);
   - after Remove, the button is gone.
 - [ ] A11y:
   - the copy button's accessible name is "Copy RAC member number": no value in the name, the title or a tooltip;
@@ -104,9 +106,9 @@ R11 (the bulk search whose tariff rule changes), R13 (the alerted-snipe panel th
 ## Notes
 - The number reaches RAC only when the person types or pastes it at RAC's checkout ("Existing RAC member" → "Member Number"). WA Stay never fills that field, not even in its payment window: no script of ours runs there (`provider-windows.ts:9-12`).
 - With a number, the app shows the price RAC charges a verified member. RAC checks the number against the name at checkout and on arrival (booking policy 8.4).
+- **Decided 2026-10-16 (RS13):** a member number is digits only, kept as a string (it may start with 0), 4–16 digits once spaces and hyphens are removed. Tests, fixtures and docs use made-up numbers only.
 
 ## Assumptions
-- RAC member numbers are 4–16 digits once spaces and hyphens are removed. The format is unconfirmed. The stakeholder should try their own card (RS13); loosen the check if it refuses a real number.
 - Member tariffs are recognised by their wording, since the response has no "members only" flag (seen in the samples). If RAC renames them, prices fall back to non-member tariffs: wrong but safe.
 - Re-arming every snipe with `rescheduleAll()` is cheap enough. A re-arm only re-asks instants; it sends a request only for snipes that need one at arm time.
 - Pre-sale availability is unseen (RQ3). RS8's default applies: with a number, any free night counts.
