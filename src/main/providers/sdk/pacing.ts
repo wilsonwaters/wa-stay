@@ -22,7 +22,10 @@
  *   `getJson` or `postForm` is called: `withRequestPriority(priority, fn)` sets it for `fn`
  *   and everything `fn` starts, and `currentRequestPriority()` reads it (`background`
  *   outside any scope). The core sets it where it knows the person is waiting (a place page,
- *   Explore's dates, "Check now"), so a provider needs no change to its modules.
+ *   Explore's dates, "Check now"), so a provider needs no change to its modules. Like any
+ *   async context, it carries into the timers and promises a call starts, so work a module
+ *   starts during a call and keeps running (a keep-alive) asks at that call's priority unless
+ *   it passes `priority` itself.
  *
  * Nothing here retries or reads a provider's answers. Fixture mode is never paced.
  */
@@ -65,9 +68,10 @@ export function currentRequestPriority(): RequestPriority {
 export interface PacedHttpClientOptions {
   /** The background gap in ms, from the end of one request to the start of the next; above 0. */
   intervalMs: number;
-  /** A monotonic clock in ms. Default `performance.now()`. */
-  now?: () => number;
 }
+
+/** The monotonic clock gaps are measured on (ms), so a wall clock set back cannot shorten one. */
+const monotonicNow = (): number => performance.now();
 
 interface Waiting {
   readonly priority: RequestPriority;
@@ -77,7 +81,7 @@ interface Waiting {
 /** One provider's queue: one request in flight, each after its gap. */
 class PacingQueue {
   private busy = false;
-  /** When the last request ended (`now()`); undefined before the first. */
+  /** When the last request ended (`monotonicNow()`); undefined before the first. */
   private lastEnd?: number;
   private timer?: ReturnType<typeof setTimeout>;
   private readonly waiting: Record<RequestPriority, Waiting[]> = {
@@ -85,10 +89,7 @@ class PacingQueue {
     background: [],
   };
 
-  constructor(
-    private readonly intervalMs: number,
-    private readonly now: () => number
-  ) {}
+  constructor(private readonly intervalMs: number) {}
 
   /** Runs `send` on its turn. Rejects with an `AbortError` if `signal` fires while waiting. */
   run<T>(
@@ -100,7 +101,8 @@ class PacingQueue {
     return new Promise<T>((resolve, reject) => {
       const onAbort = (): void => {
         const queue = this.waiting[priority];
-        queue.splice(queue.indexOf(entry), 1);
+        const at = queue.indexOf(entry);
+        if (at >= 0) queue.splice(at, 1);
         reject(createAbortError(signal));
         this.pump();
       };
@@ -136,7 +138,7 @@ class PacingQueue {
   /** The request in flight ended, however it ended: its gap starts now. */
   private finish(): void {
     this.busy = false;
-    this.lastEnd = this.now();
+    this.lastEnd = monotonicNow();
     this.pump();
   }
 
@@ -150,7 +152,7 @@ class PacingQueue {
     const wait =
       this.lastEnd === undefined
         ? 0
-        : this.lastEnd + pacedGapMs(this.intervalMs, next.priority) - this.now();
+        : this.lastEnd + pacedGapMs(this.intervalMs, next.priority) - monotonicNow();
     if (wait > 0) {
       this.timer = setTimeout(() => this.pump(), Math.ceil(wait));
       return;
@@ -216,10 +218,10 @@ class PacedHttpClient implements HttpClient {
  */
 export function createPacedHttpClient(
   inner: HttpClient,
-  { intervalMs, now = () => performance.now() }: PacedHttpClientOptions
+  { intervalMs }: PacedHttpClientOptions
 ): HttpClient {
   if (!Number.isFinite(intervalMs) || intervalMs <= 0) {
     throw new RangeError(`A paced client needs an interval above 0 ms, got ${intervalMs}`);
   }
-  return new PacedHttpClient(inner, new PacingQueue(intervalMs, now));
+  return new PacedHttpClient(inner, new PacingQueue(intervalMs));
 }
