@@ -63,6 +63,13 @@ and dates). The flow has five steps:
 - **One booking per night.** Before asking for a hold, the snipe reserves the stay's nights.
   A night already held or booked by another snipe or by a watch's automatic hold stops it with
   a clear message (`core/holds/night-guard.ts`).
+- **Which unit.** The first fully available unit of those you chose, or, with none chosen, of
+  the stay types you chose (campsites, cabins and villas, rooms, dorms or glamping; none: any
+  kind; a unit the provider gives no kind counts as "other"). A snipe never takes "any unit"
+  across stay types: with no units chosen, when its candidates, booked or free, are of more
+  than one kind, it holds nothing, reserves no night and ends **Failed** with "Free units of
+  more than one stay type: choose a stay type or units for this snipe", and you get a
+  warning notification. Choose one stay type, or units, and start it again.
 - **Run now** runs one attempt immediately (only while the snipe is running).
 - **WA Stay must be running**, and the computer awake, at the release.
 

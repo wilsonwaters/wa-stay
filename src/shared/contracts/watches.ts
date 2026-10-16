@@ -4,7 +4,7 @@
 
 import { z } from 'zod';
 import { DEFAULT_WATCH_INTERVAL, WATCH_INTERVAL_OPTIONS } from '../constants/app-constants';
-import { ProviderIdSchema, StayParamsSchema } from '../types/provider.types';
+import { ProviderIdSchema, StayParamsSchema, UnitKindSchema } from '../types/provider.types';
 import { LocationRefSchema, StayInputSchema } from '../types/stay.types';
 import type {
   Watch,
@@ -40,6 +40,7 @@ export const watchInputSchema = z.object({
   location: LocationRefSchema,
   stay: StayInputSchema,
   unitIds: z.array(z.string()).optional(),
+  unitKinds: z.array(UnitKindSchema).optional(),
   stayParams: StayParamsSchema.optional(),
   checkIntervalMinutes: checkIntervalSchema.optional(),
   autoHold: z.boolean().optional(),

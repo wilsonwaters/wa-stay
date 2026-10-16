@@ -12,7 +12,7 @@ import type { NotificationDispatcher } from '@main/core/notifications/notificati
 import { openDatabase } from '@main/database/connection';
 import { NotificationRepository } from '@main/database/repositories';
 import { ProviderRegistry } from '@main/providers/registry';
-import { NotificationType } from '@shared/types/common.types';
+import { NotificationType, RelatedType } from '@shared/types/common.types';
 import type { Watch } from '@shared/types';
 import { mockWatch } from '@tests/fixtures/watches';
 import { mockSiteSnipe } from '@tests/fixtures/site-sniper';
@@ -140,6 +140,28 @@ describe('notifications carry their provider', () => {
       'Site u1'
     );
     expect(repo.findByUserId(userId)[0].message).toContain('within 25 minutes');
+  });
+
+  it('a warning about a snipe carries its provider, its page and its place', async () => {
+    await service.notifyWarning(userId, 'Snipe stopped at Osprey Bay', 'Choose a stay type.', {
+      providerId: 'fake',
+      relatedType: RelatedType.SNIPE,
+      relatedId: 4,
+      locationName: 'Osprey Bay',
+    });
+
+    expect(repo.findByUserId(userId)[0]).toMatchObject({
+      type: NotificationType.WARNING,
+      providerId: 'fake',
+      title: 'Snipe stopped at Osprey Bay',
+      relatedType: 'snipe',
+      relatedId: 4,
+      actionUrl: '/site-sniper/4',
+    });
+    expect(mockNotification.mock.calls[0][0].title).toBe('Fake · Snipe stopped at Osprey Bay');
+    expect(dispatch).toHaveBeenCalledWith(
+      expect.objectContaining({ providerId: 'fake', locationName: 'Osprey Bay' })
+    );
   });
 
   it('app-wide notifications and unknown providers keep the plain desktop title', async () => {

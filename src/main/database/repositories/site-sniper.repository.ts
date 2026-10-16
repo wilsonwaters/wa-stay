@@ -8,7 +8,14 @@ import {
 } from '@shared/types';
 import { SnipeResult, SnipeReleaseMode, SnipeStatus } from '@shared/types/common.types';
 import { AppError } from '../../utils/app-error';
-import { readStay, readStayParams, readUnitIds, StayRow, stayValues } from '../stay-columns';
+import {
+  readStay,
+  readStayParams,
+  readUnitIds,
+  readUnitKinds,
+  StayRow,
+  stayValues,
+} from '../stay-columns';
 
 interface SiteSnipeRow extends StayRow {
   id: number;
@@ -40,6 +47,8 @@ interface SiteSnipeRow extends StayRow {
   payment_url: string | null;
   booked_reference: string | null;
   notes: string | null;
+  // Migration v11
+  unit_kinds: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -58,10 +67,11 @@ export class SiteSniperRepository extends BaseRepository<SiteSnipe> {
     const stmt = this.db.prepare(`
       INSERT INTO site_snipes (
         user_id, provider_id, name, location_external_id, location_name, area_name, unit_ids,
-        arrival_date, departure_date, num_adults, num_children, num_infants, num_concessions,
-        stay_params, release_mode, release_at, access_gate_enabled, lead_time_seconds,
-        poll_interval_ms, window_duration_ms, status, is_active, max_attempts, notes
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        unit_kinds, arrival_date, departure_date, num_adults, num_children, num_infants,
+        num_concessions, stay_params, release_mode, release_at, access_gate_enabled,
+        lead_time_seconds, poll_interval_ms, window_duration_ms, status, is_active, max_attempts,
+        notes
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
     const result = stmt.run(
@@ -72,6 +82,7 @@ export class SiteSniperRepository extends BaseRepository<SiteSnipe> {
       input.location.name || null,
       input.location.areaName ?? null,
       JSON.stringify(input.unitIds ?? []),
+      JSON.stringify(input.unitKinds ?? []),
       ...stayValues(input.stay),
       JSON.stringify(input.stayParams ?? {}),
       input.releaseMode,
@@ -113,6 +124,7 @@ export class SiteSniperRepository extends BaseRepository<SiteSnipe> {
       push('area_name', updates.location.areaName ?? null);
     }
     if (updates.unitIds !== undefined) push('unit_ids', JSON.stringify(updates.unitIds));
+    if (updates.unitKinds !== undefined) push('unit_kinds', JSON.stringify(updates.unitKinds));
     if (updates.stay !== undefined) {
       const [arrival, departure, adults, children, infants, concessions] = stayValues(updates.stay);
       push('arrival_date', arrival);
@@ -433,6 +445,7 @@ export class SiteSniperRepository extends BaseRepository<SiteSnipe> {
       name: row.name,
       stay: readStay(row),
       unitIds: readUnitIds(row.unit_ids, where),
+      unitKinds: readUnitKinds(row.unit_kinds, where),
       stayParams: readStayParams(row.stay_params, where),
       releaseMode: row.release_mode as SnipeReleaseMode,
       releaseAt: this.parseDate(row.release_at),

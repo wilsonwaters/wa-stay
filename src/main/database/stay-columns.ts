@@ -1,6 +1,7 @@
 /**
  * Column mapping shared by the provider-aware tables (watches, site_snipes, bookings, v8):
- * the stay columns and the `unit_ids` / `stay_params` JSON columns.
+ * the stay columns and the `unit_ids` / `stay_params` JSON columns, and (watches and
+ * site_snipes, v11) `unit_kinds`.
  *
  * Reads are defensive. A legacy row whose JSON is malformed reads as an empty value with a
  * warning instead of failing the whole list, and stay dates are passed through as stored,
@@ -8,7 +9,8 @@
  * error.
  */
 
-import type { Stay, StayInput, StayParams } from '@shared/types';
+import type { Stay, StayInput, StayParams, UnitKind } from '@shared/types';
+import { cleanUnitKinds } from '@shared/utils/unit-kinds';
 import { logger } from '../utils/logger';
 
 const log = logger.child({ module: 'repositories' });
@@ -63,6 +65,19 @@ export function readUnitIds(json: string | null | undefined, where: string): str
       .map(String);
   }
   log.warn(`${where}: unit_ids is not a JSON array; read as []`);
+  return [];
+}
+
+/**
+ * `unit_kinds` as `UnitKind`s, in order, without unknown values or duplicates
+ * (`cleanUnitKinds`). NULL or empty is `[]`; anything but a JSON array is `[]` (any kind) with a
+ * warning.
+ */
+export function readUnitKinds(json: string | null | undefined, where: string): UnitKind[] {
+  if (json === null || json === undefined || json === '') return [];
+  const value = parse(json);
+  if (Array.isArray(value)) return cleanUnitKinds(value);
+  log.warn(`${where}: unit_kinds is not a JSON array; read as []`);
   return [];
 }
 

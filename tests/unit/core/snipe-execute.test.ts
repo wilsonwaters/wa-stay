@@ -1,11 +1,13 @@
 /**
  * One snipe attempt (`SiteSniperService.execute`): check → one-booking-per-night guard →
- * hold, and what each outcome does to the snipe and to the next tick.
+ * hold, and what each outcome does to the snipe and to the next tick; which unit it holds
+ * (the named units, or the first free one of its stay types), and a snipe for "any unit" at a
+ * place with more than one stay type, which holds nothing.
  */
 
 import { AccessGateError } from '@main/providers/sdk';
-import { SnipeResult, SnipeStatus } from '@shared/types/common.types';
-import type { SiteSnipe } from '@shared/types';
+import { RelatedType, SnipeResult, SnipeStatus } from '@shared/types/common.types';
+import type { SiteSnipe, SiteSnipeInput } from '@shared/types';
 import { createCoreHarness, fakeDateOnly, type CoreHarness } from '@tests/utils/core-harness';
 import { createFakeProvider } from '@tests/utils/fake-provider';
 
@@ -20,11 +22,12 @@ describe('snipe attempt', () => {
   });
 
   async function sniping(
-    options: Parameters<typeof createFakeProvider>[0] = {}
+    options: Parameters<typeof createFakeProvider>[0] = {},
+    input: Partial<SiteSnipeInput> = {}
   ): Promise<SiteSnipe> {
     fakeDateOnly(NOW);
     h = createCoreHarness({ providers: [createFakeProvider(options)] });
-    const snipe = await h.snipes.create(h.userId, h.snipeInput());
+    const snipe = await h.snipes.create(h.userId, h.snipeInput(input));
     h.snipeRepo.updateStatus(snipe.id, SnipeStatus.SNIPING);
     return snipe;
   }
@@ -142,6 +145,109 @@ describe('snipe attempt', () => {
 
     expect(outcome.next).toBe('done');
     expect(stored(snipe.id)).toMatchObject({ status: SnipeStatus.EXPIRED, isActive: false });
+  });
+
+  describe('stay types', () => {
+    // A free campsite listed first, then a free cabin and a booked dorm bed
+    const mixedPlace: Parameters<typeof createFakeProvider>[0] = {
+      availability: { '1': { s1: 'available', c1: 'available', d1: 'booked' } },
+      unitKinds: { s1: 'campsite', c1: 'cabin', d1: 'dorm' },
+    };
+    const MIXED_ERROR =
+      'Free units of more than one stay type: choose a stay type or units for this snipe';
+
+    it("with unitKinds ['cabin'] it holds a cabin, even when a free site is listed first", async () => {
+      const snipe = await sniping(mixedPlace, { unitKinds: ['cabin'] });
+      expect(snipe.unitKinds).toEqual(['cabin']);
+      const outcome = await h.snipes.execute(snipe.id);
+
+      const holds = h.fake.calls.filter((c) => c.module === 'holds');
+      expect(holds).toHaveLength(1);
+      expect(holds[0].args[0]).toMatchObject({ unitId: 'c1' });
+      expect(outcome.result).toMatchObject({ held: true, matchedSiteId: 'c1' });
+      expect(stored(snipe.id)).toMatchObject({ status: SnipeStatus.HELD, holdUnitId: 'c1' });
+    });
+
+    it('an ambiguous snipe ends FAILED, with no hold, no night reserved and one warning', async () => {
+      const snipe = await sniping(mixedPlace);
+      const create = jest.spyOn(h.registry.get('fake').holds!, 'create');
+      const reserve = jest.spyOn(h.nightGuard, 'tryReserve');
+      h.events.emit.mockClear();
+      const outcome = await h.snipes.execute(snipe.id);
+
+      expect(outcome).toMatchObject({
+        next: 'done',
+        result: { result: SnipeResult.ERROR, held: false, error: MIXED_ERROR },
+      });
+      expect(create).not.toHaveBeenCalled();
+      expect(reserve).not.toHaveBeenCalled();
+      expect(stored(snipe.id)).toMatchObject({
+        status: SnipeStatus.FAILED,
+        lastResult: SnipeResult.ERROR,
+        lastError: MIXED_ERROR,
+        isActive: false,
+        attemptsCount: 1,
+      });
+      expect(h.events.emit).toHaveBeenCalledWith(
+        'snipe:updated',
+        expect.objectContaining({ id: snipe.id, status: SnipeStatus.FAILED })
+      );
+      expect(h.notifications.notifyWarning).toHaveBeenCalledTimes(1);
+      expect(h.notifications.notifyWarning).toHaveBeenCalledWith(
+        h.userId,
+        'Snipe stopped at Banksia Camp',
+        `${MIXED_ERROR}.`,
+        {
+          providerId: 'fake',
+          relatedType: RelatedType.SNIPE,
+          relatedId: snipe.id,
+          locationName: 'Banksia Camp',
+        }
+      );
+      expect(h.notifications.notifySnipeHeld).not.toHaveBeenCalled();
+    });
+
+    it('two kinds are ambiguous too; units named are not, and kinds do not apply to them', async () => {
+      const twoKinds = await sniping(mixedPlace, { unitKinds: ['campsite', 'cabin'] });
+      await h.snipes.execute(twoKinds.id);
+      expect(stored(twoKinds.id)).toMatchObject({
+        status: SnipeStatus.FAILED,
+        lastError: MIXED_ERROR,
+      });
+      await h.close();
+
+      const named = await sniping(mixedPlace, { unitIds: ['d1', 's1'], unitKinds: ['cabin'] });
+      await h.snipes.execute(named.id);
+      expect(h.fake.calls.filter((c) => c.module === 'holds')[0].args[0]).toMatchObject({
+        unitId: 's1',
+      });
+      expect(stored(named.id).status).toBe(SnipeStatus.HELD);
+    });
+
+    it('a cabin snipe where no cabin is free keeps polling; a provider without kinds is never ambiguous', async () => {
+      const cabins = await sniping(
+        { ...mixedPlace, availability: { '1': { s1: 'available', c1: 'booked' } } },
+        { unitKinds: ['cabin'] }
+      );
+      await expect(h.snipes.execute(cabins.id)).resolves.toMatchObject({
+        next: 'continue',
+        result: { result: SnipeResult.UNAVAILABLE },
+      });
+      expect(h.fake.calls.filter((c) => c.module === 'holds')).toHaveLength(0);
+      await h.close();
+
+      // No kinds at all: every unit is `other`, so "any unit" holds the first free one
+      const plain = await sniping({ availability: { '1': { u1: 'available', u2: 'available' } } });
+      await expect(h.snipes.execute(plain.id)).resolves.toMatchObject({ result: { held: true } });
+    });
+
+    it('drops duplicate kinds at create and update', async () => {
+      const snipe = await sniping({}, { unitKinds: ['cabin', 'cabin', 'dorm'] });
+      expect(snipe.unitKinds).toEqual(['cabin', 'dorm']);
+      await expect(
+        h.snipes.update(snipe.id, { unitKinds: ['glamping', 'glamping'] })
+      ).resolves.toMatchObject({ unitKinds: ['glamping'] });
+    });
   });
 
   it('writes nothing once aborted mid-check', async () => {

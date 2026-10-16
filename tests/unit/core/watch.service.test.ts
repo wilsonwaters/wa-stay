@@ -221,6 +221,64 @@ describe('WatchService', () => {
     });
   });
 
+  describe('stay types (unitKinds)', () => {
+    // A mixed place: two campsites and two cabins, every unit free; s1 is listed first
+    const MIXED = { s1: 'available', c1: 'available', s2: 'available', c2: 'available' } as const;
+
+    beforeEach(async () => {
+      await h.close();
+      h = createCoreHarness({
+        providers: [
+          createFakeProvider({
+            availability: { '1': MIXED },
+            unitKinds: { s1: 'campsite', s2: 'campsite', c1: 'cabin', c2: 'cabin' },
+          }),
+        ],
+      });
+    });
+
+    it("unitKinds ['cabin'] at a mixed place matches only cabins, and notifies only cabins", async () => {
+      const watch = await h.watches.create(h.userId, h.watchInput({ unitKinds: ['cabin'] }));
+      expect(watch.unitKinds).toEqual(['cabin']);
+      const result = await h.watches.execute(watch.id);
+
+      expect(result.matches.map((m) => m.unitId)).toEqual(['c1', 'c2']);
+      const [, notified] = h.notifications.notifyWatchFound.mock.calls[0];
+      expect(notified.map((m: { unitId: string }) => m.unitId)).toEqual(['c1', 'c2']);
+      // The units it keeps for the watch's page are the cabins too
+      expect(h.watchRepo.findById(watch.id)?.lastAvailability?.map((u) => u.unitId)).toEqual([
+        'c1',
+        'c2',
+      ]);
+    });
+
+    it('with no kind, every unit matches as before', async () => {
+      const watch = await h.watches.create(h.userId, h.watchInput());
+      expect(watch.unitKinds).toEqual([]);
+      const result = await h.watches.execute(watch.id);
+      expect(result.matches.map((m) => m.unitId)).toEqual(['s1', 'c1', 's2', 'c2']);
+    });
+
+    it('drops duplicate kinds at create and update; a change of kinds makes the watch due at once', async () => {
+      const watch = await h.watches.create(
+        h.userId,
+        h.watchInput({ unitKinds: ['cabin', 'campsite', 'cabin'] })
+      );
+      expect(watch.unitKinds).toEqual(['cabin', 'campsite']);
+      await h.watches.execute(watch.id);
+      expect(h.watchRepo.findById(watch.id)?.nextCheckAt).toEqual(
+        new Date(NOW.getTime() + 60 * 60_000)
+      );
+
+      const updated = await h.watches.update(watch.id, { unitKinds: ['dorm', 'dorm'] });
+      expect(updated.unitKinds).toEqual(['dorm']);
+      expect(updated.nextCheckAt).toEqual(NOW);
+      await expect(h.watches.update(watch.id, { unitKinds: [] })).resolves.toMatchObject({
+        unitKinds: [],
+      });
+    });
+  });
+
   describe('lifecycle', () => {
     it('activate makes a watch due now; a held or booked watch cannot be activated again', async () => {
       const watch = await h.watches.create(h.userId, h.watchInput());

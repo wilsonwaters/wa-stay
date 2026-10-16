@@ -4,7 +4,7 @@
 
 import { z } from 'zod';
 import { SnipeReleaseMode, SnipeStatus } from '../types/common.types';
-import { ProviderIdSchema, StayParamsSchema } from '../types/provider.types';
+import { ProviderIdSchema, StayParamsSchema, UnitKindSchema } from '../types/provider.types';
 import type {
   SiteSnipe,
   SiteSnipeInput,
@@ -36,6 +36,7 @@ export const snipeInputSchema = z.object({
   location: LocationRefSchema,
   stay: StayInputSchema,
   unitIds: z.array(z.string()).optional(),
+  unitKinds: z.array(UnitKindSchema).optional(),
   stayParams: StayParamsSchema.optional(),
   releaseMode: releaseModeSchema,
   releaseAt: z.date().optional(),

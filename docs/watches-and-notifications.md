@@ -33,7 +33,8 @@ provider, the place and your dates, and opens on "Your stay"). Five steps:
 - **One request per check**: the provider's availability for the place and stay, every unit
   night by night (`core/watches/watch.service.ts`).
 - **Matching** (`core/watches/matching.ts`) uses only that answer:
-  - the units you chose, by id or name (or every unit);
+  - the units you chose, by id or name; else the units of the stay types you chose
+    ([below](#stay-types)); else every unit;
   - **a full match** is a unit free on every night that passes the price rule;
   - **a partial match** (when turned on and there is no full match) is each run of
     consecutive free nights on a unit, reported as its own shorter stay;
@@ -43,6 +44,14 @@ provider, the place and your dates, and opens on "Your stay"). Five steps:
   night.
 - **When the arrival date has passed** (in the provider's time zone), the watch stops.
 - **Check now** runs a check at once, whether or not the watch is active.
+
+### Stay types
+
+A watch can ask for stay types: campsites, cabins and villas, rooms, dorms or glamping (its
+`unitKinds`, the provider's `unitKind` on each unit). Then only units of those kinds match, and
+the notification and the watch's page list only those. A unit the provider gives no kind counts
+as "other", so at a provider that sets no kinds a watch for cabins finds nothing. Units you
+chose by name win: the stay types do not filter them. With no stay type, every unit counts.
 
 ### Scheduling
 
@@ -65,7 +74,12 @@ on the first fully matching site, by the same path and safety rules as Site Snip
 - **Pay now** in that panel opens the provider's payment page in its own window, on the session
   that holds the site;
 - if a hold is not placed (the site went, the provider refused), the watch alerts as usual and
-  shows why.
+  shows why;
+- **never "any unit" across stay types**: a watch with no units chosen whose wanted units are of
+  more than one kind (campsites and a hut, or the two stay types it asks for), booked or free,
+  places no hold. It alerts as usual, with "Not held automatically: this place has more than one
+  stay type. Choose a stay type or units to let WA Stay hold one." Choose one stay type, or
+  units, to let it hold.
 
 Hold only what you will use ([Book responsibly](site-sniper.md#book-responsibly)).
 

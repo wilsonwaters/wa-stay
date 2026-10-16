@@ -10,6 +10,10 @@
  *
  * One attempt (`execute`) is check → one-booking-per-night guard → `holds.create`. On a hold
  * the snipe is HELD with the provider's reference, expiry, unit and payment URL, and stops.
+ * The unit is the first fully available one of those the snipe names (`unitIds`, filtered by
+ * the provider), or else of its stay types (`unitKinds`; none: any kind). A snipe naming no
+ * units whose candidates are of more than one kind (`kindsAmbiguous`) holds nothing: it
+ * FAILS with a warning, so it never picks between a campsite and a cabin for the person.
  * Payment stays a human step. The scheduler (`scheduler/snipe-runner.ts`) owns the timing;
  * this service owns the state and every write.
  *
@@ -31,9 +35,15 @@ import {
   type UnitAvailability,
 } from '@shared/types';
 import type { EventSink } from '@shared/contracts/events';
-import { SnipeResult, SnipeReleaseMode, SnipeStatus } from '@shared/types/common.types';
+import {
+  RelatedType,
+  SnipeResult,
+  SnipeReleaseMode,
+  SnipeStatus,
+} from '@shared/types/common.types';
 import { toStayQuery } from '@shared/types/stay.types';
 import { compareDates, isCalendarDate, todayIn } from '@shared/utils/calendar-date';
+import { cleanUnitKinds } from '@shared/utils/unit-kinds';
 import { DEFAULT_SNIPE_POLL_INTERVAL_MS } from '@shared/constants';
 import type { SiteSniperRepository } from '../../database/repositories';
 import type { ProviderRegistry, ProviderWith } from '../../providers/registry';
@@ -50,8 +60,13 @@ import type { AccountGate } from '../accounts/ports';
 import type { NightGuard } from '../holds/night-guard';
 import type { NotificationService } from '../notifications/notification.service';
 import { resolveStayParams } from '../stay-params';
+import { kindsAmbiguous, wantedUnits } from '../watches/matching';
 
 const log = logger.child({ module: 'sitesniper' });
+
+/** Why a snipe that names no units ended at a place with free units of several stay types. */
+const MIXED_KINDS_ERROR =
+  'Free units of more than one stay type: choose a stay type or units for this snipe';
 
 /** The provider a snipe runs on: availability, holds and a release policy (and maybe a queue). */
 export type SnipeProvider = ProviderWith<'snipes'>;
@@ -90,7 +105,7 @@ export interface SnipePlan {
   timeZone: string;
 }
 
-export type SnipeNotifications = Pick<NotificationService, 'notifySnipeHeld'>;
+export type SnipeNotifications = Pick<NotificationService, 'notifySnipeHeld' | 'notifyWarning'>;
 
 export interface SnipeServiceDeps {
   snipes: SiteSniperRepository;
@@ -157,7 +172,10 @@ export class SiteSniperService {
    */
   async create(userId: number, input: SiteSnipeInput): Promise<SiteSnipe> {
     const provider = this.providers.require(input.providerId, 'snipes');
-    const prepared = await this.prepare(provider, input, input.releaseAt);
+    const prepared = {
+      unitKinds: cleanUnitKinds(input.unitKinds),
+      ...(await this.prepare(provider, input, input.releaseAt)),
+    };
     const signIn = await this.signInNeeded(provider);
     if (signIn) {
       // Saved paused, in one transaction: arming it waits for the sign-in (activate checks)
@@ -216,7 +234,11 @@ export class SiteSniperService {
       const requestedAt = updates.releaseAt ?? snipe.releaseAt;
       prepared = await this.prepare(provider, merged, requestedAt);
     }
-    this.repo.update(id, { ...updates, ...prepared });
+    this.repo.update(id, {
+      ...updates,
+      ...(updates.unitKinds !== undefined ? { unitKinds: cleanUnitKinds(updates.unitKinds) } : {}),
+      ...prepared,
+    });
     return this.changed(id);
   }
 
@@ -438,15 +460,24 @@ export class SiteSniperService {
       const externalId = snipe.location.externalId;
       const stay = toStayQuery(snipe.stay, snipe.stayParams);
 
-      // Poll availability: the preferred units, or every unit.
+      // Poll availability: the preferred units (the provider filters by id), or every unit,
+      // of which the snipe's stay types are the candidates.
+      const named = snipe.unitIds.length > 0;
       const availability = await provider.availability.check(externalId, stay, {
-        unitIds: snipe.unitIds.length > 0 ? snipe.unitIds : undefined,
+        unitIds: named ? snipe.unitIds : undefined,
         signal,
       });
       if (signal?.aborted) return stopped();
-      const matched = availability.units.find((unit) => unit.fullyAvailable);
+      const candidates = named
+        ? availability.units
+        : wantedUnits({ unitIds: [], unitKinds: snipe.unitKinds }, availability.units);
+      const matched = candidates.find((unit) => unit.fullyAvailable);
+      const ofKinds =
+        candidates.length < availability.units.length
+          ? ` (${candidates.length} of its stay types)`
+          : '';
       log.info(
-        `Snipe ${snipeId} poll: ${availability.units.length} unit(s), ` +
+        `Snipe ${snipeId} poll: ${availability.units.length} unit(s)${ofKinds}, ` +
           `${matched ? `unit ${matched.unitId} free` : 'none free'} — ${describeUnits(availability.units)}`
       );
 
@@ -456,6 +487,11 @@ export class SiteSniperService {
           : SnipeResult.UNAVAILABLE;
         this.recordAttempt(snipeId, result, undefined, checkedAt, nextCheck, true);
         return outcome('continue', result, { success: true });
+      }
+
+      // "Any unit" across stay types: no hold, and nothing reserved; the person must choose
+      if (kindsAmbiguous(snipe, candidates)) {
+        return await this.failMixedKinds(snipe, checkedAt);
       }
 
       // An account the holds need, stored as not signed in: no hold (no network here)
@@ -641,6 +677,44 @@ export class SiteSniperService {
         checkedAt,
         matchedSiteId: unitId,
         error: signIn,
+      },
+    };
+  }
+
+  /**
+   * Free units at a place with more than one stay type, and none chosen: the snipe FAILS
+   * (counted) and the person is warned, with a link to the snipe.
+   */
+  private async failMixedKinds(snipe: SiteSnipe, checkedAt: Date): Promise<SnipeOutcome> {
+    log.info(`Snipe ${snipe.id}: no hold, free units of more than one stay type`);
+    this.repo.incrementAttempts(snipe.id);
+    this.repo.finish(snipe.id, SnipeStatus.FAILED, SnipeResult.ERROR, MIXED_KINDS_ERROR);
+    this.changed(snipe.id);
+    const where = snipe.location.name || snipe.location.externalId;
+    try {
+      await this.notifications.notifyWarning(
+        snipe.userId,
+        `Snipe stopped at ${where}`,
+        `${MIXED_KINDS_ERROR}.`,
+        {
+          providerId: snipe.providerId,
+          relatedType: RelatedType.SNIPE,
+          relatedId: snipe.id,
+          ...(snipe.location.name ? { locationName: snipe.location.name } : {}),
+        }
+      );
+    } catch (error) {
+      log.error(`Snipe ${snipe.id}: stopped but not notified`, error);
+    }
+    return {
+      next: 'done',
+      result: {
+        snipeId: snipe.id,
+        success: false,
+        result: SnipeResult.ERROR,
+        held: false,
+        checkedAt,
+        error: MIXED_KINDS_ERROR,
       },
     };
   }
