@@ -13,7 +13,7 @@ R3, R4
 
 ## Scope
 1. **Stay-type chips** on the stay steps: watch create and Edit (`watches/form/WatchStayFields.tsx`, shared by both) and snipe create (`snipes/create/steps/StayStep.tsx`).
-   - The place is **mixed** when its units (`useLocationDetail(…).data.units`) span two or more kinds, a unit with no kind counting as `other`. This is R3's `kindsAmbiguous` rule applied to the whole place.
+   - The place is **mixed** when its units (`useLocationDetail(…).data.units`) span two or more kinds. A unit of kind `other`, or with no kind, counts as the distinct kind `other`, as in R3, so campsites plus `other` units are mixed. This is R3's `kindsAmbiguous` rule applied to the whole place.
    - At a mixed place, the chips are the distinct kinds of its units, without `other`, in `STAY_TYPES` order and with its labels. With campsites and `other` units that is the single chip "Camping", so the person can still meet the hold rule in 4.
    - A ParkStay campground whose units are all campsites is not mixed and shows none, so its flows look as today.
    - Markup: a `role="group"` named "Stay type", one `Chip` per kind with `pressed` (`components/ui/Chip.tsx`), and the hint "Leave all off for any stay type." It sits above the UnitPicker.
@@ -35,7 +35,7 @@ R3, R4
      - a single-kind place clears them silently, since there is nothing to filter.
 4. **A kind or a unit to hold at a mixed place.** This mirrors R3's core rule, which otherwise places no hold (a watch alerts with a note; a snipe ends FAILED). "Mixed" is as in 1.
    - **Watch:** with `autoHold` on, no `unitKinds` and no `unitIds`, the Alerts step refuses Continue. The error under "Hold a {noun} automatically when found" (`AutoHoldField.tsx`) reads "{Place} has more than one stay type. Choose a stay type or a {noun} on the Stay step to hold one automatically."
-   - **Snipe:** snipes always hold until R12 and R13. The Stay step refuses Continue with "Choose a stay type or a {noun}. At a place with more than one stay type, Site Sniper holds only what you choose."
+   - **Snipe:** snipes always hold until R12 and R13 (R13 then applies this rule to "Hold it for me" only). The Stay step refuses Continue with "Choose a stay type or a {noun}. At a place with more than one stay type, Site Sniper holds only what you choose."
    - The schema context gains `placeKinds` (`WatchFormContext`, `watchFormSchema.ts:114-122`, and the snipe equivalent), passed by the flows and the Edit page. `stepFields` checks `autoHold` on the watch Alerts step and `unitKinds` on the snipe Stay step.
 5. **Showing the choice:** a "Stay type" item ("Cabins & villas, Rooms", or "Any") when the place is mixed or kinds are stored, in:
    - the Review steps (`watches/create/steps/ReviewStep.tsx:158`, `snipes/create/steps/ReviewStep.tsx:123`);

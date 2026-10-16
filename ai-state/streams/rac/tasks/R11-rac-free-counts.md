@@ -18,7 +18,7 @@ R4 (the Stay type chip reads `byKind`) and R10 (category mapping, booking links,
 ## Scope
 1. **Manifest** (`src/main/providers/rac/manifest.ts`):
    - `bulkAvailability: true`;
-   - `bulkAvailabilityStayFields`: exactly the stay fields the POST sends. That is both dates, `adults`, `children` and `infants`, plus any RAC stay field R10 sends (for example pets). A party change asks again; nothing else does.
+   - `bulkAvailabilityStayFields`: exactly the stay fields the POST sends. That is both dates, `adults`, `children` and `infants`, plus R10's `pets`. A party change asks again; nothing else does.
 2. **`availability.search(stay, signal)`** (`src/main/providers/rac/bulk.ts`, beside R10's availability code):
    - **Requests:**
      - one POST per park in R5's seed (`parks.ts`), in seed order;
@@ -50,14 +50,14 @@ R4 (the Stay type chip reads `byKind`) and R10 (category mapping, booking links,
      - Record any missing park once: anonymous, read-only, at least 10 s apart, eight POSTs at most.
      - Trim each to 2–5 categories. Redact `api_key`, cart ids and IPs. No photos or descriptions: R5's fixture guard must pass.
    - **E2E** (`tests/e2e/fixtures/http/rac/`): the same eight responses, routed by `blog_id`.
-   - **Dated answers rot.** The e2e journey writes a temp copy of the fixture folder and launches with `WA_STAY_E2E_FIXTURES_DIR` pointing at it (`launchEnv` lets `env` override it, `tests/e2e/support/wa-stay.ts:127-150`). In the copy, the RAC night keys and dates are moved to the journey's stay (tomorrow plus two nights, Perth). Reuse R10's helper if it made one; otherwise add `tests/e2e/support/dated-fixtures.ts` for both journeys.
+   - **Dated answers rot.** The e2e journey writes a temp copy of the fixture folder and launches with `WA_STAY_E2E_FIXTURES_DIR` pointing at it (`launchEnv` lets `env` override it, `tests/e2e/support/wa-stay.ts:127-150`). In the copy, the RAC night keys and dates are moved to the journey's stay (tomorrow plus two nights, Perth). Reuse R10's `tests/e2e/support/dated-fixtures.ts`.
 6. **E2E journey** (`tests/e2e/rac-explore.spec.ts`), launched with `providers: ['parkstay', 'rac']`:
    - dates and guests are set on Explore;
    - RAC park cards show free counts beside ParkStay's;
    - choosing Stay type → "Cabins & villas" changes Busselton's count to its cabin count;
    - fixture mode refuses no request, and the window logs no errors.
 7. **Preview:** `xvfb-run -a npx cross-env PREVIEW_PROVIDER=rac PREVIEW_ARRIVAL=<recorded arrival> playwright test preview-provider` passes. Write the command and the dates in the e2e fixture folder's README.
-8. **Docs:** update the journey count in CLAUDE.md ("Testing", "22 journeys in 11 specs" as R10 left it) and in `tests/README.md`.
+8. **Docs:** update the journey count in CLAUDE.md ("Testing", the count as R10 left it) and in `tests/README.md`.
 
 ## Non-goals
 - `availability.check` and the place page (R10).
@@ -145,7 +145,7 @@ R4 (the Stay type chip reads `byKind`) and R10 (category mapping, booking links,
 - **No live holds.** Nothing here opens `online_cart_url` or any cart (§12.33). Fixtures redact cart ids.
 
 ## Assumptions
-1. **Counts are categories, not physical sites.** The place page's units are categories (R5, R10), and `bookableUnits` needs a total that RAC does not give for physical sites. So a card reads like "3 of 11 places available", not "51 sites free". *Needs a stakeholder decision* if they want site counts.
+1. **Counts are categories, not physical sites.** The place page's units are categories (R5, R10), and `bookableUnits` needs a total that RAC does not give for physical sites. So a card reads like "3 of 11 spots available" (R9's noun for a mixed park), not "51 sites free". *Needs a stakeholder decision* (RS12) if they want site counts.
 2. A superseded search resolves with what it has. For dates the person left, the unchecked parks read unknown for up to 15 minutes if they go back to those dates.
 3. Shifting fixture night keys in a temp copy is acceptable test tooling. The committed files keep their recorded dates.
 4. The party is in the bulk cache key, because RAC's answer depends on it.

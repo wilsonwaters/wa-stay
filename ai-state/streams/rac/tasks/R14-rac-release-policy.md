@@ -101,7 +101,7 @@ It reads R5's park seed.
   - a 403 route, and a 429 route: FAILED with R12's message, and no later RAC request;
   - resume after the window: EXPIRED, with no request. Resume inside the window: a check at once;
   - `isMember` turned true, then `arm()` again: the release moves 48 hours earlier.
-- [ ] Availability, with the window-edge fixture (nights 13–18 Oct 2027, checked at 23:36 AWST 16 Oct 2026; copied from `ai-state/research/rac-samples/` if R10 did not): the nights of 16–18 Oct are `not-released`, `release.open` is false, and `opensAt` is `2026-10-18T16:00:00.000Z`.
+- [ ] Availability, with R10's window-edge fixture (nights 13–18 Oct 2027, checked at 23:36 AWST 16 Oct 2026): the nights of 16–18 Oct are `not-released`, `release.open` is false, and `opensAt` is `2026-10-18T16:00:00.000Z`.
 - [ ] Manifest and registry tests: `snipes` is true and `holds` false; the two modes are declared, with `maxWindowMinutes` 30 and no cancellation mode; RAC registers.
 - [ ] A spy shows that `isMember` is asked at every `computeReleaseAt`. R5's fixture and source guards pass.
 - [ ] The full gate passes: `npm run lint && npm run format:check && npm run type-check && npm test && npm run test:tz`, then `npm run build:e2e && xvfb-run -a npm run test:e2e`, because RAC now shows in Site Sniper's provider step.
@@ -143,8 +143,8 @@ It reads R5's park seed.
 - **No live holds or carts** (§12.33). RAC holds stay off.
 
 ## Assumptions
-1. **Cable Beach's school-holiday nights follow the rolling window** (it is not in the school-holiday list). *Needs stakeholder confirmation.*
-2. **The member pre-sale opens at the same park time as the public release, in AWST.** *Needs stakeholder confirmation.*
+1. **Cable Beach's school-holiday nights follow the rolling window** (it is not in the school-holiday list). *Needs stakeholder confirmation* (RS10).
+2. **The member pre-sale opens at the same park time as the public release, in AWST.** *Needs stakeholder confirmation* (RS11).
 3. A period's first and last days are both nights in the period.
 4. A member who missed the pre-sale window is better served by the public instant than by a refusal.
 5. The WA school-holiday dates for 2027–2028 come from the Department of Education's published term dates. The implementer reads them once and cites them.

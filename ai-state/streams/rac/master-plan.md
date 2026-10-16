@@ -18,26 +18,26 @@ RAC Parks & Resorts becomes WA Stay's second provider (brief, Project 2), togeth
 
 | ID | Task | Size | Depends on | Status |
 |---|---|---|---|---|
-| R1 | [Stay-type foundation](tasks/R1-stay-type-foundation.md): `UnitKind` and its five groups; `unitKind` on units, `unitKinds` on locations, `byKind` on bulk entries; v11 (add columns); catalogue filter and facet; ParkStay maps its units and places | M | — | ⬜ |
-| R2 | [Polite request pacing](tasks/R2-polite-request-pacing.md): `limits.minRequestIntervalMs`, a paced `HttpClient` (one in flight, priority for checks), catalogue deadlines that scale with it, unpaced fixture mode, fixture routes that match form fields | M | R1 | ⬜ |
-| R3 | [Stay-type criteria for watches and snipes](tasks/R3-stay-type-criteria-core.md): `unitKinds` on watches and snipes (types, contracts, repositories); `wantedUnits` and the snipe's unit choice apply it; no automatic hold of "any unit" across mixed kinds | S | R1 | ⬜ |
-| R4 | [Explore "Stay type" chip](tasks/R4-explore-stay-type-chip.md): replaces "Type"; `stay` URL param; facet counts; prefill `&stay=` into create flows; free counts follow the chosen types (`byKind`, else "Check dates" at mixed places) | M | R1 | ⬜ |
-| R5 | [RAC catalogue on Explore](tasks/R5-rac-catalogue.md): scaffold (`npm run provider:new -- rac --api --name "RAC Parks & Resorts"`), manifest and limits, seed of eight parks, place detail with categories as units, links, the RAC client (host allow-list, headers, block cool-down), trimmed fixtures and their guard | M | R2 | ⬜ |
-| R6 | [Stay type in watch and snipe flows](tasks/R6-stay-type-in-flows.md): stay-type chips on the stay steps, UnitPicker grouped by kind, Explore's prefill, a kind or unit required to hold at a mixed place | M | R3, R4 | ⬜ |
-| R7 | [Alerts that open the booking page](tasks/R7-alerts-open-booking-page.md): `UnitAvailability.bookingUrl`; a watch alert carries the matched stay's link; desktop click opens it in the browser and the watch in the app; "Book on {shortName}" in emails and on the watch page | M | R2 | ⬜ |
-| R8 | [Minimum stays and rate notes](tasks/R8-minimum-stays-rate-notes.md): `min-stay` night reason, `minNights`, `noArrival`/`noDeparture`, `priceNote`; matching drops runs the provider would refuse; night grid and stay steps explain | M | R3, R7 | ⬜ |
-| R9 | [Unit nouns from stay types](tasks/R9-unit-nouns.md): one noun helper from unit kinds ("site", "cabin", "place"); no hard-coded "site" in notifications, services or flows | M | R6, R7, R8 | ⬜ |
-| R10 | [RAC availability, prices and watches](tasks/R10-rac-availability-watches.md): `availability.check` per category (codes, stay-through count, tariffs, refusals, min stays, prices, booking links, never a cart URL), native parks' units, `watches` on, an RAC watch e2e journey | M | R5, R7, R8 | ⬜ |
-| R11 | [RAC free counts on Explore](tasks/R11-rac-free-counts.md): bulk `availability.search` (one paced POST per park), `byKind`, e2e fixtures, the `PREVIEW_PROVIDER=rac` preview passing | M | R4, R10 | ⬜ |
-| R12 | [Release-alert snipes: core](tasks/R12-alert-snipes-core.md): `snipes` without `holds` (registry), per-snipe `action` (v12), `ALERTED`, alert notification with the booking link, `maxWindowMinutes`, a 403/429 ends the snipe | M | R3, R8, R9 | ⬜ |
-| R13 | [Release-alert snipes: Site Sniper screens](tasks/R13-alert-snipes-screens.md): "Alert me" or "Hold it" choice, alerted state with "Book on {shortName}", window cap in Advanced timing | M | R12 | ⬜ |
-| R14 | [RAC release policy and snipes](tasks/R14-rac-release-policy.md): `daily_rollover` (rolling instant or school-holiday release, member-aware) and `scheduled`; dated release calendar; `release.opensAt`; poll floor 10 s, window 30 min; `snipes` on; fake-clock tests | M | R10, R12 | ⬜ |
-| R15 | [Credentials accounts](tasks/R15-credentials-accounts.md): the `credentials` sign-in kind; `accounts.saveCredentials` (write-only, with confirmations), `accounts.copyCredential` (main writes the clipboard); values in the provider's secret vault; a generic Settings → Accounts form | M | R12 | ⬜ |
-| R16 | [RAC member number and member rates](tasks/R16-rac-member-number.md): RAC's `credentials` auth (`account: 'optional'`); members-only tariffs and pre-sale instants only with a saved number; member price with its note; copy button by "Book on RAC" | M | R14, R15 | ⬜ |
-| R17 | [Experimental provider switches](tasks/R17-experimental-switches.md): `manifest.experiments`; state in `provider_state`; applied at registration; `providers.setExperiment`; "Experimental" switch on the provider's Accounts row, after a restart | M | R15 | ⬜ |
-| R18 | [Hold release hooks](tasks/R18-hold-release-hooks.md): `HoldsModule.release`, `releaseOnPaymentClose`, `HoldSuccess.expiresAtEstimated`; the core releases a hold when its payment window closes unpaid or the person declines | S | R17 | ⬜ |
-| R19 | [RAC auto-cart, off by default](tasks/R19-rac-auto-cart.md): the `autoCart` experiment turns on `holds`; cart from `online_cart_url` on the provider's partition, payment window, one cart at a time, release, synthetic fixtures from RAC's page code; no live cart | M | R13, R16, R18 | ⬜ |
-| R20 | [Docs, website and release notes](tasks/R20-docs-website.md): `docs/providers/rac/` (README, endpoints with verification status, calendar upkeep), providers README, feature and security docs, CLAUDE.md, CHANGELOG, site row, colour and copy, screenshots; final gate | M | all | ⬜ |
+| R1 (#48) | [Stay-type foundation](tasks/R1-stay-type-foundation.md): `UnitKind` and its five groups; `unitKind` on units, `unitKinds` on locations, `byKind` on bulk entries; v11 (add columns); catalogue filter and facet; ParkStay maps its units and places | M | — | ⬜ |
+| R2 (#49) | [Polite request pacing](tasks/R2-polite-request-pacing.md): `limits.minRequestIntervalMs`, a paced `HttpClient` (one in flight, priority for checks), catalogue deadlines that scale with it, unpaced fixture mode, fixture routes that match form fields | M | R1 | ⬜ |
+| R3 (#50) | [Stay-type criteria for watches and snipes](tasks/R3-stay-type-criteria-core.md): `unitKinds` on watches and snipes (types, contracts, repositories); `wantedUnits` and the snipe's unit choice apply it; no automatic hold of "any unit" across mixed kinds | M | R1 | ⬜ |
+| R4 (#51) | [Explore "Stay type" chip](tasks/R4-explore-stay-type-chip.md): replaces "Type"; `stay` URL param; facet counts; prefill `&stay=` into create flows; free counts follow the chosen types (`byKind`, else "Check dates" at mixed places) | M | R1 | ⬜ |
+| R5 (#52) | [RAC catalogue on Explore](tasks/R5-rac-catalogue.md): scaffold (`npm run provider:new -- rac --api --name "RAC Parks & Resorts"`), manifest and limits, seed of eight parks, place detail with categories as units, links, the RAC client (host allow-list, headers, block cool-down), trimmed fixtures and their guard | M | R2 | ⬜ |
+| R6 (#53) | [Stay type in watch and snipe flows](tasks/R6-stay-type-in-flows.md): stay-type chips on the stay steps, UnitPicker grouped by kind, Explore's prefill, a kind or unit required to hold at a mixed place | M | R3, R4 | ⬜ |
+| R7 (#54) | [Alerts that open the booking page](tasks/R7-alerts-open-booking-page.md): `UnitAvailability.bookingUrl`; a watch alert carries the matched stay's link; desktop click opens it in the browser and the watch in the app; "Book on {shortName}" in emails and on the watch page | M | R2 | ⬜ |
+| R8 (#55) | [Minimum stays and rate notes](tasks/R8-minimum-stays-rate-notes.md): `min-stay` night reason, `minNights`, `noArrival`/`noDeparture`, `priceNote`; matching drops runs the provider would refuse; night grid and stay steps explain | M | R3, R7 | ⬜ |
+| R9 (#56) | [Unit nouns from stay types](tasks/R9-unit-nouns.md): one noun helper from unit kinds ("site", "cabin", "spot" for mixed kinds); no hard-coded "site" in notifications, services or flows | M | R6, R7, R8 | ⬜ |
+| R10 (#57) | [RAC availability, prices and watches](tasks/R10-rac-availability-watches.md): `availability.check` per category (codes, stay-through count, tariffs, refusals, min stays, prices, booking links, never a cart URL, `online_booking_url` verified with at most 3 anonymous GETs), native parks' units, the `pets` stay field, `watches` on, an RAC watch e2e journey | M | R5, R6, R7, R8 | ⬜ |
+| R11 (#58) | [RAC free counts on Explore](tasks/R11-rac-free-counts.md): bulk `availability.search` (one paced POST per park), `byKind`, e2e fixtures, the `PREVIEW_PROVIDER=rac` preview passing | M | R4, R10 | ⬜ |
+| R12 (#59) | [Release-alert snipes: core](tasks/R12-alert-snipes-core.md): `snipes` without `holds` (registry), per-snipe `action` and `alert`, plus `hold_expires_estimated` for R18 (v12), `ALERTED`, alert notification with the booking link, `maxWindowMinutes`, a 403/429 ends the snipe; creates architecture-notes §12.35 | L | R3, R7, R8, R9 | ⬜ |
+| R13 (#60) | [Release-alert snipes: Site Sniper screens](tasks/R13-alert-snipes-screens.md): "Alert me" or "Hold it" choice, alerted state with "Book on {shortName}", window cap in Advanced timing | M | R12 | ⬜ |
+| R14 (#61) | [RAC release policy and snipes](tasks/R14-rac-release-policy.md): `daily_rollover` (rolling instant or school-holiday release, member-aware) and `scheduled`; dated release calendar; `release.opensAt`; poll floor 10 s, window 30 min; `snipes` on; fake-clock tests | M | R10, R12 | ⬜ |
+| R15 (#62) | [Credentials accounts](tasks/R15-credentials-accounts.md): the `credentials` sign-in kind; `accounts.saveCredentials` (write-only, with confirmations), `accounts.copyCredential` (main writes the clipboard); values in the provider's secret vault; a generic Settings → Accounts form | M | R12 | ⬜ |
+| R16 (#63) | [RAC member number and member rates](tasks/R16-rac-member-number.md): RAC's `credentials` auth (`account: 'optional'`); members-only tariffs and pre-sale instants only with a saved number; member price with its note; copy button by "Book on RAC" | M | R11, R13, R14, R15 | ⬜ |
+| R17 (#64) | [Experimental provider switches](tasks/R17-experimental-switches.md): `manifest.experiments`; state in `provider_state`; applied at registration; `providers.experiments` and `providers.setExperiment`; "Experimental" switch on the provider's Accounts row, after a restart | M | R15 | ⬜ |
+| R18 (#65) | [Hold release hooks](tasks/R18-hold-release-hooks.md): `HoldsModule.release` (`released` or `gone`), `releaseOnPaymentClose`, `holdRelease`, `HoldSuccess.expiresAtEstimated`; the provider decides when the payment window closes or the person declines ("Let it go", `releaseHold`); holds at interactive pace | M | R12, R17 | ⬜ |
+| R19 (#66) | [RAC auto-cart, off by default](tasks/R19-rac-auto-cart.md): the `autoCart` experiment turns on `holds`; cart from `online_cart_url` on the provider's partition, payment window, one cart at a time, release, synthetic fixtures from RAC's page code; no live cart | M | R13, R16, R18 | ⬜ |
+| R20 (#67) | [Docs, website and release notes](tasks/R20-docs-website.md): `docs/providers/rac/` (README, endpoints with verification status, calendar upkeep), providers README, feature and security docs, CLAUDE.md, CHANGELOG, site row, colour and copy, screenshots; final gate | M | all | ⬜ |
 
 Every task keeps the full gate green (CLAUDE.md "Adding a provider" step 6) and updates the CLAUDE.md lines its change makes stale (for example the migration list in R1 and R12, the IPC table in R15 and R17). No task weakens a test, a lint rule or a coverage threshold.
 
@@ -47,19 +47,19 @@ Every task keeps the full gate green (CLAUDE.md "Adding a provider" step 6) and 
 
 - **Lane S (shared types, core, IPC):** R1 → R2 → R7 → R8 → R12 → R15 → R17 → R18. R3 runs beside R2 (its own files).
 - **Lane U (renderer):** R4 (after R1) → R6 (after R3) → R9 (after R7, R8) → R13 (after R12).
-- **Lane P (`src/main/providers/rac/`, its tests and fixtures):** R5 (after R2) → R10 (after R7, R8) → R11 (after R4) → R14 (after R12) → R16 (after R15) → R19 (after R13, R17, R18).
+- **Lane P (`src/main/providers/rac/`, its tests and fixtures):** R5 (after R2) → R10 (after R6, R7, R8) → R11 (after R4) → R14 (after R12) → R16 (after R13, R15) → R19 (after R13, R17, R18).
 - **Lane D:** R20 last.
 
-Parallel windows: {R2, R3, R4}; {R5, R6, R7}; {R9, R10}; {R11, R12}; {R13, R14, R15}; {R16, R17}. R15 could also run beside R12 if the reviewer accepts a two-line merge in `provider.types.ts`; that shortens the critical path (R1 → R2 → R7 → R8 → R9 → R12 → R15 → R17 → R18 → R19 → R20).
+Parallel windows: {R2, R3, R4}; {R5, R6, R7}; {R9, R10}; {R11, R12}; {R13, R14, R15}; {R16, R17}. R15 could also run beside R12 if the reviewer accepts a two-line merge in `provider.types.ts`; that shortens the critical path (R1 → R2 → R7 → R8 → R9 → R12 → R15 → R17 → R18 → R19 → R20). R12 (L) is the longest task on it.
 
 Vertical slices: after R5 the parks are on the map; after R10 RAC watches work end to end; after R11 Explore shows RAC free counts; after R14 RAC release alerts work; after R16 member timing and prices work; R19 adds the switched-off cart.
 
 ## Design decisions
 
-1. **Auto-cart shipped off (R2).** A manifest may declare `experiments` (id, label, description, the capabilities it turns on). The on/off state is kept main-side in `provider_state` (`('<id>', 'core.experiments')`). `registerBuiltInProviders` applies the enabled ones before the registry validates and freezes the manifest (`registry.ts:322-327,350`). Capability flags drive the UI, so the UI stays honest. The change takes effect after a restart. *Reason:* the manifest is frozen and read by the renderer, so a runtime gate would show options that then fail. RAC declares `autoCart`, which turns on `holds`. Its factory builds the holds module only when `ctx.manifest.capabilities.holds` is on (`context.ts:84-89`), so with the switch off no code path can reach a cart. The switch is on RAC's row in Settings → Accounts, under "Experimental", with a confirm dialog and "Takes effect when WA Stay restarts" (R17). Turning it off is refused while an RAC hold is unexpired. **The hold:** one GET of the chosen tariff's `online_cart_url` on `ctx.http`, the partition the payment window shares (`hold-payment.service.ts:1-9`). The payment URL is the park's `/booking/` cart page, and `paymentOrigins` is RAC's host. **Expiry:** the cart page's own countdown when it shows one (`earliest_hold_expires_when`). Otherwise a 10-minute estimate, flagged `expiresAtEstimated` so the copy says "about". There is no `bookedReference` until the stakeholder's genuine booking shows the confirmation page (RQ2).
+1. **Auto-cart shipped off (R2).** A manifest may declare `experiments` (id, label, description, the capabilities it turns on). The on/off state is kept main-side in `provider_state` (`('<id>', 'core.experiments')`). `registerBuiltInProviders` applies the enabled ones before the registry validates and freezes the manifest (`registry.ts:322-327,350`). Capability flags drive the UI, so the UI stays honest. The change takes effect after a restart. *Reason:* the manifest is frozen and read by the renderer, so a runtime gate would show options that then fail. RAC declares `autoCart`, which turns on `holds`. Its factory builds the holds module only when `ctx.manifest.capabilities.holds` is on (`context.ts:84-89`), so with the switch off no code path can reach a cart. The switch is on RAC's row in Settings → Accounts, under "Experimental", with a confirm dialog and "Takes effect when WA Stay restarts" (R17). Turning it off is refused while an RAC hold is unexpired. **The hold:** one GET of the chosen tariff's `online_cart_url` on `ctx.http`, the partition the payment window shares (`hold-payment.service.ts:1-9`). The payment URL is the park's `/booking/` cart page, and `paymentOrigins` is RAC's host. **Expiry:** the cart page's own countdown when it shows one (`earliest_hold_expires_when`). Otherwise a 10-minute estimate, flagged `expiresAtEstimated` so the copy says "about" (stored in v12's `hold_expires_estimated`, added by R12 and used by R18). Hold requests (`holds.create`, `holds.release`) run at interactive pace: the core sets the priority (R18). There is no `bookedReference` until the stakeholder's genuine booking shows the confirmation page (RQ2).
 2. **Release-alert snipes (R3).** A snipe cannot run without holds today. `snipes` needs `holds` in both rule sets (`registry.ts:86-91,208-215`), `plan()` drops a provider without `snipes` (`snipe.service.ts:316`), and `execute` always ends in `holds.create` (`:447-516`). The minimal core change (R12):
    - `snipes` needs `availability` and a release policy; `holds` becomes optional. This amends §12.30.
-   - A per-snipe `action: 'alert' | 'hold'` (v12: `site_snipes.action TEXT NOT NULL DEFAULT 'hold'`), so every ParkStay snipe keeps holding. `hold` is refused for a provider without holds. A `hold` snipe whose provider lost holds (switch off) alerts instead, with a note.
+   - A per-snipe `action: 'alert' | 'hold'` (v12: `site_snipes.action TEXT NOT NULL DEFAULT 'hold'`, plus `site_snipes.alert` JSON for what R13 shows, and `hold_expires_estimated INTEGER NOT NULL DEFAULT 0` on `watches` and `site_snipes` for R18), so every ParkStay snipe keeps holding. `hold` is refused for a provider without holds. A `hold` snipe whose provider lost holds (switch off) alerts instead, with a note.
    - On a match, an `alert` snipe notifies with the matched unit's booking link (R7) and ends `ALERTED`. It reserves no night.
    - The alert opens RAC's `online_booking_url` (no cart) or the prefilled book-now page (`links.booking`).
    - **Cadence:** RAC's `pollFloorMs.window` is 10 000 ms; the core already clamps to it (`snipe.service.ts:318-321,747`). A new `ReleaseModeDescriptor.maxWindowMinutes` (RAC: 30) clamps `windowDurationMs` (`:327`).
@@ -80,14 +80,14 @@ Vertical slices: after R5 the parks are on the map; after R10 RAC watches work e
    - **v11:** three `ADD COLUMN … unit_kinds JSON NOT NULL DEFAULT '[]'` (`locations`, `watches`, `site_snipes`), tables listed in `applyMigration`, upgrade tests from v5 and v6. An empty cached row reads as the derived default until the next sync.
    - **Catalogue:** `CatalogQuery.unitKinds` (any of) and a facet, like `amenities`.
    - **Explore:** the "Stay type" chip replaces "Type" (`FilterRow.tsx:46-53`, `facets.ts:15-21`). It filters `unitKinds` client-side, as Explore filters today, and is hidden when the catalogue has one kind.
-   - **Watches and snipes:** `unitKinds` filters `wantedUnits` (`matching.ts:24-35`) and the snipe's unit choice (`snipe.service.ts:447`). A unit without a kind counts as `other`. An automatic hold never takes "any unit" across several kinds: it alerts with a note instead.
+   - **Watches and snipes:** `unitKinds` filters `wantedUnits` (`matching.ts:24-35`) and the snipe's unit choice (`snipe.service.ts:447`). A unit without a kind counts as `other`, and `other` counts as a distinct kind when deciding whether a place is mixed (R3, R6). An automatic hold never takes "any unit" across several kinds: it alerts with a note instead.
    - **UnitPicker** groups by kind, then by `unitType` (`UnitPicker.tsx:36-43`).
    - **ParkStay:** gear-flagged sites → campsite; huts → dorm; cabins and cottages → cabin; eco tents → glamping. Every bookable campground → `['campsite']`.
    - **Free counts:** must not mislead. `BulkAvailabilityEntry.byKind?` gives counts per kind. Explore sums the chosen kinds; a mixed place without `byKind` reads "Check dates".
 5. **Member number (R5, RO4).** Implement the declared `credentials` kind minimally (R15). *Reason:* it is already declared and validated (`sdk/provider.ts:292`, `registry.ts:138-142`), and only the service refuses it (`provider-account.service.ts:351-365`); a stay field would put the number in plain `stay_params`.
    - `CredentialsAuth` gains `confirmations?` (statements the person ticks). `ProviderAccount` gains `authKind`, `fields`, `confirmations` and `savedFields` (key names only).
    - `accounts.saveCredentials({ providerId, values, confirmed })` stores each value in the provider's `ScopedSecretVault` as `account.<key>` (via `registry.secretsOf`), after `auth.signIn` checks it. RAC's check is local format only: no request.
-   - Saving again replaces the number; `accounts.signOut` removes it. `accounts.copyCredential` lets main write the clipboard, so the copy button never sends the value to the renderer.
+   - Saving again replaces the number; `accounts.signOut` removes it. Removing is never refused (no `ACCOUNT_BUSY`) and never clears the provider's session partition. `accounts.copyCredential` lets main write the clipboard, so the copy button never sends the value to the renderer.
    - The provider learns membership as a boolean: whether `ctx.secrets.get('account.memberNumber')` is set.
    - Never logged, never returned and never sent: each is a test (R15, R16).
 6. **Minimum stays and member rates (RO6).** One M task (R8).
@@ -101,7 +101,7 @@ Vertical slices: after R5 the parks are on the map; after R10 RAC watches work e
    - Availability: one POST per park per stay. Bulk: eight POSTs, cached 5 min (core) and 15 min (renderer).
    - The core paces all of it at 10 s, one at a time (R2). Catalogue and availability deadlines grow with that spacing: today 60 s and 20 s (`location-catalog.service.ts:208-210`), too short for eight paced POSTs.
    - Fixture mode is unpaced, and fixture routes can match form fields (`fixture-http-client.ts:41-48` matches path and query only), so e2e tests and the preview stay fast.
-8. **Copy and nouns.** R9 replaces `unitNoun(kind)` and `unitNounFor(manifest)` (`locationFormat.ts:26-42`, `snipeState.ts:179-181`, 38 call sites) with one helper over unit kinds. It also removes "Sites available at …", "Found N sites" (`notification.service.ts:162,171`) and the other hard-coded "site" copy in core and flows (rac-sdk-gaps I.1, I.2).
+8. **Copy and nouns.** R9 replaces `unitNoun(kind)` and `unitNounFor(manifest)` (`locationFormat.ts:26-42`, `snipeState.ts:179-181`, 38 call sites) with one helper over unit kinds. It also removes "Sites available at …", "Found N sites" (`notification.service.ts:162,171`) and the other hard-coded "site" copy in core and flows (rac-sdk-gaps I.1, I.2). Mixed kinds read "spot" / "spots" ("A spot is free at …", "3 of 11 spots"), never "place", which is Explore's word for a location.
 9. **Terms rules.** See the table below.
 10. **Website and docs.** R20 updates `docs/providers/rac/` (README, endpoints with verification status, calendar upkeep), the providers README row, the watches, Site Sniper and security docs, CLAUDE.md, CHANGELOG `[Unreleased]` and the website:
     - an RAC row with `data-provider="rac"`, the manifest name and monogram;
@@ -113,25 +113,32 @@ Vertical slices: after R5 the parks are on the map; after R10 RAC watches work e
 
 Also decided:
 - Booking links open in the system browser, as the place page's do today. Only R19's cart uses the in-app payment window.
-- A booking link must be https on the provider's own site.
+- A booking link must be https on the provider's own site. The core checks only that (R7); refusing cart URLs is the provider's job (RAC's client refuses them; R10 and R19 test it).
+- R10 verifies RAC's `online_booking_url` (the `/booking/?available_from=…&force_category_id=…` form, never `?cart&rest_api_data_id=`) with at most 3 anonymous, read-only GETs. If it does not show the stay without a cart, R5's book-now prefill link is used instead.
+- A held alert's desktop click opens the watch only, not the booking page (R7).
+- RAC's badge is a plain "RAC" text monogram in an original colour from the app's tokens (not a logo). RAC's parks use Explore's existing region names (R5).
+- Website: R4, R7 and R13 update the sentences their changes make stale; R20 refines the copy and retakes screenshots rather than adding them again.
 - RAC's client stops for 30 minutes after a challenge, 403 or 429. Requests fail fast with the same typed error and send nothing.
 
 ## Contract additions
 
-All additive and optional unless marked. The orchestrator records them as architecture-notes §12.35 when this plan is approved.
+All additive and optional unless marked. R12 creates architecture-notes §12.35, with one bullet for R1–R9's items and one for its own. Each later task that adds a contract item (R15, R17, R18, R19) appends its own bullet.
 
 | Addition | Task | Reason |
 |---|---|---|
-| `UnitKind`, `unitKind` on units, `LocationSummary.unitKinds`, `BulkAvailabilityEntry.byKind`, `CatalogQuery.unitKinds` + facet; v11 | R1 | R4 stay type |
+| `UnitKind`, `unitKind` on units, `LocationSummary.unitKinds`, `BulkAvailabilityEntry.byKind`, `CatalogQuery.unitKinds` + facet; v11; `src/shared/utils/unit-kinds.ts` (`STAY_TYPES`, `deriveUnitKinds`, `unitKindsOf`) | R1 | R4 stay type |
 | `Watch.unitKinds`, `SiteSnipe.unitKinds` (and their inputs) | R3 | Stay type in watches and snipes |
 | Explore `stay` param; prefill `&stay=` (amends §12.10) | R4, R6 | Explore → create flows |
-| `ProviderLimits.minRequestIntervalMs`, `HttpRequestOptions.priority`, fixture route `form` | R2 | Terms rule 2; fast fixtures |
-| `UnitAvailability.bookingUrl` | R7 | R1's one click |
-| `NightReason 'min-stay'`, `minNights`, `NightStatus.noArrival/noDeparture`, `UnitAvailability.priceNote` | R8 | RO6, member rates |
-| `snipes` without `holds` (amends §12.30); `SiteSnipe.action` (v12); `SnipeStatus`/`SnipeResult` `ALERTED`; notification type `snipe_alert`; `ReleaseModeDescriptor.maxWindowMinutes` | R12 | R3, RO3 |
-| `CredentialsAuth.confirmations`; `ProviderAccount.authKind/fields/confirmations/savedFields`; `accounts.saveCredentials`, `accounts.copyCredential`; `registry.secretsOf` | R15 | R5, RO4 |
-| `ProviderManifest.experiments`; `providers.setExperiment` | R17 | R2 switch |
-| `HoldsModule.release`, `releaseOnPaymentClose`; `HoldSuccess.expiresAtEstimated` | R18 | Terms rule 15 |
+| `ProviderLimits.minRequestIntervalMs` (needs `maxConcurrentRequests: 1`); `HttpRequestOptions.priority` and the ambient `withRequestPriority`/`currentRequestPriority` (interactive or background); `pacedDeadlineMs`; fixture route `form` | R2 | Terms rule 2, brief R8; fast fixtures |
+| `UnitAvailability.bookingUrl`; `links.booking(externalId, stay?, unitId?)`; `Watch.bookingLink` (derived, never stored); `NotificationMessage.bookingUrl`/`heldInApp`; the contract suite's booking-link check | R7 | R1's one click; brief R6, R7 |
+| `NightReason 'min-stay'`; `minNights` per night (`NightStatus`), per unit and stay (`UnitAvailability`) and usual (`UnitSummary.minNights`); `NightStatus.noArrival/noDeparture`; `UnitAvailability.priceNote` | R8 | RO6, member rates |
+| `src/shared/utils/unit-noun.ts` (`nounForKinds`; mixed kinds read "spot"); `WatchMatch.unitKind` | R9 | Unit nouns |
+| RAC's `pets` stay field (0–2; RAC's manifest, no SDK change) | R10 | Terms rule 16 |
+| `snipes` without `holds` (amends §12.30); `SiteSnipe.action` and `SiteSnipe.alert` (v12 columns `action`, `alert`); `hold_expires_estimated` on `watches` and `site_snipes` (v12, used by R18); `SnipeStatus`/`SnipeResult` `ALERTED`; notification type `snipe_alert`; `ReleaseModeDescriptor.maxWindowMinutes`; `ReleaseComputeInput.unitIds/unitKinds`; `isProviderBlock` (a 403 or 429 ends a snipe) | R12 | R3, RO3 |
+| `CredentialsAuth.confirmations`; `AccountFieldDescriptor.copyable`; `ProviderAccount.authKind/fields/confirmations/savedFields`; `accounts.saveCredentials`, `accounts.copyCredential` (a main-side `Clipboard` port); `registry.secretsOf`; `ProviderAccountServiceDeps.onCredentialsChanged` | R15 | R5, RO4 |
+| `ProviderManifest.experiments`; `providers.experiments`, `providers.setExperiment`; `core.*` keys reserved in `ctx.state`; `ACCOUNT_BUSY` also refuses turning a holds experiment off while a hold is open | R17 | R2 switch |
+| `HoldsModule.release` (outcome `released` or `gone`), `HoldsModule.releaseOnPaymentClose`; `HoldSuccess.expiresAtEstimated`; `ProviderManifest.holdRelease`; `watches.releaseHold`, `snipes.releaseHold`; the core runs `holds.create` and `holds.release` at interactive priority | R18 | Terms rule 15 |
+| RAC's `autoCart` experiment; RAC's hold-only stay fields `equipmentType`, `equipmentLength`, `equipmentWidth` (`appliesTo: ['hold']`, already in the contract) | R19 | R2 auto-cart |
 
 ## Terms rules → task
 
@@ -177,11 +184,11 @@ All additive and optional unless marked. The orchestrator records them as archit
 
    ParkStay's tests must pass unchanged, apart from the "Type" → "Stay type" chip.
 2. **SDK guide, scaffold and contract suite:** new fields are optional, so `npm run provider:new` output and `tests/fixtures/providers/example-*` still pass. The guide's credentials and holds sections change in R15 and R18.
-3. **E2E harness:** registers only ParkStay unless a launch passes `providers`. RAC journeys (R10, R11) pass `['parkstay', 'rac']`. R4 updates Explore journeys for the new chip.
+3. **E2E harness:** registers only ParkStay unless a launch passes `providers`. RAC journeys (R5, R10, R11, R16, R19) pass `['parkstay', 'rac']`; R10 and R11 share `tests/e2e/support/dated-fixtures.ts`. R4 updates Explore journeys for the new chip.
 4. **Notifications and email:** the booking link travels with the alert (R7). The email gets a "Book on {shortName}" link; nothing new is stored.
 5. **Settings → Accounts:** the credentials form (R15), RAC's row (R16) and the Experimental switch (R17), in that order.
 6. **Research samples:** `ai-state/research/rac-samples/` become trimmed fixtures in R5, R10 and R11. Cart fixtures in R19 are synthetic, from RAC's page code, and labelled so.
-7. **Architecture notes:** §12.30 (snipes ⇒ holds), §12.10 (prefill) and the "credentials not implemented" note are amended, as §12.35.
+7. **Architecture notes:** §12.30 (snipes ⇒ holds), §12.10 (prefill) and the "credentials not implemented" note are amended in §12.35. R12 creates it (with a bullet for R1–R9); R15, R17, R18 and R19 append theirs.
 
 ## Out of scope
 
@@ -207,8 +214,13 @@ All additive and optional unless marked. The orchestrator records them as archit
 | RS7 | Who keeps the school-holiday calendar current? | Updated by hand at each announcement; documented in `docs/providers/rac/` | R14, R20 |
 | RS8 | How pre-sale nights look is unseen (RQ3). | With a number, any free night counts; without, only non-member tariffs | R16 |
 | RS9 | Offer "Alert me" for ParkStay snipes too? | Yes, provider-neutral (R13) | R13 |
+| RS10 | Do Cable Beach's school-holiday nights follow the rolling window (it is not in the school-holiday list)? | Yes, rolling only | R14 |
+| RS11 | Does the member pre-sale open at the park's public release time, in AWST (rac-terms ambiguity 8)? | Yes, the same park time, AWST | R14, R16 |
+| RS12 | Explore counts RAC categories, not physical sites ("3 of 11 spots"). Show site counts instead? | Categories: RAC gives no physical-site totals | R11 |
+| RS13 | RAC member number format is unconfirmed. | 4–16 digits once spaces and hyphens are removed; the stakeholder tries their own card | R16 |
 
 ## Changelog
 
 - **2026-10-16:** Created with R1–R20. Decisions answer the planning brief's ten questions. RS1–RS9 go to OPEN-QUESTIONS.md.
 - 2026-10-16: stakeholder decisions R6–R8 (brief): alert clicks open the booking page for every provider; alert emails carry a public prefilled booking link for booking from a phone (R7 task); interactive pacing for person-triggered requests (R2, R11). RS2 and RS3 resolved.
+- 2026-10-16: backlog reconciliation of the 20 specs against the orchestrator's decisions. v12 (R12) also adds `hold_expires_estimated` to `watches` and `site_snipes` for R18; removing a member number is never refused and clears no session (R16 aligned to R15); `other` counts as a kind when deciding "mixed" (R6 aligned to R3); cart-URL refusal is the provider's job, the core checks https and the provider's site only (R7, R12); mixed-kind noun "spot" (R9, R11, R12); R10 verifies `online_booking_url` with at most 3 anonymous GETs, else R5's book-now link; held alert click opens the watch only; R4, R7 and R13 own their website sentences and R20 refines; RAC badge is a text monogram in an app token colour, regions use Explore's names; holds at interactive pace (R18); R12 creates §12.35 and later tasks append. Sizes: R3 M, R12 L, R18 M. Dependencies: R10 + R6, R12 + R7, R16 + R11 and R13, R18 + R12. R13 now owns moving R6's snipe hold rule to "Hold it for me". Contract table completed (unit-noun helper, `links.booking` `unitId`, release outcomes, `holdRelease`, `releaseHold`, `copyable`, `onCredentialsChanged`, `providers.experiments`, the snipe `alert` column, RAC `pets` and hold stay fields, per-night and usual `minNights`, pacing priorities). RS10–RS13 added from spec assumptions. Issues filed: R1–R20 are #48–#67.

@@ -9,12 +9,12 @@ R15 builds the generic `credentials` sign-in: the form, `accounts.saveCredential
 M
 
 ## Depends on
-R14 (release policy and calendar), R15 (credentials accounts)
+R11 (the bulk search whose tariff rule changes), R13 (the alerted-snipe panel that gets the copy button), R14 (release policy and calendar), R15 (credentials accounts)
 
 ## Scope
 1. **RAC's auth** (`src/main/providers/rac/auth.ts`, wired in RAC's factory):
    - `kind: 'credentials'`. The manifest's `capabilities.account` becomes `'optional'` (R5 shipped `'none'`). Nothing waits on it: `ensureForHolds` stays a no-op.
-   - One field: `{ key: 'memberNumber', label: 'RAC member number', secret: true }`, with help text: "On your RAC card or in myRAC. Kept encrypted on this computer and never sent. You type it at RAC's checkout." It is copyable (R15's flag, if R15 added one).
+   - One field: `{ key: 'memberNumber', label: 'RAC member number', secret: true }`, with help text: "On your RAC card or in myRAC. Kept encrypted on this computer and never sent. You type it at RAC's checkout." It sets `copyable: true` (R15's flag).
    - `confirmations` (rule 11; booking policy 8.3–8.5): "This is my own RAC member number", "I will stay at the park myself", "I will book in the name on my RAC card". R15 refuses a save without all three.
    - `signIn(values)`: a local format check only, with **no request**. Spaces and hyphens are ignored (RAC's checkout strips `-`), then 4–16 digits are required. Otherwise it refuses with "That doesn't look like an RAC member number".
    - `isSignedIn`: `signed-in` when a number is saved, else `signed-out`. No request.
@@ -26,7 +26,7 @@ R14 (release policy and calendar), R15 (credentials accounts)
    - The same rule applies everywhere: `availability.check`, bulk `availability.search` (`byKind` too), and so watch matching and `maxPrice`.
 4. **Release instants** (R14's policy): R16 feeds `hasMemberNumber` into R14's school-holiday computation. With a number, at a park and category that take part, the pre-sale instant applies. Otherwise the public one. Cable Beach, Ningaloo and Margaret River dorms never move. `release.opensAt` from `availability.check` follows the same rule.
 5. **Links:** `links.booking` (the prefilled book-now page) sets `membership_type=member` when a number is saved, else `non-member`. The number itself never goes in a link.
-6. **When the number changes** (save, replace, remove), wired from the account service through a callback in its deps (`src/main/app/container.ts`), never from the provider:
+6. **When the number changes** (save, replace, remove), wired through R15's `onCredentialsChanged` hook in the container (`src/main/app/container.ts`), never from the provider:
    - RAC's cached availability is dropped: the catalogue's bulk and per-location caches for RAC in main, and RAC's availability queries in the renderer (on `account:updated`);
    - snipes are re-armed (`JobScheduler.rescheduleAll()`, `job-scheduler.ts:126`), so a `daily_rollover` snipe asks for its instant again at its next arm (`snipe-runner.ts:300-307`).
 7. **Copy button** (renderer, provider-neutral, `components/accounts/CopyCredentialButton.tsx`): "Copy {field label}". It sits beside "Book on {shortName}" (`features/place/StayCard.tsx`, the watch page's link from R7, an alerted snipe from R13) and beside "Pay now" (`components/stay/HoldPanel.tsx`). It shows when the provider's account has a saved copyable field (`savedFields`, R15). It calls `accounts.copyCredential({ providerId, key })`. The value never reaches the renderer.
@@ -52,6 +52,7 @@ R14 (release policy and calendar), R15 (credentials accounts)
   - Busselton without a number: 5 Feb 2027 08:00 AWST;
   - Busselton with a number: 3 Feb 2027 08:00 AWST;
   - Cable Beach, and a Margaret River dorm, with a number: unchanged.
+- [ ] Removing the number while an RAC snipe is armed succeeds: no `ACCOUNT_BUSY`, and RAC's session partition is not cleared (R15's rule).
 - [ ] Core harness test: an armed snipe re-arms after the number is saved (now the pre-sale instant) and again after it is removed (back to the public instant). After a change, the next check asks RAC again instead of answering from the cache.
 - [ ] Source guard: under `src/main/providers/rac/`, only `membership.ts` and `auth.ts` name `account.memberNumber`.
 - [ ] `links.booking` with and without a number: `membership_type` is `member` or `non-member`, and the digits never appear.
@@ -68,7 +69,7 @@ R14 (release policy and calendar), R15 (credentials accounts)
   - the copy button's accessible name is "Copy RAC member number": no value in the name, the title or a tooltip;
   - "RAC member number copied" is announced through `useAnnounce`, and focus stays on the button;
   - with RAC's descriptor, R15's form gives the field a password-style input whose label and help are linked (`aria-describedby`), and each confirmation is a labelled checkbox.
-- [ ] CLAUDE.md "Secrets": RAC's member number is a provider secret, write-only over IPC, copied by main.
+- [ ] CLAUDE.md "Secrets": RAC's member number is a provider secret, write-only over IPC, copied by main. The e2e journey count in CLAUDE.md and `tests/README.md`.
 - [ ] Full gate: `npm run lint && npm run format:check && npm run type-check && npm test && npm run test:tz`, then `npm run build:e2e && xvfb-run -a npm run test:e2e`.
 
 ## Edge Cases
@@ -78,7 +79,7 @@ R14 (release policy and calendar), R15 (credentials accounts)
 - **Member tariff refused** (codes 5, 6, 8, 11) while the standard one is bookable: free at the standard price, with no note.
 - **Only a member promotion is bookable** ("Stay & Save … - RAC Member"): free with a number, noted "RAC member rate".
 - **Placeholder totals** on refused tariffs (`999`) are never a price.
-- **Remove refused** with `ACCOUNT_BUSY` while an RAC snipe or hold needs the session (R15's rule): the number and the copy button stay.
+- **Removing is never refused** (no `ACCOUNT_BUSY`), even while an RAC snipe is armed, and never clears RAC's session partition (R15's rule). The number goes, the copy button disappears, and armed snipes re-arm for the public instant.
 - **Clipboard write fails:** an error shows, and nothing is logged with the value.
 - **Replace twice quickly:** the last save wins. Caches drop and snipes re-arm each time, without errors.
 - ParkStay's cached availability and its snipes' instants are untouched by an RAC change.
@@ -105,9 +106,7 @@ R14 (release policy and calendar), R15 (credentials accounts)
 - With a number, the app shows the price RAC charges a verified member. RAC checks the number against the name at checkout and on arrival (booking policy 8.4).
 
 ## Assumptions
-- RAC member numbers are 4–16 digits once spaces and hyphens are removed. The format is unconfirmed. The stakeholder should try their own card; loosen the check if it refuses a real number.
+- RAC member numbers are 4–16 digits once spaces and hyphens are removed. The format is unconfirmed. The stakeholder should try their own card (RS13); loosen the check if it refuses a real number.
 - Member tariffs are recognised by their wording, since the response has no "members only" flag (seen in the samples). If RAC renames them, prices fall back to non-member tariffs: wrong but safe.
-- R14 takes membership as an input. If R14 already reads the vault, R16 replaces that read with `hasMemberNumber` and keeps the tests.
-- R15 lets `accounts.copyCredential` copy RAC's field. If R15 restricts copying to fields flagged copyable, RAC sets the flag.
 - Re-arming every snipe with `rescheduleAll()` is cheap enough. A re-arm only re-asks instants; it sends a request only for snipes that need one at arm time.
 - Pre-sale availability is unseen (RQ3). RS8's default applies: with a number, any free night counts.

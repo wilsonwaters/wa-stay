@@ -9,7 +9,7 @@ R5 put the eight parks on Explore, with categories as units. This task reads RAC
 M
 
 ## Depends on
-R5, R7, R8 (and R6, for the e2e journey's stay-type step)
+R5, R6 (the e2e journey presses its "Camping" chip), R7, R8
 
 ## Scope
 1. **`availability.check(externalId, stay, options)`**, in a new `src/main/providers/rac/availability.ts`:
@@ -48,6 +48,7 @@ R5, R7, R8 (and R6, for the e2e journey's stay-type step)
    - **Booking links** (R7):
      - a unit's `bookingUrl` is `online_booking_url` when it is https on `parksandresorts.rac.com.au`, under `/<the park's slug>/booking/`, with no `cart` key and no `rest_api_data_id`;
      - otherwise it is `links.booking(externalId, stay, unitId)`;
+     - **verified first:** during implementation, at most 3 anonymous, read-only GETs (10 s apart, never signed in) of an `online_booking_url` in the `/<slug>/booking/?available_from=…&force_category_id=…` form, never the `?cart&rest_api_data_id=` form, confirm that it shows the stay and category without creating a cart. If it does not, every unit's `bookingUrl` and `links.booking` with `unitId` fall back to R5's book-now prefill link;
      - `LocationAvailability.bookingUrl` is `links.booking(externalId, stay)`.
    - **`links.booking`** (`rac/links.ts`, R5):
      - with R7's `unitId`, it builds `/<slug>/booking/?available_from=…&available_to=…&force_category_id=<id>&adults=…&children=…&infants=…&animals=…`, the shape of `online_booking_url`;
@@ -99,6 +100,7 @@ R5, R7, R8 (and R6, for the e2e journey's stay-type step)
 - [ ] Never a cart URL:
   - no result over any fixture contains `?cart`, `rest_api_data_id` or `<redacted>` (`JSON.stringify`);
   - a test that rewrites a unit's `online_booking_url` to `/busselton/booking/?cart&rest_api_data_id=x` gets `links.booking` instead.
+- [ ] The booking link was verified as in Scope 1 (at most 3 anonymous read-only GETs, never the cart form); the PR records what the page showed. If it failed, the links are R5's book-now prefill link and the tests above expect that.
 - [ ] The contract suite in `tests/integration/rac-provider.test.ts` passes with availability and watches on, including R7's link check and R8's stay-rule checks.
 - [ ] `tests/integration/rac-watch.test.ts` (core harness, Busselton fixture):
   - create, then execute, gives FOUND and one alert whose link (R7) is the powered site's `online_booking_url`;
@@ -151,7 +153,7 @@ R5, R7, R8 (and R6, for the e2e journey's stay-type step)
 - R5 already records the native parks' responses. Any further live look is anonymous, read-only, at least 10 s apart, and a handful of requests at most.
 
 ## Assumptions
-- **Needs a stakeholder check:** whether `online_booking_url` opens RAC's engine with the stay and category, no cart, on a phone with no session. It was never opened (`rac-booking-flow.md` §11). Brief R1 says it never touches a cart. The stakeholder should open one on a phone before RAC watches ship; the implementer may make one anonymous GET to confirm the page renders without a cart. If it fails, `links.booking` without `unitId` (R5's verified book-now page) is the fallback.
+- `online_booking_url` was never opened during research (`rac-booking-flow.md` §11); brief R1 says it never touches a cart. The implementer verifies it (Scope 1, at most 3 GETs). The stakeholder may still open one on a phone before RAC watches ship. If it fails, R5's book-now prefill link is the fallback.
 - Members' tariffs are recognised by their label ("RAC Member"). RAC sends no flag for them.
 - The code table's choices: site codes 4, 6, 7 and 8 and tariff codes 2, 3, 4, 8 and 11 → `closed`; tariff code 5 → `not-released`. When unsure, the stay is not free (rule 16).
 - The native-park near stay (today + 14, 1 night) is arbitrary. RAC lists every category whatever their availability.
