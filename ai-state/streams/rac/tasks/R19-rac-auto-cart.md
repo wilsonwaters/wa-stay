@@ -106,7 +106,7 @@ R13 (alert or hold snipes), R16 (member number and tariff choice), R18 (release 
   - in a launch seeded with a held RAC watch (a made-up reference; no cart is created), the hold panel shows "Pay now" and "Let it go". "Pay now" makes the network guard cancel RAC's `/<slug>/booking/` page, and the page says the window could not open, as in `held-snipe.spec.ts`. A first page that failed releases nothing (R18), so the hold stays;
   - no recorded request, guarded or refused by fixtures, has `cart&` or `rest_api_data_id` in its URL, and none went to `apiau.newbook.cloud`.
 - [ ] A11y: the e2e reaches the switch, the dialog and "Pay now" by role and name only (R17 and `HoldPanel` own their a11y).
-- [ ] CLAUDE.md: "No live holds" names RAC carts, and the Key Services line on hold payment says RAC has no `bookedReference`.
+- [ ] CLAUDE.md: "No live holds" names RAC carts, the Key Services line on hold payment says RAC has no `bookedReference`, and the e2e journey count is current. `ai-state/architecture-notes.md` §12.35 gains a bullet for RAC's `autoCart` experiment, its hold-only stay fields and the cart guard.
 - [ ] Full gate: `npm run lint && npm run format:check && npm run type-check && npm test && npm run test:tz`, then `npm run build:e2e && xvfb-run -a npm run test:e2e`.
 
 ## Edge Cases

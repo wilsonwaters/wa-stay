@@ -4,7 +4,7 @@
 After R1 a unit can say what it is. A watch or snipe must be able to say "cabins only" (brief R4). An automatic hold must never take "any unit" at a park with sites, cabins and dorms (rac-sdk-gaps I.5): it could hold a dorm bed or a three-bedroom villa. This task adds `unitKinds` to watches and snipes in main: types, contracts, repositories, matching and the snipe's unit choice. There is no UI change (R6).
 
 ## Size
-M (the master plan says S). It touches two types, two contracts, two repositories, matching and two services: several files, one concern.
+M. It touches two types, two contracts, two repositories, matching and two services: several files, one concern.
 
 ## Depends on
 R1 (the v11 `unit_kinds` columns and `UnitKind`).
@@ -33,7 +33,7 @@ R1 (the v11 `unit_kinds` columns and `UnitKind`).
 ## Non-goals
 - Stay-type chips, UnitPicker grouping, reading Explore's `stay=` prefill, and requiring a kind or unit to hold (R6).
 - Unit nouns ("Sites available at …") (R9).
-- Alert snipes and `ALERTED` (R12): an ambiguous snipe fails here, and R12 may turn that into an alert.
+- Alert snipes and `ALERTED` (R12): an ambiguous snipe fails here, and R12 turns that into an alert.
 - No migration (v11 is R1's) and no ParkStay change.
 
 ## Completion Criteria
@@ -90,6 +90,6 @@ R1 (the v11 `unit_kinds` columns and `UnitKind`).
 - **Why ambiguity counts every wanted unit.** It depends on what the person asked for, not on what is free right now, so it gives the same answer every poll.
 
 ## Assumptions
-- Size raised from S to M (see Size).
+- Size M, as the master plan now has it.
 - An ambiguous snipe ends `FAILED`. There is no alert action before R12, and polling on would never hold.
 - The note wording is provisional; R9 settles nouns.

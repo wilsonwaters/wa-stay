@@ -64,7 +64,7 @@ R1 (`UnitKind`, `STAY_TYPES`, `unitKindsOf`, `CatalogQuery.unitKinds`, `byKind`)
   - "Available only" hides a `check-dates` place.
 - [ ] `routes.test.ts`: `parseCreatePrefill('?stay=cabin,castle')` gives `{ stay: ['cabin'] }`, and `ROUTES.watchNew({ stay: ['cabin', 'room'] })` round-trips.
 - [ ] `placeModel.test.ts`: `handoffPrefill` keeps `stay`. `PlaceDetailPage.test.tsx`: the watch link carries `stay=cabin` when the page was opened with it.
-- [ ] E2E: one step added to an existing Explore journey: "Stay type → Dorms" lists Yeagarup Hut and none of the campgrounds (fixture `campground_map.json`). Still 22 journeys.
+- [ ] E2E: one step added to an existing Explore journey: "Stay type → Dorms" lists Yeagarup Hut and none of the campgrounds (fixture `campground_map.json`). No new journey.
 - [ ] Accessibility:
   - the chip is named "Stay type", and "Stay type, 1 selected" with one chosen;
   - each option is a checkbox named "<label>, N places";

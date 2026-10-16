@@ -15,7 +15,7 @@ R2 (pacing; R1's unit kinds come with it).
 1. **Scaffold:** `npm run provider:new -- rac --api --name "RAC Parks & Resorts"`, then resolve every `TODO`. It writes `src/main/providers/rac/`, `tests/integration/rac-provider.test.ts`, `tests/fixtures/providers/rac/`, `tests/e2e/fixtures/http/rac/` and the `BUILT_IN_PROVIDERS` entry.
 2. **Manifest** (`rac/manifest.ts`):
    - Identity: id `rac`, name "RAC Parks & Resorts", shortName "RAC", website `https://parksandresorts.rac.com.au`, integration `api`.
-   - Badge: monogram `RAC`, and an original dark colour from the scaffold's `BRAND_COLOURS`, not RAC's own blue or yellow.
+   - Badge: a plain text monogram `RAC` (not a logo), and an original dark colour from the app's colour tokens (`src/renderer/styles/tokens.css`), not RAC's own blue or yellow and distinct from ParkStay's.
    - `locationKinds: ['holiday-park']`, `Australia/Perth`, `AUD`.
    - Capabilities: `catalog` on with `catalogMode: 'full'`. Everything else off, and `account: 'none'`.
    - Limits: `minWatchIntervalMinutes: 15`, `maxConcurrentRequests: 1`, `catalogTtlHours: 24`, `minRequestIntervalMs: 10_000`.
@@ -142,7 +142,7 @@ R2 (pacing; R1's unit kinds come with it).
 - The client is shared: R10 sends its POST through it, so the block rule covers every later RAC request.
 
 ## Assumptions
-- **Badge.** shortName "RAC" (it gives "Book on RAC", as in the master plan) and monogram `RAC` make a plain badge, not RAC's logo (rule 7). *Needs a stakeholder check.*
-- **Regions.** `area.region` uses the DBCA region names Explore already has, so the Region chip works across providers; RAC's own labels ("Coral Coast") are not used. Cervantes → Midwest is the least certain. *Needs a stakeholder check.*
+- **Badge.** shortName "RAC" (it gives "Book on RAC", as in the master plan) and monogram `RAC` make a plain badge, not RAC's logo (rule 7). *Decided by the orchestrator:* a text monogram in an app token colour is fine.
+- **Regions.** `area.region` uses the DBCA region names Explore already has, so the Region chip works across providers; RAC's own labels ("Coral Coast") are not used. Cervantes → Midwest is the least certain. *Decided by the orchestrator:* RAC's parks map onto Explore's existing region names.
 - **"Studio Room" → cabin,** following rac-sdk-gaps B.
 - **Native parks** show no categories until R10 (the master plan's R10 row).

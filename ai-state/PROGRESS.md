@@ -7,10 +7,11 @@ _Last updated: 2026-10-16 (orchestrator)_
 Branch `ccr-573ddb1d-hir0sq` (from `main` at `4bd5d62`, the v2.0.0 release). The brief is the Project 2 section of `ai-state/brief.md`.
 
 ## Phase
-Phase 2 (stream planning). Kickoff is done: research is committed and the stakeholder answered the three product decisions (R2 auto-cart built but shipped off, R3 release-alert snipes, R4 five stay types replacing "Type").
+Phase 3–4 (task specs, then execution). The stakeholder approved the 20-task plan and decided R6–R8 (alert clicks for every provider, a phone booking link in alert emails, interactive pacing).
 
 ## Currently in flight
-- Stream-planning agent writing `ai-state/streams/rac/master-plan.md` and the `streams.md` section.
+- Reconciliation agent: applying orchestrator decisions D-a…D-l across the 20 specs, then filing issues R1→R20 (`ai-planning`, `stream:rac`).
+- **R1** (stay-type foundation): implementation agent in `/home/user/lanes/r1` on `lane/r1` (cut at `10aaf89`).
 
 ## Completed
 - 2026-10-16: kickoff research, three parallel read-only agents.
@@ -24,6 +25,7 @@ Phase 2 (stream planning). Kickoff is done: research is committed and the stakeh
   - `ai-state/research/rac-terms.md` (31 requests): not links-only; personal non-commercial use; 10 s crawl delay; 16 rules.
   - `ai-state/research/rac-sdk-gaps.md`: watches need only the module; changes for stay types, member number, minimum stay and release alerts.
 - 2026-10-16: the stakeholder decided R1–R5 (brief). Brief written.
+- 2026-10-16: master plan (`ai-state/streams/rac/master-plan.md`, R1–R20, lanes S/U/P) approved; decisions R6–R8. 20 specs written by four parallel agents. Baseline gate recorded in RUNBOOK.
 
 ## Next
 1. Review the master plan, then spec-writing agents (parallel), then GitHub issues (`ai-planning`, `stream:rac`).

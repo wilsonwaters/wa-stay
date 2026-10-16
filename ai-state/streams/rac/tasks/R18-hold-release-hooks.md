@@ -12,7 +12,7 @@ This task adds the generic hooks:
 **The provider decides.** The core never treats "the payment window closed with no confirmation" as unpaid. On a close or a decline it calls `holds.release`, and the provider checks its own side first: RAC's release reads the cart, and does nothing once the stay has left it (R19). For a provider without `release`, nothing changes from today: ParkStay's holds behave exactly as now.
 
 ## Size
-M (the master plan said S; declining needs two IPC methods and a button)
+M (declining needs two IPC methods and a button)
 
 ## Depends on
 R12 (migration v12 adds `hold_expires_estimated` to `watches` and `site_snipes`), R17 (the same hold paths, in Lane S order); R2 (`withRequestPriority`) and R7 (held notifications) are already in.
@@ -65,7 +65,8 @@ R12 (migration v12 adds `hold_expires_estimated` to `watches` and `site_snipes`)
    - It works through `renderer/api/` hooks (`useReleaseWatchHold`, `useReleaseSnipeHold`).
 6. **Docs here:**
    - the guide's holds section (`docs/providers/adding-a-provider.md`): `release`, `releaseOnPaymentClose`, `holdRelease`, `expiresAtEstimated`, and "the provider decides";
-   - CLAUDE.md: the HoldPaymentService row and the IPC table rows (`watches`, `snipes`).
+   - CLAUDE.md: the HoldPaymentService row and the IPC table rows (`watches`, `snipes`);
+   - `ai-state/architecture-notes.md` §12.35: a hold-release bullet (`release` and its outcomes, `releaseOnPaymentClose`, `holdRelease`, `expiresAtEstimated`, the two `releaseHold` methods, interactive pace for holds).
 
 ## Non-goals
 - RAC's `release`, its estimate and its cart (R19). The experiment switch (R17).
@@ -108,7 +109,7 @@ R12 (migration v12 adds `hold_expires_estimated` to `watches` and `site_snipes`)
   - the dialog is an `alertdialog` named by its title. Focus starts on Cancel, Escape cancels, and focus returns to "Let it go", or to the panel's heading once the button is gone;
   - the ended-hold message is announced (`useAnnounce`);
   - the timer's accessible name carries "About" when estimated.
-- [ ] Docs: the guide section and the CLAUDE.md rows above.
+- [ ] Docs: the guide section, §12.35 and the CLAUDE.md rows above.
 - [ ] Full gate: `npm run lint && npm run format:check && npm run type-check && npm test && npm run test:tz`, then `npm run build:e2e && xvfb-run -a npm run test:e2e`.
 
 ## Edge Cases
@@ -144,6 +145,6 @@ R12 (migration v12 adds `hold_expires_estimated` to `watches` and `site_snipes`)
 - **Why end the hold at once after a release:** NightGuard then frees the nights, so a later match can hold them again.
 
 ## Assumptions
-- `ProviderManifest.holdRelease` and the two `releaseHold` IPC methods are additions beyond the master plan's contract table. The renderer needs a cue, and declining needs an action.
+- `ProviderManifest.holdRelease` and the two `releaseHold` IPC methods are in the master plan's contract table. The renderer needs a cue, and declining needs an action.
 - Deleting a held watch or snipe counts as declining.
 - A released or gone hold ends with existing states (EXPIRED, or an expired hold). No new status.

@@ -24,6 +24,7 @@ R12 (`action`, `ALERTED`, `SiteSnipe.alert`, `maxWindowMinutes`). It uses R9's n
        - "Hold it for me": "Holds a {noun} for you, then you pay on {shortName}'s page in WA Stay."
      - Without holds, one line of text instead: "When the dates are free, Site Sniper alerts you with a link to book on {shortName}. Automatic holds aren't available for {shortName}."
    - **Account prompt:** `ConnectToArmDialog` and any "sign in to hold" hint show only for `hold`.
+   - **Mixed places (R6's rule):** only a hold needs a stay type or a unit. R6's Stay-step refusal moves to the Release step: at a mixed place with neither chosen, choosing "Hold it for me" shows R6's message and refuses Continue. "Alert me" needs neither, and a provider without holds never asks.
    - **Provider step** (`steps/ProviderStep.tsx`): a provider without holds says "Alerts only" under its name.
    - **Review step** (`steps/ReviewStep.tsx`): "When the dates are free: Alert me" or "Hold a {noun}".
 2. **Advanced timing** (`steps/AdvancedTiming.tsx`, `snipeForm.ts`):
@@ -63,6 +64,7 @@ R12 (`action`, `ALERTED`, `SiteSnipe.alert`, `maxWindowMinutes`). It uses R9's n
 - [ ] **Release step** (`ReleaseStep` tests):
   - with ParkStay, the radio group "When the dates are free" has "Alert me" and "Hold it for me", and "Hold it for me" is checked;
   - with a provider without holds, there is no radio group and the alert line shows.
+- [ ] Mixed place (R6's fake detail), no stay type or unit: "Alert me" continues; "Hold it for me" shows R6's message on the Release step; the Stay step no longer refuses.
 - [ ] `NewSnipePage.submit.test.tsx`: submitting with "Alert me" sends `action: 'alert'`, and the default ParkStay submit sends `action: 'hold'`.
 - [ ] Advanced timing tests:
   - a mode with `maxWindowMinutes: 30` shows the hint;
@@ -83,7 +85,7 @@ R12 (`action`, `ALERTED`, `SiteSnipe.alert`, `maxWindowMinutes`). It uses R9's n
   - the "Alert sent" badge uses an existing status tone (`tests/unit/design/token-guard.test.ts`).
 - [ ] The site's Site Sniper copy is updated and the site test passes.
 - [ ] The full gate passes: `npm run lint && npm run format:check && npm run type-check && npm test && npm run test:tz`, then `npm run build:e2e && xvfb-run -a npm run test:e2e`.
-- [ ] CLAUDE.md is updated where it describes Site Sniper's screens or the journey count (22 journeys in 11 specs, as earlier tasks left it).
+- [ ] CLAUDE.md is updated where it describes Site Sniper's screens or the journey count (as earlier tasks left it).
 
 ## Edge Cases
 - A provider with holds and an account that is `required-for-holds`: "Alert me" needs no sign-in, so no Connect dialog for it.

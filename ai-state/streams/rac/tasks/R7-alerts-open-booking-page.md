@@ -25,7 +25,7 @@ R2 (lane order only: both edit `provider.types.ts`)
    - `isProviderBookingLink(manifest, url)`:
      - https, with no username or password;
      - the host equals `new URL(manifest.website).host`, or is a subdomain of that host without its leading `www.` (a website `www.example.com` allows `book.example.com`).
-     - A cart URL cannot be recognised generically: the doc rule, the contract suite and each provider's tests cover it (R10 for RAC).
+     - A cart URL cannot be recognised generically, so refusing one is the provider's job: the doc rule, the contract suite and each provider's tests cover it (R10 and R19 for RAC, whose client refuses cart URLs).
    - `firstBookingLink(manifest, candidates)`: the first candidate that passes. A refused one is skipped and logged once per call with `describeUrl` (the origin only), never the path or query. R12 calls it with its own candidates.
    - `matchedStayLink(provider, watch, match, units)` → `{ url, arrival, departure } | undefined`, with these candidates in order:
      1. for a full match, the matched unit's `bookingUrl`;
@@ -145,7 +145,7 @@ R2 (lane order only: both edit `provider.types.ts`)
 - No live hold, booking or payment in any test (architecture-notes §12.33).
 
 ## Assumptions
-- `links.booking` gains an optional third parameter, `unitId`. This is not in the master plan's contract table; it lets a partial run's link name the category (brief R7, "prefilled with … category").
+- `links.booking` gains an optional third parameter, `unitId` (now in the master plan's contract table). It lets a partial run's link name the category (brief R7, "prefilled with … category").
 - The website sentence lands here rather than in R20, because CLAUDE.md asks for the website change in the same change. R20 then only checks it.
 - A held alert's desktop click opens the watch only. Opening the public page would invite booking the place the person already holds.
 - The watch page shows the link only for FOUND and PARTIAL_FOUND, not HELD: at the computer, the person pays in the app.

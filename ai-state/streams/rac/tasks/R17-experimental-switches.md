@@ -50,7 +50,8 @@ R15 (the Accounts row it extends; the `provider.types.ts` edit order in Lane S)
 6. **Docs here:**
    - `docs/providers/adding-a-provider.md` gets an "Experiments" section (prose and a manifest-table row);
    - CLAUDE.md: the IPC table's `providers` row, the Provider SDK manifest bullet, and the `ACCOUNT_BUSY` wording;
-   - `ApiErrorCode`'s comment (`api.types.ts:36`) covers the new refusal.
+   - `ApiErrorCode`'s comment (`api.types.ts:36`) covers the new refusal;
+   - `ai-state/architecture-notes.md` §12.35 (R12 created it): an experiments bullet (manifest `experiments`, `providers.experiments` and `providers.setExperiment`, `core.*` keys reserved, applied at registration after a restart, `ACCOUNT_BUSY` widened).
 
 ## Non-goals
 - RAC's `autoCart` and everything behind it (R19). Hold release (R18).
@@ -86,7 +87,7 @@ R15 (the Accounts row it extends; the `provider.types.ts` edit order in Lane S)
   - the pending line is announced once (`useAnnounce`);
   - the refusal has `role="alert"`.
 - [ ] `npm run provider:new` output (`tests/scripts/new-provider.test.ts`) and `tests/fixtures/providers/example-*` pass unchanged.
-- [ ] Docs and CLAUDE.md lines above are updated.
+- [ ] Docs, §12.35 and the CLAUDE.md lines above are updated.
 - [ ] Full gate: `npm run lint && npm run format:check && npm run type-check && npm test && npm run test:tz`, then `npm run build:e2e && xvfb-run -a npm run test:e2e`.
 
 ## Edge Cases
@@ -103,7 +104,7 @@ R15 (the Accounts row it extends; the `provider.types.ts` edit order in Lane S)
 - **Unit (~18):** schema and rule, state-key guard, applying experiments and the fallback, pending turn-off checks in the watch and snipe paths.
 - **Component (~6):** the Experimental group, the dialog flow, the refusal, the pending line, and the a11y assertions above.
 - **Integration (~6):** an IPC harness round trip, the refusals, and a "restart" with a second container on the same database.
-- **E2E:** none new: no built-in provider declares an experiment until R19, which adds the journey (turn on, relaunch, see the hold option). The existing 22 journeys must pass.
+- **E2E:** none new: no built-in provider declares an experiment until R19, which adds the journey (turn on, relaunch, see the hold option). The existing journeys must pass.
 
 ## Context Files to Read First
 - `CLAUDE.md` ("Provider SDK", "IPC Pattern", "Composition root")
@@ -122,7 +123,7 @@ R15 (the Accounts row it extends; the `provider.types.ts` edit order in Lane S)
 - `core.` is already the core's prefix in `provider_state` (`core.catalog.sync`, `core.catalog.search`).
 
 ## Assumptions
-- `providers.experiments` (a read method) is needed beside the plan's `providers.setExperiment`, so a pending change still shows after the page reloads. This is a small contract addition beyond the master plan's table.
+- `providers.experiments` (a read method) is needed beside the plan's `providers.setExperiment`, so a pending change still shows after the page reloads. It is in the master plan's contract table.
 - The turn-off refusal reuses `ACCOUNT_BUSY` (its meaning widens to "a hold or snipe needs this") rather than adding a new error code.
 - Stopping new holds while a turn-off is pending is this spec's addition to the plan. It needs a one-line check in the watch and snipe hold paths.
 - RS1 is still open: the switch is shown to everyone, off, with a warning and a confirm dialog. If the stakeholder wants it in developer builds only, gate the group on `runsFromSource` instead.

@@ -141,7 +141,7 @@ R12, for lane order only: both edit `src/shared/types/provider.types.ts`. There 
 
 ## Notes
 - **Why main writes the clipboard.** The renderer never receives the value, so the copy button is a request to main, not a read.
-- **Contract additions beyond the master plan:** `AccountFieldDescriptor.copyable` and the `onCredentialsChanged` hook. R16 relies on both: the first for terms rule 12, the second for R14's member timing (brief R3).
+- **Contract additions** (now in the master plan's table): `AccountFieldDescriptor.copyable` and the `onCredentialsChanged` hook. R16 relies on both: the first for terms rule 12, the second for R14's member timing (brief R3).
 
 ## Assumptions
 1. Removing credentials does not clear the provider's session partition, and is never `ACCOUNT_BUSY`.

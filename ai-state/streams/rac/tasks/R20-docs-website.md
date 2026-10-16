@@ -81,10 +81,10 @@ R1–R19 (all)
      - nothing on holds (off) or snipes (coming).
    - **The colour:** `--provider-rac` in `site/styles.css` `:root`, plus `[data-provider='rac'] .provider__badge { background: var(--provider-rac); }` (`:601-603`).
    - **The independence notice** (`:511-516`) names RAC as it names DBCA.
-   - **Provider-neutral copy:**
-     - Explore (`:142-168`): "by the kind of stay";
-     - watches (`:209-249`): one click to the provider's booking page, and the email link for a phone;
-     - "Coming next" Site Sniper (`:302-341`): alerts at the release time, members' early access, holds where the provider allows;
+   - **Provider-neutral copy:** R4, R7 and R13 already wrote their sentences in the same change. Read and refine them; don't add them again:
+     - Explore (`:142-168`): R4's "by the kind of stay" still holds with RAC's parks and counts;
+     - watches (`:209-249`): R7's sentence on one click to the provider's booking page and the email link for a phone;
+     - "Coming next" Site Sniper (`:302-341`): R13's alerts or holds, plus members' early access;
      - questions: "Do I need an account?" (a member number some providers use, encrypted and never sent) and "Where does my information go?".
    - The "Soon" labels stay as they are.
    - **Screenshots show no RAC photos:**
@@ -109,7 +109,7 @@ R1–R19 (all)
 - [ ] `npx jest tests/unit/docs/rac-endpoints-doc.test.ts` passes.
 - [ ] `grep -rniE "rac.{0,40}(planned|next project)" README.md docs/ CLAUDE.md AGENTS.md` finds nothing.
 - [ ] `npx jest tests/unit/site/site.test.ts` passes: two provider rows, RAC's name, monogram and colour equal to its manifest, and no colour outside `:root`.
-- [ ] `grep -rnE "driveau\.newbook\.cloud|wp-content/uploads" site/ docs/ tests/fixtures/` finds nothing.
+- [ ] `grep -rnE "driveau\.newbook\.cloud|wp-content/uploads" site/ docs/` finds nothing, and R5's fixture guard passes (RAC's fixture folders hold image URLs only in its zero-id placeholder form).
 - [ ] The user docs answer each of these, found by heading:
   - What happens when I click an alert? (every provider)
   - Can I book from my phone? (the email link, never a cart page)
@@ -152,7 +152,7 @@ R1–R19 (all)
 - `docs/providers/rac/` is public: it describes what the app does and links to RAC's pages, never quoting their copy. On the site, "member number" is neutral enough for the questions; "RAC member rates" belongs in RAC's row.
 
 ## Assumptions
-- RAC's monogram and colour come from R5's manifest, and its colour already meets AA contrast in the app's `ProviderBadge`.
+- RAC's monogram (plain text `RAC`) and colour (an app colour token) come from R5's manifest, and its colour already meets AA contrast in the app's `ProviderBadge`.
 - The independence notice reads "…including DBCA, which runs ParkStay WA, and RAC, which runs RAC Parks & Resorts…". The stakeholder may prefer the club's full name.
 - The site and docs screenshots stay ParkStay-only, because RAC's photos may not be shown outside the app (rule 7).
 - R20 may fix stale lines that other tasks missed; anything beyond docs goes back to the orchestrator.

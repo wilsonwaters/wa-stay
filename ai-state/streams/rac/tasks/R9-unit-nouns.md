@@ -26,7 +26,7 @@ R6, R7, R8 (their new copy is converted too)
      | only `room` | room / rooms |
      | only `dorm` | bunk / bunks |
      | only `glamping` | tent / tents |
-     | `other`, mixed, or none | place / places |
+     | `other`, mixed, or none | spot / spots |
 
    - Where the kinds come from, the first that is not empty:
      1. the units the copy is about (matched, held or chosen), by their `unitKind`;
@@ -37,6 +37,7 @@ R6, R7, R8 (their new copy is converted too)
    - Replace every call of `unitNoun(`, `unitNounFor(` and `unitCountLabel(`: 31 lines in 23 files (`grep -rn "unitNoun(\|unitNounFor(\|unitCountLabel(" src --include=*.ts --include=*.tsx`).
    - Delete `UNIT_NOUNS`, `unitNoun`, both `unitNounFor` and `unitCountLabel`'s kind parameter.
    - `unitLabel` (`snipeState.ts:183-197`) and `unitNameOf` (`watchState.ts:57-62`) ("Site 12", "A site") take the new noun.
+   - Explore's availability label (`deriveAvailability.ts:141`) takes the kinds it counts: the chosen stay types the place has (R4), else the place's kinds. So a mixed park reads "3 of 11 spots", and with "Cabins & villas" chosen, "cabins".
 3. **Core copy:**
    - `WatchMatch` gains `unitKind?`, copied by `toMatch` (`matching.ts:52-68`).
    - `notifySnipeHeld` and `notifySnipeBooked` receive the held unit's kind from `snipe.service.ts`.
@@ -44,7 +45,7 @@ R6, R7, R8 (their new copy is converted too)
    - The copy becomes:
      - "{Nouns} available at X" and "Found 1 {noun} available at …";
      - "{Noun} held at X";
-     - for a mixed match: "Places available at X", "Found 3 places available at …".
+     - for a mixed match: "Spots available at X", "Found 3 spots available at …", "A spot is free at …".
    - `watch.service.ts:435` → "{shortName} cannot hold automatically".
    - `snipe.service.ts:241` → "This snipe already has a hold".
    - "Site snipe not found" (`snipe.service.ts:404,650,657`, `hold-payment.service.ts:139`, `database/repositories/site-sniper.repository.ts:144`) → "Snipe not found". It names the record, not a unit.
@@ -67,7 +68,7 @@ R6, R7, R8 (their new copy is converted too)
 6. **ParkStay copy is unchanged** wherever every unit is a campsite, which is every ParkStay test place. Existing expectations ("Sites available at Osprey Bay", "Hold a site automatically when found", "8 of 20 sites free for all 2 nights") keep their strings. A test fixture without kinds gets ParkStay's `campsite` kind; an expected string is never changed to make room.
 
 ## Non-goals
-- Explore's counts by stay type (R11). Snipe alert notifications (R12, which uses this helper). Site Sniper screens and copy for alerts (R13).
+- RAC's per-kind counts (`byKind`, R11). Snipe alert notifications (R12, which uses this helper). Site Sniper screens and copy for alerts (R13).
 - The website: ParkStay's copy and the screenshots do not change. RAC copy is R20's.
 - `LocationKind` labels ("Holiday park") and `KIND_LABELS` stay.
 
@@ -77,7 +78,7 @@ R6, R7, R8 (their new copy is converted too)
 - [ ] Notification tests:
   - ParkStay strings are unchanged;
   - a cabin-only fake gives "Cabins available at …", "Found 1 cabin available …" and "Cabin held at …";
-  - a mixed fake gives "Places available at …".
+  - a mixed fake gives "Spots available at …".
 - [ ] The guard passes on `src`, and a self-test proves it fails on a planted literal and accepts a `unit-noun-ok` line.
 - [ ] Renderer tests for a cabin-only and a mixed place: the watch page, snipe pages, UnitPicker ("Preferred cabins", "Any cabin"), the NightGrid summary ("2 of 5 cabins free…") and AutoHoldField ("Hold a cabin automatically when found").
 - [ ] Accessibility:
@@ -87,12 +88,12 @@ R6, R7, R8 (their new copy is converted too)
 - [ ] CLAUDE.md has no stale line about nouns (none expected). Read the website: no claim changes, `tests/unit/site/site.test.ts` passes, and the screenshots stay valid because ParkStay's copy is unchanged.
 
 ## Edge Cases
-- No kinds anywhere (an unknown provider, an old row, a provider without kinds): "place".
-- One kind plus `other` units is mixed: "place".
-- Matched units of several kinds: plural "places".
+- No kinds anywhere (an unknown provider, an old row, a provider without kinds): "spot".
+- One kind plus `other` units is mixed: "spot".
+- Matched units of several kinds: plural "spots".
 - A count of 1 against many, and a capital at the start of a sentence ("Cabin held at …").
 - The held unit is missing from the last availability: fall back along the chain.
-- The provider is not registered when the notification is built: no default, so "place".
+- The provider is not registered when the notification is built: no default, so "spot".
 - Stored notifications keep their stored titles; nothing is rewritten.
 - Bookings carry no unit kinds: the provider's default, so "site" for ParkStay.
 - ParkStay huts (`dorm`, R1) read "bunk", as `unitNoun('hut')` does today.
@@ -102,7 +103,7 @@ R6, R7, R8 (their new copy is converted too)
 - **Component (~10):** watch and snipe pages, UnitPicker, NightGrid, AutoHoldField, the snipe Release step.
 - **Integration (~2):**
   - `tests/integration/watch-parkstay.test.ts` keeps ParkStay's titles;
-  - `two-providers.test.ts` with a fake mixed provider gets "Places available at …".
+  - `two-providers.test.ts` with a fake mixed provider gets "Spots available at …".
 - **E2E:** existing journeys unchanged.
 
 ## Context Files to Read First
@@ -120,6 +121,6 @@ R6, R7, R8 (their new copy is converted too)
 - Defaulting from the provider's location kinds keeps ParkStay at "site" even where a row carries no kinds.
 
 ## Assumptions
-- Mixed places read "place" (master plan decision 8). Beside Explore's location count ("169 places"), a card's "120 places" may read oddly. *Stakeholder decision:* keep "place", or use "unit", or "sites and cabins" for exactly two kinds.
+- Mixed places read "spot" / "spots" (orchestrator decision, master plan decision 8). "Place" is Explore's word for a location ("169 places"), so it is never a unit noun.
 - `dorm` reads "bunk", keeping ParkStay's hut copy, rather than "bed".
 - "Whose sites to snipe" becomes "Which provider", a noun-free label, because the noun is unknown before a place is chosen.

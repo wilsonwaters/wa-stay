@@ -120,6 +120,6 @@ R3, R7
 - No live request, hold or booking (§12.33).
 
 ## Assumptions
-- A per-night `minNights` is added beside the unit's, because RAC's minimum depends on the arrival night. The master plan names only "`minNights`".
+- A per-night `minNights` is added beside the unit's, because RAC's minimum depends on the arrival night. The master plan's contract table lists both.
 - `min-stay` covers every stay rule (too short, too long, refused arrival or departure day), as the master plan has only that one new reason. A too-long stay carries no field of its own.
 - `UnitSummary.minNights` is optional and may stay empty for RAC, because RAC's minimums vary by date. Then the stay steps do not warn, and the night grid explains the rule after the first check.
