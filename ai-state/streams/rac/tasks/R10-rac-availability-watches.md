@@ -140,12 +140,9 @@ R5, R7, R8 (and R6, for the e2e journey's stay-type step)
 - `ai-state/research/rac-booking-flow.md` §2–§4 and §11, `ai-state/research/rac-terms.md` (rules 1–7 and 16), `ai-state/research/rac-samples/`
 - `ai-state/streams/rac/master-plan.md` (decisions 2 and 7, the terms table, RS8)
 - `ai-state/streams/rac/tasks/R5-rac-catalogue.md`, `R2-polite-request-pacing.md`, `R7-alerts-open-booking-page.md`, `R8-minimum-stays-rate-notes.md`
-- `src/main/providers/rac/` (R5's client, seed, links, unit-kind rule and guards)
-- `src/main/providers/parkstay/availability.ts` (how `split` and `unknown` nights are set)
-- `src/main/providers/sdk/provider.ts` (`AvailabilityModule`), `sdk/html.ts`
-- `src/main/core/watches/next-check.ts`, `src/main/core/stay-params.ts`
-- `tests/utils/provider-contract.ts`, `tests/utils/core-harness.ts`
-- `tests/e2e/create-watch.spec.ts`, `tests/e2e/support/wa-stay.ts`, `tests/e2e/fixtures/http/README.md`
+- `src/main/providers/rac/` (R5's client, seed, links, unit-kind rule and guards); `src/main/providers/parkstay/availability.ts` (how `split` and `unknown` nights are set)
+- `src/main/providers/sdk/provider.ts` (`AvailabilityModule`), `sdk/html.ts`, `src/main/core/watches/next-check.ts`, `src/main/core/stay-params.ts`
+- `tests/utils/provider-contract.ts`, `tests/utils/core-harness.ts`, `tests/e2e/create-watch.spec.ts`, `tests/e2e/support/wa-stay.ts`, `tests/e2e/fixtures/http/README.md`
 - `docs/providers/adding-a-provider.md` (Availability)
 
 ## Notes
