@@ -50,6 +50,26 @@ export const LOCATION_KINDS = [
 
 export const LocationKindSchema = z.enum(LOCATION_KINDS);
 
+/**
+ * What a person sleeps in, the same words for every provider: a site to camp on (tent,
+ * caravan, campervan), a cabin (or a chalet, cottage, villa), a room, a bed in a shared room
+ * or hut, or a glamping tent. A place can have several (`LocationSummary.unitKinds`); a unit
+ * is one (`UnitSummary.unitKind`). `other` is anything else, and never a filter option. The
+ * groups people choose from are `STAY_TYPES` (`shared/utils/unit-kinds.ts`).
+ */
+export type UnitKind = 'campsite' | 'cabin' | 'room' | 'dorm' | 'glamping' | 'other';
+
+export const UNIT_KINDS = [
+  'campsite',
+  'cabin',
+  'room',
+  'dorm',
+  'glamping',
+  'other',
+] as const satisfies readonly UnitKind[];
+
+export const UnitKindSchema = z.enum(UNIT_KINDS);
+
 export type BookingMode = 'online' | 'offline' | 'external' | 'application';
 
 export const BOOKING_MODES = [
@@ -270,6 +290,8 @@ export interface UnitAvailability {
   unitId: string;
   unitName: string;
   unitType?: string;
+  /** What the unit is, when the provider says (as on `UnitSummary`). */
+  unitKind?: UnitKind;
   /**
    * Unit ids the caller asked about (`unitIds`, `knownUnitIds`) that name this unit by an id
    * the provider used for it before, e.g. a site of a class the provider now lists as one unit.
@@ -312,6 +334,12 @@ export interface BulkAvailabilityEntry {
    * total, or 0 when none can be (not released yet, closed, or past the booking window).
    */
   bookableUnits: number;
+  /**
+   * The same two counts for each kind of unit the place has, so a filter on what people sleep
+   * in can count only those units. Set it at a place with more than one kind; a kind left out
+   * has no count. Passed through as the provider gives it.
+   */
+  byKind?: Partial<Record<UnitKind, { availableUnits: number; bookableUnits: number }>>;
 }
 
 /** The state of a provider's waiting room or queue. */

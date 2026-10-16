@@ -138,7 +138,7 @@ The provider SDK and how to add a provider: [Providers](../providers/README.md) 
 
 One SQLite file, `<userData>/wa-stay.db`. `src/main/database/connection.ts` holds the schema
 and every migration; each runs in one transaction with a foreign-key check, and the database
-records the versions applied. At version 10 the tables are:
+records the versions applied. At version 11 the tables are:
 
 | Table | Holds |
 | --- | --- |
@@ -164,6 +164,7 @@ records the versions applied. At version 10 the tables are:
 | v8 | Provider-aware: `provider_id` and generic location, stay and unit columns on watches, snipes and bookings; calendar dates; the local profile row; `provider_accounts`, `provider_state` (the queue session moved there) and `locations` with FTS5. |
 | v9 | The v1.x ParkStay password columns dropped (run with `secure_delete`, then VACUUM); watch hold fields; `maintenance`. |
 | v10 | The never-written `job_logs` table dropped. |
+| v11 | Unit kinds: `unit_kinds` on locations (filled from each place's kind), watches and snipes. |
 
 Migration tests start from SQL dumps of a real v5 (v1.2.0) and v6 database
 (`tests/fixtures/db/`).
@@ -208,7 +209,7 @@ and v1.x auto-update finds WA Stay through GitHub's redirect from the renamed re
    (`%APPDATA%\parkstay-bookings\parkstay.db`, else the snapshot) to `wa-stay.db` with
    SQLite's online backup, writes `migration.json`, and leaves the v1.x folder untouched as
    the backup. A failed copy asks Retry, Start fresh or Quit.
-3. The migrations bring the copy to v10; the secret migration re-encrypts its notifier
+3. The migrations bring the copy to v11; the secret migration re-encrypts its notifier
    settings; the v1.x ParkStay password is dropped.
 4. A welcome notice says where the old data is kept, and launch at login is re-registered under
    WA Stay (with "Start minimised" on, as v1.x always started hidden).

@@ -28,6 +28,7 @@
 
 import type { UnitSummary } from '@shared/types/catalog.types';
 import type { RawCampsite, RawCampsiteAvailabilityView } from './types';
+import { unitKindOf } from './unit-kinds';
 
 const CLASS_UNIT = /^class:(\d+)$/;
 
@@ -86,6 +87,7 @@ export function toClassUnitSummary(entry: RawCampsite): UnitSummary {
   return {
     unitId: classUnitId(entry) ?? String(entry.id),
     unitName: entry.name,
+    unitKind: unitKindOf(entry.gearType, entry.name),
     ...unitFacts(entry),
   };
 }

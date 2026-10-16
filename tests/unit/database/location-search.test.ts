@@ -3,7 +3,8 @@
  * scope, on a real migrated database; plus the helpers the catalogue service uses
  * (`externalIds`, `setSummaryIfEmpty`) and the summary a sync keeps. Includes the
  * performance criterion: `text: 'bay'` over 5,000 rows in under 200 ms. And `mergeMany`,
- * which stores what a search-mode catalogue's search found (DX2).
+ * which stores what a search-mode catalogue's search found (DX2). And unit kinds (R1): the
+ * `unitKinds` filter and facet, and the cleaned or derived list every row stores and reads.
  */
 
 import type Database from 'better-sqlite3';
@@ -221,6 +222,172 @@ describe('LocationRepository.search', () => {
     locations.upsertMany('fake', [place('fake', '1', 'Lucky Bay', { summary: 'Fresh' })], AT);
     expect(keys({ text: 'kangaroo' })).toEqual([]);
     expect(keys({ text: 'fresh' })).toEqual(['fake:1']);
+  });
+});
+
+describe('LocationRepository unit kinds', () => {
+  let helper: TestDatabaseHelper;
+  let db: Database.Database;
+  let locations: LocationRepository;
+  const SCOPE = ['fake'];
+
+  /** The stored `unit_kinds` text of one row. */
+  const stored = (externalId: string): string =>
+    (
+      db
+        .prepare("SELECT unit_kinds FROM locations WHERE provider_id = 'fake' AND external_id = ?")
+        .get(externalId) as { unit_kinds: string }
+    ).unit_kinds;
+
+  beforeEach(async () => {
+    helper = new TestDatabaseHelper('location-unit-kinds');
+    db = await helper.setup();
+    locations = new LocationRepository(db);
+    locations.upsertMany(
+      'fake',
+      [
+        // No unit kinds from the provider: derived from the kind
+        place('fake', 'camp', 'Banksia Camp', { area: { name: 'Park', region: 'South West' } }),
+        place('fake', 'park', 'Seaside Holiday Park', {
+          kind: 'holiday-park',
+          area: { name: 'Town', region: 'South Coast' },
+        }),
+        place('fake', 'farm', 'Quokka Farm', {
+          kind: 'farm-stay',
+          area: { name: 'Shire', region: 'South West' },
+        }),
+        // The provider's own
+        place('fake', 'villas', 'Karri Villas', {
+          kind: 'cabin',
+          unitKinds: ['cabin', 'room'],
+          area: { name: 'Town', region: 'South West' },
+        }),
+        place('fake', 'tents', 'Eco Tents', {
+          unitKinds: ['glamping'],
+          area: { name: 'Park', region: 'South Coast' },
+        }),
+      ],
+      AT
+    );
+  });
+
+  afterEach(async () => {
+    await helper.teardown();
+  });
+
+  const keys = (query: Parameters<LocationRepository['search']>[0]): string[] =>
+    locations
+      .search(query, SCOPE)
+      .items.map((l) => l.key)
+      .sort();
+
+  it("unitKinds ['cabin'] returns the cabin places, a derived holiday park included", () => {
+    expect(keys({ unitKinds: ['cabin'] })).toEqual(['fake:park', 'fake:villas']);
+    // Any of them
+    expect(keys({ unitKinds: ['glamping', 'room'] })).toEqual(['fake:tents', 'fake:villas']);
+    expect(keys({ unitKinds: ['campsite'] })).toEqual(['fake:camp', 'fake:park']);
+    // `other` is a valid filter too
+    expect(keys({ unitKinds: ['other'] })).toEqual(['fake:farm']);
+    expect(keys({ unitKinds: ['dorm'] })).toEqual([]);
+    // With the other filters, and an empty list is no filter
+    expect(keys({ unitKinds: ['cabin'], regions: ['South West'] })).toEqual(['fake:villas']);
+    expect(keys({ unitKinds: ['cabin'], kinds: ['holiday-park'] })).toEqual(['fake:park']);
+    expect(keys({ unitKinds: [] })).toHaveLength(5);
+  });
+
+  it('facets.unitKinds counts each kind over the other filters, not its own', () => {
+    expect(locations.search({}, SCOPE).facets!.unitKinds).toEqual([
+      { value: 'cabin', count: 2 },
+      { value: 'campsite', count: 2 },
+      { value: 'glamping', count: 1 },
+      { value: 'other', count: 1 },
+      { value: 'room', count: 1 },
+    ]);
+    // Within the South Coast: the holiday park (sites and cabins) and the eco tents
+    expect(locations.search({ regions: ['South Coast'] }, SCOPE).facets!.unitKinds).toEqual([
+      { value: 'cabin', count: 1 },
+      { value: 'campsite', count: 1 },
+      { value: 'glamping', count: 1 },
+    ]);
+    // Its own filter does not narrow it, but narrows the others
+    const cabins = locations.search({ unitKinds: ['cabin'] }, SCOPE);
+    expect(cabins.facets!.unitKinds).toHaveLength(5);
+    expect(cabins.facets!.kinds).toEqual([
+      { value: 'cabin', count: 1 },
+      { value: 'holiday-park', count: 1 },
+    ]);
+  });
+
+  it('every location read back has non-empty unit kinds, its own or derived', () => {
+    const byKey = Object.fromEntries(
+      locations.search({}, SCOPE).items.map((l) => [l.externalId, l.unitKinds])
+    );
+    expect(byKey).toEqual({
+      camp: ['campsite'],
+      park: ['campsite', 'cabin'],
+      farm: ['other'],
+      villas: ['cabin', 'room'],
+      tents: ['glamping'],
+    });
+    expect(locations.get('fake', 'park')?.unitKinds).toEqual(['campsite', 'cabin']);
+  });
+
+  it('stores what the provider sends cleaned, or the derived default: never empty', () => {
+    locations.upsertMany(
+      'fake',
+      [
+        place('fake', 'empty', 'Empty', { kind: 'hut', unitKinds: [] }),
+        place('fake', 'dupes', 'Dupes', { unitKinds: ['cabin', 'cabin', 'room'] }),
+        place('fake', 'odd', 'Odd', {
+          kind: 'glamping',
+          unitKinds: ['castle'] as unknown as LocationSummary['unitKinds'],
+        }),
+        place('fake', 'mixed', 'Mixed', {
+          unitKinds: ['castle', 'dorm'] as unknown as LocationSummary['unitKinds'],
+        }),
+      ],
+      AT
+    );
+    expect(['empty', 'dupes', 'odd', 'mixed'].map(stored)).toEqual([
+      '["dorm"]',
+      '["cabin","room"]',
+      '["glamping"]',
+      '["dorm"]',
+    ]);
+    expect(locations.countByProvider()).toEqual({ fake: 4 });
+  });
+
+  it('reads a row with unreadable or empty unit_kinds as the derived default; the next sync rewrites it', () => {
+    db.prepare("UPDATE locations SET unit_kinds = '{not json' WHERE external_id = 'park'").run();
+    db.prepare("UPDATE locations SET unit_kinds = '[]' WHERE external_id = 'farm'").run();
+
+    expect(locations.get('fake', 'park')?.unitKinds).toEqual(['campsite', 'cabin']);
+    expect(locations.get('fake', 'farm')?.unitKinds).toEqual(['other']);
+    // A search, its filter and its facet never fail on it
+    const result = locations.search({ unitKinds: ['cabin'] }, SCOPE);
+    expect(result.items.map((l) => l.key)).toEqual(['fake:villas']);
+    expect(result.facets!.unitKinds.find((f) => f.value === 'cabin')).toEqual({
+      value: 'cabin',
+      count: 1,
+    });
+
+    locations.upsertMany(
+      'fake',
+      [
+        place('fake', 'park', 'Seaside Holiday Park', { kind: 'holiday-park' }),
+        place('fake', 'farm', 'Quokka Farm', { kind: 'farm-stay' }),
+      ],
+      AT
+    );
+    expect([stored('park'), stored('farm')]).toEqual(['["campsite","cabin"]', '["other"]']);
+    expect(keys({ unitKinds: ['cabin'] })).toEqual(['fake:park']);
+  });
+
+  it("rewrites unit_kinds when a place's kind changes between syncs", () => {
+    locations.upsertMany('fake', [place('fake', 'camp', 'Banksia Camp', { kind: 'hut' })], AT);
+    expect(stored('camp')).toBe('["dorm"]');
+    expect(keys({ unitKinds: ['dorm'] })).toEqual(['fake:camp']);
+    expect(keys({ unitKinds: ['campsite'] })).toEqual([]);
   });
 });
 

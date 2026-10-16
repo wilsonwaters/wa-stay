@@ -49,6 +49,7 @@ import type {
   RawCampsite,
   RawCampsiteAvailabilityView,
 } from './types';
+import { placeUnitKinds, unitKindOf } from './unit-kinds';
 
 /** `campground_type` → booking mode (0 online, 1 offline, 2 other operator, 4 application). */
 const BOOKING_MODES: Record<number, BookingMode> = {
@@ -224,6 +225,7 @@ export function toLocationSummary(
     bookingMode = 'offline';
   }
   const kind: LocationKind = type === 2 ? kindFromName(p.name ?? '') : 'campground';
+  const unitKinds = placeUnitKinds(kind);
   const region = p.park?.district?.region?.name;
   const summary = typeof p.description === 'string' ? p.description.trim() : '';
   const unitCount = Array.isArray(p.campsites) ? p.campsites.length : 0;
@@ -242,6 +244,7 @@ export function toLocationSummary(
     ...(summary ? { summary } : {}),
     imageUrls: imageUrls(p.images),
     amenities: (p.features ?? []).map((f) => f.name).filter((n) => typeof n === 'string'),
+    ...(unitKinds ? { unitKinds } : {}),
     ...(unitCount > 0 ? { unitCount } : {}),
     ...(infoUrl ? { infoUrl } : {}),
     ...(type === 0 ? { bookingUrl: parkstayLinks.location(externalId)! } : {}),
@@ -258,6 +261,7 @@ export function toUnitSummary(
     unitId: String(site.id),
     unitName: site.name,
     ...(className ? { unitType: className } : {}),
+    unitKind: unitKindOf(site.gearType, site.name, className),
     ...unitFacts(site),
   };
 }
