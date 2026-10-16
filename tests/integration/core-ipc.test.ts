@@ -179,6 +179,10 @@ describe('watches / snipes / bookings over IPC', () => {
         code: 'VALIDATION',
         issues: ['updates.unitKinds.0'],
       });
+      // `other` is accepted, though the flows never offer it
+      await expect(
+        call(`${namespace}:update`, { id, updates: { unitKinds: ['other'] } })
+      ).resolves.toMatchObject({ success: true, data: { unitKinds: ['other'] } });
       await expect(
         call(`${namespace}:update`, { id, updates: { unitKinds: [] } })
       ).resolves.toMatchObject({ success: true, data: { unitKinds: [] } });

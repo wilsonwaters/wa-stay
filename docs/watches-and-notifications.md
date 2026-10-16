@@ -48,10 +48,12 @@ provider, the place and your dates, and opens on "Your stay"). Five steps:
 ### Stay types
 
 A watch can ask for stay types: campsites, cabins and villas, rooms, dorms or glamping (its
-`unitKinds`, the provider's `unitKind` on each unit). Then only units of those kinds match, and
-the notification and the watch's page list only those. A unit the provider gives no kind counts
-as "other", so at a provider that sets no kinds a watch for cabins finds nothing. Units you
-chose by name win: the stay types do not filter them. With no stay type, every unit counts.
+`unitKinds`, matched against the provider's `unitKind` on each unit). Then only units of those
+kinds match: the alert counts only those, and the watch's page shows only those. A unit the
+provider gives no kind counts as "other", so at a provider that sets no kinds a watch for cabins
+finds nothing. Units you chose by name win: the stay types do not filter them. With no stay
+type, every unit counts. The watch flow does not offer stay types yet, so a watch made there
+wants any kind.
 
 ### Scheduling
 
@@ -78,8 +80,8 @@ on the first fully matching site, by the same path and safety rules as Site Snip
 - **never "any unit" across stay types**: a watch with no units chosen whose wanted units are of
   more than one kind (campsites and a hut, or the two stay types it asks for), booked or free,
   places no hold. It alerts as usual, with "Not held automatically: this place has more than one
-  stay type. Choose a stay type or units to let WA Stay hold one." Choose one stay type, or
-  units, to let it hold.
+  stay type. Choose a stay type or units to let WA Stay hold one." Choose units to let it hold
+  (the watch flow does not offer stay types yet).
 
 Hold only what you will use ([Book responsibly](site-sniper.md#book-responsibly)).
 

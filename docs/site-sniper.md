@@ -69,7 +69,8 @@ and dates). The flow has five steps:
   across stay types: with no units chosen, when its candidates, booked or free, are of more
   than one kind, it holds nothing, reserves no night and ends **Failed** with "Free units of
   more than one stay type: choose a stay type or units for this snipe", and you get a
-  warning notification. Choose one stay type, or units, and start it again.
+  warning notification. Choose units (the snipe flow does not offer stay types yet) and start
+  it again.
 - **Run now** runs one attempt immediately (only while the snipe is running).
 - **WA Stay must be running**, and the computer awake, at the release.
 
