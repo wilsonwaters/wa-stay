@@ -81,3 +81,48 @@ All work lands on `ccr-da6e94c0-litpr7`. Lanes run in parallel git worktrees and
 - **Lane M (main process):** P1 → P2 → P3 → {P4, P5, P6} → V1 → {V2, V3, V7} → V4 → V5 → V6 → B2 → B3 → P7
 - **Lane R (renderer):** D1 → D2 → D3 → E1 → E2 → E3 → U1 → U3 → U2 → U4 → U5
 - **Lane A (assets/docs):** B1 (after D1) → Q1 → Q2
+
+## Project 2 — RAC
+
+Brief: the Project 2 section of `ai-state/brief.md`. Master plan: `ai-state/streams/rac/master-plan.md`. One stream, with four lanes.
+
+| Stream | Label | Outcome | Size | Status |
+|---|---|---|---|---|
+| RAC | `stream:rac` | RAC Parks & Resorts is the second provider: its eight parks on Explore with free counts and prices, watches that alert with a one-click booking page, release-alert snipes (member-aware), an optional encrypted member number, and auto-cart built but switched off. A provider-neutral "Stay type" filter works across ParkStay and RAC in Explore, watches and snipes. | L | ⬜ |
+
+### Task map
+
+Size = S/M/L per methodology. "→" = depends on.
+
+#### RAC (R)
+| ID | Task | Size | Depends |
+|---|---|---|---|
+| R1 | Stay-type foundation: `UnitKind`, unit and location kinds, `byKind`, migration v11, catalogue filter and facet, ParkStay mapping | M | — |
+| R2 | Polite request pacing: `limits.minRequestIntervalMs`, paced client, scaled catalogue deadlines, form-field fixture routes | M | R1 |
+| R3 | Stay-type criteria for watches and snipes (core) | S | R1 |
+| R4 | Explore "Stay type" chip replacing "Type"; free counts by stay type | M | R1 |
+| R5 | RAC catalogue on Explore: scaffold, manifest, park seed, place detail, links, RAC client, fixtures | M | R2 |
+| R6 | Stay type in watch and snipe flows; UnitPicker grouped by kind | M | R3, R4 |
+| R7 | Alerts that open the booking page (one click) | M | R2 |
+| R8 | Minimum stays, arrival-day rules and rate notes | M | R3, R7 |
+| R9 | Unit nouns from stay types; no hard-coded "site" | M | R6, R7, R8 |
+| R10 | RAC availability, prices and watches | M | R5, R7, R8 |
+| R11 | RAC free counts on Explore; `PREVIEW_PROVIDER=rac` preview | M | R4, R10 |
+| R12 | Release-alert snipes: core (snipes without holds, `action`, v12, `ALERTED`, window cap, stop on 403/429) | M | R3, R8, R9 |
+| R13 | Release-alert snipes: Site Sniper screens | M | R12 |
+| R14 | RAC release policy and snipes (rolling, school holidays, member pre-sale; fake-clock tests) | M | R10, R12 |
+| R15 | Credentials accounts: write-only `accounts.saveCredentials`, main-side copy, Settings form | M | R12 |
+| R16 | RAC member number and member rates | M | R14, R15 |
+| R17 | Experimental provider switches (`manifest.experiments`, `providers.setExperiment`) | M | R15 |
+| R18 | Hold release hooks (`release`, `releaseOnPaymentClose`, estimated expiry) | S | R17 |
+| R19 | RAC auto-cart, off by default (fixtures and fakes only) | M | R13, R16, R18 |
+| R20 | Docs, website and release notes; final gate | M | all |
+
+### Execution lanes
+
+All work lands on `ccr-573ddb1d-hir0sq`. Tasks that edit `src/shared/types/provider.types.ts` or `src/main/providers/sdk/provider.ts` run in Lane S, in order.
+
+- **Lane S (shared types, core, IPC):** R1 → R2 (R3 beside it) → R7 → R8 → R12 → R15 → R17 → R18
+- **Lane U (renderer):** R4 → R6 → R9 → R13
+- **Lane P (RAC module):** R5 → R10 → R11 → R14 → R16 → R19
+- **Lane D (docs):** R20 last
