@@ -27,8 +27,8 @@ export function DesktopSwitches() {
         label="Desktop notifications"
         description={
           desktop.value
-            ? 'Pop-up alerts on your desktop when a watch finds a site or a site is held. Everything also appears under the bell.'
-            : "Pop-up alerts are off. Held sites expire quickly; you'll only see them in WA Stay or by email."
+            ? 'Pop-up alerts on your desktop when a place frees up for your dates or a stay is held for you. Everything also appears under the bell.'
+            : "Pop-up alerts are off. Holds expire quickly; you'll only see them in WA Stay or by email."
         }
         checked={desktop.value}
         disabled={desktop.isPending}
