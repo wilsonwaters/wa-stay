@@ -19,7 +19,7 @@ import {
 import { buttonClassName } from '../../components/ui/Button';
 import { InfoLink, MoreInformationLink } from './PlaceSections';
 import type { UnitNoun } from '../../components/nightGridModel';
-import type { CheckFailure, PlaceLinks } from './placeModel';
+import { rateLimitedMessage, type CheckFailure, type PlaceLinks } from './placeModel';
 
 /** The longest stay the dates allow (EQ6), as on Explore. */
 export const MAX_NIGHTS = 30;
@@ -75,7 +75,7 @@ function FailureNotice({
     );
   }
   if (failure === 'rate-limit') {
-    return <Notice tone="warning">Too many checks in a short time. Try again in a minute.</Notice>;
+    return <Notice tone="warning">{rateLimitedMessage(shortName)}</Notice>;
   }
   return (
     <Notice

@@ -5,6 +5,7 @@ import {
   handoffPrefill,
   linkHost,
   placeKey,
+  rateLimitedMessage,
   resolvePlaceLinks,
   sameStay,
   stayQueryOf,
@@ -213,5 +214,13 @@ describe('checkFailure', () => {
     expect(checkFailure({ code: 'RATE_LIMITED' }, ungated)).toBe('rate-limit');
     expect(checkFailure({ code: 'PROVIDER_ERROR' }, gated)).toBe('other');
     expect(checkFailure(undefined, gated)).toBe('other');
+  });
+
+  it("says a rate limit in the provider's name, with no length of time that may be wrong", () => {
+    expect(rateLimitedMessage('ParkStay')).toBe(
+      'ParkStay asked WA Stay to slow down. Try again later.'
+    );
+    expect(rateLimitedMessage('RAC')).toBe('RAC asked WA Stay to slow down. Try again later.');
+    expect(rateLimitedMessage('RAC')).not.toMatch(/minute|hour/);
   });
 });

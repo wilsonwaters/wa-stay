@@ -40,6 +40,7 @@ import {
   checkFailure,
   handoffPrefill,
   placeKey,
+  rateLimitedMessage,
   resolvePlaceLinks,
   sameStay,
   stayQueryOf,
@@ -242,7 +243,7 @@ export default function PlaceDetailPage() {
       if (kind === 'access-gate') {
         announce(`${shortName} has a waiting queue right now. Try again in a few minutes.`);
       } else if (kind === 'rate-limit') {
-        announce('Too many checks in a short time. Try again in a minute.');
+        announce(rateLimitedMessage(shortName));
       }
       // Anything else shows an alert, which announces itself.
       return;
