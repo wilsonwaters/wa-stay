@@ -18,10 +18,16 @@
  *   not one. A block rejects with a non-retryable `ProviderHttpError` whose status is 429 for a
  *   429 and 403 for anything else, with a plain message ("RAC Parks & Resorts turned the request
  *   away (HTTP 429). WA Stay won't ask again until 3:45 pm."), and logs one warning with the
- *   status only. For `RAC_BLOCK_COOLDOWN_MS` (30 minutes) after it, every request rejects at once
- *   with the same error and sends nothing. The time it ends is kept in the provider's state, so
- *   a restart honours it; one more than 30 minutes ahead (the clock was set back) counts as 30
- *   minutes from now. Nothing is retried, and no challenge is ever answered (terms rule 5).
+ *   status only. For the cool-down after it, every request rejects at once with the same error
+ *   and sends nothing. Nothing is retried, and no challenge is ever answered (terms rule 5).
+ * - **The cool-down** is `RAC_BLOCK_COOLDOWN_MS` (30 minutes) after a first block, and doubles
+ *   with each block that follows it with no successful answer between them (1 hour, 2 hours…),
+ *   up to `RAC_MAX_BLOCK_COOLDOWN_MS` (a day), so a block that persists costs a few requests a
+ *   day, not one every 30 minutes. A `Retry-After` asking for longer is honoured, up to a day.
+ *   A 2xx answer ends the run of blocks, and so does a day with no block. The cool-down is kept
+ *   in the provider's state, so a restart honours it; an end further ahead than its own length
+ *   (the clock was set back) counts as that length from now. A message whose end is on another
+ *   day in Perth names the day ("until 9:15 am on Sun 18 Oct").
  * - **Other failures.** Any other non-2xx answer is a `ProviderHttpError` with its status:
  *   retryable for a 5xx (a 520 included), with no cool-down. The core never retries in a loop.
  */
@@ -39,8 +45,11 @@ export const RAC_SITE_URL = 'https://parksandresorts.rac.com.au';
 /** The most redirects one request follows. */
 export const RAC_MAX_REDIRECTS = 3;
 
-/** How long every request is refused after a block. */
+/** How long every request is refused after a first block. */
 export const RAC_BLOCK_COOLDOWN_MS = 30 * 60_000;
+
+/** The longest cool-down: for blocks in a row, or a `Retry-After` asking for longer. A day. */
+export const RAC_MAX_BLOCK_COOLDOWN_MS = 24 * 60 * 60_000;
 
 /** Where the end of a cool-down is kept in the provider's state. */
 export const RAC_BLOCK_STATE_KEY = 'client.blockedUntil';
@@ -91,17 +100,45 @@ interface StoredBlock {
   until: string;
   status: 403 | 429;
   cause: BlockCause;
+  /** How long the cool-down is, in ms. Absent (a block kept before it was stored): 30 minutes. */
+  durationMs?: number;
+  /** Blocks in a row, this one included, with no successful answer between. Absent: 1. */
+  strikes?: number;
 }
 
 function isStoredBlock(value: unknown): value is StoredBlock {
   if (typeof value !== 'object' || value === null) return false;
-  const { until, status, cause } = value as Partial<StoredBlock>;
+  const { until, status, cause, durationMs, strikes } = value as Partial<StoredBlock>;
   return (
     typeof until === 'string' &&
     !Number.isNaN(Date.parse(until)) &&
     (status === 403 || status === 429) &&
-    (cause === 'status' || cause === 'challenge')
+    (cause === 'status' || cause === 'challenge') &&
+    (durationMs === undefined ||
+      (Number.isFinite(durationMs) && durationMs > 0 && durationMs <= RAC_MAX_BLOCK_COOLDOWN_MS)) &&
+    (strikes === undefined || (Number.isInteger(strikes) && strikes >= 1))
   );
+}
+
+/**
+ * How long a `Retry-After` header asks to wait, in ms: its seconds, or the time to its date.
+ * Undefined when there is none or it cannot be read.
+ */
+export function retryAfterMs(value: string | null, now: number): number | undefined {
+  const text = value?.trim();
+  if (!text) return undefined;
+  if (/^\d+$/.test(text)) return Number(text) * 1_000;
+  // An HTTP date names its day and month ("Sat, 17 Oct 2026 07:45:00 GMT")
+  const at = /[a-z]/i.test(text) ? Date.parse(text) : Number.NaN;
+  return Number.isNaN(at) ? undefined : Math.max(0, at - now);
+}
+
+/** "30 minutes", "1 hour", "24 hours", for the log. */
+function describeDuration(ms: number): string {
+  const minutes = Math.ceil(ms / 60_000);
+  if (minutes < 120 && minutes % 60 !== 0) return `${minutes} minutes`;
+  const hours = Math.ceil(minutes / 60);
+  return hours === 1 ? '1 hour' : `${hours} hours`;
 }
 
 function withoutQuery(url: string): string {
@@ -140,6 +177,7 @@ export function isChallengePage(body: string): boolean {
 export class RacClient {
   private readonly limit: Limiter;
   private readonly timeFormat: Intl.DateTimeFormat;
+  private readonly dayFormat: Intl.DateTimeFormat;
 
   constructor(private readonly deps: RacClientDeps) {
     this.limit = createLimiter(deps.maxConcurrent);
@@ -148,6 +186,12 @@ export class RacClient {
       hour: 'numeric',
       minute: '2-digit',
       hour12: true,
+    });
+    this.dayFormat = new Intl.DateTimeFormat('en-AU', {
+      timeZone: deps.timezone,
+      weekday: 'short',
+      day: 'numeric',
+      month: 'short',
     });
   }
 
@@ -281,10 +325,13 @@ export class RacClient {
     if (challenged || response.status === 403 || response.status === 429) {
       const block = await this.startBlock(
         response.status === 429 ? 429 : 403,
-        challenged ? 'challenge' : 'status'
+        challenged ? 'challenge' : 'status',
+        retryAfterMs(response.headers.get('retry-after'), this.deps.clock().getTime())
       );
       throw this.blockError(response.url, block);
     }
+    // An answer: the run of blocks, if any, is over.
+    if (response.ok) await this.deps.state.delete(RAC_BLOCK_STATE_KEY);
     if (!response.ok) {
       throw new ProviderHttpError({
         providerId: this.deps.providerId,
@@ -296,8 +343,8 @@ export class RacClient {
   }
 
   /**
-   * The cool-down in force now, if any. One that ends more than 30 minutes from now (the clock
-   * was set back) is cut to 30 minutes from now, and kept so.
+   * The cool-down in force now, if any. One that ends further from now than its own length (the
+   * clock was set back) is cut to that length from now, and kept so.
    */
   private async currentBlock(): Promise<StoredBlock | undefined> {
     const stored = await this.deps.state.get<unknown>(RAC_BLOCK_STATE_KEY);
@@ -305,31 +352,61 @@ export class RacClient {
     const now = this.deps.clock().getTime();
     const until = Date.parse(stored.until);
     if (until <= now) return undefined;
-    if (until <= now + RAC_BLOCK_COOLDOWN_MS) return stored;
-    const cut: StoredBlock = {
-      ...stored,
-      until: new Date(now + RAC_BLOCK_COOLDOWN_MS).toISOString(),
-    };
+    const length = stored.durationMs ?? RAC_BLOCK_COOLDOWN_MS;
+    if (until <= now + length) return stored;
+    const cut: StoredBlock = { ...stored, until: new Date(now + length).toISOString() };
     await this.deps.state.set(RAC_BLOCK_STATE_KEY, cut);
     return cut;
   }
 
-  private async startBlock(status: 403 | 429, cause: BlockCause): Promise<StoredBlock> {
-    const until = new Date(this.deps.clock().getTime() + RAC_BLOCK_COOLDOWN_MS);
-    const block: StoredBlock = { until: until.toISOString(), status, cause };
+  /**
+   * Starts a cool-down: 30 minutes, doubled for each block before it in a row (one whose
+   * cool-down ended less than a day ago, with no successful answer since), or what
+   * `Retry-After` asked when that is longer; never more than a day.
+   */
+  private async startBlock(
+    status: 403 | 429,
+    cause: BlockCause,
+    retryAfter: number | undefined
+  ): Promise<StoredBlock> {
+    const now = this.deps.clock().getTime();
+    const previous = await this.deps.state.get<unknown>(RAC_BLOCK_STATE_KEY);
+    const inARow =
+      isStoredBlock(previous) && Date.parse(previous.until) > now - RAC_MAX_BLOCK_COOLDOWN_MS;
+    const strikes = inARow ? (previous.strikes ?? 1) + 1 : 1;
+    const doubled = RAC_BLOCK_COOLDOWN_MS * 2 ** Math.min(strikes - 1, 16);
+    const durationMs = Math.min(Math.max(doubled, retryAfter ?? 0), RAC_MAX_BLOCK_COOLDOWN_MS);
+    const block: StoredBlock = {
+      until: new Date(now + durationMs).toISOString(),
+      status,
+      cause,
+      durationMs,
+      strikes,
+    };
     await this.deps.state.set(RAC_BLOCK_STATE_KEY, block);
     // The status only: never the address's query or the answer.
+    const pause = describeDuration(durationMs);
     this.deps.logger.warn(
       cause === 'challenge'
-        ? `Turned away by a security check (HTTP ${status}); no requests for 30 minutes`
-        : `Turned away (HTTP ${status}); no requests for 30 minutes`
+        ? `Turned away by a security check (HTTP ${status}); no requests for ${pause}`
+        : `Turned away (HTTP ${status}); no requests for ${pause}`
     );
     return block;
   }
 
+  /** "3:45 pm", or "9:15 am on Sun 18 Oct" for a longer cool-down ending on another day. */
+  private endOf(block: StoredBlock): string {
+    const end = new Date(block.until);
+    const time = this.timeFormat.format(end);
+    const longer = (block.durationMs ?? RAC_BLOCK_COOLDOWN_MS) > RAC_BLOCK_COOLDOWN_MS;
+    const day = this.dayFormat.format(end);
+    if (!longer || day === this.dayFormat.format(this.deps.clock())) return time;
+    return `${time} on ${day.replace(',', '')}`;
+  }
+
   private blockError(url: string, block: StoredBlock): ProviderHttpError {
     const why = block.cause === 'challenge' ? 'a security check' : `HTTP ${block.status}`;
-    const until = this.timeFormat.format(new Date(block.until));
+    const until = this.endOf(block);
     return new ProviderHttpError({
       providerId: this.deps.providerId,
       status: block.status,

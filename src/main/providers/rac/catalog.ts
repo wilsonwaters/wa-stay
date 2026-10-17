@@ -11,8 +11,11 @@
  *   gallery's photos are the place's. They are fetched live and shown only in the app (rule 6).
  *   The page's notices that have not ended become `info` notices. A page with no category is a
  *   `ProviderParseError` (the core then serves the stored summary, marked stale).
- * - A **NewBook-native** park's page lists no categories until it is searched, so its detail is
- *   the seed's facts with no units, and nothing is sent.
+ * - A **NewBook-native** park's page lists no categories until it is searched, so its units
+ *   come from one availability POST for a near stay (one night, 14 days after today in Perth,
+ *   two adults; `availability.ts`): every category RAC lists, whatever its availability, as
+ *   `cat:<category id>` with its kind and its kind's group as its type. Nothing of that stay's
+ *   availability or prices is kept. An answer with no category is a `ProviderParseError`.
  * - A park the seed does not have (Ningaloo) rejects with a `ProviderError`, unsent.
  */
 
@@ -22,24 +25,28 @@ import type {
   LocationSummary,
   UnitSummary,
 } from '@shared/types/catalog.types';
-import type { ProviderId, UnitKind } from '@shared/types/provider.types';
-import { todayIn } from '@shared/utils/calendar-date';
+import type { ProviderId, StayQuery } from '@shared/types/provider.types';
+import { addDays, todayIn } from '@shared/utils/calendar-date';
 import { makeLocationKey } from '@shared/utils/location-key';
 import type { ProviderContext } from '../sdk/context';
 import { ProviderError, ProviderParseError, throwIfAborted } from '../sdk/errors';
 import type { FullCatalogModule, ProviderLinks } from '../sdk/provider';
+import { categoryUnitId, type CategoryKindOf, type RacAvailability } from './availability';
 import { readBookNowPage, type BookNowCategory, type BookNowPage } from './book-now';
 import type { RacClient } from './client';
 import { RAC_PARKS, racPark, type RacPark } from './parks';
-import { unitKindOf } from './unit-kinds';
+import { unitTypeOfKind } from './unit-kinds';
 
 /** When a park's dates open, for the place page's booking rules. */
 export const RAC_RELEASE_INFO =
   'Bookings open 364 days ahead, at midnight Perth time. School-holiday dates open on set days.';
 
-/** Cable Beach is not in the school-holiday releases; its peak season opens month by month. */
+/** Cable Beach is not in the school-holiday releases; its seasonal dates open on set days. */
 export const RAC_ROLLING_RELEASE_INFO =
-  'Bookings open 364 days ahead, at midnight Perth time. Peak-season dates open on set days.';
+  'Bookings open 364 days ahead, at midnight Perth time. Seasonal dates open on set days.';
+
+/** How far ahead a native park's near stay is, to list its categories: 14 days. */
+export const RAC_NATIVE_LOOKAHEAD_DAYS = 14;
 
 /** A park as a location: the seed's facts only. */
 export function toLocationSummary(
@@ -81,31 +88,27 @@ export interface RacCatalogDeps {
   ctx: ProviderContext;
   client: RacClient;
   links: ProviderLinks;
+  /** For a native park's categories. */
+  availability: RacAvailability;
+  kindOf: CategoryKindOf;
 }
 
-export function createRacCatalog({ ctx, client, links }: RacCatalogDeps): FullCatalogModule {
-  /** Categories whose kind was not found, already logged once. */
-  const unknownKinds = new Set<string>();
-
-  function kindOf(park: RacPark, category: BookNowCategory): UnitKind {
-    const kind = unitKindOf(category.title, category.typeId, park.categoryTypes);
-    if (kind) return kind;
-    const key = `${park.slug}:${category.catId}`;
-    if (!unknownKinds.has(key)) {
-      unknownKinds.add(key);
-      ctx.logger.warn(
-        `${park.slug}: category ${category.catId} (type ${category.typeId ?? 'none'}) has no ` +
-          `unit kind in its name or its type; it is "other"`
-      );
-    }
-    return 'other';
-  }
-
+export function createRacCatalog({
+  ctx,
+  client,
+  links,
+  availability,
+  kindOf,
+}: RacCatalogDeps): FullCatalogModule {
   function toUnit(park: RacPark, page: BookNowPage, category: BookNowCategory): UnitSummary {
     const unit: UnitSummary = {
       unitId: `cat:${category.catId}`,
       unitName: category.title,
-      unitKind: kindOf(park, category),
+      unitKind: kindOf(park, {
+        catId: category.catId,
+        name: category.title,
+        typeId: category.typeId,
+      }),
     };
     const type = category.typeId === undefined ? undefined : page.types.get(category.typeId);
     if (type) unit.unitType = type;
@@ -129,6 +132,33 @@ export function createRacCatalog({ ctx, client, links }: RacCatalogDeps): FullCa
         level: 'info',
         text: notice.title ? `${notice.title}: ${notice.text}` : notice.text,
       }));
+  }
+
+  /** A native park's categories, from one availability POST for a near stay. */
+  async function nativeUnits(park: RacPark, signal?: AbortSignal): Promise<UnitSummary[]> {
+    const arrival = addDays(todayIn(ctx.timezone, ctx.clock()), RAC_NATIVE_LOOKAHEAD_DAYS);
+    const stay: StayQuery = { arrival, departure: addDays(arrival, 1), adults: 2 };
+    const categories = await availability.categories(park, stay, signal);
+    if (categories.length === 0) {
+      throw new ProviderParseError({
+        providerId: ctx.id,
+        message: `${ctx.manifest.name}: RAC listed no accommodation at ${park.name}`,
+      });
+    }
+    return categories.map((category): UnitSummary => {
+      const unitKind = kindOf(park, {
+        catId: String(category.category_id),
+        name: category.category_name,
+        typeId: category.category_type_id,
+      });
+      const unitType = unitTypeOfKind(unitKind);
+      return {
+        unitId: categoryUnitId(category),
+        unitName: category.category_name,
+        ...(unitType ? { unitType } : {}),
+        unitKind,
+      };
+    });
   }
 
   return {
@@ -156,8 +186,7 @@ export function createRacCatalog({ ctx, client, links }: RacCatalogDeps): FullCa
         fetchedAt: ctx.clock().toISOString(),
       };
       if (park.bookNow === 'native') {
-        await Promise.resolve();
-        throwIfAborted(signal);
+        detail.units = await nativeUnits(park, signal);
         return detail;
       }
 
