@@ -373,7 +373,13 @@ export class ProviderAccountService implements AccountGate {
       throw new AppError('INTERNAL', `Couldn't read your saved ${field.label}. Add it again.`);
     }
     if (!value) throw new AppError('NOT_FOUND', `No ${field.label} is saved`);
-    this.clipboard.writeText(value);
+    try {
+      this.clipboard.writeText(value);
+    } catch (error) {
+      // The clipboard's own error is not passed on: only its name is logged
+      this.log.warn(`Account ${providerId}: ${key} could not be copied (${errorName(error)})`);
+      throw new AppError('INTERNAL', `Couldn't copy your ${field.label}. Try again.`);
+    }
     this.log.info(`Account ${providerId}: ${key} copied to the clipboard`);
   }
 

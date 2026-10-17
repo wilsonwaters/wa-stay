@@ -1121,6 +1121,23 @@ describe('ProviderAccountService', () => {
       expect(JSON.stringify(logger.lines)).not.toContain(NUMBER);
     });
 
+    it('a clipboard that fails to write is INTERNAL, in words of its own; its error and the value are not logged (R16)', async () => {
+      await service.saveCredentials('keystay', VALUES, ['own']);
+      clipboard.writeText.mockImplementationOnce((text: string) => {
+        throw new Error(`clipboard refused ${text}`);
+      });
+
+      await expect(refusal(service.copyCredential('keystay', 'memberNumber'))).resolves.toEqual({
+        code: 'INTERNAL',
+        message: "Couldn't copy your Member number. Try again.",
+        issues: undefined,
+      });
+      expect(logger.lines.map((line) => line.message)).toContain(
+        'Account keystay: memberNumber could not be copied (Error)'
+      );
+      expect(JSON.stringify(logger.lines)).not.toContain(NUMBER);
+    });
+
     it('copyCredential refuses a field that is not copyable, not declared, or not saved', async () => {
       await expect(refusal(service.copyCredential('keystay', 'memberNumber'))).resolves.toEqual({
         code: 'NOT_FOUND',

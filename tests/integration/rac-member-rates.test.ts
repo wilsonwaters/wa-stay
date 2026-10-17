@@ -15,6 +15,7 @@
 
 import fs from 'fs';
 import path from 'path';
+import { fullMatches } from '@main/core/watches/matching';
 import { RAC_PARKS, racFactory, racManifest } from '@main/providers/rac';
 import { RAC_AVAILABILITY_PATH } from '@main/providers/rac/availability';
 import { createRacLinks } from '@main/providers/rac/links';
@@ -133,6 +134,17 @@ describe('RAC prices with a member number, and without (rule 14)', () => {
       availableUnits: 51,
       byKind: { campsite: { availableUnits: 51 } },
     });
+  });
+
+  it("so a watch's price limit: $70 a night matches the powered site only for a member", async () => {
+    for (const [member, matched] of [
+      [false, []],
+      [true, ['cat:4']],
+    ] as const) {
+      const result = await (await rac({ member })).provider.availability!.check('busselton', STAY);
+      const matches = fullMatches({ maxPrice: 70 }, result.units);
+      expect(matches.map((match) => match.unitId)).toEqual(matched);
+    }
   });
 
   it('asks the vault at every check: a number saved or removed shows at the next one', async () => {

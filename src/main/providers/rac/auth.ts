@@ -19,7 +19,8 @@
  *   request. (The core works a `credentials` account's status out itself and never calls it.)
  *
  * Neither function logs, and neither puts what was typed in an answer other than the digits to
- * store.
+ * store. Neither sends a request, so a save never waits in RAC's paced queue (10 s between
+ * requests): the core's 15 s limit on `signIn` (`probeTimeoutMs`) needs nothing more for RAC.
  */
 
 import type { ProviderContext } from '../sdk/context';
