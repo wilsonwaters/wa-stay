@@ -125,6 +125,72 @@ describe('summariseAvailability', () => {
   });
 });
 
+describe('free counts (a provider that counts its units, such as RAC)', () => {
+  const SPOTS = { one: 'spot', many: 'spots' };
+  /** A category of sites: free for the stay with `freeCount` of them, or taken with 0. */
+  const category = (id: string, states: (NightState | null)[], freeCount: number) => ({
+    ...unit(id, states),
+    freeCount,
+  });
+
+  it('counts the units the free ones stand for, and gives no total', () => {
+    const units = [
+      category('powered', ['available', 'available'], 51),
+      category('ensuite', ['booked', 'booked'], 0),
+    ];
+    const summary = summariseAvailability(units, NIGHTS);
+    expect(summary).toMatchObject({ total: 2, known: 2, fully: 1, freeUnits: 51 });
+    expect(summaryLine(summary, SPOTS, 'RAC')).toBe('51 spots free for all 2 nights');
+    expect(summaryLine(summariseAvailability(units.slice(0, 1), NIGHTS), SITE, 'RAC')).toBe(
+      '51 sites free for all 2 nights'
+    );
+  });
+
+  it('says none are free, with no total, when no unit is free for the whole stay', () => {
+    const units = [
+      category('powered', ['available', 'booked'], 0),
+      category('ensuite', ['booked', 'booked'], 0),
+    ];
+    const summary = summariseAvailability(units, NIGHTS);
+    expect(summary.freeUnits).toBe(0);
+    expect(summaryLine(summary, SPOTS, 'RAC')).toBe('No spots free for all 2 nights');
+    expect(summaryLine({ ...summary, nights: 1 }, SITE, 'RAC')).toBe('No sites free for 1 night');
+    expect(
+      summaryLine(
+        summariseAvailability([category('one', ['available', 'available'], 1)], NIGHTS),
+        SITE,
+        'RAC'
+      )
+    ).toBe('1 site free for all 2 nights');
+  });
+
+  it('counts a free unit with a count that is not a whole number of 1 or more as one', () => {
+    const odd = [
+      { ...unit('a', ['available', 'available']), freeCount: 2.5 },
+      { ...unit('b', ['available', 'available']), freeCount: 0 },
+      category('c', ['available', 'available'], 3),
+    ];
+    expect(summariseAvailability(odd, NIGHTS).freeUnits).toBe(5);
+  });
+
+  it('keeps "N of M" for a provider whose units are one each (ParkStay)', () => {
+    const summary = summariseAvailability(
+      [unit('a', ['available', 'available']), unit('b', ['booked', 'available'])],
+      NIGHTS
+    );
+    expect(summary).not.toHaveProperty('freeUnits');
+    expect(summaryLine(summary, SITE, 'ParkStay')).toBe('1 of 2 sites free for all 2 nights');
+  });
+
+  it('says why when no unit is settled, as before', () => {
+    const summary = summariseAvailability(
+      [category('a', ['not-released', 'not-released'], 0)],
+      NIGHTS
+    );
+    expect(summaryLine(summary, SPOTS, 'RAC')).toBe("These nights aren't released for booking yet");
+  });
+});
+
 describe('noFullRowsMessage', () => {
   it('suggests turning the switch off when some units are partly free, or unsettled', () => {
     expect(noFullRowsMessage(summaryOf({ total: 3, known: 3, partly: 2 }), SITE)).toBe(

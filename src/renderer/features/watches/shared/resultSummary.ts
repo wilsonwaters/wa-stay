@@ -1,11 +1,14 @@
 /**
  * The words for what a watch found: its last result on a card ("3 sites available") and the
- * outcome of Check now ("3 sites available at Osprey Bay"). Pure.
+ * outcome of Check now ("3 sites available at Osprey Bay"). What is free for the whole stay is
+ * counted as Explore and the alert count it (`sumFreeUnits`: RAC's sites of each category free
+ * for the whole stay, else one per unit), so an RAC park reads "51 sites available". Pure.
  */
 import type { ProviderManifest } from '../../../../shared/types/provider.types';
 import { WatchResult } from '../../../../shared/types/common.types';
 import type { Watch, WatchExecutionResult, WatchMatch } from '../../../../shared/types/watch.types';
 import { eachNight } from '../../../../shared/utils/calendar-date';
+import { sumFreeUnits } from '../../../../shared/utils/free-units';
 import {
   nounOfUnits,
   unitCountLabel as count,
@@ -45,7 +48,7 @@ export function resultSummary(watch: Watch, noun: UnitNoun): string {
       const stay = eachNight(watch.stay.arrival, watch.stay.departure);
       const full = (watch.lastAvailability ?? []).filter((u) => isFullyAvailable(u, stay));
       return full.length > 0
-        ? `${count(full.length, nounOfUnits(full, noun))} available`
+        ? `${count(sumFreeUnits(full), nounOfUnits(full, noun))} available`
         : `${noun.many} available`;
     }
     case WatchResult.PARTIAL_FOUND:
@@ -86,7 +89,7 @@ export function runResultMessage(
   }
   const full = result.matches.filter((m) => !m.partial);
   if (full.length > 0)
-    return `${count(full.length, nounOfUnits(full, noun))} available at ${place}`;
+    return `${count(sumFreeUnits(full), nounOfUnits(full, noun))} available at ${place}`;
   const partial = result.matches.filter((m) => m.partial);
   if (partial.length > 0) {
     const nights = eachNight(watch.stay.arrival, watch.stay.departure).length;

@@ -187,6 +187,24 @@ describe('watch matching', () => {
       ).toHaveLength(1);
     });
 
+    it('keeps the units a unit stands for (freeCount), so an alert counts as Explore does; a partial run has none', () => {
+      const units = [
+        unit('cat:4', [night(D1, 'available', 75), night(D2, 'available', 75)], {
+          freeCount: 51,
+        }),
+        unit('cat:7', [night(D1, 'available', 80), night(D2, 'booked')], { freeCount: 0 }),
+        unit('2', [night(D1, 'available', 30), night(D2, 'available', 30)]),
+      ];
+      expect(fullMatches({}, units).map((m) => [m.unitId, m.freeCount])).toEqual([
+        ['cat:4', 51],
+        ['2', undefined],
+      ]);
+      expect(fullMatches({}, units)[1]).not.toHaveProperty('freeCount');
+      const [run] = partialMatches({}, [units[1]]);
+      expect(run).toMatchObject({ unitId: 'cat:7', partial: true });
+      expect(run).not.toHaveProperty('freeCount');
+    });
+
     it('passes a unit with unknown prices, marked priceKnown false', () => {
       const [match] = fullMatches({ maxPrice: 25 }, [
         unit('1', [night(D1, 'available', 30), night(D2, 'available')]),

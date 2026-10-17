@@ -106,6 +106,8 @@ describe('RAC watches (core, fixtures)', () => {
         arrival: '2026-11-06',
         departure: '2026-11-08',
         partial: false,
+        // The powered site's 51 sites free for the whole stay, as Explore counts them
+        freeCount: 51,
         priceKnown: true,
         total: 150,
       },
@@ -119,6 +121,11 @@ describe('RAC watches (core, fixtures)', () => {
 
     const stored = await service.get(watch.id);
     expect(stored?.lastResult).toBe(WatchResult.FOUND);
+    // The stored units keep their counts, for the watch's card and night grid
+    expect(stored?.lastAvailability?.map((unit) => [unit.unitId, unit.freeCount])).toEqual([
+      ['cat:7', 0],
+      ['cat:4', 51],
+    ]);
     expect(stored?.bookingLink).toEqual({
       url: POWERED_SITE_LINK,
       arrival: '2026-11-06',

@@ -6,6 +6,7 @@
 import { format } from 'date-fns';
 import type { NightState, NightStatus, UnitAvailability } from '../../shared/types/provider.types';
 import { eachNight } from '../../shared/utils/calendar-date';
+import { countsFreeUnits, freeUnitsOf } from '../../shared/utils/free-units';
 import { MIXED_UNIT_NOUN, type UnitNoun } from '../../shared/utils/unit-noun';
 import { parseIsoDate } from './ui/calendar';
 
@@ -99,6 +100,13 @@ export interface AvailabilitySummary {
   known: number;
   /** Free for the whole stay. */
   fully: number;
+  /**
+   * Set when the provider counts its units (`freeCount`, `countsFreeUnits`): the units the
+   * `fully` ones stand for, as Explore counts them (`freeUnitsOf`: RAC's sites of each category
+   * free for the whole stay). Such a provider gives no total of its units, so the summary line
+   * then says what is free, never "of M".
+   */
+  freeUnits?: number;
   /** Taken on some nights, free on others. */
   partly: number;
   /** Not settled yet: some nights are not released for booking. */
@@ -131,12 +139,14 @@ export function summariseAvailability(
     notReleased: 0,
     unknown: 0,
     nights: nights.length,
+    ...(countsFreeUnits(units) ? { freeUnits: 0 } : {}),
   };
   for (const unit of units) {
     const standing = unitStanding(unit, nights);
     if (standing === 'free') {
       summary.known += 1;
       summary.fully += 1;
+      if (summary.freeUnits !== undefined) summary.freeUnits += freeUnitsOf(unit);
     } else if (standing === 'taken') {
       summary.known += 1;
       if (nights.some((date) => nightOf(unit, date).state === 'available')) summary.partly += 1;
@@ -168,10 +178,17 @@ const span = (nights: number) => (nights === 1 ? '1 night' : `all ${nights} nigh
 
 /**
  * The summary line, counting only units whose known nights settle the stay: "8 of 20 sites
- * free for all 2 nights". With none settled, it says why: the nights are not released yet,
- * or `source` (the provider's short name) did not say.
+ * free for all 2 nights". A provider that counts its units (`freeUnits`) gives no total, so
+ * its line counts what is free as Explore does: "51 spots free for all 2 nights", or "No spots
+ * free for all 2 nights", never "of M". With none settled, it says why: the nights are not
+ * released yet, or `source` (the provider's short name) did not say.
  */
 export function summaryLine(summary: AvailabilitySummary, noun: UnitNoun, source: string): string {
+  const { freeUnits } = summary;
+  if (summary.known > 0 && freeUnits !== undefined) {
+    const free = freeUnits > 0 ? `${freeUnits} ${plural(freeUnits, noun)}` : `No ${noun.many}`;
+    return `${free} free for ${span(summary.nights)}`;
+  }
   if (summary.known > 0) {
     return `${summary.fully} of ${summary.known} ${plural(summary.known, noun)} free for ${span(
       summary.nights

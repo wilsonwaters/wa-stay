@@ -188,8 +188,9 @@ function NightCell({ kind, label, short }: { kind: CellKind; label: string; shor
 /**
  * Units by nights, for one stay: a real `<table>` with a caption, a column per night ("Fri 3";
  * never the check-out day), a row per unit, and every cell's state in words as well as an icon
- * (and its price when known). A summary line ("8 of 24 sites free for all 2 nights") and a
- * "Fully available only" switch (on by default) come first; the first 10 rows show, with
+ * (and its price when known). A summary line ("8 of 24 sites free for all 2 nights"; "51 spots
+ * free for all 2 nights", with no total, from a provider that counts its units, such as RAC's
+ * categories) and a "Fully available only" switch (on by default) come first; the first 10 rows show, with
  * "Show all" for the rest. Only known nights count: a night not released yet, or one the
  * source did not report, is never read as taken, and the summary says so when that is all
  * there is. The table scrolls sideways inside its own region (a tab stop only while it

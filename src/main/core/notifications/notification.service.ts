@@ -12,6 +12,7 @@ import {
 import { NotificationType, RelatedType } from '@shared/types/common.types';
 import { isAppLinkPath, notificationLinkPath, relatedPath } from '@shared/utils/app-links';
 import { isCalendarDate, nightsBetween } from '@shared/utils/calendar-date';
+import { sumFreeUnits } from '@shared/utils/free-units';
 import {
   capitalise,
   kindsOfUnits,
@@ -258,9 +259,12 @@ export class NotificationService {
   }
 
   /**
-   * Notify when a watch finds the whole stay. `note` is a sentence added to the message, such
-   * as why no automatic hold was placed. `bookingUrl` is the provider's booking page for the
-   * stay found (`matchedStayLink`): a desktop click opens it, and the email links it.
+   * Notify when a watch finds the whole stay: "Found 51 sites available at …", counting the
+   * units the matches stand for as Explore counts them (`sumFreeUnits`: RAC's sites of each
+   * category free for the whole stay, else one per match). `note` is a sentence added to the
+   * message, such as why no automatic hold was placed. `bookingUrl` is the provider's booking
+   * page for the stay found (`matchedStayLink`): a desktop click opens it, and the email links
+   * it.
    */
   async notifyWatchFound(
     watch: Watch,
@@ -270,7 +274,7 @@ export class NotificationService {
   ): Promise<void> {
     const noun = this.nounFor(watch, matches);
     const message =
-      `Found ${unitCountLabel(matches.length, noun)} available at ${watch.location.name} for ${formatCalendarDate(watch.stay.arrival)} - ${formatCalendarDate(watch.stay.departure)}` +
+      `Found ${unitCountLabel(sumFreeUnits(matches), noun)} available at ${watch.location.name} for ${formatCalendarDate(watch.stay.arrival)} - ${formatCalendarDate(watch.stay.departure)}` +
       (note ? `. ${note}` : '');
 
     await this.notify(

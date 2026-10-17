@@ -6,8 +6,9 @@
  * and no total ("51 spots free", RS12) beside ParkStay's "2 of 3 sites available". Stay type →
  * "Cabins & villas" counts only the cabins: Busselton's answer lists no cabin, so its card turns
  * to "No cabins open for these dates", Esperance's reads its six free cabins, and Cervantes',
- * whose villas are booked out, "No cabin free every night". Fixture mode
- * refuses no request, and the window logs no errors. Roles and accessible names only.
+ * whose villas are booked out, "No cabin free every night". Busselton's page counts the same
+ * 51 for the stay ("51 spots free for all 2 nights", no "of M"). Fixture mode refuses no
+ * request, and the window logs no errors. Roles and accessible names only.
  */
 
 import { stayRangeLabel } from '../../src/renderer/components/nightGridModel';
@@ -101,6 +102,19 @@ test('RAC parks read their free spots beside ParkStay’s “N of M”, and Stay
   await expect(card('RAC Cervantes Holiday Park')).toHaveAccessibleDescription(
     /No cabin free every night/
   );
+
+  // 5. Busselton's page, for the same stay: the same 51 as its card, and no total
+  await busselton.click();
+  await expect.poll(() => currentRoute(window)).toMatch(/^\/places\/rac\/busselton\?/);
+  await window
+    .getByRole('region', { name: 'Check your dates' })
+    .getByRole('button', { name: 'Check availability' })
+    .click();
+  const availability = window.getByRole('region', { name: 'Availability', exact: true });
+  await expect(
+    availability.getByText('51 spots free for all 2 nights', { exact: true })
+  ).toBeVisible({ timeout: 20_000 });
+  await expect(availability.getByText(/\b\d+ of \d+ spots free/)).toHaveCount(0);
 
   // Nothing left the fixtures, and the window logged no errors
   const requests = wa.unexpectedRequests();
