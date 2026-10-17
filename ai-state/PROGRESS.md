@@ -10,7 +10,9 @@ Branch `ccr-573ddb1d-hir0sq` (from `main` at `4bd5d62`, the v2.0.0 release). The
 Phase 3–4 (task specs, then execution). The stakeholder approved the 20-task plan and decided R6–R8 (alert clicks for every provider, a phone booking link in alert emails, interactive pacing).
 
 ## Currently in flight
-- **R5 (#52)** and **R7 (#54)**: implementation agents in `/home/user/lanes/r5` and `/home/user/lanes/r7` (cut at `3a28271`).
+- **R5 (#52)** done on `lane/r5` (`84fe618`, `cdd44ee`, `810c514`; 4496 tests, e2e 23, RAC preview passed; 0 live requests). Review running.
+- **R7 (#54)** done on `lane/r7` (`223587d`; 4442 tests, e2e 22; rendered emails in the scratchpad). Review running.
+- **R8 (#55)**: implementation agent in `/home/user/lanes/r8` (at `7f4c2b4` = branch tip + `lane/r7`; I resolved an import conflict in `matching.ts` between R6 and R7).
 
 ## Completed
 - **R6 (#53) merged** (`9328ab9`): stay-type chips on the watch and snipe stay steps at mixed places, UnitPicker grouped by kind, `stay=` prefill checked against the place, a stay type or unit needed to hold at a mixed place; `unitKindOfUnit` moved to `src/shared/utils/unit-kinds.ts`. Review APPROVE; fix `0940ce3` (Edit keeps stored stay types as chips so focus isn't lost). Copy notes forwarded to R9. Gate: 4350 tests.
