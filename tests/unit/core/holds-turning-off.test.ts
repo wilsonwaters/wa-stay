@@ -69,9 +69,17 @@ describe('holds turning off (an experiment turned off, until the restart)', () =
     expect(h.notifications.notifyWatchFound.mock.calls[0][2]).toBeUndefined();
   });
 
-  it('a hold snipe that finds a free unit holds nothing: it alerts, with the booking page and why', async () => {
+  /** A hold snipe created while holds were on, sniping now that they are turning off. */
+  async function holdSnipe() {
+    turningOff.mockReturnValue(false);
     const snipe = await h.snipes.create(h.userId, h.snipeInput({ action: 'hold' }));
     h.snipeRepo.updateStatus(snipe.id, SnipeStatus.SNIPING);
+    turningOff.mockClear().mockReturnValue(true);
+    return snipe;
+  }
+
+  it('a hold snipe that finds a free unit holds nothing: it alerts, with the booking page and why', async () => {
+    const snipe = await holdSnipe();
     const reserve = jest.spyOn(h.nightGuard, 'tryReserve');
     const outcome = await h.snipes.execute(snipe.id);
 
@@ -106,13 +114,34 @@ describe('holds turning off (an experiment turned off, until the restart)', () =
 
   it('a hold snipe with nothing free keeps polling: only a match is affected', async () => {
     h.fake.setAvailability('1', { u1: 'booked' });
-    const snipe = await h.snipes.create(h.userId, h.snipeInput());
-    h.snipeRepo.updateStatus(snipe.id, SnipeStatus.SNIPING);
+    const snipe = await holdSnipe();
     const outcome = await h.snipes.execute(snipe.id);
 
     expect(outcome.next).toBe('continue');
     expect(turningOff).not.toHaveBeenCalled();
     expect(h.snipeRepo.findById(snipe.id)?.status).toBe(SnipeStatus.SNIPING);
-    expect(h.notifications.notifyWarning).not.toHaveBeenCalled();
+    expect(h.notifications.notifySnipeAlert).not.toHaveBeenCalled();
+  });
+
+  it('while holds are turning off, a new snipe is an alert snipe, and one asked to hold is refused', async () => {
+    const snipe = await h.snipes.create(h.userId, h.snipeInput());
+    expect(snipe.action).toBe('alert');
+    expect(turningOff).toHaveBeenCalledWith('fake');
+
+    await expect(h.snipes.create(h.userId, h.snipeInput({ action: 'hold' }))).rejects.toMatchObject(
+      {
+        code: 'VALIDATION',
+        issues: ['action'],
+        message: "Fake can't hold automatically, so choose an alert",
+      }
+    );
+    await expect(h.snipes.update(snipe.id, { action: 'hold' })).rejects.toMatchObject({
+      code: 'VALIDATION',
+      issues: ['action'],
+    });
+
+    // Turned back on before the restart: holds are offered again
+    turningOff.mockReturnValue(false);
+    expect((await h.snipes.create(h.userId, h.snipeInput())).action).toBe('hold');
   });
 });

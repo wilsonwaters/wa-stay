@@ -268,6 +268,25 @@ describe('provider experiments over IPC', () => {
       ]);
     });
 
+    it('once off, a hold snipe alerts instead of holding, and a new snipe is an alert snipe', async () => {
+      const snipe = await container!.siteSniperService.create(userId, snipeInput);
+      expect(snipe.action).toBe('hold');
+      expect((await setCart(false)).success).toBe(true);
+
+      const outcome = await container!.siteSniperService.execute(snipe.id, { manual: true });
+
+      expect(fake.calls.filter((c) => c.module === 'holds')).toEqual([]);
+      expect(outcome.result).toMatchObject({ result: SnipeResult.ALERTED, held: false });
+      expect(container!.repositories.snipes.findById(snipe.id)).toMatchObject({
+        status: SnipeStatus.ALERTED,
+        alert: expect.objectContaining({
+          unitId: 'u1',
+          note: 'Automatic holds are off for ExpStay, so Site Sniper alerted you instead.',
+        }),
+      });
+      expect((await container!.siteSniperService.create(userId, snipeInput)).action).toBe('alert');
+    });
+
     it('turning off is ACCOUNT_BUSY while a watch auto-hold is being placed, and the hold it lands keeps it busy', async () => {
       await start({ holdDelayMs: 200 });
       const watch = await container!.watchService.create(userId, {

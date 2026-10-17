@@ -18,8 +18,9 @@
  *   held and no night is reserved; no sign-in is ever needed.
  * - `hold`: one-booking-per-night guard → `holds.create`. On a hold the snipe is HELD with the
  *   provider's reference, expiry, unit and payment URL, and stops. Payment stays a human step.
- *   It alerts instead, with a note, when the provider has no holds (any more), or when it names
- *   no units and its candidates are of more than one kind (`kindsAmbiguous`): it never picks
+ *   It alerts instead, with a note, when the provider has no holds (any more, or until WA Stay
+ *   restarts after the person turned a holds experiment off: `holdsOf`), or when it names no
+ *   units and its candidates are of more than one kind (`kindsAmbiguous`): it never picks
  *   between a campsite and a cabin for the person.
  *
  * A provider that turns the check (or the hold) away with a 403 or 429 (`isProviderBlock`) ends
@@ -142,7 +143,8 @@ export interface SnipeServiceDeps {
   accounts?: AccountGate;
   /**
    * The provider's holds are on through an experiment the person has turned off: they go when
-   * WA Stay restarts, and until then no snipe holds (default: never).
+   * WA Stay restarts, and until then a snipe treats the provider as having none (`holdsOf`):
+   * it alerts, and a new one is an alert snipe (default: never).
    */
   holdsTurningOff?: (providerId: string) => boolean;
   clock?: () => Date;
@@ -152,14 +154,6 @@ export interface SnipeServiceDeps {
 function needsAccountForHolds(provider: { manifest: { capabilities: { account: string } } }) {
   const { account } = provider.manifest.capabilities;
   return account === 'required' || account === 'required-for-holds';
-}
-
-/**
- * The provider's holds, when it places them: `capabilities.holds` on and the module there.
- * Without them a snipe alerts (§12.35).
- */
-function holdsOf(provider: SnipeProvider): HoldsModule | undefined {
-  return provider.manifest.capabilities.holds === true ? provider.holds : undefined;
 }
 
 /**
@@ -227,7 +221,7 @@ export class SiteSniperService {
    */
   async create(userId: number, input: SiteSnipeInput): Promise<SiteSnipe> {
     const provider = this.providers.require(input.providerId, 'snipes');
-    const action = input.action ?? (holdsOf(provider) ? 'hold' : 'alert');
+    const action = input.action ?? (this.holdsOf(provider) ? 'hold' : 'alert');
     this.assertAction(provider, action);
     const unitKinds = cleanUnitKinds(input.unitKinds);
     const prepared = {
@@ -580,7 +574,7 @@ export class SiteSniperService {
       // An alert snipe alerts; so does a hold snipe whose provider places no holds (or no
       // longer does), and one for "any unit" across stay types, which never picks one for the
       // person. None reserves a night.
-      const holds = holdsOf(provider);
+      const holds = this.holdsOf(provider);
       if (snipe.action === 'alert') {
         return await this.alert(snipe, provider, availability, matched, undefined, checkedAt);
       }
@@ -591,12 +585,6 @@ export class SiteSniperService {
       if (kindsAmbiguous(snipe, candidates)) {
         log.info(`Snipe ${snipeId}: no hold, its units are of more than one stay type`);
         const note = `${MIXED_KINDS_ERROR}.`;
-        return await this.alert(snipe, provider, availability, matched, note, checkedAt);
-      }
-
-      // Holds turning off (an experiment turned off, until the restart): no hold, an alert
-      if (this.holdsTurningOff(snipe.providerId)) {
-        const note = holdsOffNote(provider.manifest.shortName);
         return await this.alert(snipe, provider, availability, matched, note, checkedAt);
       }
 
@@ -893,8 +881,20 @@ export class SiteSniperService {
   }
 
   /** `VALIDATION` on `action` for `hold` on a provider that places no holds. */
+  /**
+   * The provider's holds, when it places them: `capabilities.holds` on, the module there, and
+   * not turning off (an experiment the person turned off, until WA Stay restarts: §12.35).
+   * Without them a snipe alerts, a new snipe defaults to `alert`, and `hold` is refused. The
+   * one place a snipe asks whether it may hold.
+   */
+  private holdsOf(provider: SnipeProvider): HoldsModule | undefined {
+    if (provider.manifest.capabilities.holds !== true) return undefined;
+    if (this.holdsTurningOff(provider.manifest.id)) return undefined;
+    return provider.holds;
+  }
+
   private assertAction(provider: SnipeProvider, action: SnipeAction): void {
-    if (action === 'hold' && !holdsOf(provider)) {
+    if (action === 'hold' && !this.holdsOf(provider)) {
       throw new AppError(
         'VALIDATION',
         `${provider.manifest.shortName} can't hold automatically, so choose an alert`,

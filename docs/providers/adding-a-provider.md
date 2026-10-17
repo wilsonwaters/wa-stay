@@ -448,7 +448,8 @@ interface ProviderExperiment {
   reads "Couldn't turn on".
 - **Holds stop at once.** Turning off an experiment that turns on `holds` is refused while a hold
   or snipe needs your provider. Once it is off, the app places no new hold on your provider until
-  the restart: a watch says so in its alert, and a snipe tells the person what is free instead.
+  the restart: a watch says so in its alert, and a snipe alerts instead of holding (a new snipe
+  is an alert snipe).
 - **What it may turn on.** Only boolean capabilities that are off in your manifest, never
   `account` or `catalogMode`, and every experiment on together must still pass the manifest
   rules (`MANIFEST_RULES`: Site Sniper turned on needs holds, availability and a release mode).
