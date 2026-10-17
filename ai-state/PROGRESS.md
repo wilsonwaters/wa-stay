@@ -11,11 +11,11 @@ Phase 3–4 (task specs, then execution). The stakeholder approved the 20-task p
 
 ## Currently in flight
 - **R2 (#49)** done on `lane/r2` (`4af59e9`, `b3bcd53`; 4262 tests, e2e 22). Review running.
-- **R3 (#50)** done on `lane/r3` (`b7e764c`, `e0e1aba`; 4237 tests, e2e 22). Review running.
 - **R4 (#51)** done on `lane/r4` (`d21d712`, rebased on `lane/r1` tip; 4243 tests, e2e 22; runtime screenshots in the scratchpad). Review running. Follow-up for R20: retake `docs/images/explore.png` with a Mapbox token.
 - Next wave once R2–R4 merge: R5 (RAC catalogue), R6 (stay type in flows), R7 (alerts open the booking page) in parallel.
 
 ## Completed
+- **R3 (#50) merged** (`3563100`): `unitKinds` on watches and snipes (types, contracts, repositories), matching by ids > kinds > all, no automatic hold across stay types. Review APPROVE; fix `4e51842` (fixtures typed, docs wording). Notes for R6: remove the docs' "does not offer stay types yet" phrases (`docs/watches-and-notifications.md`, `docs/site-sniper.md`); consider moving `unitKindOfUnit` (`core/watches/matching.ts`) into `src/shared/utils/unit-kinds.ts` so the renderer's "mixed" rule can't drift.
 - **R1 (#48) merged** (`8455c07`): unit kinds, five stay types, migration v11, catalogue filter and facet, ParkStay mapping. Commits `924ea34`, `d95b5ec`, review fix `6084c96` (bunk word boundary). Review APPROVE, nits only (read/filter mismatch on hand-edited rows; v11 backfill uses the live table). Gate: 4203 tests, test:tz 7, e2e 22.
 - 2026-10-16: kickoff research, three parallel read-only agents.
   - `ai-state/research/rac-booking-flow.md` (63 anonymous requests; samples in `ai-state/research/rac-samples/`):
