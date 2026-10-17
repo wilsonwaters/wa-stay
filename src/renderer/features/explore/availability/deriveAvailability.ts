@@ -82,7 +82,7 @@ function units(value: unknown): number {
  * A provider's total as whole units, or undefined when it left the total out (`undefined` or
  * `null`): "no total", never 0, which means none can be booked.
  */
-function total(value: unknown): number | undefined {
+function totalOf(value: unknown): number | undefined {
   return value === undefined || value === null ? undefined : units(value);
 }
 
@@ -116,7 +116,7 @@ function chosenCounts(
   entry: BulkAvailabilityEntry,
   stayTypes: readonly UnitKind[]
 ): UnitCounts | null {
-  const totals = { available: units(entry.availableUnits), bookable: total(entry.bookableUnits) };
+  const totals = { available: units(entry.availableUnits), bookable: totalOf(entry.bookableUnits) };
   if (stayTypes.length === 0) return totals;
   const kinds = unitKindsOf(location);
   const chosen = kinds.filter((kind) => stayTypes.includes(kind));
@@ -132,7 +132,7 @@ function chosenCounts(
     (sum, kind) => {
       const counts = countsOf(kind);
       // A kind left out counts none; a kind whose total is left out leaves the sum without one
-      const bookable = counts ? total(counts.bookableUnits) : 0;
+      const bookable = counts ? totalOf(counts.bookableUnits) : 0;
       return {
         available: sum.available + units(counts?.availableUnits),
         bookable:
