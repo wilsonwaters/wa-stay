@@ -10,12 +10,12 @@ Branch `ccr-573ddb1d-hir0sq` (from `main` at `4bd5d62`, the v2.0.0 release). The
 Phase 3–4 (task specs, then execution). The stakeholder approved the 20-task plan and decided R6–R8 (alert clicks for every provider, a phone booking link in alert emails, interactive pacing).
 
 ## Currently in flight
-- **R2 (#49)** done on `lane/r2` (`4af59e9`, `b3bcd53`; 4262 tests, e2e 22). Review running.
 - **R6 (#53)**: implementation agent in `/home/user/lanes/r6` (cut at `4d32817`).
-- Full unit suite running on the merged R1+R3+R4 tip (cluster check).
-- Next wave once R2–R4 merge: R5 (RAC catalogue), R6 (stay type in flows), R7 (alerts open the booking page) in parallel.
+- **R5 (#52)** and **R7 (#54)**: implementation agents in `/home/user/lanes/r5` and `/home/user/lanes/r7` (cut at `3a28271`).
 
 ## Completed
+- **R2 (#49) merged** (`3a28271`): `limits.minRequestIntervalMs`, a paced client (one in flight; interactive 1 s gap, background at the provider's interval), core-set priority (place page, Explore, "Check now" interactive; due loop and sync background), deadlines grown with pacing, unpaced fixture mode, form-field fixture routes. Review REQUEST_CHANGES (a FIFO module limiter put interactive requests last) → fix `443629f` (limiters start interactive tasks first; sync-deadline tests; field names only in fixture errors) → APPROVE. Side effect accepted: ParkStay's limiter also lets person-triggered requests go first.
+- Cluster check after R1+R3+R4: full suite 4277 passed + 6 skipped.
 - **R4 (#51) merged** (`4d32817`): Explore "Stay type" chip replaces "Type", `stay=` param, free counts per stay type (`byKind`, else "Check dates"), prefill `&stay=`. Review APPROVE (nits: stale results briefly read "Check dates" while a new search loads; `%2C` re-encoding on the place page). Follow-ups: R20 retakes `docs/images/explore.png` with a Mapbox token; R11 must carry an unknown `bookableUnits` through `deriveAvailability`.
 - **R3 (#50) merged** (`3563100`): `unitKinds` on watches and snipes (types, contracts, repositories), matching by ids > kinds > all, no automatic hold across stay types. Review APPROVE; fix `4e51842` (fixtures typed, docs wording). Notes for R6: remove the docs' "does not offer stay types yet" phrases (`docs/watches-and-notifications.md`, `docs/site-sniper.md`); consider moving `unitKindOfUnit` (`core/watches/matching.ts`) into `src/shared/utils/unit-kinds.ts` so the renderer's "mixed" rule can't drift.
 - **R1 (#48) merged** (`8455c07`): unit kinds, five stay types, migration v11, catalogue filter and facet, ParkStay mapping. Commits `924ea34`, `d95b5ec`, review fix `6084c96` (bunk word boundary). Review APPROVE, nits only (read/filter mismatch on hand-edited rows; v11 backfill uses the live table). Gate: 4203 tests, test:tz 7, e2e 22.
