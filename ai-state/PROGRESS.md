@@ -7,7 +7,7 @@ _Last updated: 2026-10-17 (orchestrator)_
 Branch `ccr-573ddb1d-hir0sq` (from `main` at `4bd5d62`, the v2.0.0 release). The brief is the Project 2 section of `ai-state/brief.md`.
 
 ## Phase
-Phase 6 (completion). All 20 tasks and the system-verification fix are merged on `ccr-573ddb1d-hir0sq` and pushed. System verification: success criteria 1–9 met; full gate green. Waiting on the stakeholder: the PR (RO1), the stakeholder actions below, and RQ1, RQ4, RQ6–RQ8.
+Phase 6 (completion). All 20 tasks and the system-verification fix are merged on `ccr-573ddb1d-hir0sq` and pushed. System verification: success criteria 1–9 met; full gate green. Waiting on the stakeholder: the PR (RO1), the stakeholder actions below, and RQ6 and RQ8.
 
 ## Currently in flight
 - PR #68 (`ccr-573ddb1d-hir0sq` → `main`) opened at the stakeholder's request; it closes #48–#67 on merge.
@@ -16,10 +16,9 @@ Phase 6 (completion). All 20 tasks and the system-verification fix are merged on
 - Retake screenshots with a `pk.` Mapbox token: `npm run docs:screenshots`, `npm run site:screenshots` (`docs/images/explore.png` and the site hero still show the old "Type" chip; alt text still true).
 - First genuine auto-cart booking before recommending the switch (RQ2): follow `docs/providers/rac/README.md` "Verifying it".
 - Read-only look at availability around the 3 Feb (members) and 5 Feb 2027 (public) pre-sale (RQ3); keep `src/main/providers/rac/release-calendar.ts` current before 2 Feb 2028 (`docs/providers/rac/release-calendar.md`).
-- Decide RQ1 (ask RAC), RQ4 (non-commercial), RQ6 (Cable Beach dry season), RQ7 (count wording), RQ8 (let-go deadline).
+- Decide RQ6 (Cable Beach dry season) and RQ8 (let-go deadline). RQ7 decided (counts as on Explore, being built); asking RAC for approval and the commercial-use question were dropped by the stakeholder (2026-10-17).
 
 ## Known issues (small, not blocking)
-- [Low] RAC count wording (RQ7).
 - [Low, test fixtures] e2e fixtures lack book-now pages for Cable Beach, Cervantes and Esperance; availability routes match any dates, so the release preview reads "already open" in fixture mode.
 - Left from reviews: a stored hold-ending marker (needs a migration); the Electron-only Advanced timing focus bug; a provider-supplied Settings purpose line; the held-alert email could say the stay is in the RAC cart; `rearmProvider` gives up an access-gate place (harmless for RAC).
 

@@ -79,7 +79,7 @@ The same WA Stay users, who want to:
 - Rottnest Island accommodation (the next project). The stay types must already suit it.
 - Booking import, the NewBook guest account sign-in and "manage my booking" for RAC (links only).
 - Any automated checkout, terms acceptance, payment, cancellation or change on RAC.
-- Asking RAC for permission or an API. Suggested to the stakeholder; not blocking.
+- Asking RAC for permission or an API. The stakeholder decided not to (2026-10-17).
 
 ---
 
