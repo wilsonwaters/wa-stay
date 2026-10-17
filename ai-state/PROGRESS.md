@@ -10,7 +10,7 @@ Branch `ccr-573ddb1d-hir0sq` (from `main` at `4bd5d62`, the v2.0.0 release). The
 Phase 3–4 (task specs, then execution). The stakeholder approved the 20-task plan and decided R6–R8 (alert clicks for every provider, a phone booking link in alert emails, interactive pacing).
 
 ## Currently in flight
-- **R16 (#63)**: implementation agent in `/home/user/lanes/r16` (base `fb84ce7`).
+- **R16 (#63)**: implemented on `lane/r16` (`5750238`, R18 merged in; 5582 tests, e2e 27); in independent review (security of the member number first). Member-number-like values in the diff are only sequential placeholders (`1234567890123`, `012345678`, `12345678`, `1234567890123456`, `01234567`).
 - Next: R19 (after R16), R20.
 
 ## Completed
