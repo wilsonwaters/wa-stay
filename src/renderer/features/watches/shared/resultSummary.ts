@@ -6,6 +6,7 @@ import type { ProviderManifest } from '../../../../shared/types/provider.types';
 import { WatchResult } from '../../../../shared/types/common.types';
 import type { Watch, WatchExecutionResult, WatchMatch } from '../../../../shared/types/watch.types';
 import { eachNight } from '../../../../shared/utils/calendar-date';
+import { isFullyAvailable } from '../../../components/nightGridModel';
 import type { UnitNoun } from '../../../components/stay/UnitPicker';
 import { timeInZone } from '../../../components/timeFormat';
 import { unitNameOf } from './watchState';
@@ -35,7 +36,9 @@ export function resultSummary(watch: Watch, noun: UnitNoun): string {
   const nights = eachNight(watch.stay.arrival, watch.stay.departure).length;
   switch (watch.lastResult) {
     case WatchResult.FOUND: {
-      const full = (watch.lastAvailability ?? []).filter((u) => u.fullyAvailable).length;
+      // Free every night as the night grid reads it (a night refused by stay rules is not)
+      const stay = eachNight(watch.stay.arrival, watch.stay.departure);
+      const full = (watch.lastAvailability ?? []).filter((u) => isFullyAvailable(u, stay)).length;
       return full > 0 ? `${count(full, noun)} available` : `${noun.many} available`;
     }
     case WatchResult.PARTIAL_FOUND:
