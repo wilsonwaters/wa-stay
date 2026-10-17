@@ -9,7 +9,7 @@
 import type Database from 'better-sqlite3';
 import { openDatabase } from '@main/database/connection';
 import { ProviderStateRepository } from '@main/database/repositories';
-import { registerBuiltInProviders } from '@main/providers';
+import { BUILT_IN_PROVIDERS, registerBuiltInProviders } from '@main/providers';
 import {
   applyExperiments,
   EXPERIMENTS_STATE_KEY,
@@ -47,6 +47,19 @@ function cartProvider(options: Parameters<typeof createFakeProvider>[0] = {}): F
     ...options,
   });
 }
+
+describe('built-in providers ship every experiment off', () => {
+  it.each(BUILT_IN_PROVIDERS.map((factory) => [factory.id, factory] as const))(
+    '%s marks no experiment applied, and keeps what each turns on off',
+    (_id, factory) => {
+      const { capabilities, experiments = [] } = factory.manifest;
+      expect(experiments.filter((e) => e.applied).map((e) => e.id)).toEqual([]);
+      for (const experiment of experiments) {
+        expect(experiment.turnsOn.filter((capability) => capabilities[capability])).toEqual([]);
+      }
+    }
+  );
+});
 
 describe('experiments', () => {
   let db: Database.Database;

@@ -2,6 +2,7 @@ import { screen, waitFor, within } from '@testing-library/react';
 import { fail, ok } from '@tests/utils/renderer/createMockApi';
 import {
   NOT_CONNECTED,
+  deferred,
   row,
   rows,
   setupAccounts,
@@ -62,7 +63,8 @@ describe('Settings → Accounts: Experimental switches (R17)', () => {
     const toggle = await cartSwitch();
 
     expect(within(cart).getByRole('heading', { level: 4, name: 'Experimental' })).toBeVisible();
-    expect(within(cart).getByRole('region', { name: 'Experimental' })).toHaveTextContent(
+    // Named with the provider: two providers with experiments are two distinct regions
+    expect(within(cart).getByRole('region', { name: 'Cart Stay experimental' })).toHaveTextContent(
       'Takes effect when WA Stay restarts.'
     );
     await waitFor(() => expect(toggle).toBeEnabled());
@@ -198,6 +200,46 @@ describe('Settings → Accounts: Experimental switches (R17)', () => {
       expect(rawAnnouncement()).toBe('');
     }
   );
+
+  it('the switch is disabled while its change is saved, and keeps focus once it is', async () => {
+    const answer = deferred<unknown>();
+    const { user, setExperiment } = setup(
+      ON,
+      jest.fn(() => answer.promise)
+    );
+    await rows();
+    const toggle = await cartSwitch();
+    await waitFor(() => expect(toggle).toBeChecked());
+
+    await user.click(toggle);
+
+    expect(setExperiment).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(toggle).toBeDisabled());
+    answer.resolve(ok([{ ...ON, enabled: false }]));
+    await waitFor(() => expect(toggle).toBeEnabled());
+    expect(toggle).not.toBeChecked();
+    await waitFor(() => expect(toggle).toHaveFocus());
+  });
+
+  it('turning it back on while it is still on (its turn-off waits for the restart) says nothing about a restart', async () => {
+    const { user, setExperiment } = setup({ ...ON, enabled: false });
+    await rows();
+    const toggle = await cartSwitch();
+    await waitFor(() => expect(toggle).toBeEnabled());
+
+    await user.click(toggle);
+    const dialog = await screen.findByRole('alertdialog', { name: DIALOG });
+    expect(dialog).toHaveTextContent(AUTO_CART.warning);
+    expect(dialog).not.toHaveTextContent('Takes effect when WA Stay restarts.');
+    await user.click(within(dialog).getByRole('button', { name: 'Turn on' }));
+
+    expect(setExperiment).toHaveBeenCalledWith('cartstay', 'autoCart', true);
+    await waitFor(() => expect(toggle).toBeChecked());
+    expect(
+      within(row('Cart Stay')).queryByText(/^Turns (on|off) when WA Stay restarts\.$/)
+    ).toBeNull();
+    expect(rawAnnouncement()).toBe('');
+  });
 
   it("the experiments couldn't be loaded: says so, with Try again", async () => {
     const experiments = jest

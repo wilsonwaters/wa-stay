@@ -37,6 +37,8 @@ const messageOf = (error: unknown): string =>
  * change takes effect when WA Stay restarts, and the line under the switch says so until then.
  * Turning one on asks first (its description, its warning and the restart); turning one off
  * does not, and a refusal (a stay held on the provider) shows under the switch, which stays on.
+ * A switch is disabled while its change is being saved; focus stays on it (or comes back to it,
+ * when the dialog closes or the switch is enabled again).
  */
 export function Experiments({ manifest }: { manifest: ProviderManifest }) {
   const declared = manifest.experiments ?? [];
@@ -48,9 +50,16 @@ export function Experiments({ manifest }: { manifest: ProviderManifest }) {
   const lastConfirming = useRef<ProviderExperiment | null>(null);
   if (confirming) lastConfirming.current = confirming;
   const [refusals, setRefusals] = useState<Record<string, string | undefined>>({});
+  const switches = useRef(new Map<string, HTMLInputElement>());
+  // A disabled switch can lose focus, and the dialog gives it back while it is disabled: once
+  // the change is saved, focus that went nowhere comes back to the switch
+  const keepFocus = (experiment: ProviderExperiment) =>
+    requestAnimationFrame(() => {
+      const focused = document.activeElement;
+      if (!focused || focused === document.body) switches.current.get(experiment.id)?.focus();
+    });
   const idOf = (experiment: ProviderExperiment, part: string) =>
     `experiment-${manifest.id}-${experiment.id}-${part}`;
-  const headingId = `experiments-${manifest.id}-heading`;
 
   const save = async (experiment: ProviderExperiment, enabled: boolean) => {
     setRefusals((current) => ({ ...current, [experiment.id]: undefined }));
@@ -69,6 +78,8 @@ export function Experiments({ manifest }: { manifest: ProviderManifest }) {
       await save(experiment, false);
     } catch (error) {
       setRefusals((current) => ({ ...current, [experiment.id]: messageOf(error) }));
+    } finally {
+      keepFocus(experiment);
     }
   };
 
@@ -78,15 +89,22 @@ export function Experiments({ manifest }: { manifest: ProviderManifest }) {
     // A failure rejects: the dialog stays open and shows main's reason
     await save(experiment, true);
     setConfirming(null);
+    keepFocus(experiment);
   };
 
   const closing = confirming ?? lastConfirming.current;
+  // Still on in this run (its turn-off is waiting for the restart): turning it on again changes
+  // nothing that needs a restart
+  const closingActive = states.data?.find((s) => s.id === closing?.id)?.active === true;
+  const saving = (experiment: ProviderExperiment) =>
+    setExperiment.isPending && setExperiment.variables?.experimentId === experiment.id;
   return (
-    <section aria-labelledby={headingId} className="mt-4 flex max-w-prose flex-col gap-3">
+    <section
+      aria-label={`${manifest.name} ${EXPERIMENTS_TEXT.heading.toLowerCase()}`}
+      className="mt-4 flex max-w-prose flex-col gap-3"
+    >
       <div>
-        <h4 id={headingId} className="text-sm font-semibold text-fg">
-          {EXPERIMENTS_TEXT.heading}
-        </h4>
+        <h4 className="text-sm font-semibold text-fg">{EXPERIMENTS_TEXT.heading}</h4>
         <p className="text-sm text-fg-muted">{EXPERIMENTS_TEXT.restart}</p>
       </div>
       {states.isError ? (
@@ -115,11 +133,15 @@ export function Experiments({ manifest }: { manifest: ProviderManifest }) {
           return (
             <div key={experiment.id} className="flex flex-col gap-1.5">
               <Switch
+                ref={(input) => {
+                  if (input) switches.current.set(experiment.id, input);
+                  else switches.current.delete(experiment.id);
+                }}
                 id={idOf(experiment, 'switch')}
                 label={experiment.label}
                 description={experiment.description}
                 checked={state?.enabled ?? false}
-                disabled={!states.isSuccess}
+                disabled={!states.isSuccess || saving(experiment)}
                 aria-describedby={describedBy || undefined}
                 onChange={(event) => {
                   if (event.target.checked) setConfirming(experiment);
@@ -156,7 +178,7 @@ export function Experiments({ manifest }: { manifest: ProviderManifest }) {
           <div className="flex flex-col gap-3">
             <p>{closing?.description}</p>
             {closing?.warning && <p className="font-medium text-fg">{closing.warning}</p>}
-            <p>{EXPERIMENTS_TEXT.restart}</p>
+            {!closingActive && <p>{EXPERIMENTS_TEXT.restart}</p>}
           </div>
         }
         confirmLabel={EXPERIMENTS_TEXT.turnOn}
