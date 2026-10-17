@@ -20,10 +20,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Clicking an alert that a watch found something, or that a snipe found the dates free, opens the provider's booking page for those dates in your browser as well as the watch or snipe in WA Stay, for every provider. An alert that a site is held still opens only the watch or snipe, where you pay (#54).
 - **Interactive pace**: what you start (your dates on Explore, a place's "Check availability", "Check now") goes first, while watches and snipes are spaced out in the background for a provider that asks for a pause between requests (RAC: 10 seconds) (#49).
 - Alerts and screens name what was found by its kind ("Cabins available at …", "A spot is free at …" for several kinds), not always "site" (#56).
-- Settings → Notifications no longer says "site" for what a watch finds or holds.
+- Settings → Notifications no longer says "site" for what a watch finds or holds (#67).
 
 ### Fixed
-- A watch check still running when the watch was moved to another place, or its dates or units changed, could save what it found for the old one and alert on it. Its answer is now dropped, and the watch checks again at once.
+- A watch check still running when the watch was moved to another place, or its dates, units, stay types or stay fields changed, could save what it found (or its error) for the old one and alert on it. Its answer and its failure are now dropped, and the watch checks again at once; only a provider turning the check away (HTTP 403 or 429) is still recorded, and then the watch waits its interval (#67).
 
 ## [2.0.0] - 2026-10-11
 

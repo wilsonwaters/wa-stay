@@ -221,9 +221,9 @@ Open Settings from the account menu (top right).
     and stays open only to members (the school-holiday pre-sale) read as free;
   - Site Sniper times school-holiday snipes to the members' pre-sale, 48 hours before everyone
     else (not for Margaret River's dorms, which are not in it);
-  - **Book on RAC** opens RAC's pages as a member, and **Copy RAC member number** sits beside it
-    (on a place's page, a watch and an alerted snipe). You type or paste the number at RAC's own
-    checkout, where RAC checks it against your name.
+  - **Book on RAC** opens the book-now page as a member, and **Copy RAC member number** sits
+    beside it (on a place's page, a watch and an alerted snipe). You type or paste the number at
+    RAC's own checkout, where RAC checks it against your name.
 
   Saving, replacing or removing it checks RAC's availability again. A copied number stays on
   the clipboard until you copy something else, and Windows keeps copies of what you copy if
@@ -242,14 +242,16 @@ Open Settings from the account menu (top right).
 - **WA Stay checks watches and runs snipes only while it is running** (and the computer is
   awake). Closing the window quits it; turn on **Start WA Stay when you sign in** to keep it
   going.
-- **Your data stays on your computer**, in `%APPDATA%\WA Stay` on Windows, your RAC member
-  number included. WA Stay talks to the providers (ParkStay, the DBCA queue, RAC), Mapbox for
-  the map (the Mapbox map library also sends Mapbox its standard usage events), GitHub for
-  updates, and your own email server if you set one up. WA Stay itself has no account, no cloud
-  service and no analytics.
+- **Your data stays on your computer**, in `%APPDATA%\WA Stay` on Windows. Your RAC member
+  number is kept there encrypted, and WA Stay never sends it. WA Stay talks to the providers
+  (ParkStay, the DBCA queue, RAC) and the sites that host their photos (RAC's come from NewBook,
+  its booking system), Mapbox for the map (the Mapbox map library also sends Mapbox its standard
+  usage events), GitHub for updates, and your own email server if you set one up. WA Stay
+  itself has no account, no cloud service and no analytics.
 - **What WA Stay sends RAC, and how often.** Only what it needs for the places and dates you
-  look at, watch or snipe, one request at a time: a park's booking page when you open the park,
-  and one availability request for a park and stay. Watches and snipes check in the
+  look at, watch or snipe, one request at a time: when you open a park, its book-now page (at
+  Exmouth, Karri Valley and Monkey Mia, an availability request instead, which lists their
+  cabins and sites), and one availability request for a park and stay. Watches and snipes check in the
   background, at least 10 seconds apart: a watch no more often than every 15 minutes, and a
   snipe every 10 seconds for at most 30 minutes after a release. Your member number is never
   sent.

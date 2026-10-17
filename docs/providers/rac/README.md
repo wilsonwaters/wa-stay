@@ -204,10 +204,10 @@ public release times.
 - **Where it is kept.** Encrypted on the computer, in RAC's own secret store
   ([security](../../security.md#secret-storage)). It is write-only: the app never shows it
   again, and only `membership.ts` reads it, as a yes or no.
-- **It is never sent.** Not to RAC, not anywhere: RAC offers no way to check a number without a
-  booking, and WA Stay never tries one. The person types or pastes it at RAC's own checkout;
-  **Copy RAC member number** (in Settings, and beside "Book on RAC" on a place page, a watch and
-  an alerted snipe) puts it on the clipboard for that.
+- **WA Stay never sends it.** Not to RAC, not anywhere: RAC offers no way to check a number
+  without a booking, and WA Stay never tries one. The person types or pastes it at RAC's own
+  checkout; **Copy RAC member number** (in Settings, and beside "Book on RAC" on a place page, a
+  watch and an alerted snipe) puts it on the clipboard for that.
 
 ## RAC's terms
 

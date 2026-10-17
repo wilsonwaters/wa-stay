@@ -52,8 +52,8 @@ bookings: ParkStay is now one **provider** of several, and existing users are
   and keeps the session alive while it is needed.
 - **Provider accounts.** Sign in to ParkStay in the app, on ParkStay's own page (optional;
   holds work without it). Save your RAC member number for members' rates and the members'
-  pre-sale (optional; kept encrypted on your computer and never sent: you type it at RAC's
-  checkout, and WA Stay can copy it for you).
+  pre-sale (optional; kept encrypted on your computer, and WA Stay never sends it: you type it
+  at RAC's checkout, and WA Stay can copy it for you).
 - **Site Sniper** *(coming soon)*. Catch a hard-to-get site the moment it is released: when a
   provider opens new dates, at a release time you set, or, for ParkStay, when someone cancels.
   It alerts you with a link to book, or holds the site for you to pay for on the provider's own

@@ -57,10 +57,11 @@ nothing for 30 minutes, longer if it happens again (at most a day), and says unt
 Explore's RAC parks read "Couldn't check RAC", and a watch or snipe shows the message ("WA Stay
 won't ask again until 3:45 pm."). A snipe stops there; start it again later if you want. Wait
 until the time given: restarting WA Stay doesn't shorten the pause, and WA Stay never tries to
-get around RAC's checks. RAC's own site still works in your browser.
+get around RAC's checks. You can still try RAC's site in your browser.
 
-**"Too many checks in a short time".** ParkStay asked the app to slow down. Wait a minute before checking
-again; WA Stay never retries this straight away.
+**"{provider} asked WA Stay to slow down".** The provider answered "too many requests" (HTTP
+429). Try again later: WA Stay never retries this straight away. ParkStay usually lets you check
+again after a minute; RAC also pauses every request for 30 minutes or more (above).
 
 ## Watches
 

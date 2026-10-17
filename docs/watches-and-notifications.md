@@ -11,11 +11,12 @@ This page is the deep dive; the [user guide](user-guide.md#watches) has the shor
 **Watches → New watch**, or **Watch for availability** on a place's page (which fills in the
 provider, the place and your dates, and opens on "Your stay"). Five steps:
 
-1. **Provider.** Only providers that support watches are listed; with one (ParkStay WA), it is
+1. **Provider.** Only providers that support watches are listed; when only one does, it is
    chosen for you but still shown.
 2. **Location.** Search the provider's synced catalogue.
 3. **Your stay.** Dates and guests, the provider's own fields (ParkStay: **Camping with**:
-   Any, Tent, Campervan or Caravan), **Stay type** at a place whose units are of more than one
+   Any, Tent, Campervan or Caravan; RAC: **Pets**, up to 2, where pets are allowed), **Stay
+   type** at a place whose units are of more than one
    kind ([below](#stay-types)), **Preferred sites** (leave all unticked to hear about any
    site) and **Max price per night** (optional; in dollars, applied only when the provider
    shows a price for every night). A warning says when the stay is shorter than the sites
@@ -189,9 +190,11 @@ a cart is never one (the provider's rule). It is never stored: the watch's page 
 same link from the last check ("Book on {provider}" under the result, while the stay has not
 begun), and logs name only a link's origin. Moving a watch to another place forgets what its
 last check saw, so the page shows no link (and no result) until the new place is checked. A
-check that was already running when the watch was moved, or its stay, units or stay types
-changed, keeps nothing of its answer and alerts on nothing: the change makes the watch due
-again, and the next check asks about what it is now.
+check that was already running when the watch was moved, or its stay, units, stay types or
+stay fields changed, keeps nothing of its answer or its failure and alerts on nothing: the
+change makes the watch due again, and the next check asks about what it is now. A provider
+turning that check away (HTTP 403 or 429) is the one thing kept: the watch shows it, and its
+next check waits its interval rather than asking again at once.
 
 ### For developers
 
