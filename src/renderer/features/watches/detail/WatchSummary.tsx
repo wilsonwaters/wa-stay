@@ -11,9 +11,10 @@ import { intervalLabel } from '../form/watchFormSchema';
 import type { UnitNoun } from '../../../components/nightGridModel';
 import {
   autoHoldLabel,
+  heldNoun,
   statusPillFor,
   unitNameOf,
-  unitNounFor,
+  watchNoun,
   type WatchState,
 } from '../shared/watchState';
 
@@ -64,7 +65,14 @@ function chosenUnits(watch: Watch, units: readonly UnitSummary[] | undefined, no
 /** The watch's stay, preferences and status, side by side (no cards inside cards). */
 export function WatchSummary({ watch, state, manifest, today, now, units }: WatchSummaryProps) {
   const { stay } = watch;
-  const noun = unitNounFor(manifest);
+  // The units it wants (its last check's), else the chosen units, its stay types or the place's
+  const chosen = units?.filter(
+    (u) => watch.unitIds.includes(u.unitId) || watch.unitIds.includes(u.unitName)
+  );
+  const noun = watchNoun(watch, manifest, {
+    about: watch.lastAvailability ?? chosen,
+    placeUnits: units,
+  });
   const zone = manifest?.timezone ?? 'Australia/Perth';
   const params = (manifest?.stayFields ?? []).filter((f) => watch.stayParams[f.key] !== undefined);
   const showStayType = watch.unitKinds.length > 0 || isMixedPlace(units && placeUnitKinds(units));
@@ -114,7 +122,7 @@ export function WatchSummary({ watch, state, manifest, today, now, units }: Watc
       </Group>
       <Group title="Status">
         <Item label="State">
-          <StatusPill {...statusPillFor(state)} />
+          <StatusPill {...statusPillFor(state, heldNoun(watch, manifest, units))} />
         </Item>
         <Item label="Last checked">
           {watch.lastCheckedAt ? (

@@ -4,16 +4,23 @@
  */
 import { CircleHelp } from 'lucide-react';
 import { SnipeReleaseMode, SnipeStatus } from '../../../../shared/types/common.types';
-import type { ProviderManifest } from '../../../../shared/types/provider.types';
 import type { SiteSnipe } from '../../../../shared/types/site-sniper.types';
-import { unitNoun } from '../../../components/locationFormat';
-import type { UnitNoun } from '../../../components/stay/UnitPicker';
+import { capitalise, type UnitNoun } from '../../../../shared/utils/unit-noun';
 import { statusPresets, type StatusPreset } from '../../../components/ui';
+
+// What a snipe's units are called, decided with the rest of its state (`snipeNouns.ts`)
+export { heldUnitNoun, snipeNoun } from './snipeNouns';
 
 const KNOWN = new Set<string>(Object.values(SnipeStatus));
 
-/** The status pill: the preset ("Paused", "Booked"…), or the raw status for one it does not know. */
-export function statusPillFor(status: string): StatusPreset {
+/**
+ * The status pill: the preset ("Paused", "Booked"…), a hold with the held unit's noun
+ * (`heldUnitNoun`: "Site held"), or the raw status for one it does not know.
+ */
+export function statusPillFor(status: string, held: UnitNoun): StatusPreset {
+  if (status === SnipeStatus.HELD) {
+    return { ...statusPresets.snipe[SnipeStatus.HELD], label: `${capitalise(held.one)} held` };
+  }
   if (KNOWN.has(status)) return statusPresets.snipe[status as SnipeStatus];
   return { tone: 'neutral', icon: CircleHelp, label: status };
 }
@@ -173,14 +180,6 @@ export function releaseLineFor(snipe: SiteSnipe): ReleaseLine {
 }
 
 /**
- * What a provider's units are called (its main location kind): ParkStay's are sites. A snipe
- * keeps no location kind, so this is the provider's first.
- */
-export function unitNounFor(manifest: ProviderManifest | undefined): UnitNoun {
-  return unitNoun(manifest?.locationKinds[0]);
-}
-
-/**
  * A unit by the place's own name for it ("CAMPSITE 01", "Camp site (no power)"). Without one, a
  * plain number reads "Site 12"; any other id (a class such as `class:117`) is never shown and
  * reads "A site".
@@ -193,7 +192,7 @@ export function unitLabel(
   const named = unitId ? names?.get(unitId) : undefined;
   if (named) return named;
   if (!unitId || !/^\d+$/.test(unitId)) return `A ${noun.one}`;
-  return `${noun.one.charAt(0).toUpperCase()}${noun.one.slice(1)} ${unitId}`;
+  return `${capitalise(noun.one)} ${unitId}`;
 }
 
 /** Most urgent first: a hold to pay for, then running snipes, paused, ended, booked. */

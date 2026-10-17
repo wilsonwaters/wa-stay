@@ -229,7 +229,8 @@ describe('split nights (free, but not on the same unit as the nights next to the
 
   it('say "Free on another site" in the cell, with no price', () => {
     expect(nightCellText(split.nights[1], 'AUD', SITE)).toEqual({ label: 'Free on another site' });
-    expect(nightCellText(split.nights[1]).label).toBe('Free on another unit');
+    // With no kinds to go on, a unit is a "spot" (R9)
+    expect(nightCellText(split.nights[1]).label).toBe('Free on another spot');
   });
 });
 

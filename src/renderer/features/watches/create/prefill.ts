@@ -8,7 +8,11 @@
  */
 import type { ProviderManifest, UnitKind } from '../../../../shared/types/provider.types';
 import { parseCreatePrefill } from '../../../app/routes';
-import { clampStayParams, EMPTY_STAY_PARAMS, hasUnusableStayType } from '../../../app/stayParams';
+import {
+  clampStayParams,
+  EMPTY_STAY_PARAMS,
+  unusableStayTypeNotice,
+} from '../../../app/stayParams';
 import { providerToday } from '../../../components/stay/providerToday';
 
 export interface WatchPrefill {
@@ -77,8 +81,7 @@ export function parseWatchPrefill(
     prefill.notices.push("The link's guests couldn't be used, so check who's coming.");
 
   if (parsed.stay) prefill.unitKinds = [...parsed.stay];
-  if (hasUnusableStayType(raw.get('stay'))) {
-    prefill.notices.push("The link's stay type couldn't be used, so choose one.");
-  }
+  const stayNotice = unusableStayTypeNotice(raw.get('stay'));
+  if (stayNotice) prefill.notices.push(stayNotice);
   return prefill;
 }

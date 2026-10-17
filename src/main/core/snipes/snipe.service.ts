@@ -44,7 +44,7 @@ import {
 } from '@shared/types/common.types';
 import { toStayQuery } from '@shared/types/stay.types';
 import { compareDates, isCalendarDate, todayIn } from '@shared/utils/calendar-date';
-import { cleanUnitKinds } from '@shared/utils/unit-kinds';
+import { cleanUnitKinds, isUnitKind } from '@shared/utils/unit-kinds';
 import { DEFAULT_SNIPE_POLL_INTERVAL_MS } from '@shared/constants';
 import type { SiteSniperRepository } from '../../database/repositories';
 import type { ProviderRegistry, ProviderWith } from '../../providers/registry';
@@ -65,9 +65,12 @@ import { freeForStay, kindsAmbiguous, wantedUnits } from '../watches/matching';
 
 const log = logger.child({ module: 'sitesniper' });
 
-/** Why a snipe that names no units ended at a place with free units of several stay types. */
+/**
+ * Why a snipe that names no units ended: the units it could hold (those of its stay types, or
+ * every unit), booked or free, are of more than one stay type.
+ */
 const MIXED_KINDS_ERROR =
-  'Free units of more than one stay type: choose a stay type or units for this snipe';
+  'The units this snipe could hold are of more than one stay type: choose one stay type or units for it';
 
 /** The provider a snipe runs on: availability, holds and a release policy (and maybe a queue). */
 export type SnipeProvider = ProviderWith<'snipes'>;
@@ -261,7 +264,7 @@ export class SiteSniperService {
       throw new AppError(
         'VALIDATION',
         snipe.status === SnipeStatus.HELD
-          ? 'This snipe already holds a site'
+          ? 'This snipe already has a hold'
           : 'This snipe is already booked'
       );
     }
@@ -424,7 +427,7 @@ export class SiteSniperService {
       outcome('done', SnipeResult.ERROR, { error: 'The attempt was stopped' });
 
     const snipe = this.repo.findById(snipeId);
-    if (!snipe) return outcome('done', SnipeResult.ERROR, { error: 'Site snipe not found' });
+    if (!snipe) return outcome('done', SnipeResult.ERROR, { error: 'Snipe not found' });
     if (!snipe.isActive || TERMINAL_SNIPE_STATUSES.has(snipe.status)) {
       return outcome('done', SnipeResult.EXPIRED, { error: 'Snipe is not active' });
     }
@@ -568,6 +571,8 @@ export class SiteSniperService {
           );
         }
         try {
+          // What the alert calls the held unit: its kind in the check, when it was in it
+          const heldKind = availability.units.find((unit) => unit.unitId === unitId)?.unitKind;
           await this.notifications.notifySnipeHeld(
             stored ?? {
               ...snipe,
@@ -578,7 +583,8 @@ export class SiteSniperService {
               holdExpiresAt: hold.expiresAt,
               holdUnitId: unitId,
               paymentUrl,
-            }
+            },
+            isUnitKind(heldKind) ? heldKind : undefined
           );
         } catch (error) {
           log.error(`Snipe ${snipeId}: hold ${hold.reference} placed but not notified`, error);
@@ -635,7 +641,7 @@ export class SiteSniperService {
         this.recordAttempt(snipeId, SnipeResult.QUEUE_FULL, message, checkedAt, nextCheck, false);
         return outcome('access-gate', SnipeResult.QUEUE_FULL, { error: message });
       }
-      log.error(`Site snipe ${snipeId} execution failed: ${message}`);
+      log.error(`Snipe ${snipeId} execution failed: ${message}`);
       this.recordAttempt(snipeId, SnipeResult.ERROR, message, checkedAt, nextCheck, true);
       return outcome('continue', SnipeResult.ERROR, { error: message });
     }
@@ -684,11 +690,11 @@ export class SiteSniperService {
   }
 
   /**
-   * Free units at a place with more than one stay type, and none chosen: the snipe FAILS
-   * (counted) and the person is warned, with a link to the snipe.
+   * A unit free, but the units the snipe could hold are of more than one stay type, and none
+   * chosen: the snipe FAILS (counted) and the person is warned, with a link to the snipe.
    */
   private async failMixedKinds(snipe: SiteSnipe, checkedAt: Date): Promise<SnipeOutcome> {
-    log.info(`Snipe ${snipe.id}: no hold, free units of more than one stay type`);
+    log.info(`Snipe ${snipe.id}: no hold, its units are of more than one stay type`);
     this.repo.incrementAttempts(snipe.id);
     this.repo.finish(snipe.id, SnipeStatus.FAILED, SnipeResult.ERROR, MIXED_KINDS_ERROR);
     this.changed(snipe.id);
@@ -723,14 +729,14 @@ export class SiteSniperService {
 
   private requireSnipe(id: number): SiteSnipe {
     const snipe = this.repo.findById(id);
-    if (!snipe) throw new AppError('NOT_FOUND', 'Site snipe not found');
+    if (!snipe) throw new AppError('NOT_FOUND', 'Snipe not found');
     return snipe;
   }
 
   /** Emits `snipe:updated` with the stored snipe, and returns it. */
   private changed(id: number): SiteSnipe {
     const snipe = this.repo.findById(id);
-    if (!snipe) throw new AppError('NOT_FOUND', 'Site snipe not found');
+    if (!snipe) throw new AppError('NOT_FOUND', 'Snipe not found');
     this.events?.emit('snipe:updated', snipe);
     return snipe;
   }

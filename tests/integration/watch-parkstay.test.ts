@@ -128,6 +128,7 @@ describe('WatchService on ParkStay (fixture server)', () => {
       ['3', '4', '5'].map((id) => ({
         unitId: id,
         unitName: `CAMPSITE 0${id}`,
+        unitKind: 'campsite',
         arrival: '2026-11-10',
         departure: '2026-11-12',
         partial: false,
@@ -208,6 +209,7 @@ describe('WatchService on ParkStay (fixture server)', () => {
       {
         unitId: '1',
         unitName: 'CAMPSITE 01',
+        unitKind: 'campsite',
         arrival: '2026-11-10',
         departure: '2026-11-11',
         partial: true,

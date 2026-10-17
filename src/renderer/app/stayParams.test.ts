@@ -2,6 +2,7 @@ import {
   clampStayParams,
   hasDates,
   hasUnusableStayType,
+  unusableStayTypeNotice,
   isStayType,
   parseStayParams,
   parseStayTypes,
@@ -130,5 +131,19 @@ describe('stay types', () => {
     expect(hasUnusableStayType('cabin,cabin, room,')).toBe(false);
     expect(hasUnusableStayType('')).toBe(false);
     expect(hasUnusableStayType(null)).toBe(false);
+  });
+
+  it('says to choose a stay type when none is usable, else that only the rest were left out', () => {
+    expect(unusableStayTypeNotice('castle')).toBe(
+      "The link's stay type couldn't be used, so choose one."
+    );
+    expect(unusableStayTypeNotice('cabin,bogus')).toBe(
+      "One of the link's stay types couldn't be used, so it was left out."
+    );
+    expect(unusableStayTypeNotice('cabin,bogus,castle,bogus')).toBe(
+      "Some of the link's stay types couldn't be used, so they were left out."
+    );
+    expect(unusableStayTypeNotice('cabin,room')).toBeUndefined();
+    expect(unusableStayTypeNotice(null)).toBeUndefined();
   });
 });

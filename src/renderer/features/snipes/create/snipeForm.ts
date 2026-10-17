@@ -126,9 +126,12 @@ export interface SnipeFormContext {
   noun?: UnitNoun;
 }
 
-/** Why a snipe at a mixed place needs a stay type or a unit chosen. */
+/**
+ * Why a snipe at a mixed place needs one stay type or a unit chosen: none, or more than one, is
+ * chosen.
+ */
 export function snipeHoldChoiceMessage(noun: UnitNoun): string {
-  return `Choose a stay type or a ${noun.one}. At a place with more than one stay type, Site Sniper holds only what you choose.`;
+  return `Choose one stay type or a ${noun.one}. At a place with more than one stay type, Site Sniper holds only what you choose.`;
 }
 
 /** Midnight of check-in day where the provider is (epoch ms), or never when there is no date. */
@@ -166,7 +169,7 @@ export function snipeFormSchema({
     }
 
     if (!modes.some((mode) => mode.id === v.releaseMode)) {
-      issue(['releaseMode'], 'Choose when the sites are released');
+      issue(['releaseMode'], `Choose when the ${noun.many} are released`);
     } else if (v.releaseMode === SnipeReleaseMode.SCHEDULED && manifest) {
       const at = zonedInstant(v.releaseDate, v.releaseTime, manifest.timezone);
       if (!v.releaseDate || !v.releaseTime)

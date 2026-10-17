@@ -269,20 +269,22 @@ export const exampleApiManifest: ProviderManifest = {
 ### Location kinds
 
 `locationKinds` comes from a fixed list (`LOCATION_KINDS` in `src/shared/types/provider.types.ts`).
-A place's kind sets its label and what its units are called on Explore's cards and the place
-page ("2 of 6 cabins available"):
+A place's kind sets its label. What its units are called, on Explore's cards, the place page and
+in alerts ("2 of 6 cabins available"), comes from their unit kinds (each unit's `unitKind`, else
+the place's `unitKinds`): one stay type gives its own noun (site, cabin, room, bunk or tent), and
+more than one, or `other`, gives "spots". A place that gives no unit kinds has those of its kind:
 
 | Kind | Shown as | Its units are called |
 | --- | --- | --- |
 | `campground` | Campground | sites |
 | `caravan-park` | Caravan park | sites |
-| `holiday-park` | Holiday park | sites |
+| `holiday-park` | Holiday park | spots |
 | `cabin` | Cabin | cabins |
 | `hut` | Hut | bunks |
 | `glamping` | Glamping | tents |
-| `farm-stay` | Farm stay | rooms |
-| `home` | Home | rooms |
-| `other` | Place to stay | units |
+| `farm-stay` | Farm stay | spots |
+| `home` | Home | spots |
+| `other` | Place to stay | spots |
 
 Map the provider's own words to these with an explicit table, and a word you do not know to
 `other` (so keep `other` in `locationKinds`).

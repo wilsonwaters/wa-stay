@@ -154,7 +154,7 @@ describe('snipe attempt', () => {
       unitKinds: { s1: 'campsite', c1: 'cabin', d1: 'dorm' },
     };
     const MIXED_ERROR =
-      'Free units of more than one stay type: choose a stay type or units for this snipe';
+      'The units this snipe could hold are of more than one stay type: choose one stay type or units for it';
 
     it("with unitKinds ['cabin'] it holds a cabin, even when a free site is listed first", async () => {
       const snipe = await sniping(mixedPlace, { unitKinds: ['cabin'] });

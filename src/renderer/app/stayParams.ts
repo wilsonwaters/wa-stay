@@ -137,8 +137,26 @@ export function parseStayTypes(raw: string | null | undefined): StayTypeKind[] {
  * which `parseStayTypes` leaves out: a create flow says so. Repeats and empty items do not count.
  */
 export function hasUnusableStayType(raw: string | null | undefined): boolean {
-  return (raw ?? '')
-    .split(',')
-    .map((item) => item.trim())
-    .some((item) => item !== '' && !isStayType(item));
+  return unusableStayTypes(raw).length > 0;
+}
+
+/** What a `stay` query value names that is not a stay type, without repeats. */
+function unusableStayTypes(raw: string | null | undefined): string[] {
+  const items = (raw ?? '').split(',').map((item) => item.trim());
+  return [...new Set(items.filter((item) => item !== '' && !isStayType(item)))];
+}
+
+/**
+ * A create flow's notice for a `stay` query value naming something that is not a stay type:
+ * with none of its stay types usable, to choose one; with some kept, that only the others were
+ * left out ("stay=cabin,castle" keeps Cabins & villas). None when all of it is usable.
+ */
+export function unusableStayTypeNotice(raw: string | null | undefined): string | undefined {
+  const unusable = unusableStayTypes(raw).length;
+  if (unusable === 0) return undefined;
+  if (parseStayTypes(raw).length === 0)
+    return "The link's stay type couldn't be used, so choose one.";
+  return unusable === 1
+    ? "One of the link's stay types couldn't be used, so it was left out."
+    : "Some of the link's stay types couldn't be used, so they were left out.";
 }

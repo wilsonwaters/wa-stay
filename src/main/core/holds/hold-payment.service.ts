@@ -136,7 +136,7 @@ export class HoldPaymentService {
   /** Opens the payment window for a HELD snipe's hold (see the class comment). */
   async openForSnipe(id: number): Promise<void> {
     const snipe = this.deps.snipes.findById(id);
-    if (!snipe) throw new AppError('NOT_FOUND', 'Site snipe not found');
+    if (!snipe) throw new AppError('NOT_FOUND', 'Snipe not found');
     const provider = this.deps.providers.require(snipe.providerId, 'holds');
     const { holdReference, holdExpiresAt } = snipe;
     if (snipe.status !== SnipeStatus.HELD || !holdReference || !this.unexpired(holdExpiresAt)) {

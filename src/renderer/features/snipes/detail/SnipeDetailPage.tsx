@@ -31,9 +31,9 @@ import { HeldPanel } from '../shared/HeldPanel';
 import { ReleaseLine } from '../shared/ReleaseLine';
 import { SnipeActionsBar } from '../shared/SnipeActionsBar';
 import { SnipeTimeline } from '../shared/SnipeTimeline';
-import { isFinished, timelineSteps } from '../shared/snipeState';
+import { isFinished, snipeNoun, timelineSteps } from '../shared/snipeState';
 import { useSnipeActions } from '../shared/useSnipeActions';
-import { useUnitNames } from '../shared/useUnitNames';
+import { usePlaceUnits } from '../shared/usePlaceUnits';
 import { bookingHref } from '../shared/snipeFormat';
 import { HoldAlert, useStatusAnnouncements } from '../shared/useStatusAnnouncements';
 import { SnipeRecord, SnipeSummary } from './SnipeSummary';
@@ -55,8 +55,8 @@ function SnipeDetailView({ snipe, manifest, updating: fetching }: ViewProps) {
   const now = useNow();
   const [confirming, setConfirming] = useState(false);
   const place = useLocationDetail(snipe.locationKey);
-  const names = useUnitNames(snipe);
-  const actions = useSnipeActions(snipe, manifest, names);
+  const units = usePlaceUnits(snipe);
+  const actions = useSnipeActions(snipe, manifest, units);
   const snipes = useMemo(() => [snipe], [snipe]);
   const manifestOf = useCallback(() => manifest, [manifest]);
   const alert = useStatusAnnouncements(snipes, manifestOf);
@@ -110,7 +110,7 @@ function SnipeDetailView({ snipe, manifest, updating: fetching }: ViewProps) {
       />
       <HoldAlert message={alert} />
       {snipe.status === SnipeStatus.HELD && (
-        <HeldPanel snipe={snipe} manifest={manifest} actions={actions} unitNames={names} />
+        <HeldPanel snipe={snipe} manifest={manifest} actions={actions} place={units} />
       )}
       {snipe.status === SnipeStatus.BOOKED && (
         <Notice tone="success" title={`Booked on ${provider}`}>
@@ -134,7 +134,7 @@ function SnipeDetailView({ snipe, manifest, updating: fetching }: ViewProps) {
           message={
             manifest.capabilities.account === 'optional'
               ? `Connect ${provider} before the release so checkout is quicker.`
-              : `${provider} needs you signed in before Site Sniper can hold a site.`
+              : `${provider} needs you signed in before Site Sniper can hold a ${snipeNoun(snipe, manifest, units.units).one}.`
           }
         />
       )}
@@ -145,7 +145,7 @@ function SnipeDetailView({ snipe, manifest, updating: fetching }: ViewProps) {
           </h2>
           <ReleaseLine snipe={snipe} manifest={manifest} />
           <SnipeTimeline snipe={snipe} />
-          <SnipeRecord snipe={snipe} manifest={manifest} now={now} />
+          <SnipeRecord snipe={snipe} manifest={manifest} now={now} units={units.units} />
         </section>
         <SnipeSummary
           snipe={snipe}

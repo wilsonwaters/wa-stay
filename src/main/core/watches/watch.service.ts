@@ -57,7 +57,7 @@ const log = logger.child({ module: 'watches' });
 
 /** Why an automatic hold was not placed at a place with more than one stay type. */
 const MIXED_KINDS_NOTE =
-  'Not held automatically: this place has more than one stay type. Choose a stay type or units to let WA Stay hold one.';
+  'Not held automatically: this place has more than one stay type. Choose one stay type or units to let WA Stay hold one.';
 
 /** The provider a watch runs on: one with availability. */
 export type WatchProvider = ProviderWith<'watches'>;
@@ -347,7 +347,7 @@ export class WatchService {
         // An automatic hold that was not placed says why (the run itself succeeded)
         if (!hold && outcome.note) this.repo.setLastError(watchId, outcome.note);
         if (hold) {
-          await this.notifications.notifyWatchHeld(watch, hold, full[0].unitName, link);
+          await this.notifications.notifyWatchHeld(watch, hold, full[0], link);
         } else {
           if (signal?.aborted) return result({ error: 'The check was stopped' });
           await this.notifications.notifyWatchFound(watch, full, outcome.note, link);
@@ -516,7 +516,7 @@ export class WatchService {
     const { manifest } = provider;
     const signInNote = `Sign in to ${manifest.shortName} to enable automatic holds`;
     if (!provider.holds || manifest.capabilities.holds !== true) {
-      return { note: `${manifest.shortName} cannot hold sites automatically` };
+      return { note: `${manifest.shortName} cannot hold automatically` };
     }
     if (mixedKinds) {
       log.info(`Watch ${watch.id}: no automatic hold, more than one stay type`);

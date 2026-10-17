@@ -21,7 +21,8 @@ export type StatusPreset = Pick<StatusPillProps, 'tone' | 'icon' | 'label' | 'li
 /**
  * StatusPill props for every status the app shows, keyed by the enums in `src/shared/types`.
  * Use `<StatusPill {...statusPresets.snipe[snipe.status]} />`. A test fails if an enum value
- * has no preset.
+ * has no preset. Labels name no unit: a watch's or snipe's pill says "Site held" or "Cabin held"
+ * with its own noun (`statusPillFor` in their state modules).
  */
 export const statusPresets = {
   /** A watch's own state: running or paused. */
@@ -33,14 +34,14 @@ export const statusPresets = {
   },
   /** The outcome of a watch's last check. */
   watchResult: {
-    [WatchResult.FOUND]: { tone: 'available', icon: CircleCheck, label: 'Sites found' },
+    [WatchResult.FOUND]: { tone: 'available', icon: CircleCheck, label: 'Found' },
     [WatchResult.PARTIAL_FOUND]: {
       tone: 'warning',
       icon: TriangleAlert,
       label: 'Some nights found',
     },
     [WatchResult.NOT_FOUND]: { tone: 'neutral', icon: Search, label: 'Nothing yet' },
-    [WatchResult.HELD]: { tone: 'warning', icon: Timer, label: 'Site held' },
+    [WatchResult.HELD]: { tone: 'warning', icon: Timer, label: 'Held' },
     [WatchResult.BOOKED]: { tone: 'available', icon: CircleCheck, label: 'Booked' },
     [WatchResult.ERROR]: { tone: 'danger', icon: CircleAlert, label: 'Check failed' },
   },
@@ -49,7 +50,7 @@ export const statusPresets = {
     [SnipeStatus.WAITING_RELEASE]: { tone: 'sun', icon: Clock, label: 'Waiting for release' },
     [SnipeStatus.QUEUEING]: { tone: 'sun', icon: Hourglass, label: 'In the queue', live: true },
     [SnipeStatus.SNIPING]: { tone: 'brand', icon: Search, label: 'Trying now', live: true },
-    [SnipeStatus.HELD]: { tone: 'warning', icon: Timer, label: 'Site held' },
+    [SnipeStatus.HELD]: { tone: 'warning', icon: Timer, label: 'Held' },
     [SnipeStatus.BOOKED]: { tone: 'available', icon: CircleCheck, label: 'Booked' },
     [SnipeStatus.FAILED]: { tone: 'danger', icon: CircleAlert, label: 'Failed' },
     [SnipeStatus.EXPIRED]: { tone: 'neutral', icon: CircleX, label: 'Expired' },
@@ -58,7 +59,7 @@ export const statusPresets = {
   /** The outcome of a snipe attempt. */
   snipeResult: {
     [SnipeResult.PENDING]: { tone: 'neutral', icon: Clock, label: 'Pending' },
-    [SnipeResult.HELD]: { tone: 'warning', icon: Timer, label: 'Site held' },
+    [SnipeResult.HELD]: { tone: 'warning', icon: Timer, label: 'Held' },
     [SnipeResult.BOOKED]: { tone: 'available', icon: CircleCheck, label: 'Booked' },
     [SnipeResult.UNAVAILABLE]: { tone: 'neutral', icon: Ban, label: 'Not available' },
     [SnipeResult.TOO_EARLY]: { tone: 'sun', icon: Clock, label: 'Not released yet' },

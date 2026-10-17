@@ -247,10 +247,10 @@ describe('SmtpEmailNotifier: "Book on {shortName}" (R7)', () => {
     expect(mail.html).not.toMatch(/javascript:|http:\/\/parkstay|me:pw/);
   });
 
-  it("names the provider's site for a provider the registry does not know", async () => {
+  it("names the provider's website for a provider the registry does not know", async () => {
     const mail = await sent({ ...WATCH_FOUND, providerId: 'gone', bookingUrl: BOOKING_URL });
-    expect(mail.text).toContain(`Book on the provider's site: ${BOOKING_URL}`);
-    expect(mail.html).toContain('Book on the provider&#039;s site');
+    expect(mail.text).toContain(`Book on the provider's website: ${BOOKING_URL}`);
+    expect(mail.html).toContain('Book on the provider&#039;s website');
   });
 
   it('escapes &, \', " and non-ASCII in the href, and keeps the text part raw', async () => {

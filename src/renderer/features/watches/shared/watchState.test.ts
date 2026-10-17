@@ -1,7 +1,14 @@
 import { WatchResult } from '../../../../shared/types/common.types';
 import { FAKE_MANIFEST, PARKSTAY_MANIFEST } from '@tests/utils/renderer/manifests';
 import { makeWatch } from '@tests/fixtures/renderer/watches';
-import { autoHoldLabel, statusPillFor, unitNameOf, unitNounFor, watchStateOf } from './watchState';
+import {
+  autoHoldLabel,
+  heldNoun,
+  statusPillFor,
+  unitNameOf,
+  watchNoun,
+  watchStateOf,
+} from './watchState';
 
 const now = new Date('2099-12-01T02:00:00Z');
 const today = '2099-12-01';
@@ -40,23 +47,63 @@ describe('watchStateOf', () => {
 });
 
 describe('watch state helpers', () => {
-  it('gives each state its pill', () => {
-    expect(statusPillFor('active').label).toBe('Watching');
-    expect(statusPillFor('paused').label).toBe('Paused');
-    expect(statusPillFor('ended').label).toBe('Ended');
-    expect(statusPillFor('held').label).toBe('Site held');
-    expect(statusPillFor('booked').label).toBe('Booked');
+  const SITES = { one: 'site', many: 'sites' };
+
+  it('gives each state its pill, a hold with the held unit’s noun', () => {
+    expect(statusPillFor('active', SITES).label).toBe('Watching');
+    expect(statusPillFor('paused', SITES).label).toBe('Paused');
+    expect(statusPillFor('ended', SITES).label).toBe('Ended');
+    expect(statusPillFor('held', SITES).label).toBe('Site held');
+    expect(statusPillFor('hold-expired', { one: 'cabin', many: 'cabins' }).label).toBe(
+      'Cabin held'
+    );
+    expect(statusPillFor('booked', SITES).label).toBe('Booked');
   });
 
   it('names units by the provider’s main kind, and a held unit by its last-check name', () => {
-    expect(unitNounFor(PARKSTAY_MANIFEST)).toEqual({ one: 'site', many: 'sites' });
-    expect(unitNounFor(FAKE_MANIFEST)).toEqual({ one: 'site', many: 'sites' });
-    expect(unitNounFor(undefined)).toEqual({ one: 'unit', many: 'units' });
+    expect(watchNoun(makeWatch(), PARKSTAY_MANIFEST)).toEqual(SITES);
+    // A holiday park has sites and cabins (`deriveUnitKinds`): "spots"
+    expect(watchNoun(makeWatch(), FAKE_MANIFEST)).toEqual({ one: 'spot', many: 'spots' });
+    expect(watchNoun(makeWatch(), undefined)).toEqual({ one: 'spot', many: 'spots' });
     const watch = makeWatch({
       lastAvailability: [{ unitId: '7', unitName: 'Site 07', nights: [], fullyAvailable: true }],
     });
-    expect(unitNameOf(watch, '7', { one: 'site', many: 'sites' })).toBe('Site 07');
-    expect(unitNameOf(watch, '9', { one: 'site', many: 'sites' })).toBe('Site 9');
+    expect(unitNameOf(watch, '7', SITES)).toBe('Site 07');
+    expect(unitNameOf(watch, '9', SITES)).toBe('Site 9');
+  });
+
+  it('names a watch’s units by its last check, its stay types, the place or the provider (R9)', () => {
+    const unit = (unitId: string, unitKind?: 'cabin' | 'campsite') => ({
+      unitId,
+      unitName: `Unit ${unitId}`,
+      nights: [],
+      fullyAvailable: true,
+      ...(unitKind ? { unitKind } : {}),
+    });
+    const cabins = makeWatch({ lastAvailability: [unit('1', 'cabin'), unit('2', 'cabin')] });
+    expect(watchNoun(cabins, PARKSTAY_MANIFEST).many).toBe('cabins');
+    const mixed = makeWatch({ lastAvailability: [unit('1', 'cabin'), unit('2', 'campsite')] });
+    expect(watchNoun(mixed, PARKSTAY_MANIFEST).many).toBe('spots');
+    // A check stored before kinds: the stay types, then the place's units, then the provider
+    const old = makeWatch({ lastAvailability: [unit('1')] });
+    expect(watchNoun({ ...old, unitKinds: ['room'] }, PARKSTAY_MANIFEST).many).toBe('rooms');
+    expect(watchNoun(old, PARKSTAY_MANIFEST, { placeUnits: [unit('3', 'cabin')] }).many).toBe(
+      'cabins'
+    );
+    expect(watchNoun(old, PARKSTAY_MANIFEST).many).toBe('sites');
+  });
+
+  it('names a held unit by its own kind, and falls back when it is not in the last check', () => {
+    const hold = { reference: 'H1', expiresAt: new Date('2099-12-01T02:30:00Z'), unitId: '2' };
+    const lastAvailability = [
+      { unitId: '1', unitName: 'Site 1', nights: [], fullyAvailable: true, unitKind: 'campsite' },
+      { unitId: '2', unitName: 'Cabin 2', nights: [], fullyAvailable: true, unitKind: 'cabin' },
+    ] as const;
+    const held = makeWatch({ hold, lastAvailability: [...lastAvailability] });
+    expect(heldNoun(held, PARKSTAY_MANIFEST).one).toBe('cabin');
+    expect(heldNoun({ ...held, hold: { ...hold, unitId: '9' } }, PARKSTAY_MANIFEST).one).toBe(
+      'site'
+    );
   });
 });
 

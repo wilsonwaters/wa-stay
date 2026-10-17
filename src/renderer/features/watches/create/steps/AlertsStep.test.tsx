@@ -5,14 +5,14 @@ import { FAKE_MANIFEST, PARKSTAY_MANIFEST, ok } from '@tests/utils/renderer/crea
 import { renderWithProviders } from '@tests/utils/renderer/renderWithProviders';
 import { emptyWatchForm } from '../../form/watchFormMapping';
 import type { WatchFormValues } from '../../form/watchFormSchema';
-import { unitNounFor } from '../../shared/watchState';
+import { stayNoun } from '../../../../components/stay/stayTypes';
 import { AlertsStep } from './AlertsStep';
 
 function Harness({ manifest }: { manifest: ProviderManifest }) {
   const form = useForm<WatchFormValues>({ defaultValues: emptyWatchForm(manifest) });
   return (
     <FormProvider {...form}>
-      <AlertsStep manifest={manifest} noun={unitNounFor(manifest)} />
+      <AlertsStep manifest={manifest} noun={stayNoun([], undefined, undefined, manifest)} />
     </FormProvider>
   );
 }

@@ -160,7 +160,8 @@ describe('create a watch at a place with sites and cabins, end to end', () => {
     await screen.findByRole('heading', { level: 2, name: /Your stay$/ });
     const stayTypes = await screen.findByRole('group', { name: 'Stay type' });
     await user.click(within(stayTypes).getByRole('button', { name: 'Cabins & villas' }));
-    await user.click(screen.getByRole('button', { name: 'Choose sites' }));
+    // Only cabins listed now: the units are cabins (R9)
+    await user.click(screen.getByRole('button', { name: 'Choose cabins' }));
     expect(screen.queryByRole('checkbox', { name: 'Site 1' })).toBeNull();
     await user.click(screen.getByRole('button', { name: /^Dates/ }));
     await user.keyboard('{ArrowRight}{Enter}{ArrowRight}{ArrowRight}{Enter}');

@@ -2,7 +2,13 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import type { UnitSummary } from '../../../shared/types/catalog.types';
 import type { UnitKind } from '../../../shared/types/provider.types';
 import { unitKindOfUnit } from '../../../shared/utils/unit-kinds';
-import type { UnitNoun } from '../nightGridModel';
+import {
+  capitalise,
+  nounForKinds,
+  nounOfUnits,
+  unitCountLabel,
+  type UnitNoun,
+} from '../../../shared/utils/unit-noun';
 import { Checkbox, Disclosure } from '../ui';
 import { orderedKinds, stayTypeLabel } from './stayTypes';
 
@@ -13,7 +19,7 @@ export interface UnitPickerProps {
   /** Chosen unit ids. Older records may name units instead; those match by name. */
   value: readonly string[];
   onChange: (unitIds: string[]) => void;
-  /** What a unit is called here, e.g. site / sites. */
+  /** What the units listed are called (`stayNoun`), e.g. site / sites. */
   noun: UnitNoun;
   /** The heading. Default "Preferred {sites}". */
   label?: string;
@@ -29,7 +35,6 @@ export interface UnitPickerProps {
 
 const OTHER = 'Other';
 const ANY_KIND: readonly UnitKind[] = [];
-const capitalise = (text: string) => text.charAt(0).toUpperCase() + text.slice(1);
 
 /** Whether `value` chooses `unit`, by id or (older records) by name. */
 export function choosesUnit(value: readonly string[], unit: UnitSummary): boolean {
@@ -54,15 +59,24 @@ function byType(units: readonly UnitSummary[]): [string, UnitSummary[]][] {
 interface UnitBoxesProps {
   units: readonly UnitSummary[];
   value: readonly string[];
+  /** What these units are called: the picker's, or in a stay-type group that kind's. */
   noun: UnitNoun;
+  /** Inside a stay-type group, whose heading ("Dorms") already says what the units are. */
+  nested?: string;
   setUnits: (list: readonly UnitSummary[], on: boolean) => void;
 }
 
+/** Whether two headings say the same words ("Sites" and "sites"). */
+const sameWords = (a: string, b: string | undefined) =>
+  b !== undefined && a.trim().toLowerCase() === b.trim().toLowerCase();
+
 /**
  * One set of units' boxes: grouped by unit type, a group of several with an "All {type}" box;
- * or, for units listed by class (one unit per type), the units as they are.
+ * or, for units listed by class (one unit per type), the units as they are. A unit type that
+ * only repeats what the units are (an RAC "Sites" among sites, or, in a stay-type group, "Other"
+ * or the stay type itself, "Dorms") gets no heading of its own: "All bunks (2)".
  */
-function UnitBoxes({ units, value, noun, setUnits }: UnitBoxesProps) {
+function UnitBoxes({ units, value, noun, nested, setUnits }: UnitBoxesProps) {
   const groups = byType(units);
   // A location listed by unit class (one unit per class, such as ParkStay's class-listed
   // campgrounds) has nothing to group: its few units are listed as they are.
@@ -83,16 +97,24 @@ function UnitBoxes({ units, value, noun, setUnits }: UnitBoxesProps) {
       </div>
     );
   }
+  // A unit type that repeats what the units are, or the stay type's heading: no heading
+  const [only] = groups.length === 1 ? groups[0] : [];
+  const untyped =
+    only !== undefined &&
+    (sameWords(only, noun.many) ||
+      (nested !== undefined && (only === OTHER || sameWords(only, nested))));
   return (
     <>
       {groups.map(([type, list]) => {
         const ticked = list.filter((unit) => choosesUnit(value, unit)).length;
+        const all = untyped ? noun.many : type === OTHER ? `other ${noun.many}` : type;
+        const Group = untyped ? 'div' : 'fieldset';
         return (
-          <fieldset key={type} className="flex flex-col gap-2">
-            <legend className="mb-2 text-sm font-semibold text-fg">{type}</legend>
+          <Group key={type} className="flex flex-col gap-2">
+            {!untyped && <legend className="mb-2 text-sm font-semibold text-fg">{type}</legend>}
             {list.length > 1 && (
               <Checkbox
-                label={`All ${type === OTHER ? `other ${noun.many}` : type} (${list.length})`}
+                label={`All ${all} (${list.length})`}
                 checked={ticked === list.length}
                 ref={(box) => {
                   if (box) box.indeterminate = ticked > 0 && ticked < list.length;
@@ -114,7 +136,7 @@ function UnitBoxes({ units, value, noun, setUnits }: UnitBoxesProps) {
                 />
               ))}
             </div>
-          </fieldset>
+          </Group>
         );
       })}
     </>
@@ -152,7 +174,8 @@ export function UnitPicker({ units, value, onChange, noun, label, hint, kinds }:
     return orderedKinds(groups.keys()).map((kind) => [kind, groups.get(kind) ?? []] as const);
   }, [listed]);
   const kept = value.filter((id) => !units.some((u) => u.unitId === id || u.unitName === id));
-  const chosen = units.filter((unit) => choosesUnit(value, unit)).length + kept.length;
+  const chosenUnits = units.filter((unit) => choosesUnit(value, unit));
+  const chosen = chosenUnits.length + kept.length;
 
   const setUnits = (list: readonly UnitSummary[], on: boolean) =>
     onChange(on ? [...without(value, list), ...list.map((u) => u.unitId)] : without(value, list));
@@ -180,16 +203,23 @@ export function UnitPicker({ units, value, onChange, noun, label, hint, kinds }:
       return;
     }
     now.onChange(without(now.value, dropped));
-    const n = dropped.length;
-    setStatus(
-      `${n} ${n === 1 ? now.noun.one : now.noun.many} unticked: not in the chosen stay types`
-    );
+    // Named by what they are: the sites unticked when only cabins are chosen are sites
+    const noun = nounOfUnits(dropped, now.noun);
+    setStatus(`${unitCountLabel(dropped.length, noun)} unticked: not in the chosen stay types`);
   }, [kindsKey]);
 
   const summary =
-    chosen === 0 ? `Any ${noun.one}` : `${chosen} ${chosen === 1 ? noun.one : noun.many} chosen`;
-  const boxes = (list: readonly UnitSummary[]) => (
-    <UnitBoxes units={list} value={value} noun={noun} setUnits={setUnits} />
+    chosen === 0
+      ? `Any ${noun.one}`
+      : `${unitCountLabel(chosen, nounOfUnits(chosenUnits, noun))} chosen`;
+  const boxes = (list: readonly UnitSummary[], kind?: UnitKind) => (
+    <UnitBoxes
+      units={list}
+      value={value}
+      noun={kind ? nounForKinds([kind]) : noun}
+      nested={kind ? stayTypeLabel(kind) : undefined}
+      setUnits={setUnits}
+    />
   );
 
   return (
@@ -214,7 +244,7 @@ export function UnitPicker({ units, value, onChange, noun, label, hint, kinds }:
                     <legend className="mb-2 text-base font-semibold text-fg">
                       {stayTypeLabel(kind)}
                     </legend>
-                    {boxes(list)}
+                    {boxes(list, kind)}
                   </fieldset>
                 ))
               : boxes(listed)}

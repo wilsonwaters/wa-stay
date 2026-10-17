@@ -304,7 +304,9 @@ describe('scheduler races (V4 review)', () => {
         holdReference: 'FAKE-1',
         holdExpiresAt: expect.any(Date),
         paymentUrl: 'https://fake.example/pay/FAKE-1',
-      })
+      }),
+      // The fake's units say no kind
+      undefined
     );
     expect(h.snipeRepo.findById(snipe.id)).toBeNull();
   });

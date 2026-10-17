@@ -63,7 +63,7 @@ export function SnipesPage() {
     <div className="mx-auto flex w-full max-w-5xl flex-col gap-8 px-6 py-8 lg:px-8">
       <PageHeader
         title="Site Sniper"
-        description="Hold a hard-to-get site the moment it is released, then pay for it yourself."
+        description="Hold a hard-to-get site the moment it is released, then pay for it yourself." // unit-noun-ok: R13 rewrites the Site Sniper intros
         actions={newSnipe}
       />
       <ComingSoonBanner featureName="Site Sniper" />
@@ -116,8 +116,8 @@ export function SnipesPage() {
           title={canSnipe ? 'No snipes yet' : 'No provider supports Site Sniper yet'}
           description={
             canSnipe
-              ? 'A snipe waits for a place’s sites to be released and tries to hold one for you the moment they open.'
-              : 'When a provider that releases sites on a schedule is added, you can create a snipe here.'
+              ? 'A snipe waits for a place’s sites to be released and tries to hold one for you the moment they open.' // unit-noun-ok: R13 rewrites the Site Sniper intros
+              : 'When a provider that releases sites on a schedule is added, you can create a snipe here.' // unit-noun-ok: R13 rewrites the Site Sniper intros
           }
           actions={
             canSnipe ? (

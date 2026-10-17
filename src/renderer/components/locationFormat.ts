@@ -4,6 +4,15 @@
 
 import type { LocationSummary, UnitSummary } from '../../shared/types/catalog.types';
 import type { LocationKind } from '../../shared/types/provider.types';
+import { unitKindsOf } from '../../shared/utils/unit-kinds';
+import {
+  kindsOfUnits,
+  providerUnitKinds,
+  unitNounFrom,
+  type UnitNoun,
+} from '../../shared/utils/unit-noun';
+
+export { unitCountLabel } from '../../shared/utils/unit-noun';
 
 /** Location kinds as a person reads them. */
 export const KIND_LABELS: Record<LocationKind, string> = {
@@ -22,29 +31,20 @@ export function kindLabel(kind: string): string {
   return KIND_LABELS[kind as LocationKind] ?? KIND_LABELS.other;
 }
 
-/** What a location's bookable units are called, by kind. */
-const UNIT_NOUNS: Record<LocationKind, [one: string, many: string]> = {
-  campground: ['site', 'sites'],
-  'caravan-park': ['site', 'sites'],
-  'holiday-park': ['site', 'sites'],
-  cabin: ['cabin', 'cabins'],
-  hut: ['bunk', 'bunks'],
-  glamping: ['tent', 'tents'],
-  'farm-stay': ['room', 'rooms'],
-  home: ['room', 'rooms'],
-  other: ['unit', 'units'],
-};
-
-/** What a unit is called at a location of this kind: `{ one: 'site', many: 'sites' }`. */
-export function unitNoun(kind: string | undefined): { one: string; many: string } {
-  const [one, many] = UNIT_NOUNS[kind as LocationKind] ?? UNIT_NOUNS.other;
-  return { one, many };
-}
-
-/** "24 sites", "1 cabin". */
-export function unitCountLabel(kind: string, count: number): string {
-  const { one, many } = unitNoun(kind);
-  return `${count} ${count === 1 ? one : many}`;
+/**
+ * What a place's units are called (`unitNounFrom`): by the kinds its units say, where they are
+ * loaded (`units`), else by its own unit kinds (`unitKindsOf`), else its provider's default.
+ */
+export function placeNoun(
+  place:
+    (Pick<LocationSummary, 'kind' | 'unitKinds'> & { units?: readonly UnitSummary[] }) | undefined,
+  manifest?: { locationKinds: readonly LocationKind[] }
+): UnitNoun {
+  return unitNounFrom(
+    kindsOfUnits(place?.units),
+    place ? unitKindsOf(place) : undefined,
+    providerUnitKinds(manifest)
+  );
 }
 
 /** "Cape Range National Park · Pilbara", or whichever of the two is known. */

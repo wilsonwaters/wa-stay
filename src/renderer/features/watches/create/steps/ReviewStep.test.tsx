@@ -4,7 +4,7 @@ import { PARKSTAY_MANIFEST } from '@tests/utils/renderer/createMockApi';
 import { renderWithProviders } from '@tests/utils/renderer/renderWithProviders';
 import { emptyWatchForm } from '../../form/watchFormMapping';
 import type { WatchFormValues } from '../../form/watchFormSchema';
-import { unitNounFor } from '../../shared/watchState';
+import { stayNoun } from '../../../../components/stay/stayTypes';
 import { ReviewStep, type FlowStepId } from './ReviewStep';
 
 const PHOTO = 'https://example.org/osprey.jpg';
@@ -24,7 +24,7 @@ function Harness({
       <ReviewStep
         manifest={PARKSTAY_MANIFEST}
         today="2099-01-01"
-        noun={unitNounFor(PARKSTAY_MANIFEST)}
+        noun={stayNoun([], undefined, undefined, PARKSTAY_MANIFEST)}
         place={{ kind: 'campground', imageUrls: [PHOTO] }}
         onChangeStep={onChangeStep}
       />

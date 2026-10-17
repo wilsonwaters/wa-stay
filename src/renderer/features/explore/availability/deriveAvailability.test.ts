@@ -1,6 +1,8 @@
 import type { BulkAvailabilityEntry, UnitKind } from '../../../../shared/types/provider.types';
+import type { LocationKind } from '../../../../shared/types/provider.types';
 import {
   availabilityLabel,
+  countedKinds,
   deriveAvailability,
   sortByAvailability,
   type AvailabilityInput,
@@ -322,7 +324,9 @@ describe('deriveAvailability with stay types chosen', () => {
       'Cabins full',
       'Cabins unknown',
     ]);
-    expect(availabilityLabel(places[0].availability, 'holiday-park', 'Fake')).toEqual({
+    expect(
+      availabilityLabel(places[0].availability, countedKinds(PARK, ['cabin']), 'Fake')
+    ).toEqual({
       pill: 'Check dates',
       card: 'Check dates on the place page',
       tone: 'neutral',
@@ -331,8 +335,8 @@ describe('deriveAvailability with stay types chosen', () => {
 });
 
 describe('availabilityLabel', () => {
-  const label = (availability: PlaceAvailability, kind = 'campground') =>
-    availabilityLabel(availability, kind, 'ParkStay');
+  const label = (availability: PlaceAvailability, kind: LocationKind = 'campground') =>
+    availabilityLabel(availability, countedKinds({ kind }), 'ParkStay');
 
   it.each<[PlaceAvailability, string, string | null, string | null]>([
     [{ state: 'full', bookableUnits: 24 }, 'None free', 'No site free every night', 'neutral'],
@@ -340,7 +344,7 @@ describe('availabilityLabel', () => {
     [{ state: 'check-dates' }, 'Check dates', 'Check dates on the place page', 'neutral'],
     // The card already says "Info only": no second badge.
     [{ state: 'offline-booking' }, 'Info only', null, 'neutral'],
-    [{ state: 'not-supported' }, '–', 'Availability not shared by ParkStay', 'neutral'],
+    [{ state: 'not-supported' }, '–', 'Check dates on ParkStay', 'neutral'],
     [{ state: 'unknown' }, '–', 'Availability unknown', 'neutral'],
     [{ state: 'error', queue: false }, '–', "Couldn't check ParkStay", 'danger'],
     [{ state: 'loading' }, '···', '', null],
@@ -381,7 +385,8 @@ describe('availabilityLabel', () => {
     const two = { state: 'available', availableUnits: 2, bookableUnits: 6 } as const;
     expect(label(two, 'caravan-park').card).toBe('2 of 6 sites available');
     expect(label(two, 'cabin').card).toBe('2 of 6 cabins available');
-    expect(label(two, 'farm-stay').card).toBe('2 of 6 rooms available');
+    // A farm stay's units are `other` (R9): "spots"
+    expect(label(two, 'farm-stay').card).toBe('2 of 6 spots available');
     expect(label({ state: 'available', availableUnits: 1, bookableUnits: 1 }).card).toBe(
       '1 of 1 site available'
     );
@@ -394,6 +399,30 @@ describe('availabilityLabel', () => {
       card: '5 sites available',
       tone: 'available',
     });
+  });
+});
+
+describe('countedKinds and the noun it gives (R9)', () => {
+  const MIXED = { kind: 'holiday-park' as const, unitKinds: ['campsite', 'cabin'] as UnitKind[] };
+  const free = { state: 'available', availableUnits: 27, bookableUnits: 40 } as const;
+
+  it('counts the stay types chosen that the place has, else all its kinds', () => {
+    expect(countedKinds(MIXED)).toEqual(['campsite', 'cabin']);
+    expect(countedKinds(MIXED, ['cabin', 'room'])).toEqual(['cabin']);
+    expect(countedKinds(MIXED, ['room'])).toEqual(['campsite', 'cabin']);
+    expect(countedKinds({ kind: 'campground' }, [])).toEqual(['campsite']);
+  });
+
+  it('reads a mixed park’s units as "spots", and "cabins" with Cabins & villas chosen', () => {
+    expect(availabilityLabel(free, countedKinds(MIXED), 'RAC')?.card).toBe(
+      '27 of 40 spots available'
+    );
+    expect(availabilityLabel(free, countedKinds(MIXED, ['cabin']), 'RAC')?.card).toBe(
+      '27 of 40 cabins available'
+    );
+    expect(availabilityLabel({ state: 'none-open' }, countedKinds(MIXED), 'RAC')?.card).toBe(
+      'No spots open for these dates'
+    );
   });
 });
 

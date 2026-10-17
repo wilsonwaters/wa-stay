@@ -86,9 +86,10 @@ describe('parseWatchPrefill', () => {
     expect(parse('stay=bogus')).toEqual({
       notices: ["The link's stay type couldn't be used, so choose one."],
     });
+    // Cabins kept: only the unusable one is said to be left out (R9, routed R6 note)
     expect(parse('stay=cabin,other')).toEqual({
       unitKinds: ['cabin'],
-      notices: ["The link's stay type couldn't be used, so choose one."],
+      notices: ["One of the link's stay types couldn't be used, so it was left out."],
     });
   });
 

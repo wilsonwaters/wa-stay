@@ -11,8 +11,9 @@ const button = (name: string) => screen.getByRole('button', { name });
 const step = (name: RegExp) => screen.findByRole('heading', { level: 2, name });
 const sent = (mock: jest.Mock): SiteSnipeInput => mock.mock.calls[0][0];
 const stayTypes = () => screen.findByRole('group', { name: 'Stay type' });
+// R9: "one stay type", and the mixed place's noun
 const MESSAGE =
-  'Choose a stay type or a site. At a place with more than one stay type, Site Sniper holds only what you choose.';
+  'Choose one stay type or a spot. At a place with more than one stay type, Site Sniper holds only what you choose.';
 
 describe('NewSnipePage at a place with sites and cabins', () => {
   it('offers its stay types; "Cabins & villas" narrows the units and is sent as unitKinds', async () => {
@@ -28,7 +29,8 @@ describe('NewSnipePage at a place with sites and cabins', () => {
     const cabins = within(group).getByRole('button', { name: 'Cabins & villas' });
     await user.click(cabins);
     expect(cabins).toHaveAttribute('aria-pressed', 'true');
-    await user.click(button('Choose sites'));
+    // Only cabins listed now: the units are cabins (R9)
+    await user.click(button('Choose cabins'));
     expect(screen.getByRole('checkbox', { name: 'Cabin 1' })).toBeInTheDocument();
     expect(screen.queryByRole('checkbox', { name: 'Site 1' })).toBeNull();
 
@@ -55,7 +57,7 @@ describe('NewSnipePage at a place with sites and cabins', () => {
     expect(screen.getByRole('heading', { level: 2, name: /Your stay$/ })).toBeInTheDocument();
 
     // A site meets it as well as a stay type, and the error goes.
-    await user.click(button('Choose sites'));
+    await user.click(button('Choose spots'));
     await user.click(screen.getByRole('checkbox', { name: 'Site 3' }));
     await waitFor(() => expect(screen.queryByText(MESSAGE)).toBeNull());
     expect(group).not.toHaveAttribute('aria-invalid');

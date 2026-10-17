@@ -18,7 +18,8 @@ import type {
 } from '../../../shared/types/catalog.types';
 import { amenityIcon } from '../../components/amenityIcons';
 import { ExternalLink } from '../../components/ExternalLink';
-import { unitCountLabel, unitNoun } from '../../components/locationFormat';
+import { unitCountLabel } from '../../components/locationFormat';
+import type { UnitNoun } from '../../components/nightGridModel';
 import { RichText } from '../../components/RichText';
 import { ApiError, useOpenLocationDocument } from '../../api';
 import { Button, Disclosure, Notice, useToast, VisuallyHidden } from '../../components/ui';
@@ -259,9 +260,7 @@ export function AboutSection({
         <p className="max-w-2xl text-base text-fg-secondary">{detail.summary}</p>
       ) : (
         <div className="flex flex-col items-start gap-2">
-          <p className="text-base text-fg-secondary">
-            {shortName} hasn&apos;t published a description.
-          </p>
+          <p className="text-base text-fg-secondary">No description yet.</p>
           <InfoLink links={links} shortName={shortName} />
         </div>
       )}
@@ -296,15 +295,15 @@ export function FacilitiesSection({ amenities }: { amenities: readonly string[] 
 export function SitesSection({
   units,
   unitCount,
-  kind,
+  noun,
 }: {
   units: readonly UnitSummary[];
   /** The place's own count (the catalogue's), which can differ from the units listed. */
   unitCount?: number;
-  kind: string;
+  /** What the place's units are called (`placeNoun`). */
+  noun: UnitNoun;
 }) {
   if (units.length === 0) return null;
-  const noun = unitNoun(kind);
   const breakdown = unitTypeBreakdown(units);
   const guests = guestRangeLabel(units, noun);
   const title = noun.many.charAt(0).toUpperCase() + noun.many.slice(1);
@@ -321,7 +320,7 @@ export function SitesSection({
       : `Show all ${units.length} ${noun.many}`;
   return (
     <PlaceSection title={title}>
-      <p className="text-base font-semibold text-fg">{unitCountLabel(kind, count)}</p>
+      <p className="text-base font-semibold text-fg">{unitCountLabel(count, noun)}</p>
       {byType && (
         <p className="mt-1 text-base text-fg-secondary">
           Bookable as {units.length} {noun.one} {units.length === 1 ? 'type' : 'types'}

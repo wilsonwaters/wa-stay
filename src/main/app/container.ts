@@ -18,6 +18,7 @@ import path from 'path';
 import type Database from 'better-sqlite3';
 import { app, clipboard, powerMonitor } from 'electron';
 import { SnipeReleaseMode, SnipeStatus } from '@shared/types/common.types';
+import { providerUnitKinds } from '@shared/utils/unit-noun';
 import { ProviderAccountService } from '../core/accounts/provider-account.service';
 import { LocationCatalogService } from '../core/catalog/location-catalog.service';
 import { closeDatabase } from '../database/connection';
@@ -297,6 +298,8 @@ export function createContainer({
   const providerName = (id: string): string | undefined => providers.tryGet(id)?.manifest.shortName;
   // Its manifest, to check an alert's booking link against its website
   const providerManifest = (id: string) => providers.tryGet(id)?.manifest;
+  // Its default unit kinds, for what an alert calls units nothing else names (R9)
+  const unitKindsOfProvider = (id: string) => providerUnitKinds(providers.tryGet(id)?.manifest);
   const notifierDispatcher = new NotificationDispatcher(repositories.notifiers, [
     new SmtpEmailNotifier({ providerName, logoPath: getEmailLogoPath() }),
   ]);
@@ -312,6 +315,7 @@ export function createContainer({
     {
       providerName,
       providerManifest,
+      providerUnitKinds: unitKindsOfProvider,
       showMainWindow,
       openExternal,
       preferences: notificationPreferences,

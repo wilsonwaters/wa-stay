@@ -67,7 +67,7 @@ Click a place to open its page:
 - **Book on ParkStay** opens ParkStay in your browser with this place and your dates chosen;
   its **See availability** takes you on to book;
 - **Watch for availability** starts a watch for this place and these dates;
-- **Snipe a site** starts a Site Sniper snipe;
+- **Snipe a site** (or a cabin, a room…: the place's own word) starts a Site Sniper snipe;
 - **View on ParkStay** and **More information** open the provider's pages in your browser.
 
 ## Watches

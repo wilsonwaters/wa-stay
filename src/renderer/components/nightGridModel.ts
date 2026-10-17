@@ -6,15 +6,13 @@
 import { format } from 'date-fns';
 import type { NightState, NightStatus, UnitAvailability } from '../../shared/types/provider.types';
 import { eachNight } from '../../shared/utils/calendar-date';
+import { MIXED_UNIT_NOUN, type UnitNoun } from '../../shared/utils/unit-noun';
 import { parseIsoDate } from './ui/calendar';
 
-/** What one unit is called, and several: `{ one: 'site', many: 'sites' }`. */
-export interface UnitNoun {
-  one: string;
-  many: string;
-}
+export type { UnitNoun };
 
-export const DEFAULT_UNIT_NOUN: UnitNoun = { one: 'unit', many: 'units' };
+/** With no kinds to go on, units are "spots" (`nounForKinds`). */
+export const DEFAULT_UNIT_NOUN: UnitNoun = MIXED_UNIT_NOUN;
 
 /** Each night of the stay, by the date it starts: the arrival up to, not including, departure. */
 export function stayNights(arrival: string, departure: string): string[] {

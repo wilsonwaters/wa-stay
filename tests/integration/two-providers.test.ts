@@ -25,6 +25,7 @@ import type {
   CatalogQuery,
   CatalogSearchResult,
   CatalogStatus,
+  Notification,
   ProviderAccount,
   Watch,
   WatchInput,
@@ -232,6 +233,48 @@ describe('a container with ParkStay and a second provider', () => {
     expect(listed.map((w) => [w.providerId, w.bookingLink?.url])).toEqual([
       ['bush-camps', bush.bookingLink?.url],
       ['parkstay', bungarra.bookingLink?.url],
+    ]);
+  });
+
+  it("each provider's alerts name its units (R9): mixed units are spots, ParkStay's sites", async () => {
+    fakeDateOnly(FIXED_NOW);
+    // u1 says no kind, u2 is a cabin: both free
+    second = createFakeProvider({
+      id: 'bush-camps',
+      name: 'Bush Camps WA',
+      shortName: 'Bush Camps',
+      account: 'signed-out',
+      availability: { '1': { u1: 'available', u2: 'available' } },
+      unitKinds: { u2: 'cabin' },
+    });
+    const both = await world([parkstayFactory, second.factory]);
+    const stay = { arrival: '2026-11-10', departure: '2026-11-12', adults: 1 };
+    const run = async (input: WatchInput): Promise<void> => {
+      const watch = await both.read<Watch>('watches:create', input);
+      await both.read('watches:run-now', { id: watch.id });
+    };
+    const banksia = { externalId: '1', name: 'Banksia Camp' };
+
+    await run({ providerId: 'bush-camps', name: 'Any', location: banksia, stay });
+    // The unit found says no kind: the provider's default (its first location kind, campground)
+    await run({ providerId: 'bush-camps', name: 'u1', location: banksia, stay, unitIds: ['u1'] });
+    await run({
+      providerId: 'parkstay',
+      name: 'Bungarra',
+      location: { externalId: '20', name: 'Bungarra' },
+      stay,
+      stayParams: { gearType: 'all' },
+    });
+
+    const listed = await both.read<Notification[]>('notifications:list', {});
+    expect(
+      listed
+        .sort((a, b) => a.id - b.id)
+        .map((n) => [n.providerId, n.title, n.message.replace(/ for .*/, '')])
+    ).toEqual([
+      ['bush-camps', 'Spots available at Banksia Camp', 'Found 2 spots available at Banksia Camp'],
+      ['bush-camps', 'Sites available at Banksia Camp', 'Found 1 site available at Banksia Camp'],
+      ['parkstay', 'Sites available at Bungarra', 'Found 3 sites available at Bungarra'],
     ]);
   });
 

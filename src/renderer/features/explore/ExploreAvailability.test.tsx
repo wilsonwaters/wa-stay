@@ -730,8 +730,9 @@ describe('Explore with dates: stay types', () => {
       stubs(),
       '3 places · 3 available for 6–8 Nov'
     );
-    expect(within(card(COUNTED.name)).getByText('7 of 26 sites available')).toBeInTheDocument();
-    expect(within(card(TOTALS.name)).getByText('4 of 12 sites available')).toBeInTheDocument();
+    // Holiday parks have sites and cabins: their units are "spots" (R9)
+    expect(within(card(COUNTED.name)).getByText('7 of 26 spots available')).toBeInTheDocument();
+    expect(within(card(TOTALS.name)).getByText('4 of 12 spots available')).toBeInTheDocument();
     unmount();
 
     // Camping and Cabins & villas: everything these places have, so their totals.
@@ -740,8 +741,9 @@ describe('Explore with dates: stay types', () => {
       stubs(),
       '3 places · 3 available for 6–8 Nov'
     );
-    expect(within(card(COUNTED.name)).getByText('7 of 26 sites available')).toBeInTheDocument();
-    expect(within(card(TOTALS.name)).getByText('4 of 12 sites available')).toBeInTheDocument();
+    // Holiday parks have sites and cabins: their units are "spots" (R9)
+    expect(within(card(COUNTED.name)).getByText('7 of 26 spots available')).toBeInTheDocument();
+    expect(within(card(TOTALS.name)).getByText('4 of 12 spots available')).toBeInTheDocument();
     expect(within(card('Bungarra')).getByText('3 of 5 sites available')).toBeInTheDocument();
   });
 
@@ -751,19 +753,73 @@ describe('Explore with dates: stay types', () => {
       stubs(),
       '2 places · 1 available for 6–8 Nov'
     );
-    expect(within(card(COUNTED.name)).getByText('2 of 6 sites available')).toBeInTheDocument();
+    // Only cabins counted: "cabins" (R9)
+    expect(within(card(COUNTED.name)).getByText('2 of 6 cabins available')).toBeInTheDocument();
     // No count of cabins alone: never its totals, which include sites, and never "not open".
     const totals = card(TOTALS.name);
     expect(within(totals).getByText('Check dates on the place page')).toBeInTheDocument();
     expect(totals).toHaveAccessibleDescription(
       expect.stringContaining('Check dates on the place page')
     );
-    expect(within(totals).queryByText(/available|not open|No sites/i)).toBeNull();
+    expect(within(totals).queryByText(/available|not open|No (sites|spots|cabins)/i)).toBeNull();
     expect(cardNames()).toEqual([COUNTED.name, TOTALS.name]);
 
     // "Available only" hides the place that says "Check dates".
     await user.click(availableOnly());
     expect(cardNames()).toEqual([COUNTED.name]);
+  });
+
+  it('announces the units counted by their kinds: "spots" at mixed parks, "cabins" when chosen', async () => {
+    const { unmount } = await renderExplore(
+      `/?${STAY}`,
+      stubs(),
+      '3 places · 3 available for 6–8 Nov'
+    );
+    // Bungarra's sites and two parks' sites and cabins: units of more than one kind (R9)
+    await waitFor(() =>
+      expect(politeLive()?.textContent?.trim()).toBe(
+        '3 of 3 places have spots available for 6–8 Nov'
+      )
+    );
+    unmount();
+
+    await renderExplore(`/?stay=cabin&${STAY}`, stubs(), '2 places · 1 available for 6–8 Nov');
+    await waitFor(() =>
+      expect(politeLive()?.textContent?.trim()).toBe(
+        '1 of 2 places have cabins available for 6–8 Nov'
+      )
+    );
+  });
+
+  it('says "No places have spots", or "cabins" with Cabins & villas chosen, when none is free', async () => {
+    const full: BulkAvailabilityEntry[] = ENTRIES.map((entry) => ({
+      ...entry,
+      availableUnits: 0,
+      ...(entry.byKind
+        ? {
+            byKind: {
+              campsite: { availableUnits: 0, bookableUnits: 20 },
+              cabin: { availableUnits: 0, bookableUnits: 6 },
+            },
+          }
+        : {}),
+    }));
+    const nothingFree = () =>
+      api(
+        jest.fn(async (stay, options) => answering(full)(stay, options)),
+        [PARKSTAY_MANIFEST, PARKS],
+        [BUNGARRA, COUNTED, TOTALS]
+      ).stubs;
+    const { unmount } = await renderExplore(`/?${STAY}&avail=1`, nothingFree(), /./);
+    expect(
+      await screen.findByRole('heading', { name: 'No places have spots for 6–8 Nov' })
+    ).toBeInTheDocument();
+    unmount();
+
+    await renderExplore(`/?stay=cabin&${STAY}&avail=1`, nothingFree(), /./);
+    expect(
+      await screen.findByRole('heading', { name: 'No places have cabins for 6–8 Nov' })
+    ).toBeInTheDocument();
   });
 
   describe('on the map', () => {
