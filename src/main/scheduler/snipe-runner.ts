@@ -142,6 +142,29 @@ export class SnipeRunner {
     this.armHoldExpiries();
   }
 
+  /**
+   * After something the provider times a release by has changed (the person's saved details
+   * for it: an RAC member number moves the member pre-sale), its snipes whose release the
+   * provider works out (`daily_rollover`) ask for it again: each one armed (a refresh in flight
+   * is aborted) or sniping between two checks starts a new run, whose prepare asks the
+   * provider for the instant again. One with a check in flight is left alone (it may be
+   * placing a hold); an active snipe with no run is armed. Other providers' snipes are
+   * untouched.
+   */
+  rearmProvider(providerId: string): void {
+    if (this.stopped) return;
+    for (const snipe of this.snipes.getActive()) {
+      if (snipe.providerId !== providerId) continue;
+      const run = this.runs.get(snipe.id);
+      if (!run) {
+        this.arm(snipe.id);
+        continue;
+      }
+      if (snipe.releaseMode !== SnipeReleaseMode.DAILY_ROLLOVER) continue;
+      if (snipe.status === SnipeStatus.ARMED || !run.inFlight) this.arm(snipe.id);
+    }
+  }
+
   /** Starts (or restarts) the snipe's chain with a new generation. */
   arm(id: number): void {
     if (this.stopped) return;

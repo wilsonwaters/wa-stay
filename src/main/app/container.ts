@@ -312,6 +312,14 @@ export function createContainer({
     clipboard: { writeText: (text) => clipboard.writeText(text) },
     events: rendererEvents,
     isBusy,
+    // Saved details changed (an RAC member number saved, replaced or removed): the provider's
+    // availability answers are asked again (prices and free nights change with membership),
+    // and its snipes ask for their release instants again (the member pre-sale moves them).
+    // The renderer drops its own answers on `account:updated`. Nothing else is touched.
+    onCredentialsChanged: (providerId) => {
+      catalogService.forgetAvailability(providerId);
+      scheduler.rearmSnipes(providerId);
+    },
     logger,
   });
 
