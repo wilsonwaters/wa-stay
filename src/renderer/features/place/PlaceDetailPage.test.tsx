@@ -632,7 +632,7 @@ describe('Place detail page', () => {
   });
 
   describe('capabilities', () => {
-    it("says WA Stay can't check availability here yet, instead of Check", async () => {
+    it("says WA Stay can't check availability here, instead of Check", async () => {
       await renderPlace(
         `/places/parkstay/20${STAY}`,
         placeApi({
@@ -645,7 +645,7 @@ describe('Place detail page', () => {
       );
       expect(
         within(card()).getByText(
-          "WA Stay can't check availability here yet. Check dates on ParkStay's website."
+          "WA Stay can't check availability here. Check dates on ParkStay's website."
         )
       ).toBeInTheDocument();
       expect(within(card()).queryByRole('button', { name: 'Check availability' })).toBeNull();

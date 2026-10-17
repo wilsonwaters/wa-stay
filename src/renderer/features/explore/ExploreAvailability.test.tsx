@@ -769,6 +769,59 @@ describe('Explore with dates: stay types', () => {
     expect(cardNames()).toEqual([COUNTED.name]);
   });
 
+  it('announces the units counted by their kinds: "spots" at mixed parks, "cabins" when chosen', async () => {
+    const { unmount } = await renderExplore(
+      `/?${STAY}`,
+      stubs(),
+      '3 places · 3 available for 6–8 Nov'
+    );
+    // Bungarra's sites and two parks' sites and cabins: units of more than one kind (R9)
+    await waitFor(() =>
+      expect(politeLive()?.textContent?.trim()).toBe(
+        '3 of 3 places have spots available for 6–8 Nov'
+      )
+    );
+    unmount();
+
+    await renderExplore(`/?stay=cabin&${STAY}`, stubs(), '2 places · 1 available for 6–8 Nov');
+    await waitFor(() =>
+      expect(politeLive()?.textContent?.trim()).toBe(
+        '1 of 2 places have cabins available for 6–8 Nov'
+      )
+    );
+  });
+
+  it('says "No places have spots", or "cabins" with Cabins & villas chosen, when none is free', async () => {
+    const full: BulkAvailabilityEntry[] = ENTRIES.map((entry) => ({
+      ...entry,
+      availableUnits: 0,
+      ...(entry.byKind
+        ? {
+            byKind: {
+              campsite: { availableUnits: 0, bookableUnits: 20 },
+              cabin: { availableUnits: 0, bookableUnits: 6 },
+            },
+          }
+        : {}),
+    }));
+    const nothingFree = () =>
+      api(
+        jest.fn(async (stay, options) => answering(full)(stay, options)),
+        [PARKSTAY_MANIFEST, PARKS],
+        [BUNGARRA, COUNTED, TOTALS]
+      ).stubs;
+    const { unmount } = await renderExplore(`/?${STAY}&avail=1`, nothingFree(), /./);
+    expect(
+      await screen.findByRole('heading', { name: 'No places have spots for 6–8 Nov' })
+    ).toBeInTheDocument();
+    unmount();
+
+    await renderExplore(`/?stay=cabin&${STAY}&avail=1`, nothingFree(), /./);
+    expect(
+      await screen.findByRole('heading', { name: 'No places have cabins for 6–8 Nov' })
+    ).toBeInTheDocument();
+  });
+
   describe('on the map', () => {
     beforeEach(() => {
       mockMapAvailable = true;

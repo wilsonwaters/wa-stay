@@ -300,7 +300,7 @@ export default function PlaceDetailPage() {
       : !manifest?.capabilities.availability
         ? {
             kind: 'unavailable',
-            message: `WA Stay can't check availability here yet. Check dates on ${shortName}'s website.`,
+            message: `WA Stay can't check availability here. Check dates on ${shortName}'s website.`,
           }
         : units.length === 0
           ? {

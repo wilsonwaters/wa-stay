@@ -1,10 +1,11 @@
-import { screen, within } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
 import { makeHeldSnipe, makeSnipe, snipeFlowApi } from '@tests/fixtures/renderer/snipes';
 import { catalogGet, makeLocationDetail, makeMixedDetail } from '@tests/fixtures/renderer/watches';
-import { ok, PARKSTAY_MANIFEST } from '@tests/utils/renderer/createMockApi';
+import { createMockApi, ok, PARKSTAY_MANIFEST } from '@tests/utils/renderer/createMockApi';
 import { renderWithApp } from '@tests/utils/renderer/renderWithApp';
 import { renderWithProviders } from '@tests/utils/renderer/renderWithProviders';
 import { SnipeCard } from './list/SnipeCard';
+import { SnipesPage } from './SnipesPage';
 
 /**
  * Site Sniper's pages name units by their kinds (R9): a held cabin is a "Cabin held", a snipe of
@@ -65,6 +66,26 @@ describe('Site Sniper: unit nouns', () => {
     const card = screen.getByRole('article', { name: heldCabin.name });
     expect(await within(card).findByText('Cabin held')).toBeInTheDocument();
     expect(within(card).getByText('Cabin 1 is held for you')).toBeInTheDocument();
+  });
+
+  it('announces a hold on a cabin as "Cabin held", as its pill and hold panel say', async () => {
+    const snipe = makeSnipe();
+    const list = jest.fn().mockResolvedValue(ok([snipe]));
+    const mock = createMockApi({ snipes: { list }, catalog: { get: catalogGet(MIXED) } });
+    renderWithProviders(<SnipesPage />, { api: mock });
+    await screen.findByRole('article', { name: snipe.name });
+
+    const held = { ...heldCabin, name: snipe.name };
+    list.mockResolvedValue(ok([held]));
+    mock.emit('snipe:updated', held);
+    // Said at once, then named as the card names it once the place's units load
+    await waitFor(() =>
+      expect(screen.getByRole('alert')).toHaveTextContent(
+        'Cabin held at Osprey Bay. Pay within 20 minutes.'
+      )
+    );
+    const card = screen.getByRole('article', { name: snipe.name });
+    expect(await within(card).findByText('Cabin held')).toBeInTheDocument();
   });
 
   it('asks when the cabins are released at a place of cabins', async () => {

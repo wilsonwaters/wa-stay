@@ -52,7 +52,7 @@ export interface SmtpEmailNotifierOptions {
 /** The "Book on {shortName}" link of an alert. */
 interface BookingAction {
   url: string;
-  /** "Book on ParkStay", or "Book on the provider's site" for a provider the app does not know. */
+  /** "Book on ParkStay", or "Book on the provider's website" for a provider the app does not know. */
   label: string;
 }
 
@@ -303,7 +303,7 @@ export class SmtpEmailNotifier extends BaseNotifier {
     const logo = this.logoPath && fs.existsSync(this.logoPath) ? this.logoPath : undefined;
     const bookingUrl = httpsLink(message.bookingUrl);
     const booking: BookingAction | undefined = bookingUrl
-      ? { url: bookingUrl, label: `Book on ${provider ?? "the provider's site"}` } // unit-noun-ok: the provider's website, not a unit
+      ? { url: bookingUrl, label: `Book on ${provider ?? "the provider's website"}` }
       : undefined;
     const holdNote = message.heldInApp ? heldInAppNote(provider, booking !== undefined) : undefined;
 
@@ -516,7 +516,7 @@ export class SmtpEmailNotifier extends BaseNotifier {
 
 /**
  * What an email about a hold WA Stay placed says first: the hold is in the app on the computer
- * that placed it; with a booking link, that the person can book on the provider's site instead.
+ * that placed it; with a booking link, that the person can book on the provider's website instead.
  */
 function heldInAppNote(provider: string | undefined, hasBookingLink: boolean): string {
   const inApp =
@@ -524,7 +524,7 @@ function heldInAppNote(provider: string | undefined, hasBookingLink: boolean): s
     `Open ${APP_NAME} there to pay before it expires.`;
   if (!hasBookingLink) return inApp;
   return (
-    `${inApp} Away from that computer? You can book on ${provider ?? "the provider's site"} instead. ` + // unit-noun-ok: the provider's website, not a unit
+    `${inApp} Away from that computer? You can book on ${provider ?? "the provider's website"} instead. ` +
     `What ${APP_NAME} held may show as taken there until the hold ends.`
   );
 }

@@ -99,7 +99,7 @@ on the first fully matching site, by the same path and safety rules as Site Snip
 - **never "any unit" across stay types**: a watch with no units chosen whose wanted units are of
   more than one kind (campsites and a hut, or the two stay types it asks for), booked or free,
   places no hold. It alerts as usual, with "Not held automatically: this place has more than one
-  stay type. Choose a stay type or units to let WA Stay hold one." So at a place the flow knows
+  stay type. Choose one stay type or units to let WA Stay hold one." So at a place the flow knows
   is mixed, **Hold a site automatically when found** needs one stay type or a site chosen on
   "Your stay" before the Alerts step (or Edit) goes on.
 

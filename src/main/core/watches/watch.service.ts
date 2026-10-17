@@ -57,7 +57,7 @@ const log = logger.child({ module: 'watches' });
 
 /** Why an automatic hold was not placed at a place with more than one stay type. */
 const MIXED_KINDS_NOTE =
-  'Not held automatically: this place has more than one stay type. Choose a stay type or units to let WA Stay hold one.';
+  'Not held automatically: this place has more than one stay type. Choose one stay type or units to let WA Stay hold one.';
 
 /** The provider a watch runs on: one with availability. */
 export type WatchProvider = ProviderWith<'watches'>;
