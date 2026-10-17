@@ -102,6 +102,7 @@ describe('RAC watches (core, fixtures)', () => {
         unitId: 'cat:4',
         unitName: 'Powered Site',
         unitType: 'Sites',
+        unitKind: 'campsite',
         arrival: '2026-11-06',
         departure: '2026-11-08',
         partial: false,

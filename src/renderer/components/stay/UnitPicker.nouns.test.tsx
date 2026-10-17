@@ -54,6 +54,30 @@ describe('UnitPicker nouns', () => {
     expect(within(camping).getByRole('group', { name: 'Powered' })).toBeInTheDocument();
   });
 
+  it('gives a unit type that only repeats the stay type no heading (RAC’s "Sites", "Dorms")', async () => {
+    const rac = (n: number, unitKind: 'campsite' | 'dorm', unitType: string): UnitSummary => ({
+      unitId: `cat:${n}`,
+      unitName: `Category ${n}`,
+      unitKind,
+      unitType,
+    });
+    await open(
+      [
+        rac(1, 'campsite', 'Sites'),
+        rac(2, 'campsite', 'Sites'),
+        rac(3, 'dorm', 'Dorms'),
+        rac(4, 'dorm', 'Dorms'),
+      ],
+      ['campsite', 'dorm']
+    );
+    const camping = screen.getByRole('group', { name: 'Camping' });
+    expect(within(camping).queryByRole('group', { name: 'Sites' })).toBeNull();
+    expect(within(camping).getByRole('checkbox', { name: 'All sites (2)' })).toBeInTheDocument();
+    const dorms = screen.getByRole('group', { name: 'Dorms' });
+    expect(within(dorms).queryAllByRole('group')).toHaveLength(0);
+    expect(within(dorms).getByRole('checkbox', { name: 'All bunks (2)' })).toBeInTheDocument();
+  });
+
   it('keeps "Other" beside a typed group, naming its units by the stay type', async () => {
     await open([site(1), hut(1, 'Bunkhouse'), hut(2), hut(3)], ['campsite', 'dorm']);
     const dorms = screen.getByRole('group', { name: 'Dorms' });

@@ -61,18 +61,22 @@ interface UnitBoxesProps {
   value: readonly string[];
   /** What these units are called: the picker's, or in a stay-type group that kind's. */
   noun: UnitNoun;
-  /** Inside a stay-type group, whose heading already says what the units are. */
-  nested?: boolean;
+  /** Inside a stay-type group, whose heading ("Dorms") already says what the units are. */
+  nested?: string;
   setUnits: (list: readonly UnitSummary[], on: boolean) => void;
 }
 
+/** Whether two headings say the same words ("Sites" and "sites"). */
+const sameWords = (a: string, b: string | undefined) =>
+  b !== undefined && a.trim().toLowerCase() === b.trim().toLowerCase();
+
 /**
  * One set of units' boxes: grouped by unit type, a group of several with an "All {type}" box;
- * or, for units listed by class (one unit per type), the units as they are. In a stay-type
- * group whose units have no unit type, the stay type's heading is theirs: no "Other" under it,
- * and "All bunks (2)".
+ * or, for units listed by class (one unit per type), the units as they are. A unit type that
+ * only repeats what the units are (an RAC "Sites" among sites, or, in a stay-type group, "Other"
+ * or the stay type itself, "Dorms") gets no heading of its own: "All bunks (2)".
  */
-function UnitBoxes({ units, value, noun, nested = false, setUnits }: UnitBoxesProps) {
+function UnitBoxes({ units, value, noun, nested, setUnits }: UnitBoxesProps) {
   const groups = byType(units);
   // A location listed by unit class (one unit per class, such as ParkStay's class-listed
   // campgrounds) has nothing to group: its few units are listed as they are.
@@ -93,8 +97,12 @@ function UnitBoxes({ units, value, noun, nested = false, setUnits }: UnitBoxesPr
       </div>
     );
   }
-  // The stay type's heading says it already
-  const untyped = nested && groups.length === 1 && groups[0][0] === OTHER;
+  // A unit type that repeats what the units are, or the stay type's heading: no heading
+  const [only] = groups.length === 1 ? groups[0] : [];
+  const untyped =
+    only !== undefined &&
+    (sameWords(only, noun.many) ||
+      (nested !== undefined && (only === OTHER || sameWords(only, nested))));
   return (
     <>
       {groups.map(([type, list]) => {
@@ -209,7 +217,7 @@ export function UnitPicker({ units, value, onChange, noun, label, hint, kinds }:
       units={list}
       value={value}
       noun={kind ? nounForKinds([kind]) : noun}
-      nested={kind !== undefined}
+      nested={kind ? stayTypeLabel(kind) : undefined}
       setUnits={setUnits}
     />
   );
