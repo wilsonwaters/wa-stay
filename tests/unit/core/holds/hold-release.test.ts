@@ -633,6 +633,24 @@ describe('HoldPaymentService: letting a hold go', () => {
       expect(h.snipeRepo.findById(snipe.id)?.lastError).toBe(RELEASED_MESSAGE);
     });
 
+    it('a confirmation being read as the person deletes wins: booked, and no release', async () => {
+      setUp();
+      const snipe = heldSnipe();
+      await service.openForSnipe(snipe.id);
+      slowReading();
+      windows.last.showPage('https://fake.example/paid/FAKE-1', { text: 'BK-FAKE-1' });
+
+      await service.releaseBeforeDelete('snipe', snipe.id);
+
+      expect(h.snipeRepo.findById(snipe.id)).toMatchObject({
+        status: SnipeStatus.BOOKED,
+        bookedReference: 'BK-FAKE-1',
+      });
+      expect(releases()).toEqual([]);
+      await drain();
+      expect(releases()).toEqual([]);
+    });
+
     it('asks nothing for an expired hold, an unheld row, a missing row, or a provider without release', async () => {
       setUp({ holdRelease: {} });
       await service.releaseBeforeDelete('snipe', heldSnipe('FAKE-2', -1).id);

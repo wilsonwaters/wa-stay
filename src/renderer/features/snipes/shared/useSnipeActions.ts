@@ -90,6 +90,10 @@ export function useSnipeActions(
   // "Let it go" was asked here: once the hold has ended (EXPIRED), the page keeps the hold
   // panel to say how (and focus its heading) instead of the ended snipe's notice
   const [releaseAsked, setReleaseAsked] = useState(false);
+  // Armed again (or anything but held or ended): a later end is not that hold's
+  if (releaseAsked && snipe.status !== SnipeStatus.HELD && snipe.status !== SnipeStatus.EXPIRED) {
+    setReleaseAsked(false);
+  }
   const running = useRef(false);
   // The snipe as main last pushed it: by the time Run now answers, the one it changed
   const cachedSnipe = useCachedSnipe();

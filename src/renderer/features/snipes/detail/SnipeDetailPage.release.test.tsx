@@ -116,4 +116,28 @@ describe('SnipeDetailPage: Let it go', () => {
     expect(within(progress).getByText('Hold let go')).toBeInTheDocument();
     expect(screen.queryByText('Hold expired')).toBeNull();
   });
+
+  it('armed again after letting its hold go, a later end shows the ended notice, not the old hold panel', async () => {
+    const releaseHold = jest.fn();
+    const { user, held, mock } = render(RELEASING, releaseHold);
+    const letGo = ended(held);
+    releaseHold.mockResolvedValue(ok(letGo));
+    const hold = await screen.findByRole('region', { name: 'Hold at Osprey Bay' });
+    await user.click(await within(hold).findByRole('button', { name: 'Let it go' }));
+    const dialog = screen.getByRole('alertdialog', { name: 'Let this hold go?' });
+    await user.click(within(dialog).getByRole('button', { name: 'Let it go' }));
+    expect(await screen.findByRole('heading', { name: 'The hold has ended' })).toBeInTheDocument();
+
+    // Armed again, then its window closes with nothing free (the old hold's reference stays)
+    mock!.emit('snipe:updated', { ...letGo, status: SnipeStatus.ARMED, isActive: true });
+    await waitFor(() =>
+      expect(screen.queryByRole('region', { name: 'Hold at Osprey Bay' })).toBeNull()
+    );
+    const window = 'The window closed before the dates were free';
+    mock!.emit('snipe:updated', { ...letGo, lastError: window, isActive: false });
+
+    expect(await screen.findByText(window)).toBeInTheDocument();
+    expect(screen.queryByRole('region', { name: 'Hold at Osprey Bay' })).toBeNull();
+    expect(screen.queryByRole('heading', { name: 'The hold has ended' })).toBeNull();
+  });
 });
