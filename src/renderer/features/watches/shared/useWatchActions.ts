@@ -11,7 +11,7 @@ import type { Watch } from '../../../../shared/types/watch.types';
 import { HOLD_EXPIRED_MESSAGE } from '../../../components/stay/HoldPanel';
 import { useToast } from '../../../components/ui';
 import { runResultMessage } from './resultSummary';
-import { unitNounFor } from './watchState';
+import { watchNoun } from './watchState';
 
 /**
  * The actions a watch offers wherever it is shown (card, detail, edit), each telling the
@@ -32,7 +32,7 @@ export function useWatchActions(watch: Watch, manifest: ProviderManifest | undef
     checking.current = true;
     run.mutate(watch.id, {
       onSuccess: (result) => {
-        const message = runResultMessage(result, watch, unitNounFor(manifest), manifest);
+        const message = runResultMessage(result, watch, watchNoun(watch, manifest), manifest);
         if (result.success) toast.success(message);
         else toast.error(message);
       },

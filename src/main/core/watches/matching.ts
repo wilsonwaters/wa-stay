@@ -22,7 +22,7 @@
 
 import type { NightStatus, UnitAvailability, UnitKind, WatchMatch } from '@shared/types';
 import { addDays, nightsBetween } from '@shared/utils/calendar-date';
-import { unitKindOfUnit } from '@shared/utils/unit-kinds';
+import { isUnitKind, unitKindOfUnit } from '@shared/utils/unit-kinds';
 
 /** What matching needs from a watch (or a snipe). */
 export interface MatchCriteria {
@@ -149,6 +149,7 @@ function toMatch(
     unitId: unit.unitId,
     unitName: unit.unitName,
     ...(unit.unitType ? { unitType: unit.unitType } : {}),
+    ...(isUnitKind(unit.unitKind) ? { unitKind: unit.unitKind } : {}),
     arrival: nights[0].date,
     departure: addDays(nights[nights.length - 1].date, 1),
     partial,

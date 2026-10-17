@@ -107,6 +107,11 @@ Hold only what you will use ([Book responsibly](site-sniper.md#book-responsibly)
 
 ## Notifications
 
+Alerts name units by what they are: "Sites available at Bungarra" for ParkStay's campsites,
+"Cabins available at …" or "Cabin held at …" for cabins, and "spots" when the units found are of
+more than one stay type ("Found 3 spots available at …"). The words come from the units found or
+held, else the watch's or snipe's stay types, else the provider's usual kind of place.
+
 ### Where they appear
 
 | Where | What |

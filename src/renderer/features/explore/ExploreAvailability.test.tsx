@@ -730,8 +730,9 @@ describe('Explore with dates: stay types', () => {
       stubs(),
       '3 places · 3 available for 6–8 Nov'
     );
-    expect(within(card(COUNTED.name)).getByText('7 of 26 sites available')).toBeInTheDocument();
-    expect(within(card(TOTALS.name)).getByText('4 of 12 sites available')).toBeInTheDocument();
+    // Holiday parks have sites and cabins: their units are "spots" (R9)
+    expect(within(card(COUNTED.name)).getByText('7 of 26 spots available')).toBeInTheDocument();
+    expect(within(card(TOTALS.name)).getByText('4 of 12 spots available')).toBeInTheDocument();
     unmount();
 
     // Camping and Cabins & villas: everything these places have, so their totals.
@@ -740,8 +741,9 @@ describe('Explore with dates: stay types', () => {
       stubs(),
       '3 places · 3 available for 6–8 Nov'
     );
-    expect(within(card(COUNTED.name)).getByText('7 of 26 sites available')).toBeInTheDocument();
-    expect(within(card(TOTALS.name)).getByText('4 of 12 sites available')).toBeInTheDocument();
+    // Holiday parks have sites and cabins: their units are "spots" (R9)
+    expect(within(card(COUNTED.name)).getByText('7 of 26 spots available')).toBeInTheDocument();
+    expect(within(card(TOTALS.name)).getByText('4 of 12 spots available')).toBeInTheDocument();
     expect(within(card('Bungarra')).getByText('3 of 5 sites available')).toBeInTheDocument();
   });
 
@@ -751,14 +753,15 @@ describe('Explore with dates: stay types', () => {
       stubs(),
       '2 places · 1 available for 6–8 Nov'
     );
-    expect(within(card(COUNTED.name)).getByText('2 of 6 sites available')).toBeInTheDocument();
+    // Only cabins counted: "cabins" (R9)
+    expect(within(card(COUNTED.name)).getByText('2 of 6 cabins available')).toBeInTheDocument();
     // No count of cabins alone: never its totals, which include sites, and never "not open".
     const totals = card(TOTALS.name);
     expect(within(totals).getByText('Check dates on the place page')).toBeInTheDocument();
     expect(totals).toHaveAccessibleDescription(
       expect.stringContaining('Check dates on the place page')
     );
-    expect(within(totals).queryByText(/available|not open|No sites/i)).toBeNull();
+    expect(within(totals).queryByText(/available|not open|No (sites|spots|cabins)/i)).toBeNull();
     expect(cardNames()).toEqual([COUNTED.name, TOTALS.name]);
 
     // "Available only" hides the place that says "Check dates".

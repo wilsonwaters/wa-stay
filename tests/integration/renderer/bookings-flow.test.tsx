@@ -91,7 +91,8 @@ describe('bookings, end to end', () => {
         name: 'Done',
       })
     );
-    await user.type(within(dialog).getByRole('textbox', { name: 'Site (optional)' }), '14');
+    // A holiday park's units are sites and cabins: a booking with it names a "spot" (R9)
+    await user.type(within(dialog).getByRole('textbox', { name: 'Spot (optional)' }), '14');
     await user.type(within(dialog).getByRole('textbox', { name: 'Booking reference' }), 'lb-2041');
     await user.type(
       within(dialog).getByRole('textbox', { name: 'Total cost (optional)' }),
@@ -119,7 +120,7 @@ describe('bookings, end to end', () => {
       'true'
     );
     expect(within(card).getByRole('img', { name: 'Fake Stay Holidays' })).toBeInTheDocument();
-    expect(card).toHaveTextContent('Site 14 · Ref lb-2041');
+    expect(card).toHaveTextContent('Spot 14 · Ref lb-2041');
     // The empty state's button is gone; focus is on the header's "Add booking".
     await waitFor(() => expect(screen.getByRole('button', { name: 'Add booking' })).toHaveFocus());
 

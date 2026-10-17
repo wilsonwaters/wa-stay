@@ -47,8 +47,9 @@ describe('minStayWarning', () => {
     const units = [cabin('1', 3), cabin('2'), { ...cabin('s', 4), unitKind: 'campsite' as const }];
     expect(minStayWarning(input({ units, unitIds: ['1'] }))).toBe(EVERY);
     expect(minStayWarning(input({ units, unitIds: ['Cabin 2'] }))).toBeUndefined();
+    // The units it is about are named by their own kind (R9): the campsite is a site
     expect(minStayWarning(input({ units, unitKinds: ['campsite'] }))).toBe(
-      "Busselton's cabins need at least 4 nights. WA Stay only alerts on stays RAC accepts."
+      "Busselton's sites need at least 4 nights. WA Stay only alerts on stays RAC accepts."
     );
     expect(minStayWarning(input({ units, unitKinds: ['cabin'] }))).toBe(
       'Some cabins need at least 3 nights.'

@@ -6,7 +6,7 @@ import { HoldPanel } from '../../../components/stay/HoldPanel';
 import { timeInZone } from '../../../components/timeFormat';
 import { Notice } from '../../../components/ui';
 import type { WatchActions } from '../shared/useWatchActions';
-import { holdRegionLabel, unitNameOf, unitNounFor, type WatchState } from '../shared/watchState';
+import { heldNoun, holdRegionLabel, unitNameOf, type WatchState } from '../shared/watchState';
 
 export interface HoldNoticeProps {
   watch: Watch;
@@ -21,7 +21,7 @@ export interface HoldNoticeProps {
  */
 export function HoldNotice({ watch, state, manifest, actions }: HoldNoticeProps) {
   const provider = manifest?.shortName ?? 'the provider';
-  const unit = unitNameOf(watch, watch.hold?.unitId, unitNounFor(manifest));
+  const unit = unitNameOf(watch, watch.hold?.unitId, heldNoun(watch, manifest));
   const at = watch.hold
     ? timeInZone(new Date(watch.hold.expiresAt), manifest?.timezone ?? 'Australia/Perth')
     : undefined;

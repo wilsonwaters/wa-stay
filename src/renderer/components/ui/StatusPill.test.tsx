@@ -6,7 +6,8 @@ import { statusPresets } from './statusPresets';
 describe('StatusPill', () => {
   it('shows an icon and a text label, not colour alone', () => {
     render(<StatusPill {...statusPresets.snipe[SnipeStatus.HELD]} />);
-    const pill = screen.getByText('Site held');
+    // Presets name no unit (R9): a watch or snipe says "Site held" with its own noun
+    const pill = screen.getByText('Held');
     expect(pill.querySelector('svg')).toHaveAttribute('aria-hidden', 'true');
   });
 

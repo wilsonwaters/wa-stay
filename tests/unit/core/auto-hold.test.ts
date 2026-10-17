@@ -54,7 +54,7 @@ describe('watch auto-hold', () => {
     expect(h.notifications.notifyWatchHeld).toHaveBeenCalledWith(
       expect.objectContaining({ id: watch.id }),
       result.hold,
-      'Site u1',
+      expect.objectContaining({ unitName: 'Site u1' }),
       BOOKING_URL
     );
     expect(h.notifications.notifyWatchFound).not.toHaveBeenCalled();

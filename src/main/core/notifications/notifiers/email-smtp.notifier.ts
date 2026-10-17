@@ -303,7 +303,7 @@ export class SmtpEmailNotifier extends BaseNotifier {
     const logo = this.logoPath && fs.existsSync(this.logoPath) ? this.logoPath : undefined;
     const bookingUrl = httpsLink(message.bookingUrl);
     const booking: BookingAction | undefined = bookingUrl
-      ? { url: bookingUrl, label: `Book on ${provider ?? "the provider's site"}` }
+      ? { url: bookingUrl, label: `Book on ${provider ?? "the provider's site"}` } // unit-noun-ok: the provider's website, not a unit
       : undefined;
     const holdNote = message.heldInApp ? heldInAppNote(provider, booking !== undefined) : undefined;
 
@@ -524,7 +524,7 @@ function heldInAppNote(provider: string | undefined, hasBookingLink: boolean): s
     `Open ${APP_NAME} there to pay before it expires.`;
   if (!hasBookingLink) return inApp;
   return (
-    `${inApp} Away from that computer? You can book on ${provider ?? "the provider's site"} instead. ` +
+    `${inApp} Away from that computer? You can book on ${provider ?? "the provider's site"} instead. ` + // unit-noun-ok: the provider's website, not a unit
     `What ${APP_NAME} held may show as taken there until the hold ends.`
   );
 }

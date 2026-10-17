@@ -41,7 +41,8 @@ and dates). The flow has five steps:
    type or a site before it goes on (the same chips and rules as a watch:
    [Stay types](watches-and-notifications.md#stay-types)). A warning says when the stay is
    shorter than the sites usually take.
-4. **Release**: **When are the sites released?** For a scheduled release, the release date
+4. **Release**: **When are the sites released?** (or cabins, rooms…: the place's units as
+   it calls them). For a scheduled release, the release date
    and time (in the provider's time zone), which must be before your check-in day. **Advanced timing**: Start early (seconds, default
    120), Check every (seconds, default 1.5; never under 0.5), Keep trying for (minutes, default
    15), Most attempts (no limit by default).
@@ -73,8 +74,8 @@ and dates). The flow has five steps:
   provider's stay rules allow (its minimum nights, and the days it takes arrivals and
   departures), even when the provider says the unit is free. A snipe never takes "any unit"
   across stay types: with no units chosen, once one of its candidates comes free and they,
-  booked or free, are of more than one kind, it holds nothing, reserves no night and ends **Failed** with "Free units of
-  more than one stay type: choose a stay type or units for this snipe", and you get a
+  booked or free, are of more than one kind, it holds nothing, reserves no night and ends **Failed** with "The units
+  this snipe could hold are of more than one stay type: choose one stay type or units for it", and you get a
   warning notification. The flow asks for one stay type or units at a place it knows is mixed,
   so this happens only when the flow could not load the place's units, or they changed after the
   snipe was made: choose a stay type or units and start it again.

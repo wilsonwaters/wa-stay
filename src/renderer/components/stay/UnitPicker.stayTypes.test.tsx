@@ -91,7 +91,8 @@ describe('UnitPicker with more than one stay type', () => {
     expect(onChange).toHaveBeenLastCalledWith(['c1']);
     expect(screen.getByRole('status')).toBe(status);
     expect(status).toHaveTextContent('2 sites unticked: not in the chosen stay types');
-    expect(screen.getByText(/1 site chosen/)).toBeInTheDocument();
+    // The one left is a cabin, and says so (R9)
+    expect(screen.getByText(/1 cabin chosen/)).toBeInTheDocument();
 
     // Widening the choice unticks nothing, and the line clears.
     rerender(<Picker kinds={[]} start={start} onChange={onChange} />);

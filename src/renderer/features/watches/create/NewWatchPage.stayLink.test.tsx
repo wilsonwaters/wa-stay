@@ -63,6 +63,19 @@ describe('NewWatchPage: the stay types in a link from Explore', () => {
     ).toBeInTheDocument();
   });
 
+  it('stay=cabin,bogus keeps Cabins & villas and says only the other was left out', async () => {
+    renderWithApp({ route: `${PREFILL}&stay=cabin,bogus`, api: api() });
+    const group = await stayTypes();
+    expect(within(group).getByRole('button', { name: 'Cabins & villas' })).toHaveAttribute(
+      'aria-pressed',
+      'true'
+    );
+    expect(
+      screen.getByText("One of the link's stay types couldn't be used, so it was left out.")
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/so choose one/)).toBeNull();
+  });
+
   it('stay=cabin at a place with sites only is dropped without a word', async () => {
     const mock = api(makeMixedDetail({}, 'campsite'));
     const { user } = renderWithApp({ route: `${PREFILL}&stay=cabin`, api: mock });

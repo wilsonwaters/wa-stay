@@ -96,7 +96,7 @@ export function firstBookingLink(
     refused.push(describeUrl(candidate));
   }
   if (refused.length > 0 && !quiet) {
-    log.warn(`${manifest.id}: skipped booking links off its site: ${refused.join(', ')}`);
+    log.warn(`${manifest.id}: skipped booking links off its website: ${refused.join(', ')}`);
   }
   return found;
 }

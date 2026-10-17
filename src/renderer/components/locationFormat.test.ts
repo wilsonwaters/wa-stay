@@ -1,12 +1,33 @@
-import { unitCountLabel, unitNoun, unitPeopleLabel, unitVehiclesLabel } from './locationFormat';
+import { placeNoun, unitCountLabel, unitPeopleLabel, unitVehiclesLabel } from './locationFormat';
 
-describe('locationFormat units', () => {
-  it('names a location’s units by its kind, with "unit" for anything unknown', () => {
-    expect(unitNoun('campground')).toEqual({ one: 'site', many: 'sites' });
-    expect(unitNoun('cabin')).toEqual({ one: 'cabin', many: 'cabins' });
-    expect(unitNoun('spaceport')).toEqual({ one: 'unit', many: 'units' });
-    expect(unitNoun(undefined)).toEqual({ one: 'unit', many: 'units' });
-    expect(unitCountLabel('campground', 1)).toBe('1 site');
+describe('placeNoun', () => {
+  const PARKSTAY = { locationKinds: ['campground' as const] };
+
+  it('names a place’s units by the kinds its units say, where they are loaded', () => {
+    const units = [
+      { unitId: '1', unitName: 'Cabin 1', unitKind: 'cabin' as const },
+      { unitId: '2', unitName: 'Cabin 2', unitKind: 'cabin' as const },
+    ];
+    expect(placeNoun({ kind: 'campground', units }, PARKSTAY)).toEqual({
+      one: 'cabin',
+      many: 'cabins',
+    });
+    expect(
+      placeNoun({ kind: 'holiday-park', units: [...units, { unitId: '3', unitName: 'Site 3' }] })
+    ).toEqual({ one: 'spot', many: 'spots' });
+  });
+
+  it('else by its own unit kinds or its kind’s; else its provider’s; else "spot"', () => {
+    expect(placeNoun({ kind: 'campground' })).toEqual({ one: 'site', many: 'sites' });
+    // Units that say no kind: the place's
+    expect(placeNoun({ kind: 'hut', units: [{ unitId: '1', unitName: 'Hut' }] }).many).toBe(
+      'bunks'
+    );
+    expect(placeNoun({ kind: 'holiday-park', unitKinds: ['room'] }).many).toBe('rooms');
+    expect(placeNoun({ kind: 'holiday-park' }).many).toBe('spots');
+    expect(placeNoun(undefined, PARKSTAY).many).toBe('sites');
+    expect(placeNoun(undefined).many).toBe('spots');
+    expect(unitCountLabel(1, placeNoun({ kind: 'campground' }))).toBe('1 site');
   });
 });
 

@@ -20,7 +20,7 @@ import type {
   UnitKind,
 } from '../../../../shared/types/provider.types';
 import { unitKindsOf } from '../../../../shared/utils/unit-kinds';
-import { unitNoun } from '../../../components/locationFormat';
+import { nounForKinds } from '../../../../shared/utils/unit-noun';
 
 /** The states, in the order they take precedence (see `deriveAvailability`). */
 export type AvailabilityState =
@@ -75,6 +75,19 @@ function units(value: unknown): number {
 interface UnitCounts {
   available: number;
   bookable: number;
+}
+
+/**
+ * The unit kinds a place's counts are about: the stay types chosen that it has, else all of its
+ * own (`unitKindsOf`). What its availability calls its units ("27 spots", "3 cabins").
+ */
+export function countedKinds(
+  location: Pick<LocationSummary, 'kind' | 'unitKinds'>,
+  stayTypes: readonly UnitKind[] = []
+): UnitKind[] {
+  const kinds = unitKindsOf(location);
+  const chosen = kinds.filter((kind) => stayTypes.includes(kind));
+  return chosen.length > 0 ? chosen : kinds;
 }
 
 /**
@@ -179,15 +192,16 @@ export const NO_STATE_PILL = '–';
 export const LOADING_PILL = '···';
 
 /**
- * How a state reads on a map pill and a card, with the unit noun of the place's kind
- * ("8 of 24 sites available", "2 of 6 cabins available"). Null with no dates: nothing shows.
+ * How a state reads on a map pill and a card, with the noun of the unit kinds it counts
+ * (`countedKinds`: "8 of 24 sites available", "2 of 6 cabins available", "27 spots available"
+ * at a place of several kinds). Null with no dates: nothing shows.
  */
 export function availabilityLabel(
   availability: PlaceAvailability,
-  kind: string,
+  kinds: readonly UnitKind[],
   shortName: string
 ): AvailabilityLabel | null {
-  const noun = unitNoun(kind);
+  const noun = nounForKinds(kinds);
   switch (availability.state) {
     case 'no-dates':
       return null;
@@ -222,7 +236,7 @@ export function availabilityLabel(
     case 'not-supported':
       return {
         pill: NO_STATE_PILL,
-        card: `Availability not shared by ${shortName}`,
+        card: `Check dates on ${shortName}`,
         tone: 'neutral',
       };
     case 'unknown':

@@ -167,7 +167,7 @@ export function BookingsPage() {
           icon={<Luggage size={24} />}
           accent="sun"
           title="No trips yet"
-          description="Add a booking you made on a provider's site to keep all your trips in one place."
+          description="Add a booking you made on a provider's website to keep all your trips in one place."
           actions={
             <>
               <Button variant="secondary" onClick={() => setAdding(true)}>

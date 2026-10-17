@@ -156,7 +156,7 @@ describe('the hold rule at a place with more than one stay type', () => {
   it('refuses an automatic hold with no stay type and no unit chosen, saying what to choose', () => {
     expect(holdIssues(held(), MIXED)).toEqual({
       autoHold:
-        'Osprey Bay has more than one stay type. Choose a stay type or a site on the Stay step to hold one automatically.',
+        'Osprey Bay has more than one stay type. Choose one stay type or a site under "Your stay" to hold one automatically.',
     });
     expect(holdIssues(held(), ['campsite', 'other'])).toHaveProperty('autoHold');
   });

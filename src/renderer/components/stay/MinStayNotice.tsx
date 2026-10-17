@@ -2,7 +2,7 @@ import type { UnitSummary } from '../../../shared/types/catalog.types';
 import type { UnitKind } from '../../../shared/types/provider.types';
 import { isCalendarDate, nightsBetween } from '../../../shared/utils/calendar-date';
 import { unitKindOfUnit } from '../../../shared/utils/unit-kinds';
-import type { UnitNoun } from '../nightGridModel';
+import { nounOfUnits, type UnitNoun } from '../../../shared/utils/unit-noun';
 import { Notice } from '../ui';
 import { choosesUnit } from './UnitPicker';
 
@@ -18,6 +18,7 @@ export interface MinStayInput {
   departure: string;
   /** The place's name: "Osprey Bay". */
   place?: string;
+  /** What the units listed are called; the units it is about are named by their own kinds. */
   noun: UnitNoun;
   /** The provider's short name. */
   shortName: string;
@@ -55,15 +56,15 @@ export function minStayWarning(input: MinStayInput): string | undefined {
       : unitKinds.length > 0
         ? units.filter((unit) => unitKinds.includes(unitKindOfUnit(unit)))
         : units;
-  const short = about.flatMap((unit) => {
-    const minimum = usualMinimum(unit);
-    return minimum !== undefined && minimum > nights ? [minimum] : [];
-  });
+  const short = about.filter((unit) => (usualMinimum(unit) ?? 0) > nights);
   if (short.length === 0) return undefined;
 
-  const minimum = Math.min(...short);
-  if (short.length < about.length) return `Some ${noun.many} need at least ${minimum} nights.`;
-  const whose = place ? `${place}'s ${noun.many}` : `These ${noun.many}`;
+  const minimum = Math.min(...short.map((unit) => usualMinimum(unit) ?? 0));
+  if (short.length < about.length) {
+    return `Some ${nounOfUnits(short, noun).many} need at least ${minimum} nights.`;
+  }
+  const { many } = nounOfUnits(about, noun);
+  const whose = place ? `${place}'s ${many}` : `These ${many}`;
   return (
     `${whose} need at least ${minimum} nights. ` +
     `WA Stay only ${input.action} stays ${input.shortName} accepts.`

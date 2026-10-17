@@ -7,7 +7,7 @@ import { stayRangeLabel } from '../../../components/nightGridModel';
 import { providerToday } from '../../../components/stay/providerToday';
 import { relativeTime, timeInZone } from '../../../components/timeFormat';
 import { resultSummary } from '../shared/resultSummary';
-import { unitNounFor } from '../shared/watchState';
+import { watchNoun } from '../shared/watchState';
 
 export interface WatchAvailabilityProps {
   watch: Watch;
@@ -22,7 +22,7 @@ export interface WatchAvailabilityProps {
  * in the browser, right after the result line (with a partial match's dates).
  */
 export function WatchAvailability({ watch, manifest, now }: WatchAvailabilityProps) {
-  const noun = unitNounFor(manifest);
+  const noun = watchNoun(watch, manifest);
   const units = watch.lastAvailability;
   const checked = watch.lastCheckedAt ? new Date(watch.lastCheckedAt) : undefined;
   const when = checked && (
@@ -45,7 +45,7 @@ export function WatchAvailability({ watch, manifest, now }: WatchAvailabilityPro
   const book = link && (
     <p className="flex flex-wrap items-center gap-x-3 gap-y-2">
       <ExternalLink href={link.url} variant="primary">
-        Book on {manifest?.shortName ?? "the provider's site"}
+        Book on {manifest?.shortName ?? "the provider's website"}
       </ExternalLink>
       {partialStay && (
         <span className="text-sm text-fg-secondary">

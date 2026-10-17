@@ -33,7 +33,7 @@ import {
   DEFAULT_TIMEOUT_MS,
   INTERACTIVE_REQUEST_GAP_MS,
 } from '@main/providers/sdk';
-import { KIND_LABELS, unitNoun } from '@renderer/components/locationFormat';
+import { KIND_LABELS, placeNoun } from '@renderer/components/locationFormat';
 import { LOCATION_KINDS, StayFieldDescriptorSchema } from '@shared/types/provider.types';
 import { docFiles, readDoc, ROOT } from './markdown';
 
@@ -206,7 +206,7 @@ describe("the guide's location kinds, stay-field types and bulk availability ent
     expect(rows.map(([kind]) => unquote(kind))).toEqual([...LOCATION_KINDS]);
     for (const [cell, label, units] of rows) {
       const kind = unquote(cell) as (typeof LOCATION_KINDS)[number];
-      expect([kind, label, units]).toEqual([kind, KIND_LABELS[kind], unitNoun(kind).many]);
+      expect([kind, label, units]).toEqual([kind, KIND_LABELS[kind], placeNoun({ kind }).many]);
     }
   });
 

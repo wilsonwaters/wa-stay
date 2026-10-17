@@ -12,19 +12,22 @@ import type { ProviderManifest } from '../../../../shared/types/provider.types';
 import type { SiteSnipe, SnipeExecutionResult } from '../../../../shared/types/site-sniper.types';
 import { HOLD_EXPIRED_MESSAGE } from '../../../components/stay/HoldPanel';
 import { useToast } from '../../../components/ui';
-import { unitLabel, unitNounFor } from './snipeState';
+import type { PlaceUnits } from './usePlaceUnits';
+import { heldUnitNoun } from './snipeNouns';
+import { unitLabel } from './snipeState';
 
 /** What one attempt found, for the toast that announces it. */
 export function runResultMessage(
   result: SnipeExecutionResult,
   snipe: SiteSnipe,
   manifest: ProviderManifest | undefined,
-  unitNames?: ReadonlyMap<string, string>
+  units?: PlaceUnits
 ): string {
   const place = snipe.location.name || snipe.name;
   const provider = manifest?.shortName ?? 'the provider';
   if (result.held) {
-    const unit = unitLabel(result.matchedSiteId, unitNounFor(manifest), unitNames);
+    const noun = heldUnitNoun(snipe, manifest, units?.units, result.matchedSiteId);
+    const unit = unitLabel(result.matchedSiteId, noun, units?.names);
     return `${unit} held at ${place}. Pay on ${provider} to keep it.`;
   }
   if (!result.success) return result.error ?? `The attempt at ${place} failed. Try again soon.`;
@@ -44,12 +47,12 @@ export function runResultMessage(
  * The actions a snipe offers wherever it is shown (card, detail), each telling the outcome in a
  * toast. Arming a snipe of a provider whose holds need an account, while signed out, opens the
  * Connect prompt instead (`connectOpen`), as does main refusing it for that (`AUTH_REQUIRED`,
- * when the recorded account was stale; §12.32). `unitNames` names a unit Run now holds.
+ * when the recorded account was stale; §12.32). `units` names a unit Run now holds.
  */
 export function useSnipeActions(
   snipe: SiteSnipe,
   manifest: ProviderManifest | undefined,
-  unitNames?: ReadonlyMap<string, string>
+  units?: PlaceUnits
 ) {
   const toast = useToast();
   const setActive = useSetSnipeActive();
@@ -87,7 +90,7 @@ export function useSnipeActions(
     running.current = true;
     run.mutate(snipe.id, {
       onSuccess: (result) => {
-        const message = runResultMessage(result, snipe, manifest, unitNames);
+        const message = runResultMessage(result, snipe, manifest, units);
         if (result.success) toast.success(message);
         else toast.error(message);
       },

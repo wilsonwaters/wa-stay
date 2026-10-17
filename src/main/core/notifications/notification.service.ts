@@ -5,12 +5,20 @@ import {
   type ProviderId,
   SiteSnipe,
   type Booking,
+  type UnitKind,
   type WatchHold,
   type WatchMatch,
 } from '@shared/types';
 import { NotificationType, RelatedType } from '@shared/types/common.types';
 import { isAppLinkPath, notificationLinkPath, relatedPath } from '@shared/utils/app-links';
 import { isCalendarDate, nightsBetween } from '@shared/utils/calendar-date';
+import {
+  capitalise,
+  kindsOfUnits,
+  unitCountLabel,
+  unitNounFrom,
+  type UnitNoun,
+} from '@shared/utils/unit-noun';
 import { NotificationRepository } from '../../database/repositories';
 import { NotificationDispatcher } from './notification-dispatcher';
 import type { EventSink } from '@shared/contracts/events';
@@ -65,6 +73,12 @@ export type ProviderNameResolver = (providerId: string) => string | undefined;
 /** A provider's manifest (its id and website), or undefined for an unknown provider. */
 export type ProviderManifestResolver = (providerId: string) => BookingLinkManifest | undefined;
 
+/**
+ * A provider's default unit kinds (`providerUnitKinds`: its first location kind's), or none
+ * for an unknown provider.
+ */
+export type ProviderUnitKindsResolver = (providerId: string) => readonly UnitKind[];
+
 /** The person's notification preferences (Settings → Notifications). */
 export interface NotificationPreferences {
   /** Show an OS (desktop) notification. The in-app list, events and email are not affected. */
@@ -87,6 +101,12 @@ export interface NotificationServiceOptions {
    * against its website. Without it (or for an unknown provider) alerts carry no link.
    */
   providerManifest?: ProviderManifestResolver;
+  /**
+   * Resolves a provider's default unit kinds through the registry: what alerts call its units
+   * when neither the units found nor the watch or snipe say (ParkStay's: sites). Without it (or
+   * for an unknown provider) such units are "spots".
+   */
+  providerUnitKinds?: ProviderUnitKindsResolver;
   /**
    * The current preferences, read on every notification, so a change in Settings applies to
    * the next one with nothing to push. The container reads the stored settings.
@@ -135,6 +155,7 @@ export class NotificationService {
   private events: EventSink | null = null;
   private readonly providerName: ProviderNameResolver;
   private readonly providerManifest: ProviderManifestResolver;
+  private readonly providerUnitKinds: ProviderUnitKindsResolver;
   private readonly clock: () => Date;
   private readonly showMainWindow: () => boolean;
   private readonly openExternal: (url: string) => Promise<void>;
@@ -153,6 +174,7 @@ export class NotificationService {
     this.events = events || null;
     this.providerName = options.providerName ?? (() => undefined);
     this.providerManifest = options.providerManifest ?? (() => undefined);
+    this.providerUnitKinds = options.providerUnitKinds ?? (() => []);
     this.clock = options.clock ?? (() => new Date());
     this.showMainWindow = options.showMainWindow ?? (() => false);
     this.openExternal = options.openExternal ?? (() => Promise.resolve());
@@ -221,6 +243,21 @@ export class NotificationService {
   }
 
   /**
+   * What an alert calls its units (`unitNounFrom`): the kinds of the units it is about (those
+   * found, or the one held), else the watch's or snipe's stay types, else its provider's.
+   */
+  private nounFor(
+    subject: { providerId: string; unitKinds?: readonly UnitKind[] },
+    units: readonly { unitKind?: unknown }[]
+  ): UnitNoun {
+    return unitNounFrom(
+      kindsOfUnits(units),
+      subject.unitKinds,
+      this.providerUnitKinds(subject.providerId)
+    );
+  }
+
+  /**
    * Notify when a watch finds the whole stay. `note` is a sentence added to the message, such
    * as why no automatic hold was placed. `bookingUrl` is the provider's booking page for the
    * stay found (`matchedStayLink`): a desktop click opens it, and the email links it.
@@ -231,9 +268,9 @@ export class NotificationService {
     note?: string,
     bookingUrl?: string
   ): Promise<void> {
-    const sitesText = matches.length === 1 ? '1 site' : `${matches.length} sites`;
+    const noun = this.nounFor(watch, matches);
     const message =
-      `Found ${sitesText} available at ${watch.location.name} for ${formatCalendarDate(watch.stay.arrival)} - ${formatCalendarDate(watch.stay.departure)}` +
+      `Found ${unitCountLabel(matches.length, noun)} available at ${watch.location.name} for ${formatCalendarDate(watch.stay.arrival)} - ${formatCalendarDate(watch.stay.departure)}` +
       (note ? `. ${note}` : '');
 
     await this.notify(
@@ -241,7 +278,7 @@ export class NotificationService {
         userId: watch.userId,
         providerId: watch.providerId,
         type: NotificationType.WATCH_FOUND,
-        title: `Sites available at ${watch.location.name}`,
+        title: `${capitalise(noun.many)} available at ${watch.location.name}`,
         message,
         relatedId: watch.id,
         relatedType: RelatedType.WATCH,
@@ -283,14 +320,15 @@ export class NotificationService {
   }
 
   /**
-   * Notify when a watch's automatic hold was placed (payment still required), like a snipe's.
-   * A desktop click opens only the watch, where the person pays; the email says the hold is
-   * in WA Stay and gives `bookingUrl`, the public booking page, for booking away from it.
+   * Notify when a watch's automatic hold was placed (payment still required), like a snipe's,
+   * on `unit` (the match it held: its name, and its kind for the title). A desktop click opens
+   * only the watch, where the person pays; the email says the hold is in WA Stay and gives
+   * `bookingUrl`, the public booking page, for booking away from it.
    */
   async notifyWatchHeld(
     watch: Watch,
     hold: WatchHold,
-    unitName: string,
+    unit: Pick<WatchMatch, 'unitName' | 'unitKind'>,
     bookingUrl?: string
   ): Promise<void> {
     const arrival = formatCalendarDate(watch.stay.arrival);
@@ -299,14 +337,15 @@ export class NotificationService {
       1,
       Math.round((Date.parse(hold.expiresAt) - this.clock().getTime()) / 60_000)
     );
-    const message = `${unitName} held at ${watch.location.name} for ${arrival}–${departure}. Complete payment within ${minutesLeft} minutes.`;
+    const message = `${unit.unitName} held at ${watch.location.name} for ${arrival}–${departure}. Complete payment within ${minutesLeft} minutes.`;
+    const noun = this.nounFor(watch, [unit]);
 
     await this.notify(
       {
         userId: watch.userId,
         providerId: watch.providerId,
         type: NotificationType.SNIPE_HELD,
-        title: `Site held at ${watch.location.name}`,
+        title: `${capitalise(noun.one)} held at ${watch.location.name}`,
         message,
         relatedId: watch.id,
         relatedType: RelatedType.WATCH,
@@ -317,9 +356,10 @@ export class NotificationService {
   }
 
   /**
-   * Notify when a Site Snipe places a temporary hold (payment still required).
+   * Notify when a Site Snipe places a temporary hold (payment still required). `unitKind` is
+   * the held unit's kind, when the provider gave one: what the alert calls it.
    */
-  async notifySnipeHeld(snipe: SiteSnipe): Promise<void> {
+  async notifySnipeHeld(snipe: SiteSnipe, unitKind?: UnitKind): Promise<void> {
     const arrival = formatCalendarDate(snipe.stay.arrival);
     const departure = formatCalendarDate(snipe.stay.departure);
     const where = snipe.location.name || snipe.location.externalId;
@@ -328,14 +368,15 @@ export class NotificationService {
       ? Math.max(1, Math.round((snipe.holdExpiresAt.getTime() - this.clock().getTime()) / 60_000))
       : undefined;
     const deadline = minutesLeft ? ` within ${minutesLeft} minutes` : ' before the hold expires';
-    const message = `Site held at ${where} for ${arrival}–${departure}. Complete payment${deadline}.`;
+    const held = capitalise(this.nounFor(snipe, [{ unitKind }]).one);
+    const message = `${held} held at ${where} for ${arrival}–${departure}. Complete payment${deadline}.`;
 
     await this.notify(
       {
         userId: snipe.userId,
         providerId: snipe.providerId,
         type: NotificationType.SNIPE_HELD,
-        title: `Site held at ${where}`,
+        title: `${held} held at ${where}`,
         message,
         relatedId: snipe.id,
         relatedType: RelatedType.SNIPE,

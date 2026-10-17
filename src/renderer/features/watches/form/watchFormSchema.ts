@@ -135,9 +135,12 @@ export interface WatchFormContext {
   noun?: UnitNoun;
 }
 
-/** Why an automatic hold at a mixed place needs a stay type or a unit chosen first. */
+/**
+ * Why an automatic hold at a mixed place needs one stay type or a unit chosen first (none, or
+ * more than one, is chosen). "Your stay" is the step, and the Edit section, they are chosen in.
+ */
 export function holdChoiceMessage(place: string, noun: UnitNoun): string {
-  return `${place} has more than one stay type. Choose a stay type or a ${noun.one} on the Stay step to hold one automatically.`;
+  return `${place} has more than one stay type. Choose one stay type or a ${noun.one} under "Your stay" to hold one automatically.`;
 }
 
 /** The form's rules for one provider. */

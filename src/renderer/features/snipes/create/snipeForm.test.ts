@@ -29,7 +29,7 @@ describe('snipeFormSchema: a stay type or a unit at a mixed place', () => {
   it('refuses a snipe with neither, since it always holds', () => {
     expect(issues(valid(), ['campsite', 'cabin'])).toEqual({
       unitKinds:
-        'Choose a stay type or a site. At a place with more than one stay type, Site Sniper holds only what you choose.',
+        'Choose one stay type or a site. At a place with more than one stay type, Site Sniper holds only what you choose.',
     });
     expect(issues(valid(), ['campsite', 'other'])).toHaveProperty('unitKinds');
   });

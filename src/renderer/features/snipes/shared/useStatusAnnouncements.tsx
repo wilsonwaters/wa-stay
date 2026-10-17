@@ -3,9 +3,9 @@ import { SnipeStatus } from '../../../../shared/types/common.types';
 import type { ProviderManifest } from '../../../../shared/types/provider.types';
 import type { SiteSnipe } from '../../../../shared/types/site-sniper.types';
 import { useAnnounce } from '../../../components/ui';
-import { statusPillFor, unitNounFor } from './snipeState';
-
-const capitalise = (text: string) => text.charAt(0).toUpperCase() + text.slice(1);
+import { capitalise } from '../../../../shared/utils/unit-noun';
+import { heldUnitNoun } from './snipeNouns';
+import { statusPillFor } from './snipeState';
 
 /** "Site held at Osprey Bay. Pay within 23 minutes." */
 export function heldMessage(
@@ -13,7 +13,7 @@ export function heldMessage(
   manifest: ProviderManifest | undefined,
   now = Date.now()
 ) {
-  const unit = capitalise(unitNounFor(manifest).one);
+  const unit = capitalise(heldUnitNoun(snipe, manifest).one);
   const place = snipe.location.name || snipe.name;
   if (!snipe.holdExpiresAt) {
     return `${unit} held at ${place}. Pay on ${manifest?.shortName ?? 'the provider'} before the hold runs out.`;
@@ -45,7 +45,10 @@ export function useStatusAnnouncements(
       if (before === undefined || before === snipe.status) continue;
       if (snipe.status === SnipeStatus.HELD)
         setAlert(heldMessage(snipe, manifestOf(snipe.providerId)));
-      else announce(`${snipe.name}: ${statusPillFor(snipe.status).label}`);
+      else {
+        const held = heldUnitNoun(snipe, manifestOf(snipe.providerId));
+        announce(`${snipe.name}: ${statusPillFor(snipe.status, held).label}`);
+      }
     }
   }, [snipes, manifestOf, announce]);
 

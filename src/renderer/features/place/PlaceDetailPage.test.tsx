@@ -299,7 +299,8 @@ describe('Place detail page', () => {
       placeApi({ detail: placeDetail({ descriptionHtml: undefined, summary: undefined }) })
     );
     const about = screen.getByRole('region', { name: 'About' });
-    expect(within(about).getByText("ParkStay hasn't published a description.")).toBeInTheDocument();
+    // Says what WA Stay lacks, never that the provider failed (R9, routed R5 note)
+    expect(within(about).getByText('No description yet.')).toBeInTheDocument();
     expect(
       within(about).getByRole('link', {
         name: 'More information exploreparks.dbca.wa.gov.au (opens in your browser)',
@@ -631,7 +632,7 @@ describe('Place detail page', () => {
   });
 
   describe('capabilities', () => {
-    it("says when the provider doesn't share availability, instead of Check", async () => {
+    it("says WA Stay can't check availability here yet, instead of Check", async () => {
       await renderPlace(
         `/places/parkstay/20${STAY}`,
         placeApi({
@@ -644,7 +645,7 @@ describe('Place detail page', () => {
       );
       expect(
         within(card()).getByText(
-          "ParkStay doesn't share availability with WA Stay. Check dates on their website."
+          "WA Stay can't check availability here yet. Check dates on ParkStay's website."
         )
       ).toBeInTheDocument();
       expect(within(card()).queryByRole('button', { name: 'Check availability' })).toBeNull();

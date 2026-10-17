@@ -153,7 +153,7 @@ export class SiteSniperRepository extends BaseRepository<SiteSnipe> {
     }
 
     const snipe = this.findById(id);
-    if (!snipe) throw new AppError('NOT_FOUND', 'Site snipe not found');
+    if (!snipe) throw new AppError('NOT_FOUND', 'Snipe not found');
     return snipe;
   }
 
