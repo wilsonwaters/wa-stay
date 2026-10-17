@@ -18,7 +18,10 @@ import {
   type ProviderContext,
 } from '@main/providers/sdk';
 import { racFactory, racManifest } from '@main/providers/rac';
+import { partialMatches } from '@main/core/watches/matching';
 import { RAC_AVAILABILITY_PATH } from '@main/providers/rac/availability';
+import { isMemberTariff } from '@main/providers/rac/mapping';
+import { unitTypeOfKind } from '@main/providers/rac/unit-kinds';
 import { FixtureHttpClient } from '@main/testing/fixture-http-client';
 import type {
   LocationAvailability,
@@ -392,6 +395,44 @@ describe('RAC availability: stays RAC refuses are never free (terms rule 16)', (
     expect(cabin.total).toBeUndefined();
   });
 
+  it('Karri Valley: sold-out categories whose stay-through reason is a retired site are booked, not closed', async () => {
+    const result = await fixtureProvider().availability!.check('karri-valley', {
+      arrival: '2026-10-31',
+      departure: '2026-11-01',
+      adults: 2,
+    });
+    // RAC's stay-through code 2 ("This Site is closed as of …") with live tariffs: the
+    // Lakeside Room Queen's Standard Rate succeeds; the chalets' are refused for a minimum stay
+    for (const [unitId, name] of [
+      ['cat:10', 'Lakeside Room Queen'],
+      ['cat:6', 'Two Bedroom Chalet - Lake View'],
+      ['cat:11', 'Two Bedroom Accessible Forest View Chalet'],
+    ]) {
+      const category = unit(result, unitId);
+      expect([category.unitName, states(category)]).toEqual([name, [['2026-10-31', 'booked']]]);
+      expect(category.nights[0].label).toBeUndefined();
+    }
+  });
+
+  it("Exmouth, 31 Oct 2026: categories closed for the stay with stop-sold tariffs are closed, in RAC's words", async () => {
+    const result = await fixtureProvider().availability!.check('exmouth', {
+      arrival: '2026-10-31',
+      departure: '2026-11-01',
+      adults: 2,
+    });
+    for (const unitId of ['cat:4', 'cat:8', 'cat:31', 'cat:39']) {
+      expect(unit(result, unitId).nights).toEqual([
+        {
+          date: '2026-10-31',
+          state: 'closed',
+          label: expect.stringMatching(/^This Site is closed as of /),
+        },
+      ]);
+    }
+    // Sold out with live tariffs (stay-through code 3): booked
+    expect(states(unit(result, 'cat:2'))).toEqual([['2026-10-31', 'booked']]);
+  });
+
   it('stop-sold tariffs (code 11) close free nights, labelled with the tariff message', async () => {
     const { provider } = recordingProvider(() => ({
       body: edited('2026-11-06-2n', (json) => {
@@ -674,6 +715,104 @@ describe('RAC availability: the mapping of a stay', () => {
     expect(site.nights[0]).toMatchObject({ state: 'unknown', reason: 'min-stay', noArrival: true });
   });
 
+  it("keeps RAC's closed days on a taken night, so a partial stay never ends on a refused morning", async () => {
+    const site = await poweredSite((s) => {
+      s.sites_code = { '2026-11-06': 0, '2026-11-07': 3 };
+      s.sites_available = { '2026-11-06': 4, '2026-11-07': 0 };
+      const quotes = s.tariffs_available[0].tariffs_quoted as Record<string, object>;
+      Object.assign(quotes['2026-11-07'], { close_arrival: '1', close_departure: '1' });
+    });
+    expect(site.nights).toEqual([
+      { date: '2026-11-06', state: 'available', price: 75, minNights: 1 },
+      { date: '2026-11-07', state: 'booked', noArrival: true, noDeparture: true },
+    ]);
+    // The core's partial matching: 6 → 7 Nov would leave on a morning RAC refuses
+    expect(partialMatches({}, [site])).toEqual([]);
+    // Without the closed day, the one free night is a partial match
+    const open = await poweredSite((s) => {
+      s.sites_code = { '2026-11-06': 0, '2026-11-07': 3 };
+      s.sites_available = { '2026-11-06': 4, '2026-11-07': 0 };
+    });
+    expect(partialMatches({}, [open]).map((m) => [m.arrival, m.departure])).toEqual([
+      ['2026-11-06', '2026-11-07'],
+    ]);
+  });
+
+  it('keeps closed days on closed, not-released and min-stay nights too', async () => {
+    const result = await fixtureProvider().availability!.check('busselton', LEAVERS);
+    expect(unit(result, 'cat:4').nights).toEqual([
+      { date: '2027-11-20', state: 'not-released', noArrival: true, noDeparture: true },
+    ]);
+  });
+
+  it.each([
+    'RAC Members Special',
+    'Members-Only Spring Rate',
+    'Members Only Rate',
+    'RAC member rate',
+  ])(
+    "a members' tariff (%s) never counts, even when RAC takes it and it is cheapest",
+    async (label) => {
+      const site = await poweredSite((s) => {
+        const promo = s.tariffs_available[2];
+        Object.assign(promo, {
+          tariff_label: label,
+          tariff_success: 'true',
+          tariff_code: 0,
+          tariff_total: 100,
+        });
+        for (const quote of Object.values(promo.tariffs_quoted as object)) {
+          Object.assign(quote, { amount: 50, minimum_periods: '1' });
+        }
+      });
+      expect([site.total, site.priceNote, site.nights.map((n) => n.price)]).toEqual([
+        150,
+        undefined,
+        [75, 75],
+      ]);
+    }
+  );
+
+  it("tells members' tariffs from public ones by their label", () => {
+    for (const label of [
+      'RAC Member Rate',
+      'Stay & Save This Spring - RAC Member',
+      'RAC Members Special',
+      'Members-Only Spring Rate',
+      'Members Only',
+      'member rate',
+    ]) {
+      expect([label, isMemberTariff({ tariff_label: label })]).toEqual([label, true]);
+    }
+    for (const label of [
+      'Standard Rate',
+      'Stay & Save This Spring',
+      'Non-Member Rate',
+      'Non Member Rate',
+      'Nonmember Rate',
+      'Membership Week Special',
+      'Remember Me Rate',
+    ]) {
+      expect([label, isMemberTariff({ tariff_label: label })]).toEqual([label, false]);
+    }
+  });
+
+  it('a Non-Member tariff is public: it counts, and its label is the price note', async () => {
+    const site = await poweredSite((s) => {
+      const promo = s.tariffs_available[2];
+      Object.assign(promo, {
+        tariff_label: 'Non-Member Saver',
+        tariff_success: 'true',
+        tariff_code: 0,
+        tariff_total: 140,
+      });
+      for (const quote of Object.values(promo.tariffs_quoted as object)) {
+        Object.assign(quote, { amount: 70, minimum_periods: '1' });
+      }
+    });
+    expect([site.total, site.priceNote]).toEqual([140, 'Non-Member Saver']);
+  });
+
   it('prices come from the cheapest public tariff RAC took, with its label as the price note', async () => {
     const site = await poweredSite((s) => {
       const promo = s.tariffs_available[2];
@@ -689,6 +828,20 @@ describe('RAC availability: the mapping of a stay', () => {
     });
     expect(site.nights.map((n) => n.price)).toEqual([65, 65]);
     expect([site.total, site.priceNote]).toEqual([130, 'Stay & Save This Spring']);
+  });
+});
+
+describe('RAC availability: unit types', () => {
+  it("gives every unit its kind's group as its type, as the place page does", async () => {
+    const provider = fixtureProvider();
+    const detail = await provider.catalog!.getLocation('busselton');
+    const result = await provider.availability!.check('busselton', BUSSELTON);
+    for (const u of result.units) {
+      expect(u.unitType).toBe(unitTypeOfKind(u.unitKind!));
+      const listed = detail.units.find((d) => d.unitId === u.unitId);
+      if (listed) expect([u.unitId, u.unitType]).toEqual([listed.unitId, listed.unitType]);
+    }
+    expect(detail.units.every((d) => d.unitType === unitTypeOfKind(d.unitKind!))).toBe(true);
   });
 });
 

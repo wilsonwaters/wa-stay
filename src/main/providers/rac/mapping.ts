@@ -11,7 +11,8 @@
  * one.
  *
  * **Tariffs.** A tariff counts when RAC says `tariff_success: "true"` and it is public: its label
- * does not say "RAC Member" (members' rates come with the member number, later). Prices come
+ * does not name members ("RAC Member Rate", "RAC Members Special", NewBook's "Members-Only"
+ * pre-sale rates; "Non-Member" is public). Members' rates come with the member number, later. Prices come
  * from the cheapest tariff that counts: each night's `tariffs_quoted[date].amount`, and the
  * stay's `tariff_total`. A refused tariff never gives a price (its total can be a placeholder,
  * `999`). Nor does NewBook's placeholder amount, `999`, which a tariff that counts quotes for a
@@ -29,14 +30,17 @@
  * | 1, any other, or no entry | `unknown` |
  *
  * A category RAC says is closed for the stay (stay-through code 2: "This Site is closed as
- * of …") with no night closed of its own is closed every night it has no free site, labelled
- * with that message.
+ * of …"), with no night closed of its own, is closed every night it has no free site, labelled
+ * with that message, only when its tariffs agree: none counts, and the deciding tariff (below)
+ * is refused as closed (code 2, 3, 4, 8 or 11, stop sold). Otherwise the nights' own codes
+ * decide: a sold-out category whose stay-through reason is one long-retired site is `booked`.
  *
- * **Stay rules.** Each free night carries the rules of the tariff the prices come from (else of
- * the deciding tariff, below): `minNights` from `minimum_periods`, `noArrival` and
- * `noDeparture` from `close_arrival` and `close_departure` being 1. The unit's `minNights` is the
- * arrival night's, from 2 up. When that minimum is above the stay's nights, no free night is
- * `available`: each is `unknown` with `min-stay`.
+ * **Stay rules**, from the tariff the prices come from (else the deciding tariff, below): each
+ * night carries `noArrival` and `noDeparture` from `close_arrival` and `close_departure` being
+ * 1, whatever its state (a partial stay's departure morning can be a booked night's), and each
+ * free night `minNights` from `minimum_periods`. The unit's `minNights` is the arrival night's,
+ * from 2 up. When that minimum is above the stay's nights, no free night is `available`: each
+ * is `unknown` with `min-stay`.
  *
  * **The stay.** `fullyAvailable` only when every night is available, the whole stay has a site
  * (`stay_through_sites_available` above 0, with code 0), a tariff counts, and the arrival night
@@ -236,9 +240,13 @@ export function nightPriceOf(tariff: RawTariff | undefined, date: string): numbe
     : undefined;
 }
 
-/** A members' tariff ("RAC Member Rate", "Stay & Save This Spring - RAC Member"). */
+/**
+ * A members' tariff: its label names members ("RAC Member Rate", "Stay & Save This Spring - RAC
+ * Member", "RAC Members Special", "Members-Only Spring Rate"), but not non-members
+ * ("Non-Member Rate").
+ */
 export function isMemberTariff(tariff: Pick<RawTariff, 'tariff_label'>): boolean {
-  return /\bRAC Member\b/i.test(tariff.tariff_label);
+  return /(?<!\bnon[-\s]?)\bmembers?\b/i.test(tariff.tariff_label);
 }
 
 /** RAC took the tariff for this stay. */
@@ -283,18 +291,27 @@ export function priceNoteOf(tariff: RawTariff): string | undefined {
 
 type StayRules = Pick<NightStatus, 'minNights' | 'noArrival' | 'noDeparture'>;
 
+/** The tariff's closed days on `date`: no arrivals, no departures. */
+export function closedDaysOf(
+  tariff: RawTariff | undefined,
+  date: string
+): Pick<NightStatus, 'noArrival' | 'noDeparture'> {
+  const quote = tariff?.tariffs_quoted?.[date];
+  return {
+    ...(quote?.close_arrival === 1 ? { noArrival: true as const } : {}),
+    ...(quote?.close_departure === 1 ? { noDeparture: true as const } : {}),
+  };
+}
+
 /** The tariff's rules for a stay arriving on `date`: its minimum and its closed days. */
 export function rulesOf(tariff: RawTariff | undefined, date: string): StayRules {
-  const quote = tariff?.tariffs_quoted?.[date];
-  if (!quote) return {};
-  const rules: StayRules = {};
-  const minimum = quote.minimum_periods;
-  if (minimum !== undefined && Number.isInteger(minimum) && minimum >= 1) {
-    rules.minNights = minimum;
-  }
-  if (quote.close_arrival === 1) rules.noArrival = true;
-  if (quote.close_departure === 1) rules.noDeparture = true;
-  return rules;
+  const minimum = tariff?.tariffs_quoted?.[date]?.minimum_periods;
+  return {
+    ...(minimum !== undefined && Number.isInteger(minimum) && minimum >= 1
+      ? { minNights: minimum }
+      : {}),
+    ...closedDaysOf(tariff, date),
+  };
 }
 
 // ---------------------------------------------------------------------------------------
@@ -384,10 +401,13 @@ export function categoryAvailability(
 
   let unitNights = nights.map((date) => siteNight(category, date));
 
-  // A category closed for the stay, with no night of its own closed: closed whenever not free
+  // A category closed for the stay, with no night of its own closed, and its tariffs refused
+  // as closed: closed whenever not free. Otherwise the nights' own codes decide.
   const closedForStay =
     category.stay_through_sites_code === CLOSED_CATEGORY_CODE &&
-    !nights.some((date) => category.sites_code[date] === CLOSED_CATEGORY_CODE);
+    !nights.some((date) => category.sites_code[date] === CLOSED_CATEGORY_CODE) &&
+    deciding?.tariff_code !== undefined &&
+    CLOSED_TARIFF_CODES.has(deciding.tariff_code);
   if (closedForStay) {
     unitNights = unitNights.map((night) =>
       night.state === 'available'
@@ -442,6 +462,9 @@ export function categoryAvailability(
         : night
     );
   }
+
+  // Every night keeps its closed days, free or not: a partial stay may end on a taken night
+  unitNights = unitNights.map((night) => ({ ...night, ...closedDaysOf(rulesTariff, night.date) }));
 
   const result: CategoryAvailability = { nights: unitNights, fullyAvailable };
   const total = priceTariff?.tariff_total;

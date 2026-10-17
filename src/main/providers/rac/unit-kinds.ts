@@ -58,8 +58,10 @@ const TYPE_LABELS: Readonly<Record<UnitKind, string | undefined>> = {
 };
 
 /**
- * A unit's `unitType` where RAC gives no label for its category type (an availability answer,
- * a NewBook-native park): the group its kind is in, "Sites" or "Cabins".
+ * Every RAC unit's `unitType`: the group its kind is in, "Sites" or "Cabins". RAC's availability
+ * answer and a NewBook-native park give no label for a category's type, so the book-now page's
+ * labels ("Dorm", or a safari tent among "Cabins") are not used either: a unit's type is the
+ * same on the place page, in a check and in a watch.
  */
 export function unitTypeOfKind(kind: UnitKind): string | undefined {
   return TYPE_LABELS[kind];

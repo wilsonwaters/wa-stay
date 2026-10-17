@@ -7,7 +7,9 @@
  *   amenities: those are RAC's copy (rule 6).
  * - **`getLocation`**, for a park on RAC's widget, reads its book-now page (one GET,
  *   `book-now.ts`): each category is the unit `cat:<category id>`, with its kind
- *   (`unit-kinds.ts`), type, guests, equipment, features and short description, and the
+ *   (`unit-kinds.ts`), its kind's group as its type ("Sites", "Cabins", "Glamping": the type
+ *   availability gives it too, which has no type labels), guests, equipment, features and short
+ *   description, and the
  *   gallery's photos are the place's. They are fetched live and shown only in the app (rule 6).
  *   The page's notices that have not ended become `info` notices. A page with no category is a
  *   `ProviderParseError` (the core then serves the stored summary, marked stale).
@@ -110,7 +112,8 @@ export function createRacCatalog({
         typeId: category.typeId,
       }),
     };
-    const type = category.typeId === undefined ? undefined : page.types.get(category.typeId);
+    // The kind's group, as availability gives it, so a unit's type is the same on both
+    const type = unitTypeOfKind(unit.unitKind ?? 'other');
     if (type) unit.unitType = type;
     if (category.maxGuests !== undefined) unit.maxPeople = category.maxGuests;
     const equipment = category.equipmentIds

@@ -240,9 +240,9 @@ describe('RAC Parks & Resorts', () => {
       const detail = await provider.catalog.getLocation('margaret-river');
       expect(detail.units.map((u) => [u.unitName, u.unitKind, u.unitType])).toEqual([
         ['4 Bedroom Eco Lodge', 'cabin', 'Cabins'],
-        ['Modern Safari Tent', 'glamping', 'Cabins'],
-        ['Dorm Room - Sleeps 26', 'dorm', 'Dorm'],
-        ['Dorm Room - Sleeps 5', 'dorm', 'Dorm'],
+        ['Modern Safari Tent', 'glamping', 'Glamping'],
+        ['Dorm Room - Sleeps 26', 'dorm', 'Dorms'],
+        ['Dorm Room - Sleeps 5', 'dorm', 'Dorms'],
         ['Powered Site', 'campsite', 'Sites'],
       ]);
       expect(detail.units[2].maxPeople).toBe(26);
