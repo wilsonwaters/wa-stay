@@ -279,6 +279,66 @@ describe('WatchService', () => {
     });
   });
 
+  describe('stay rules (R8)', () => {
+    it('a 2-night stay whose every night is refused under a 3-night minimum is NOT_FOUND, with no alert', async () => {
+      const refused = { state: 'unknown', reason: 'min-stay', minNights: 3 } as const;
+      h.fake.setAvailability('1', {
+        u1: [{ ...refused, noArrival: true }, { ...refused }],
+        u2: [{ ...refused }, { ...refused, noDeparture: true }],
+      });
+      const watch = await h.watches.create(
+        h.userId,
+        h.watchInput({
+          stay: { arrival: '2026-12-01', departure: '2026-12-03', adults: 2 },
+          allowPartialMatch: true,
+        })
+      );
+      const result = await h.watches.execute(watch.id);
+
+      expect(result).toMatchObject({ success: true, found: false, matches: [] });
+      const stored = h.watchRepo.findById(watch.id)!;
+      expect(stored.lastResult).toBe(WatchResult.NOT_FOUND);
+      // The nights are kept as the provider said them, for the watch's page
+      expect(stored.lastAvailability?.[0].nights[0]).toMatchObject({
+        reason: 'min-stay',
+        minNights: 3,
+        noArrival: true,
+      });
+      expect(h.notifications.notifyWatchFound).not.toHaveBeenCalled();
+      expect(h.notifications.notifyWatchPartialFound).not.toHaveBeenCalled();
+      expect((await h.watches.get(watch.id))?.bookingLink).toBeUndefined();
+    });
+
+    it('a partial alert names the run from the day after a no-arrival night, with its booking page', async () => {
+      h.fake.setAvailability('1', {
+        u1: [
+          { state: 'available', noArrival: true },
+          { state: 'available' },
+          { state: 'available' },
+        ],
+        u2: 'booked',
+      });
+      const watch = await h.watches.create(h.userId, h.watchInput({ allowPartialMatch: true }));
+      const result = await h.watches.execute(watch.id);
+
+      expect(result.matches).toEqual([
+        expect.objectContaining({ unitId: 'u1', arrival: '2026-12-02', departure: '2026-12-04' }),
+      ]);
+      expect(h.watchRepo.findById(watch.id)?.lastResult).toBe(WatchResult.PARTIAL_FOUND);
+      const url = 'https://fake.example/book/1?arrival=2026-12-02&departure=2026-12-04';
+      expect(h.notifications.notifyWatchPartialFound).toHaveBeenCalledWith(
+        expect.objectContaining({ id: watch.id }),
+        [expect.objectContaining({ unitId: 'u1', arrival: '2026-12-02' })],
+        url
+      );
+      expect((await h.watches.get(watch.id))?.bookingLink).toEqual({
+        url,
+        arrival: '2026-12-02',
+        departure: '2026-12-04',
+      });
+    });
+  });
+
   describe('booking links (R7)', () => {
     /** The fake's booking page (`links.booking`) for location 1 and these dates. */
     const bookingUrl = (arrival: string, departure: string) =>

@@ -1,6 +1,7 @@
 import { useId, useLayoutEffect, useMemo, useRef, useState, type ReactNode, type Ref } from 'react';
 import {
   ArrowLeftRight,
+  CalendarRange,
   Car,
   Check,
   CircleQuestionMark,
@@ -16,7 +17,9 @@ import { unitPeopleLabel, unitVehiclesLabel } from './locationFormat';
 import {
   DEFAULT_UNIT_NOUN,
   isFullyAvailable,
+  isMinStayNight,
   isSplitNight,
+  MIN_STAY_LEGEND,
   NIGHT_STATE_LABELS,
   nightCellText,
   nightHeading,
@@ -52,8 +55,11 @@ const STATE_LOOK: Record<NightState, { icon: LucideIcon; cell: string; glyph: st
   },
 };
 
-/** A cell's look: its state, or `split` (free on another unit than the nights next to it). */
-type CellKind = NightState | 'split';
+/**
+ * A cell's look: its state, `split` (free on another unit than the nights next to it), or
+ * `min-stay` (free, but refused for this stay under the provider's stay rules).
+ */
+type CellKind = NightState | 'split' | 'min-stay';
 
 const SPLIT_LOOK = {
   icon: ArrowLeftRight,
@@ -61,11 +67,19 @@ const SPLIT_LOOK = {
   glyph: 'text-available',
 };
 
-const lookOf = (kind: CellKind) => (kind === 'split' ? SPLIT_LOOK : STATE_LOOK[kind]);
+const MIN_STAY_LOOK = {
+  icon: CalendarRange,
+  cell: 'border border-dashed border-warning-fg bg-surface text-warning-fg',
+  glyph: 'text-warning-fg',
+};
+
+const lookOf = (kind: CellKind) =>
+  kind === 'split' ? SPLIT_LOOK : kind === 'min-stay' ? MIN_STAY_LOOK : STATE_LOOK[kind];
 
 const LEGEND_ORDER: CellKind[] = [
   'available',
   'split',
+  'min-stay',
   'booked',
   'closed',
   'not-released',
@@ -74,7 +88,15 @@ const LEGEND_ORDER: CellKind[] = [
 
 const capitalise = (text: string) => text.charAt(0).toUpperCase() + text.slice(1);
 
-const cellKind = (night: NightStatus): CellKind => (isSplitNight(night) ? 'split' : night.state);
+const cellKind = (night: NightStatus): CellKind =>
+  isSplitNight(night) ? 'split' : isMinStayNight(night) ? 'min-stay' : night.state;
+
+/** The key's words for a kind of cell. */
+function legendLabel(kind: CellKind, noun: UnitNoun): string {
+  if (kind === 'split') return splitNightLabel(noun);
+  if (kind === 'min-stay') return MIN_STAY_LEGEND;
+  return NIGHT_STATE_LABELS[kind];
+}
 
 export interface NightGridProps {
   /** Each unit's nights, as a provider's availability check returns them. */
@@ -173,7 +195,11 @@ function NightCell({ kind, label, short }: { kind: CellKind; label: string; shor
  * there is. The table scrolls sideways inside its own region (a tab stop only while it
  * overflows) with the unit names held in place, so a 30-night stay stays readable.
  * Given `unitDetails`, each unit's people and vehicle limits and description show under its
- * name. Domain-generic: Explore's place page and watch details use it.
+ * name; so does the rate its prices are, when the provider says (`priceNote`: "Rate: RAC member
+ * rate"). A night the provider refuses for this stay under its stay rules reads "Free, stay
+ * rules apply" in the key and says which rule in its words ("Available, 3-night minimum"), and
+ * the notes count the units that need a longer stay or take no arrivals that day.
+ * Domain-generic: Explore's place page and watch details use it.
  */
 export function NightGrid({
   units,
@@ -277,7 +303,7 @@ export function NightGrid({
                     >
                       <Icon size={14} className={look.glyph} />
                     </span>
-                    {kind === 'split' ? splitNightLabel(unitNoun) : NIGHT_STATE_LABELS[kind]}
+                    {legendLabel(kind, unitNoun)}
                   </li>
                 );
               })}
@@ -319,23 +345,30 @@ export function NightGrid({
               </thead>
               <tbody>
                 {shown.map((unit) => {
-                  // Only a unit with something to show gets the wider heading, so a unit
-                  // without details (or a provider that gives none) looks as it always has.
+                  // Only a unit with something to show (details, or a rate's note) gets the
+                  // wider heading, so a unit without (or a provider that gives none) looks as
+                  // it always has.
                   const entry = unitDetails?.get(unit.unitId);
                   const facts = hasUnitFacts(entry) ? entry : undefined;
+                  const priceNote = unit.priceNote?.trim();
                   return (
                     <tr key={unit.unitId} className="border-b border-border last:border-b-0">
                       <th
                         scope="row"
                         className={cx(
                           'sticky left-0 bg-surface px-3 py-1.5 text-left font-semibold text-fg',
-                          facts ? 'max-w-60' : 'max-w-48'
+                          facts || priceNote ? 'max-w-60' : 'max-w-48'
                         )}
                       >
                         <span className="block truncate">{unit.unitName}</span>
                         {unit.unitType && (
                           <span className="block truncate text-xs font-normal text-fg-muted">
                             {unit.unitType}
+                          </span>
+                        )}
+                        {priceNote && (
+                          <span className="mt-0.5 block max-w-60 text-xs font-normal break-words text-fg-secondary">
+                            Rate: {priceNote}
                           </span>
                         )}
                         {facts && <UnitFacts unit={facts} />}
@@ -346,7 +379,7 @@ export function NightGrid({
                           <NightCell
                             key={date}
                             kind={cellKind(night)}
-                            {...nightCellText(night, currency, unitNoun)}
+                            {...nightCellText(night, currency, unitNoun, nights.length)}
                           />
                         );
                       })}

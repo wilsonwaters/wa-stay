@@ -250,6 +250,54 @@ describe('snipe attempt', () => {
     });
   });
 
+  describe('stay rules (R8)', () => {
+    it('never holds a fullyAvailable unit whose stay its rules refuse, and holds the next one', async () => {
+      const snipe = await sniping({ availability: { '1': { u1: 'available', u2: 'available' } } });
+      const check = h.fake.availability!.check.bind(h.fake.availability);
+      // The provider's mistake: u1 says fullyAvailable under its own 3-night minimum (the
+      // snipe is 2 nights), and u2 arrives on a day that takes no arrivals
+      const mistaken = (units: string[]) =>
+        jest.spyOn(h.fake.availability!, 'check').mockImplementation(async (...args) => {
+          const answer = await check(...args);
+          return {
+            ...answer,
+            units: answer.units
+              .filter((unit) => units.includes(unit.unitId))
+              .map((unit) =>
+                unit.unitId === 'u1'
+                  ? { ...unit, minNights: 3 }
+                  : unit.unitId === 'u2'
+                    ? {
+                        ...unit,
+                        nights: [
+                          { ...unit.nights[0], noArrival: true as const },
+                          ...unit.nights.slice(1),
+                        ],
+                      }
+                    : unit
+              ),
+          };
+        });
+
+      mistaken(['u1', 'u2']);
+      const refused = await h.snipes.execute(snipe.id);
+      expect(refused).toMatchObject({
+        next: 'continue',
+        result: { result: SnipeResult.UNAVAILABLE, held: false },
+      });
+      expect(h.fake.calls.filter((c) => c.module === 'holds')).toEqual([]);
+      expect(stored(snipe.id)).toMatchObject({ status: SnipeStatus.SNIPING, attemptsCount: 1 });
+
+      // With a third unit that meets the rules, that one is held
+      jest.restoreAllMocks();
+      h.fake.setAvailability('1', { u1: 'available', u2: 'available', u3: 'available' });
+      mistaken(['u1', 'u2', 'u3']);
+      const held = await h.snipes.execute(snipe.id);
+      expect(held.result).toMatchObject({ held: true, matchedSiteId: 'u3' });
+      expect(stored(snipe.id)).toMatchObject({ status: SnipeStatus.HELD, holdUnitId: 'u3' });
+    });
+  });
+
   it('writes nothing once aborted mid-check', async () => {
     const snipe = await sniping({ delayMs: 5_000 });
     const controller = new AbortController();

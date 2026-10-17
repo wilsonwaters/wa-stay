@@ -151,7 +151,7 @@ Every colour combination the app uses, one-to-one with `CONTRAST_PAIRS` in `src/
 | `fg-inverse` | `brand` | text | 6.38 | 4.5 | Text on a solid brand fill (checked control) |
 | `warning-fg` | `warning-subtle` | text | 5.67 | 4.5 | Warning notice, not-yet-released nights |
 | `warning-fg` | `sun-subtle` | text | 5.12 | 4.5 | "Soon" pill, sun badge |
-| `warning-fg` | `surface` | text | 6.07 | 4.5 | Release times and warning text on cards |
+| `warning-fg` | `surface` | text | 6.07 | 4.5 | Release times, warning text on cards, nights refused by stay rules |
 | `available-fg` | `available-subtle` | text | 7.40 | 4.5 | Available badge and notice |
 | `available-fg` | `surface` | text | 8.38 | 4.5 | Available text on cards and tables |
 | `available` | `available-subtle` | text | 5.02 | 4.5 | Available night glyph |

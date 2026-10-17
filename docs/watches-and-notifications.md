@@ -18,7 +18,9 @@ provider, the place and your dates, and opens on "Your stay"). Five steps:
    Any, Tent, Campervan or Caravan), **Stay type** at a place whose units are of more than one
    kind ([below](#stay-types)), **Preferred sites** (leave all unticked to hear about any
    site) and **Max price per night** (optional; in dollars, applied only when the provider
-   shows a price for every night).
+   shows a price for every night). A warning says when the stay is shorter than the sites
+   usually take, as WA Stay alerts only on stays the provider accepts
+   ([below](#what-a-check-does)).
 4. **Alerts.**
    - **Check every**: 15 minutes, 30 minutes, 1, 4 or 12 hours, or daily (default 1 hour).
      A provider can set a longer minimum (`limits.minWatchIntervalMinutes`). A watch saved by
@@ -36,10 +38,16 @@ provider, the place and your dates, and opens on "Your stay"). Five steps:
 - **Matching** (`core/watches/matching.ts`) uses only that answer:
   - the units you chose, by id or name; else the units of the stay types you chose
     ([below](#stay-types)); else every unit;
-  - **a full match** is a unit free on every night that passes the price rule;
+  - **a full match** is a unit free on every night that passes the price rule and the
+    provider's stay rules;
   - **a partial match** (when turned on and there is no full match) is each run of
     consecutive free nights on a unit, reported as its own shorter stay;
-  - the price rule applies per night, and only when every night has a price.
+  - the price rule applies per night, and only when every night has a price;
+  - **stay rules**: where the provider has a minimum stay, or days with no arrivals or no
+    departures, a night it refuses for the stay is never free, a partial run is trimmed to
+    start on a day that takes arrivals and end on one that takes departures, and a run
+    shorter than its minimum (the arrival night's) is dropped, so a watch never alerts on a
+    stay the provider would refuse.
 - **Results** are kept on the watch: the last result, when it last ran and runs next, how
   many times it has found something, and the last availability, which its page shows night by
   night.

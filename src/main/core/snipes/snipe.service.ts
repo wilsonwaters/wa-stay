@@ -10,12 +10,13 @@
  *
  * One attempt (`execute`) is check → one-booking-per-night guard → `holds.create`. On a hold
  * the snipe is HELD with the provider's reference, expiry, unit and payment URL, and stops.
- * The unit is the first fully available one of those the snipe names (`unitIds`, filtered by
- * the provider), or else of its stay types (`unitKinds`; none: any kind). A snipe naming no
- * units whose candidates are of more than one kind (`kindsAmbiguous`) holds nothing: it
- * FAILS with a warning, so it never picks between a campsite and a cabin for the person.
- * Payment stays a human step. The scheduler (`scheduler/snipe-runner.ts`) owns the timing;
- * this service owns the state and every write.
+ * The unit is the first fully available one, in a stay the provider's stay rules allow
+ * (`freeForStay`), of those the snipe names (`unitIds`, filtered by the provider), or else of
+ * its stay types (`unitKinds`; none: any kind). A snipe naming no units whose candidates are
+ * of more than one kind (`kindsAmbiguous`) holds nothing: it FAILS with a warning, so it never
+ * picks between a campsite and a cabin for the person. Payment stays a human step. The
+ * scheduler (`scheduler/snipe-runner.ts`) owns the timing; this service owns the state and
+ * every write.
  *
  * Accounts (§12.32): for a provider whose holds need an account (`required-for-holds` or
  * `required`), a snipe is created paused while signed out, `activate` is `AUTH_REQUIRED`
@@ -60,7 +61,7 @@ import type { AccountGate } from '../accounts/ports';
 import type { NightGuard } from '../holds/night-guard';
 import type { NotificationService } from '../notifications/notification.service';
 import { resolveStayParams } from '../stay-params';
-import { kindsAmbiguous, wantedUnits } from '../watches/matching';
+import { freeForStay, kindsAmbiguous, wantedUnits } from '../watches/matching';
 
 const log = logger.child({ module: 'sitesniper' });
 
@@ -471,7 +472,8 @@ export class SiteSniperService {
       const candidates = named
         ? availability.units
         : wantedUnits({ unitIds: [], unitKinds: snipe.unitKinds }, availability.units);
-      const matched = candidates.find((unit) => unit.fullyAvailable);
+      // Free for the whole stay, and a stay the provider's stay rules allow
+      const matched = candidates.find(freeForStay);
       const ofKinds =
         candidates.length < availability.units.length
           ? ` (${candidates.length} of its stay types)`

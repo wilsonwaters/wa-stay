@@ -754,14 +754,29 @@ The rules the normalised types carry (`src/shared/types/provider.types.ts`,
 - **Availability.** `check` returns a `LocationAvailability`: one `UnitAvailability` per unit,
   each with one `NightStatus` per night of the stay (`available`, `booked`, `closed`,
   `not-released` or `unknown`, and `price` when known), `fullyAvailable` only when every night
-  is `available`, and `total` when every night has a price. Honour `unitIds` (only those
-  units) and set `bookingUrl` to a stay-specific deep link when the provider has one; a unit
+  is `available` and the stay meets the unit's stay rules, and `total` when every night has a
+  price. Honour `unitIds` (only those units) and set `bookingUrl` to a stay-specific deep link
+  when the provider has one; a unit
   may carry its own `bookingUrl` too (the page for that unit or category and the stay). A
   booking link is what "Book on {shortName}" opens from a watch's alert, its email and its
   page: an absolute https URL on your own site (your `website`'s host, or a subdomain of it,
   which the core and the contract suite check), a public page that works with no sign-in and
   no app session, on a phone too, and **never** a URL that adds to a cart, holds or books when
   it is opened.
+- **Stay rules and rates** (all optional). A night you have room on but refuse for this stay
+  (too short, too long, or arriving or leaving on a refused day) is `unknown` with
+  `reason: 'min-stay'`, as a night free only on another unit is `unknown` with
+  `reason: 'split'`. Say which rule where you can: a night's `minNights` (the fewest nights for
+  a stay arriving that night), `noArrival: true` (no arrivals on that date) and
+  `noDeparture: true` (no departures), and a unit's `minNights` (the minimum for a stay
+  arriving on the asked arrival; a night's own comes first). Matching never counts a
+  `min-stay` night, trims a partial run to days that take arrivals and departures, and drops
+  it when shorter than its minimum, so a watch never alerts on a stay you would refuse; the
+  contract suite checks that no unit is `fullyAvailable` under its `minNights` and no
+  `min-stay` night is `available`. A unit's `priceNote` says which rate its prices are, in
+  plain text ("RAC member rate"), shown under its name. A `UnitSummary`'s `minNights` is the
+  unit's usual minimum, for the watch and snipe steps' warning; leave it out where the minimum
+  depends on the dates (the night grid explains it after a check).
 - **Dates and time zones.** Stays are calendar dates: never turn them into `Date` objects and
   back (a time zone shifts them). Convert to the provider's own format with a string
   transform, as ParkStay's `toParkStayDate` does (`2026-11-10` → `2026/11/10`). "Today" is

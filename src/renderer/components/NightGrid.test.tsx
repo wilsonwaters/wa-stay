@@ -254,6 +254,132 @@ describe('NightGrid', () => {
   });
 });
 
+describe('NightGrid: stay rules and rates', () => {
+  // RAC's school holidays: room both nights, but a 3-night minimum and no arrivals on Sat 25 Sep
+  const HOLIDAYS = { arrival: '2027-09-25', departure: '2027-09-27', adults: 2 };
+  const refused = (unitId: string, unitName: string): UnitAvailability => ({
+    unitId,
+    unitName,
+    nights: [
+      {
+        date: '2027-09-25',
+        state: 'unknown',
+        reason: 'min-stay',
+        minNights: 3,
+        noArrival: true,
+        price: 75,
+      },
+      { date: '2027-09-26', state: 'unknown', reason: 'min-stay', minNights: 3, price: 75 },
+    ],
+    fullyAvailable: false,
+    minNights: 3,
+    priceNote: 'RAC member rate',
+  });
+  const free = (unitId: string, unitName: string, priceNote?: string): UnitAvailability => ({
+    unitId,
+    unitName,
+    nights: [
+      { date: '2027-09-25', state: 'available', price: 68 },
+      { date: '2027-09-26', state: 'available', price: 68 },
+    ],
+    fullyAvailable: true,
+    ...(priceNote !== undefined ? { priceNote } : {}),
+  });
+
+  it('explains min-stay nights: the notes, a key entry in words, and each rule in the cell', async () => {
+    const user = userEvent.setup();
+    renderUnits(
+      [refused('4', 'Powered site'), refused('5', 'Ensuite site'), free('6', 'Studio')],
+      HOLIDAYS
+    );
+    expect(screen.getByText('1 of 3 sites free for all 2 nights')).toBeInTheDocument();
+    expect(screen.getByText('2 sites need a stay of at least 3 nights.')).toBeInTheDocument();
+    expect(screen.getByText('2 sites take no arrivals on Sat 25 Sep.')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('switch', { name: 'Fully available only' }));
+    const row = screen.getByRole('rowheader', { name: /^Powered site/ }).closest('tr')!;
+    const cells = within(row).getAllByRole('cell');
+    // The words name the rule; no price is shown for a stay that cannot be booked
+    expect(cells.map((cell) => cell.textContent)).toEqual([
+      'Available, 3-night minimum, no arrivals this day',
+      'Available, 3-night minimum',
+    ]);
+    for (const icon of row.querySelectorAll('td svg')) {
+      expect(icon).toHaveAttribute('aria-hidden', 'true');
+    }
+    const key = within(screen.getByRole('list', { name: 'Key' })).getAllByRole('listitem');
+    expect(key.map((item) => item.textContent)).toEqual(['Available', 'Free, stay rules apply']);
+  });
+
+  it('says "stay rules apply" in the cell of a stay refused as too long, with no number', async () => {
+    const user = userEvent.setup();
+    const fortnight = { arrival: '2027-09-25', departure: '2027-10-09', adults: 2 };
+    const tooLong = refused('4', 'Powered site');
+    tooLong.nights = tooLong.nights.map(({ noArrival: _arrival, ...night }) => night);
+    renderUnits([tooLong], fortnight);
+    expect(screen.getByText('0 of 1 site free for all 14 nights')).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        'No sites are free for all 14 nights. Turn off "Fully available only" to see each site\'s nights.'
+      )
+    ).toBeInTheDocument();
+    await user.click(screen.getByRole('switch', { name: 'Fully available only' }));
+    const row = screen.getByRole('rowheader', { name: /^Powered site/ }).closest('tr')!;
+    expect(within(row).getAllByRole('cell')[0]).toHaveTextContent('Available, stay rules apply');
+  });
+
+  it('shows the rate under the unit’s name as text, and nothing for an empty or missing note', () => {
+    renderUnits(
+      [
+        free('1', 'Studio', 'RAC <b>member</b> rate'),
+        free('2', 'Cabin', '   '),
+        free('3', 'Villa'),
+      ],
+      HOLIDAYS
+    );
+    const studio = screen.getByRole('rowheader', { name: /^Studio/ });
+    expect(studio).toHaveAccessibleName('Studio Rate: RAC <b>member</b> rate');
+    expect(within(studio).getByText('Rate: RAC <b>member</b> rate')).toBeInTheDocument();
+    expect(studio.querySelector('b')).toBeNull();
+    expect(screen.getByRole('rowheader', { name: /^Cabin/ })).toHaveAccessibleName('Cabin');
+    expect(screen.getByRole('rowheader', { name: /^Villa/ })).toHaveAccessibleName('Villa');
+    expect(screen.queryAllByText(/^Rate:/)).toHaveLength(1);
+  });
+
+  it('shows the rate beside the unit’s details, under its name', () => {
+    const [studio] = [free('1', 'Studio', 'RAC member rate')];
+    render(
+      <NightGrid
+        units={[studio]}
+        arrival={HOLIDAYS.arrival}
+        departure={HOLIDAYS.departure}
+        unitNoun={SITE}
+        unitDetails={new Map([['1', { unitId: '1', unitName: 'Studio', maxPeople: 2 }]])}
+      />
+    );
+    expect(screen.getByRole('rowheader', { name: /^Studio/ })).toHaveAccessibleName(
+      'Studio Rate: RAC member rate Up to 2 people'
+    );
+  });
+
+  it('renders stored nights from before stay rules (no new fields) as before', () => {
+    const { units } = availabilityFor(STAY, { fully: 1, partly: 1, rest: 'booked', price: 30 });
+    // As a watch stored them before (JSON), and as the provider answers them
+    const stored = JSON.parse(JSON.stringify(units)) as UnitAvailability[];
+    const html = (el: HTMLElement) => el.innerHTML.replace(/_r_\w+_/g, 'id');
+    const { container } = renderUnits(stored);
+    const { container: fresh } = renderUnits(units);
+    expect(html(container)).toBe(html(fresh));
+    expect(within(container).getByText('1 of 24 sites free for all 2 nights')).toBeInTheDocument();
+    expect(
+      within(container)
+        .getAllByRole('listitem')
+        .map((item) => item.textContent)
+    ).toEqual(['Available']);
+    expect(within(container).queryByText(/stay rules|Rate:|need a stay|arrivals/)).toBeNull();
+  });
+});
+
 describe('NightGrid layout (with the real stylesheet)', () => {
   let style: HTMLStyleElement;
 

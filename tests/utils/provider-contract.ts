@@ -10,7 +10,9 @@
  * round-trip, every module honours `AbortSignal`, failures are `ProviderError`s, links are
  * absolute https URLs, and every booking link a check returns (the location's and each
  * unit's `bookingUrl`) is on the provider's own site (`bookingLinkViolations`, the core's
- * `isProviderBookingLink`). Modules the provider does not have are skipped. For a
+ * `isProviderBookingLink`), and no unit is `fullyAvailable` for a stay shorter than its
+ * `minNights` nor any `min-stay` night `available` (`stayRuleViolations`). Modules the
+ * provider does not have are skipped. For a
  * browser-driven provider, `openPages` lets it check that no call leaves a page open.
  *
  * A `search`-mode catalogue is also checked over `searchBbox` (`searchAreaViolations`): its
@@ -37,6 +39,7 @@ import {
   type ProviderManifest,
   type StayQuery,
 } from '@shared/types/provider.types';
+import { nightsBetween } from '@shared/utils/calendar-date';
 import { makeLocationKey, parseLocationKey } from '@shared/utils/location-key';
 import { createTestProviderContext } from './fake-provider';
 
@@ -230,6 +233,39 @@ export function bookingLinkViolations(
   return links
     .filter(([, url]) => url !== undefined && !isProviderBookingLink(manifest, url))
     .map(([owner, url]) => `${owner}'s bookingUrl ${url} is not on ${manifest.website}`);
+}
+
+/**
+ * What is wrong with the stay rules of a check's answer for `stay`, as messages ([] when
+ * nothing): a unit `fullyAvailable` for a stay shorter than its `minNights`, or a night the
+ * provider refuses under its stay rules (`reason: 'min-stay'`) that is `available` (it is
+ * `unknown`). A watch must never alert on a stay the provider would refuse.
+ */
+export function stayRuleViolations(
+  stay: Pick<StayQuery, 'arrival' | 'departure'>,
+  result: Pick<LocationAvailability, 'units'>
+): string[] {
+  const stayNights = nightsBetween(stay.arrival, stay.departure);
+  const violations: string[] = [];
+  for (const unit of result.units) {
+    const { minNights } = unit;
+    if (
+      unit.fullyAvailable &&
+      typeof minNights === 'number' &&
+      Number.isInteger(minNights) &&
+      minNights > stayNights
+    ) {
+      violations.push(
+        `unit ${unit.unitId} is fullyAvailable for ${stayNights} nights, under its minNights ${minNights}`
+      );
+    }
+    for (const night of unit.nights) {
+      if (night.reason === 'min-stay' && night.state === 'available') {
+        violations.push(`unit ${unit.unitId}'s night ${night.date} is min-stay but available`);
+      }
+    }
+  }
+  return violations;
 }
 
 /** A promise that rejects with an AbortError (the caller aborted). */
@@ -438,6 +474,12 @@ export function describeProviderContract(
         if (!provider.availability) return;
         const result = await provider.availability.check(externalId, stay);
         expect(bookingLinkViolations(provider.manifest, result)).toEqual([]);
+      });
+
+      it('never offers a stay its own stay rules refuse', async () => {
+        if (!provider.availability) return;
+        const result = await provider.availability.check(externalId, stay);
+        expect(stayRuleViolations(stay, result)).toEqual([]);
       });
 
       it('searches with keys of this provider', async () => {

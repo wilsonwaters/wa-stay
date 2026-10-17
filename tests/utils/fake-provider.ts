@@ -19,8 +19,10 @@
  *   made at (`currentRequestPriority()`, what a paced `ctx.http` would send it with);
  * - `peakInFlight(module)`: the most calls into the module at once;
  * - `accessStates`: the states the access gate steps through on `ensure()`;
- * - `availability`: a state per unit for every night, or a list of nights (state and price);
- *   `setAvailability` changes it later; `unitKinds`: what each unit id is (none by default);
+ * - `availability`: a state per unit for every night, or a list of nights (state, price and
+ *   the stay rules: `reason`, `minNights`, `noArrival`, `noDeparture`); `setAvailability`
+ *   changes it later; `unitKinds`: what each unit id is (none by default); `unitMinNights`:
+ *   each unit's minimum stay (`UnitAvailability.minNights`), which `fullyAvailable` honours;
  * - `scriptHold(...results)`: the next `holds.create` calls answer these;
  * - `account` / `setAccount(state)`: what `auth.isSignedIn` answers; `auth` replaces its
  *   sign-in URL, origins or completion pages.
@@ -87,9 +89,11 @@ export interface FakeCall {
 
 /**
  * One night of a unit: its state, and its price (`FAKE_PRICE` when available unless given;
- * `null` for no price).
+ * `null` for no price), with the stay rules passed through as given.
  */
-export interface FakeNight {
+export interface FakeNight extends Partial<
+  Pick<NightStatus, 'reason' | 'minNights' | 'noArrival' | 'noDeparture'>
+> {
   state: NightState;
   price?: number | null;
 }
@@ -119,6 +123,11 @@ export interface FakeProviderOptions {
   availability?: Record<string, Record<string, FakeUnitNights>>;
   /** What each unit is, by unit id, at every location (`unitKind`). Units left out have none. */
   unitKinds?: Record<string, UnitKind>;
+  /**
+   * Each unit's minimum stay, by unit id, at every location (`UnitAvailability.minNights`): a
+   * shorter stay is never `fullyAvailable`. Units left out have none.
+   */
+  unitMinNights?: Record<string, number>;
   /**
    * Each unit of a check carries its own booking link (`UnitAvailability.bookingUrl`):
    * `https://book.<id>.example/<externalId>/<unitId>?arrival=…&departure=…`, on a subdomain of
@@ -359,8 +368,25 @@ export function createFakeProvider(options: FakeProviderOptions = {}): FakeProvi
         night.price === null
           ? undefined
           : (night.price ?? (night.state === 'available' ? FAKE_PRICE : undefined));
-      return { date, state: night.state, ...(price !== undefined ? { price } : {}) };
+      const { reason, minNights, noArrival, noDeparture } = night;
+      return {
+        date,
+        state: night.state,
+        ...(price !== undefined ? { price } : {}),
+        ...(reason ? { reason } : {}),
+        ...(minNights !== undefined ? { minNights } : {}),
+        ...(noArrival ? { noArrival } : {}),
+        ...(noDeparture ? { noDeparture } : {}),
+      };
     });
+  }
+
+  /** Every night available, and a stay its first night's (else the unit's) minimum allows. */
+  function freeForStay(nights: NightStatus[], minNights: number | undefined): boolean {
+    if (nights.length === 0) return false;
+    if (nights.some((night) => night.state !== 'available' || night.reason)) return false;
+    if (nights[0].noArrival) return false;
+    return nights.length >= (nights[0].minNights ?? minNights ?? 1);
   }
 
   function checkNow(externalId: string, stay: StayQuery, unitIds?: string[]): LocationAvailability {
@@ -370,8 +396,8 @@ export function createFakeProvider(options: FakeProviderOptions = {}): FakeProvi
       .filter(([unitId]) => !unitIds || unitIds.includes(unitId))
       .map(([unitId, spec]) => {
         const nights = nightsOf(spec, dates);
-        const fullyAvailable =
-          nights.length > 0 && nights.every((night) => night.state === 'available');
+        const minNights = options.unitMinNights?.[unitId];
+        const fullyAvailable = freeForStay(nights, minNights);
         const priced = nights.every((night) => night.price !== undefined);
         const unitKind = options.unitKinds?.[unitId];
         return {
@@ -381,6 +407,7 @@ export function createFakeProvider(options: FakeProviderOptions = {}): FakeProvi
           ...(unitKind ? { unitKind } : {}),
           nights,
           fullyAvailable,
+          ...(minNights !== undefined ? { minNights } : {}),
           total:
             fullyAvailable && priced
               ? nights.reduce((sum, night) => sum + (night.price ?? 0), 0)

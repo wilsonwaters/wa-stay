@@ -15,6 +15,7 @@ import {
   describeProviderContract,
   searchAreaViolations,
   searchTextViolations,
+  stayRuleViolations,
 } from '@tests/utils/provider-contract';
 
 /** Perth to Albany: 6 of FakeSearchProvider's 12 places. */
@@ -210,6 +211,76 @@ describe('the booking-link check of the contract suite', () => {
         }
       ).map((violation) => violation.split("'")[0])
     ).toEqual(['unit a', 'unit b', 'unit c']);
+  });
+});
+
+/** A provider with stay rules: u1 needs 3 nights, u2's nights are refused under its rules. */
+const withStayRules = () =>
+  createFakeProvider({
+    availability: {
+      '1': {
+        u1: 'available',
+        u2: [
+          { state: 'unknown', reason: 'min-stay', minNights: 3, noArrival: true },
+          { state: 'unknown', reason: 'min-stay', minNights: 3, noDeparture: true },
+        ],
+      },
+    },
+    unitMinNights: { u1: 3 },
+  });
+
+describeProviderContract('FakeProvider with stay rules', () => ({
+  provider: withStayRules(),
+  sample: { externalId: '1', stay: { arrival: '2026-11-10', departure: '2026-11-12', adults: 2 } },
+}));
+
+describe('the stay-rule checks of the contract suite', () => {
+  const stay = { arrival: '2026-11-10', departure: '2026-11-12', adults: 2 };
+
+  it('pass a provider that refuses a stay under its minimum and words its refused nights unknown', async () => {
+    const fake = withStayRules();
+    const result = await fake.availability!.check('1', stay);
+    expect(result.units.map((u) => [u.unitId, u.fullyAvailable, u.minNights])).toEqual([
+      ['u1', false, 3],
+      ['u2', false, undefined],
+    ]);
+    expect(stayRuleViolations(stay, result)).toEqual([]);
+    // A 3-night stay meets u1's minimum
+    const longer = { ...stay, departure: '2026-11-13' };
+    const three = await fake.availability!.check('1', longer, { unitIds: ['u1'] });
+    expect(three.units[0].fullyAvailable).toBe(true);
+    expect(stayRuleViolations(longer, three)).toEqual([]);
+  });
+
+  it('fail a unit that is fullyAvailable for a stay shorter than its minNights', async () => {
+    const result = await createFakeProvider().availability!.check('1', stay);
+    const mistaken = {
+      units: result.units.map((u) => (u.unitId === 'u1' ? { ...u, minNights: 3 } : u)),
+    };
+    expect(mistaken.units[0].fullyAvailable).toBe(true);
+    expect(stayRuleViolations(stay, mistaken)).toEqual([
+      'unit u1 is fullyAvailable for 2 nights, under its minNights 3',
+    ]);
+    // A minimum the stay meets, or one that is no rule, is fine
+    for (const minNights of [2, 1, 0, 2.5]) {
+      const fine = { units: [{ ...result.units[0], minNights }] };
+      expect(stayRuleViolations(stay, fine)).toEqual([]);
+    }
+  });
+
+  it('fail a min-stay night that is available', () => {
+    const unit = {
+      unitId: 'u1',
+      unitName: 'Site u1',
+      fullyAvailable: false,
+      nights: [
+        { date: '2026-11-10', state: 'available' as const, reason: 'min-stay' as const },
+        { date: '2026-11-11', state: 'unknown' as const, reason: 'min-stay' as const },
+      ],
+    };
+    expect(stayRuleViolations(stay, { units: [unit] })).toEqual([
+      "unit u1's night 2026-11-10 is min-stay but available",
+    ]);
   });
 });
 

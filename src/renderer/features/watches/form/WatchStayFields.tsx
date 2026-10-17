@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 import { useFormContext } from 'react-hook-form';
 import type { UnitSummary } from '../../../../shared/types/catalog.types';
 import type { ProviderManifest, UnitKind } from '../../../../shared/types/provider.types';
+import { MinStayNotice } from '../../../components/stay/MinStayNotice';
 import { ProviderStayFields } from '../../../components/stay/ProviderStayFields';
 import { StayTypeChips } from '../../../components/stay/StayTypeChips';
 import { placeUnitKinds, stayTypeOptions } from '../../../components/stay/stayTypes';
@@ -28,7 +29,8 @@ export interface WatchStayFieldsProps {
 
 /**
  * Dates, guests, the provider's own stay fields, stay types (at a place whose units are of more
- * than one kind), units and price: the Stay step, and Edit.
+ * than one kind), units and price: the Stay step, and Edit. A warning says when the stay is
+ * shorter than the units take (`MinStayNotice`).
  */
 export function WatchStayFields({
   manifest,
@@ -42,16 +44,18 @@ export function WatchStayFields({
   const set = useSetWatchField();
   const setFields = useSetWatchFields();
   const { errors } = formState;
-  const [arrival, departure, adults, children, infants, stayParams, unitIds, unitKinds] = watch([
-    'arrival',
-    'departure',
-    'adults',
-    'children',
-    'infants',
-    'stayParams',
-    'unitIds',
-    'unitKinds',
-  ]);
+  const [arrival, departure, adults, children, infants, stayParams, unitIds, unitKinds, location] =
+    watch([
+      'arrival',
+      'departure',
+      'adults',
+      'children',
+      'infants',
+      'stayParams',
+      'unitIds',
+      'unitKinds',
+      'location',
+    ]);
   const fields = watchStayFields(manifest).watch;
   const provider = manifest?.shortName ?? 'the provider';
   const placeKinds = useMemo(() => (units ? placeUnitKinds(units) : undefined), [units]);
@@ -117,6 +121,17 @@ export function WatchStayFields({
           kinds={stayTypes.length > 0 ? unitKinds : undefined}
         />
       )}
+      <MinStayNotice
+        units={units}
+        unitIds={unitIds}
+        unitKinds={stayTypes.length > 0 ? unitKinds : undefined}
+        arrival={arrival}
+        departure={departure}
+        place={location?.name}
+        noun={noun}
+        shortName={provider}
+        action="alerts on"
+      />
       <Field
         label="Max price per night"
         optional

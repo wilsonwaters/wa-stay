@@ -276,11 +276,16 @@ export interface StayQuery {
 export type NightState = 'available' | 'booked' | 'closed' | 'not-released' | 'unknown';
 
 /**
- * Why a night is not `available` although the provider reported room: `split`, free, but not
- * on the same unit as the available nights next to it (a unit that stands for several, such
- * as a class of sites booked whole stays on one site). Matching treats it as not available.
+ * Why a night is not `available` although the provider reported room. The night's state is
+ * `unknown` with either reason, and matching never counts it (even beside `available`: the
+ * reason wins).
+ * - `split`: free, but not on the same unit as the available nights next to it (a unit that
+ *   stands for several, such as a class of sites booked whole stays on one site).
+ * - `min-stay`: the provider has room that night but refuses this stay under its stay rules:
+ *   too short, too long, or arriving or leaving on a refused day. Say which rule with the
+ *   night's `minNights`, `noArrival` and `noDeparture` where the provider says.
  */
-export type NightReason = 'split';
+export type NightReason = 'split' | 'min-stay';
 
 export interface NightStatus {
   /** Calendar date `YYYY-MM-DD`. */
@@ -290,6 +295,15 @@ export interface NightStatus {
   /** The provider's own wording, e.g. `Booked` or `$30.00`. */
   label?: string;
   reason?: NightReason;
+  /**
+   * The fewest nights a stay arriving this night may have, when the provider has a minimum. A
+   * whole number; 0, 1, a negative or a fraction is no rule.
+   */
+  minNights?: number;
+  /** No arrivals on this date: a stay may not start this night. */
+  noArrival?: true;
+  /** No departures on this date: a stay may not end the morning of this date. */
+  noDeparture?: true;
 }
 
 export interface UnitAvailability {
@@ -304,10 +318,21 @@ export interface UnitAvailability {
    */
   aliases?: string[];
   nights: NightStatus[];
-  /** Every night of the stay is available. */
+  /** Every night of the stay is available, and the stay meets the unit's stay rules. */
   fullyAvailable: boolean;
   /** Price for the whole stay, when known. */
   total?: number;
+  /**
+   * The fewest nights a stay arriving on the asked arrival may have, when the provider has a
+   * minimum (a night's own `minNights` comes first). A whole number; 0, 1, a negative or a
+   * fraction is no rule.
+   */
+  minNights?: number;
+  /**
+   * Which rate the prices are, as plain text, e.g. "RAC member rate". Shown under the unit's
+   * name ("Rate: RAC member rate"), as text, never HTML; an empty note is not shown.
+   */
+  priceNote?: string;
   /**
    * The booking page for this unit and the stay asked about, prefilled where the provider can
    * (place, dates, guests, unit or category): what "Book on {shortName}" opens from an alert.

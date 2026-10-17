@@ -2,6 +2,8 @@ import type { NightState, UnitAvailability } from '../../shared/types/provider.t
 import {
   formatPrice,
   isFullyAvailable,
+  isMinStayNight,
+  minStayRules,
   nightCellText,
   nightHeading,
   noFullRowsMessage,
@@ -9,6 +11,7 @@ import {
   stayRangeLabel,
   summariseAvailability,
   summaryLine,
+  stayMinimum,
   summaryNotes,
   unitStanding,
 } from './nightGridModel';
@@ -227,5 +230,142 @@ describe('split nights (free, but not on the same unit as the nights next to the
   it('say "Free on another site" in the cell, with no price', () => {
     expect(nightCellText(split.nights[1], 'AUD', SITE)).toEqual({ label: 'Free on another site' });
     expect(nightCellText(split.nights[1]).label).toBe('Free on another unit');
+  });
+});
+
+describe('min-stay nights (free, but refused for this stay by the stay rules)', () => {
+  // RAC's school holidays: room both nights, but a 3-night minimum, no arrivals on Sat 25 Sep
+  const STAY = ['2027-09-25', '2027-09-26'];
+  const refused = (unitId: string, extra: Partial<UnitAvailability> = {}): UnitAvailability => ({
+    unitId,
+    unitName: unitId,
+    nights: [
+      { date: STAY[0], state: 'unknown', reason: 'min-stay', minNights: 3, noArrival: true },
+      { date: STAY[1], state: 'unknown', reason: 'min-stay', minNights: 3, noDeparture: true },
+    ],
+    fullyAvailable: false,
+    ...extra,
+  });
+  const free = (unitId: string): UnitAvailability => ({
+    unitId,
+    unitName: unitId,
+    nights: STAY.map((date) => ({ date, state: 'available' as const, price: 75 })),
+    fullyAvailable: true,
+  });
+
+  it('settle a unit as min-stay: known, not free, after taken and split', () => {
+    const unit = refused('a');
+    expect(isMinStayNight(unit.nights[0])).toBe(true);
+    expect(unitStanding(unit, STAY)).toBe('min-stay');
+    expect(isFullyAvailable(unit, STAY)).toBe(false);
+    // The reason wins over an available state
+    const available = {
+      ...unit,
+      nights: unit.nights.map((night) => ({ ...night, state: 'available' as const })),
+    };
+    expect(unitStanding(available, STAY)).toBe('min-stay');
+    expect(isFullyAvailable(available, STAY)).toBe(false);
+    // Booked still decides first
+    const taken = {
+      ...unit,
+      nights: [unit.nights[0], { date: STAY[1], state: 'booked' as const }],
+    };
+    expect(unitStanding(taken, STAY)).toBe('taken');
+  });
+
+  it('count as known and not free, by the minimum for the arrival night', () => {
+    const units = [refused('a'), refused('b'), refused('c', { minNights: 5 }), free('d')];
+    // c's arrival night has no minimum of its own: the unit's 5 applies
+    units[2].nights[0] = { ...units[2].nights[0], minNights: undefined };
+    const summary = summariseAvailability(units, STAY);
+    expect(summary).toMatchObject({
+      total: 4,
+      known: 4,
+      fully: 1,
+      partly: 0,
+      minStay: 3,
+      minimums: { 3: 2, 5: 1 },
+      noArrival: { date: STAY[0], units: 3 },
+    });
+    expect(summaryLine(summary, SITE, 'RAC')).toBe('1 of 4 sites free for all 2 nights');
+  });
+
+  it('note the sites that need a longer stay, and the day with no arrivals', () => {
+    const summary = summariseAvailability([refused('a'), refused('b'), free('c')], STAY);
+    expect(summaryNotes(summary, SITE, 'RAC')).toEqual([
+      '2 sites need a stay of at least 3 nights.',
+      '2 sites take no arrivals on Sat 25 Sep.',
+    ]);
+    const all = summariseAvailability([refused('a')], STAY);
+    expect(summaryNotes(all, { one: 'cabin', many: 'cabins' }, 'RAC')).toEqual([
+      '1 cabin needs a stay of at least 3 nights.',
+      'No arrivals on Sat 25 Sep.',
+    ]);
+    expect(noFullRowsMessage(all, SITE)).toBe(
+      'No sites are free for all 2 nights. Turn off "Fully available only" to see each site\'s nights.'
+    );
+    // A minimum the stay meets (refused for another rule) is not a note
+    const longEnough = summariseAvailability([refused('a')], [...STAY, '2027-09-27']);
+    expect(summaryNotes(longEnough, SITE, 'RAC')).toEqual(['No arrivals on Sat 25 Sep.']);
+  });
+
+  it("read a unit's minimum from its arrival night, else the unit; 0, 1, negative or a fraction is none", () => {
+    expect(stayMinimum(refused('a'), STAY[0])).toBe(3);
+    const unitOnly = refused('b', { minNights: 4 });
+    unitOnly.nights[0] = { ...unitOnly.nights[0], minNights: undefined };
+    expect(stayMinimum(unitOnly, STAY[0])).toBe(4);
+    for (const minNights of [0, 1, -3, 2.5, undefined]) {
+      const none = refused('c', { minNights });
+      none.nights[0] = { ...none.nights[0], minNights };
+      expect(stayMinimum(none, STAY[0])).toBeUndefined();
+    }
+    // A night's own 1 beats the unit's 3: arriving that night has no minimum
+    const own = refused('d', { minNights: 3 });
+    own.nights[0] = { ...own.nights[0], minNights: 1 };
+    expect(stayMinimum(own, STAY[0])).toBeUndefined();
+  });
+
+  it('say which rule in the cell, with no price, and no number for a stay refused as too long', () => {
+    const [arrival, last] = refused('a').nights;
+    expect(nightCellText({ ...arrival, price: 75 }, 'AUD', SITE, 2)).toEqual({
+      label: 'Available, 3-night minimum, no arrivals this day',
+    });
+    expect(nightCellText(last, 'AUD', SITE, 2).label).toBe(
+      'Available, 3-night minimum, no departures this day'
+    );
+    expect(minStayRules({ ...arrival, noDeparture: true }, 2)).toBe(
+      '3-night minimum, no arrivals or departures this day'
+    );
+    expect(
+      minStayRules({ date: STAY[0], state: 'unknown', reason: 'min-stay', minNights: 3 })
+    ).toBe('3-night minimum');
+    // Too long, not too short: the minimum is no reason, so no number
+    expect(nightCellText({ ...arrival, noArrival: undefined }, 'AUD', SITE, 14).label).toBe(
+      'Available, stay rules apply'
+    );
+    expect(nightCellText({ date: STAY[0], state: 'unknown', reason: 'min-stay' }).label).toBe(
+      'Available, stay rules apply'
+    );
+  });
+
+  it('leave old nights without the new fields as they were', () => {
+    const old: UnitAvailability = {
+      unitId: 'x',
+      unitName: 'x',
+      nights: [
+        { date: STAY[0], state: 'available', price: 20 },
+        { date: STAY[1], state: 'booked' },
+      ],
+      fullyAvailable: false,
+    };
+    expect(unitStanding(old, STAY)).toBe('taken');
+    const summary = summariseAvailability([old], STAY);
+    expect(summary).not.toHaveProperty('minStay');
+    expect(summary).not.toHaveProperty('minimums');
+    expect(summary).not.toHaveProperty('noArrival');
+    expect(nightCellText(old.nights[0], 'AUD', SITE, 2)).toEqual({
+      label: 'Available, $20',
+      short: '$20',
+    });
   });
 });
