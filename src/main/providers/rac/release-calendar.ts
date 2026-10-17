@@ -17,10 +17,16 @@
  *   released, or has not announced yet.
  *
  * **Periods.** A period's nights run from `first` to `last`, both included (a stay touches it
- * when any of its nights is in it). An announced period uses RAC's own nights, which differ by
- * a day from the Department's break at either end (Spring 2027: RAC's 24 Sep–9 Oct, the break
- * 25 Sep–10 Oct). The others use the Department's break as published (Saturday to Sunday, or
- * from the day after the last day of term to the day before the next term starts).
+ * when any of its nights is in it). An announced period uses RAC's own nights, which differ
+ * from the Department's break (its first to last day with no school):
+ * - Spring 2027: RAC's 24 Sep–9 Oct, the break 25 Sep–10 Oct (both ends a day earlier);
+ * - Summer 2027–28: RAC's 17 Dec–31 Jan, the break 17 Dec–1 Feb (ends a day earlier);
+ * - Autumn 2028: RAC's 7–24 Apr, the break 8–23 Apr (a day wider at both ends).
+ *
+ * So RAC's edges cannot be told from the Department's. An `'on-sale'` period uses the break as
+ * published (it times nothing). An `'unannounced'` one starts a night earlier, on the last
+ * school day (a Friday, or the Thursday that ends term 4), so a stay on its uncertain first
+ * night is refused rather than timed by the rolling window alone.
  *
  * Each period has one release state:
  * - `{ memberPreSale, publicRelease }`: the calendar days RAC announced, Perth time;
@@ -33,7 +39,8 @@
  *    nights, and `release` to its member pre-sale and public release days (`YYYY-MM-DD`). A
  *    period whose public release has passed may become `'on-sale'`.
  * 2. Read the Department's "Future term dates" page. Add the next breaks as `'unannounced'`
- *    periods, in date order, and move `CALENDAR_COVERS_UNTIL` to the last night they cover.
+ *    periods, in date order, each from the last day of term, and move `CALENDAR_COVERS_UNTIL`
+ *    to the last night they cover.
  * 3. A park whose release hour, or part in the pre-sale, changes is updated in `parks.ts`.
  * 4. Extend `tests/unit/providers/rac/release-calendar.test.ts` (each period's nights and
  *    state) and `release-policy.test.ts` (an instant for the new release, member and public).
@@ -86,10 +93,10 @@ export const SCHOOL_HOLIDAY_PERIODS: readonly SchoolHolidayPeriod[] = [
     last: '2028-04-24',
     release: { memberPreSale: '2027-04-28', publicRelease: '2027-04-30' },
   },
-  // The Department's breaks; RAC has not announced them.
-  { name: 'Winter 2028', first: '2028-07-01', last: '2028-07-16', release: 'unannounced' },
-  { name: 'Spring 2028', first: '2028-09-23', last: '2028-10-08', release: 'unannounced' },
-  { name: 'Summer 2028–29', first: '2028-12-15', last: '2029-01-30', release: 'unannounced' },
+  // RAC has not announced them: from the last school day to the Department's last break day.
+  { name: 'Winter 2028', first: '2028-06-30', last: '2028-07-16', release: 'unannounced' },
+  { name: 'Spring 2028', first: '2028-09-22', last: '2028-10-08', release: 'unannounced' },
+  { name: 'Summer 2028–29', first: '2028-12-14', last: '2029-01-30', release: 'unannounced' },
 ];
 
 /**

@@ -9,7 +9,8 @@
  * It checks the timing a snipe keeps (terms rules 2 and 3): the first request at the release
  * instant, none closer than 10 s, a 30-minute window; the alert (no hold, no night guard, a
  * booking page and never a cart); a block (rule 5); sleep and resume; and a member number
- * moving the release 48 hours earlier (rule 14). Nothing is sent anywhere.
+ * moving the release 48 hours earlier (rule 14), or not when the pre-sale's window has passed
+ * for the snipe's own 15 minutes. Nothing is sent anywhere.
  */
 
 import fs from 'fs';
@@ -386,6 +387,53 @@ describe('RAC snipes (JobScheduler, fixtures, paced)', () => {
 
     expect(http.sentAt).toEqual([RELEASE + 5 * MINUTE]);
     expect(repo.findById(snipe.id)?.status).toBe(SnipeStatus.SNIPING);
+  });
+
+  it('a member number saved 20 minutes into a 15-minute pre-sale window keeps the public release; 10 minutes in, it checks at once', async () => {
+    setUp(PRE_SALE - HOUR);
+    const late = await createSnipe();
+    const early = await createSnipe({ name: 'Busselton, early' });
+    expect([late.releaseAt?.getTime(), late.windowDurationMs]).toEqual([RELEASE, 15 * MINUTE]);
+    scheduler.start();
+    await runUntil(PRE_SALE + 10 * MINUTE);
+
+    // Saved 10 minutes in: inside the pre-sale's window, so the pre-sale, at once
+    member = true;
+    scheduler.rescheduleSnipe(early.id);
+    await runUntil(PRE_SALE + 10 * MINUTE);
+    expect(repo.findById(early.id)).toMatchObject({ status: SnipeStatus.SNIPING });
+    expect(repo.findById(early.id)?.releaseAt?.getTime()).toBe(PRE_SALE);
+    expect(http.sentAt).toEqual([PRE_SALE + 10 * MINUTE]);
+    scheduler.unscheduleSnipe(early.id);
+
+    // Re-armed 20 minutes in: the pre-sale's window has passed, so the public release
+    await runUntil(PRE_SALE + 20 * MINUTE);
+    scheduler.rescheduleSnipe(late.id);
+    await runUntil(PRE_SALE + 21 * MINUTE);
+    const stored = repo.findById(late.id)!;
+    expect([stored.status, stored.releaseAt?.getTime()]).toEqual([SnipeStatus.ARMED, RELEASE]);
+    expect(http.sentAt).toEqual([PRE_SALE + 10 * MINUTE]);
+  });
+
+  it('a member snipe asleep through the pre-sale wakes armed for the public release, not expired', async () => {
+    member = true;
+    setUp(PRE_SALE - HOUR);
+    const snipe = await createSnipe();
+    expect(snipe.releaseAt?.getTime()).toBe(PRE_SALE);
+    scheduler.start();
+    await runUntil(PRE_SALE - 30 * MINUTE);
+    expect(repo.findById(snipe.id)?.status).toBe(SnipeStatus.ARMED);
+
+    // Asleep from 30 minutes before the pre-sale to 20 minutes into it (its window is 15)
+    jest.setSystemTime(PRE_SALE + 20 * MINUTE);
+    power.emit('resume');
+    await runUntil(PRE_SALE + 21 * MINUTE);
+    const stored = repo.findById(snipe.id)!;
+    expect([stored.status, stored.releaseAt?.getTime()]).toEqual([SnipeStatus.ARMED, RELEASE]);
+    expect(http.sentAt).toEqual([]);
+
+    await runUntil(RELEASE);
+    expect(http.sentAt).toEqual([RELEASE]);
   });
 
   it('a member number moves the release 48 hours earlier at the next arm', async () => {

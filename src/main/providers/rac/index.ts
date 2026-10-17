@@ -81,11 +81,12 @@ export function createRacModules(
   const release = new RacReleasePolicy({
     providerId: ctx.id,
     isMember: options.isMember ?? (async () => false),
+    logger: ctx.logger,
   });
   const availability = createRacAvailability({ ctx, client, links: racLinks, kindOf, release });
   return {
     links: racLinks,
-    catalog: createRacCatalog({ ctx, client, links: racLinks, availability, kindOf }),
+    catalog: createRacCatalog({ ctx, client, links: racLinks, availability, kindOf, release }),
     availability: { ...availability, search: createRacBulkSearch({ ctx, availability }) },
     release,
   };

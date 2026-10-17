@@ -23,8 +23,12 @@
  *   at the same hour, 48 hours earlier (decided on 16 Oct 2026; terms rule 14); and what is left
  *   out of the pre-sale, as unit kinds and as the same categories' NewBook ids (a snipe may name
  *   categories rather than kinds, and the release policy sends no request to look one up).
- *   `null` for Cable Beach, which is in neither: only the rolling 364-day window applies there
- *   (decided on 16 Oct 2026). The release days themselves are in `release-calendar.ts`.
+ *   `null` for Cable Beach, which is in neither (decided on 16 Oct 2026). The release days
+ *   themselves are in `release-calendar.ts`.
+ * - **seasonalRelease** is the part of the year whose nights the park releases on its own
+ *   monthly seasonal release days, not as they come into the 364-day window: Cable Beach's dry
+ *   season, 15 May to 15 October (`ai-state/research/rac-terms.md` §4). WA Stay does not know
+ *   those days, so a stay with a night in it is timed by the person. `null` elsewhere.
  *
  * The NewBook-native parks' categories, from the research's availability captures of
  * 16–17 Oct 2026 (type id: names), kept for their units later:
@@ -60,6 +64,14 @@ export interface SchoolHolidayRelease {
   presaleExcludedCategoryIds: readonly string[];
 }
 
+/** Nights a park releases on its own seasonal days: month and day, `MM-DD`, both included. */
+export interface SeasonalRelease {
+  /** The season, for messages ("dry-season"). */
+  name: string;
+  first: string;
+  last: string;
+}
+
 export interface RacPark {
   slug: string;
   blogId: number;
@@ -75,6 +87,7 @@ export interface RacPark {
   /** NewBook category type id → unit kind. */
   categoryTypes: Readonly<Record<string, UnitKind>>;
   schoolHolidays: SchoolHolidayRelease | null;
+  seasonalRelease: SeasonalRelease | null;
 }
 
 /** A park in the school-holiday releases and the member pre-sale, with nothing left out. */
@@ -98,6 +111,7 @@ export const RAC_PARKS: readonly RacPark[] = [
     unitKinds: ['campsite', 'cabin'],
     categoryTypes: { '2': 'campsite', '5': 'cabin' },
     schoolHolidays: inPreSale(8),
+    seasonalRelease: null,
   },
   {
     slug: 'cable-beach',
@@ -111,6 +125,8 @@ export const RAC_PARKS: readonly RacPark[] = [
     unitKinds: ['campsite', 'cabin'],
     categoryTypes: { '2': 'cabin', '4': 'campsite' },
     schoolHolidays: null,
+    // Seasonal guests rebook on arrival; everyone else waits for RAC's monthly release days
+    seasonalRelease: { name: 'dry-season', first: '05-15', last: '10-15' },
   },
   {
     slug: 'cervantes',
@@ -124,6 +140,7 @@ export const RAC_PARKS: readonly RacPark[] = [
     unitKinds: ['campsite', 'cabin'],
     categoryTypes: { '1': 'cabin', '2': 'campsite' },
     schoolHolidays: inPreSale(9),
+    seasonalRelease: null,
   },
   {
     slug: 'esperance',
@@ -137,6 +154,7 @@ export const RAC_PARKS: readonly RacPark[] = [
     unitKinds: ['campsite', 'cabin'],
     categoryTypes: { '2': 'campsite', '5': 'cabin' },
     schoolHolidays: inPreSale(7),
+    seasonalRelease: null,
   },
   {
     slug: 'margaret-river',
@@ -157,6 +175,7 @@ export const RAC_PARKS: readonly RacPark[] = [
       presaleExcludes: ['dorm'],
       presaleExcludedCategoryIds: ['2', '3', '4'],
     },
+    seasonalRelease: null,
   },
   {
     slug: 'exmouth',
@@ -171,6 +190,7 @@ export const RAC_PARKS: readonly RacPark[] = [
     // Type 1 holds the cabins and the Blue Reef motel rooms; a cabin says so in its name.
     categoryTypes: { '1': 'room', '2': 'campsite' },
     schoolHolidays: inPreSale(9),
+    seasonalRelease: null,
   },
   {
     slug: 'karri-valley',
@@ -184,6 +204,7 @@ export const RAC_PARKS: readonly RacPark[] = [
     unitKinds: ['campsite', 'cabin', 'room'],
     categoryTypes: { '2': 'cabin', '7': 'campsite' },
     schoolHolidays: inPreSale(8),
+    seasonalRelease: null,
   },
   {
     slug: 'monkey-mia',
@@ -197,6 +218,7 @@ export const RAC_PARKS: readonly RacPark[] = [
     unitKinds: ['campsite', 'cabin', 'room', 'dorm'],
     categoryTypes: { '1': 'room', '2': 'campsite', '7': 'dorm' },
     schoolHolidays: inPreSale(8),
+    seasonalRelease: null,
   },
 ];
 

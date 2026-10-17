@@ -285,6 +285,19 @@ describe('RAC_PARKS', () => {
     });
   });
 
+  it("keeps Cable Beach's dry season, 15 May to 15 October, released on its own days; no other park has one", () => {
+    expect(Object.fromEntries(RAC_PARKS.map((park) => [park.slug, park.seasonalRelease]))).toEqual({
+      busselton: null,
+      'cable-beach': { name: 'dry-season', first: '05-15', last: '10-15' },
+      cervantes: null,
+      esperance: null,
+      'margaret-river': null,
+      exmouth: null,
+      'karri-valley': null,
+      'monkey-mia': null,
+    });
+  });
+
   it("leaves out of the pre-sale exactly Margaret River's dorm categories on its book-now page", () => {
     const page = readBookNowPage(
       fs.readFileSync(
@@ -317,6 +330,7 @@ describe('RAC_PARKS', () => {
       'unitKinds',
       'categoryTypes',
       'schoolHolidays',
+      'seasonalRelease',
     ];
     for (const park of RAC_PARKS) expect(Object.keys(park).sort()).toEqual([...allowed].sort());
     expect(JSON.stringify(RAC_PARKS)).not.toMatch(/https?:|\.jpg|newbook/i);

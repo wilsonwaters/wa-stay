@@ -6,9 +6,10 @@
  *
  * - `daily_rollover`: the rolling window (00:00 AWST on departure − 365), or a later
  *   school-holiday release at the park's hour, 48 hours earlier for a member at a park and
- *   category in the pre-sale (terms rule 14); Cable Beach follows the rolling window only;
- *   the public instant once the member window has passed; refusals for an unannounced period,
- *   a night the calendar does not cover, and a stay already open.
+ *   category in the pre-sale (terms rule 14); Cable Beach follows the rolling window only,
+ *   outside its dry season; the public instant once the member window has passed, measured by
+ *   the snipe's own window (`windowMs`); refusals for Cable Beach's dry season, an unannounced
+ *   period, a night the calendar does not cover, and a stay already open.
  * - `scheduled`: the person's time, refused without one.
  * - `isMember` asked at every compute; no request sent; `describe`; the poll floors.
  */
@@ -59,6 +60,7 @@ interface Options {
   now?: Date;
   unitIds?: string[];
   unitKinds?: UnitKind[];
+  windowMs?: number;
 }
 
 /** The `daily_rollover` instant for `stay` at `park`, as an ISO string. */
@@ -71,6 +73,7 @@ async function opens(park: string, at: StayQuery, options: Options = {}): Promis
     now: options.now ?? NOW,
     unitIds: options.unitIds,
     unitKinds: options.unitKinds,
+    windowMs: options.windowMs,
   });
   return instant!.toISOString();
 }
@@ -164,9 +167,13 @@ describe('RAC release policy', () => {
       // departure 2027-12-23 − 365 = 2026-12-23, 00:00 AWST
       expect(await opens('cable-beach', SUMMER)).toBe('2026-12-22T16:00:00.000Z');
       expect(await opens('cable-beach', SUMMER, { member: true })).toBe('2026-12-22T16:00:00.000Z');
-      // Nor does an unannounced period or the calendar's end stop it
-      expect(await opens('cable-beach', stay('2028-07-02', '2028-07-05'))).toBe(
-        '2027-07-05T16:00:00.000Z'
+      // Nor do unannounced holidays (summer 2028–29) or the calendar's end stop it, out of its
+      // dry season: 2028-12-22 − 365 = 2027-12-23 (29 Feb 2028 between), and 2029-03-03 − 365
+      expect(await opens('cable-beach', stay('2028-12-20', '2028-12-22'))).toBe(
+        '2027-12-22T16:00:00.000Z'
+      );
+      expect(await opens('cable-beach', stay('2029-03-01', '2029-03-03'))).toBe(
+        '2028-03-02T16:00:00.000Z'
       );
     });
 
@@ -247,10 +254,125 @@ describe('RAC release policy', () => {
     });
   });
 
+  describe("daily_rollover: Cable Beach's dry season (15 May to 15 October)", () => {
+    const DRY_SEASON =
+      'RAC Cable Beach Holiday Park opens its dry-season dates on set days. ' +
+      'Choose a time you set, or set a watch.';
+
+    it('refuses a stay in the dry season, member number or not: RAC releases it on its own days', async () => {
+      for (const member of [false, true]) {
+        expect(
+          (await refusal('cable-beach', stay('2027-08-01', '2027-08-03'), { member })).message
+        ).toBe(DRY_SEASON);
+      }
+      // 5–8 Oct 2027: not "already open", as the rolling window alone would say
+      expect((await refusal('cable-beach', stay('2027-10-05', '2027-10-08'))).message).toBe(
+        DRY_SEASON
+      );
+    });
+
+    it('refuses a stay with any night in it, across either edge; times one with none by the rolling window', async () => {
+      // 14–16 Oct: 14 and 15 are dry-season nights; 15 Oct, the last
+      for (const [arrival, departure] of [
+        ['2027-10-14', '2027-10-17'],
+        ['2027-10-15', '2027-10-16'],
+        ['2027-05-14', '2027-05-16'],
+        ['2027-05-15', '2027-05-16'],
+      ]) {
+        expect((await refusal('cable-beach', stay(arrival, departure))).message).toBe(DRY_SEASON);
+      }
+      // 16–17 Oct 2027: out of season. 2027-10-18 − 365 = 2026-10-18, 00:00 AWST
+      expect(await opens('cable-beach', stay('2027-10-16', '2027-10-18'))).toBe(
+        '2026-10-17T16:00:00.000Z'
+      );
+      // 13–14 May 2027, asked on 1 May 2026: 2027-05-15 − 365 = 2026-05-15
+      expect(
+        await opens('cable-beach', stay('2027-05-13', '2027-05-15'), {
+          now: new Date('2026-05-01T00:00:00.000Z'),
+        })
+      ).toBe('2026-05-14T16:00:00.000Z');
+    });
+
+    it('still takes a scheduled time in the dry season, and leaves the other parks alone', async () => {
+      const { policy } = makePolicy();
+      const requestedAt = new Date('2026-11-09T01:00:00.000Z');
+      await expect(
+        policy.computeReleaseAt({
+          mode: SnipeReleaseMode.SCHEDULED,
+          externalId: 'cable-beach',
+          stay: stay('2027-10-05', '2027-10-08'),
+          requestedAt,
+          now: NOW,
+        })
+      ).resolves.toBe(requestedAt);
+      // Busselton in August: the rolling window (2027-08-03 − 365 = 2026-08-03)
+      expect(
+        await opens('busselton', stay('2027-08-01', '2027-08-03'), {
+          now: new Date('2026-07-01T00:00:00.000Z'),
+        })
+      ).toBe('2026-08-02T16:00:00.000Z');
+    });
+  });
+
+  describe("daily_rollover: the snipe's own window (windowMs)", () => {
+    // The public release of the summer holidays at Busselton: 2027-02-05T00:00Z
+    const twentyMinutesIn = new Date('2027-02-05T00:20:00.000Z');
+
+    it('refuses a stay 20 minutes after its release when the snipe keeps trying for 15, and times it for 30', async () => {
+      const error = await refusal('busselton', SUMMER, {
+        now: twentyMinutesIn,
+        windowMs: 15 * 60_000,
+      });
+      expect(error.message).toBe(ALREADY_OPEN);
+      expect(
+        await opens('busselton', SUMMER, { now: twentyMinutesIn, windowMs: 30 * 60_000 })
+      ).toBe('2027-02-05T00:00:00.000Z');
+      // None given: RAC's 30 minutes
+      expect(await opens('busselton', SUMMER, { now: twentyMinutesIn })).toBe(
+        '2027-02-05T00:00:00.000Z'
+      );
+    });
+
+    it('never counts a window longer than 30 minutes', async () => {
+      const fortyMinutesIn = new Date('2027-02-05T00:40:00.000Z');
+      const error = await refusal('busselton', SUMMER, {
+        now: fortyMinutesIn,
+        windowMs: 60 * 60_000,
+      });
+      expect(error.message).toBe(ALREADY_OPEN);
+    });
+
+    it("a member 20 minutes into the pre-sale with a 15-minute window gets the public release, not the pre-sale's", async () => {
+      const preSale20 = new Date('2027-02-03T00:20:00.000Z');
+      const windowMs = 15 * 60_000;
+      expect(await opens('busselton', SUMMER, { member: true, now: preSale20, windowMs })).toBe(
+        '2027-02-05T00:00:00.000Z'
+      );
+      // 10 minutes in, still inside its window: the pre-sale
+      expect(
+        await opens('busselton', SUMMER, {
+          member: true,
+          now: new Date('2027-02-03T00:10:00.000Z'),
+          windowMs,
+        })
+      ).toBe('2027-02-03T00:00:00.000Z');
+    });
+  });
+
   describe('daily_rollover: refusals', () => {
     it('refuses a night in a school-holiday period RAC has not announced, at a park in the releases', async () => {
       const error = await refusal('busselton', stay('2028-06-29', '2028-07-02'));
       expect(error.message).toBe(UNANNOUNCED_MESSAGE('RAC Busselton Holiday Park'));
+      // From the last school day (Fri 30 Jun 2028), the uncertain first night; not the night before
+      expect((await refusal('busselton', stay('2028-06-30', '2028-07-01'))).message).toBe(
+        UNANNOUNCED_MESSAGE('RAC Busselton Holiday Park')
+      );
+      // 2028-06-30 − 365 = 2027-07-01 (29 Feb 2028 between), 00:00 AWST
+      expect(
+        await opens('busselton', stay('2028-06-28', '2028-06-30'), {
+          now: new Date('2027-06-01T00:00:00.000Z'),
+        })
+      ).toBe('2027-06-30T16:00:00.000Z');
       expect((await refusal('exmouth', stay('2028-10-08', '2028-10-09'))).message).toBe(
         UNANNOUNCED_MESSAGE('RAC Exmouth Cape Holiday Park')
       );
@@ -337,6 +459,28 @@ describe('RAC release policy', () => {
       expect(isMember).toHaveBeenCalledTimes(3);
     });
 
+    it('counts the person as no member when isMember fails, with a warning that names no value', async () => {
+      const warn = jest.fn();
+      const policy = new RacReleasePolicy({
+        providerId: 'rac',
+        isMember: () => Promise.reject(new Error('number 1234567890123 unreadable')),
+        logger: { warn },
+      });
+      const instant = await policy.computeReleaseAt({
+        mode: SnipeReleaseMode.DAILY_ROLLOVER,
+        externalId: 'busselton',
+        stay: SUMMER,
+        now: NOW,
+      });
+      expect(instant!.toISOString()).toBe('2027-02-05T00:00:00.000Z');
+      expect(warn).toHaveBeenCalledTimes(1);
+      expect(JSON.stringify(warn.mock.calls)).not.toMatch(/1234567890123|unreadable/);
+      // An availability check too
+      const release = await policy.forStay('busselton', SUMMER, { now: NOW });
+      expect(release.opensAt?.toISOString()).toBe('2027-02-05T00:00:00.000Z');
+      expect(warn).toHaveBeenCalledTimes(2);
+    });
+
     it('tells which categories take part in the pre-sale', () => {
       const margaretRiver = RAC_PARKS.find(
         (park) => park.slug === 'margaret-river'
@@ -350,6 +494,11 @@ describe('RAC release policy', () => {
       expect(wantsPreSale(margaretRiver, [], ['dorm'])).toBe(false);
       expect(wantsPreSale(margaretRiver, ['cat:2', 'cat:3', 'cat:4'], ['cabin'])).toBe(false);
       expect(wantsPreSale({ ...busselton, memberPreSale: false })).toBe(false);
+      // Named categories and stay types both count: a category the seed does not know, at a
+      // dorm-only snipe, is a dorm
+      expect(wantsPreSale(margaretRiver, ['cat:99'])).toBe(true);
+      expect(wantsPreSale(margaretRiver, ['cat:99'], ['dorm'])).toBe(false);
+      expect(wantsPreSale(margaretRiver, ['cat:9'], ['cabin', 'dorm'])).toBe(true);
     });
 
     it('is no member through the factory until the member number can be saved', async () => {
@@ -414,9 +563,10 @@ describe('RAC release policy', () => {
       expect(await policy.describe('cervantes')).toMatch(/at 9 am AWST, 48 hours earlier/);
     });
 
-    it('says Cable Beach follows the rolling window, with seasonal dates at a time you set', async () => {
+    it('says Cable Beach follows the rolling window, with its dry-season dates at a time you set', async () => {
       expect(await makePolicy().policy.describe('cable-beach')).toBe(
-        'New dates open daily at midnight AWST, 364 days ahead. Seasonal dates: choose a time you set.'
+        'New dates open daily at midnight AWST, 364 days ahead. Dry-season dates, 15 May to ' +
+          '15 October, open on set days: choose a time you set.'
       );
     });
 

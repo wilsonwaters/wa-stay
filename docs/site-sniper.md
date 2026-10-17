@@ -41,19 +41,23 @@ at the fastest, for at most 30 minutes, and alerts you when the dates are free.
 
 | Mode             | In the app                | What happens                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
 | ---------------- | ------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `daily_rollover` | **When these dates open** | RAC takes bookings 364 days ahead, and one more night opens at midnight Perth time each day, so your stay opens at midnight on the day its last night comes 364 days ahead. WA school holidays are held back and open on RAC's own release days, at each park's hour, Perth time: 7 am at Esperance and Margaret River, 8 am at Busselton, Karri Valley and Monkey Mia, 9 am at Cervantes and Exmouth. Site Sniper works out the later of the two for your stay. Cable Beach has no school-holiday release: only the 364-day window applies there. |
-| `scheduled`      | **At a time you set**     | For dates RAC releases on a day it announces, such as Cable Beach's seasonal dates. Site Sniper checks from the time you set.                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| `daily_rollover` | **When these dates open** | RAC takes bookings 364 days ahead, and one more night opens at midnight Perth time each day, so your stay opens at midnight on the day its last night comes 364 days ahead. WA school holidays are held back and open on RAC's own release days, at each park's hour, Perth time: 7 am at Esperance and Margaret River, 8 am at Busselton, Karri Valley and Monkey Mia, 9 am at Cervantes and Exmouth. Site Sniper works out the later of the two for your stay. Cable Beach has no school-holiday release: outside its dry season only the 364-day window applies. |
+| `scheduled`      | **At a time you set**     | For dates RAC releases on a day it announces, such as Cable Beach's dry-season dates (15 May to 15 October), which open on RAC's own monthly release days. Site Sniper checks from the time you set.                                                                                                                                                                                                                                                                                                                                                                                                                      |
 
 - **Members' pre-sale.** RAC members can book school holidays 48 hours before everyone else, at
   the same hour (except Margaret River's dorms). Site Sniper will time a snipe to the pre-sale
   once you can save your RAC member number in WA Stay, which is coming; until then it uses the
   public release.
 - **When Site Sniper can't time it**, it says so and the snipe isn't created: school holidays
-  RAC hasn't announced yet, or dates beyond the release days WA Stay knows. Set a watch, or
+  RAC hasn't announced yet (from the last school day), dates beyond the release days WA Stay
+  knows, or Cable Beach's dry season, whose release days WA Stay doesn't know. Set a watch, or
   choose **At a time you set** when you know the release. WA Stay learns new release days with
   an app update, and a waiting snipe picks them up when it is next armed.
-- **Dates already open** can't be sniped: set a watch to hear about cancellations. RAC has no
-  "When someone cancels" mode, as a watch covers it, every 15 minutes at most.
+- **Dates already open** can't be sniped: set a watch to hear about cancellations. A release
+  counts as passed once your snipe's own **Keep trying for** has run out after it (so 20
+  minutes after a release, a snipe that keeps trying for 15 is refused). A member whose
+  pre-sale has passed that way is timed to the public release instead. RAC has no "When
+  someone cancels" mode, as a watch covers it, every 15 minutes at most.
 
 ## Creating a snipe
 

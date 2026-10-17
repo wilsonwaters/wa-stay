@@ -454,6 +454,30 @@ describe('release-alert snipes', () => {
         expect.objectContaining({ unitIds: ['u1'], unitKinds: ['cabin'] })
       );
     });
+
+    it('the release policy hears the snipe’s own window, clamped to the mode’s limit, at create and when asked again (R14 review)', async () => {
+      setUp({ maxWindowMinutes: 30 });
+      const compute = jest.spyOn(h.registry.get('fake').release!, 'computeReleaseAt');
+      const usual = await h.snipes.create(
+        h.userId,
+        h.snipeInput({ releaseMode: SnipeReleaseMode.DAILY_ROLLOVER })
+      );
+      expect(compute).toHaveBeenLastCalledWith(expect.objectContaining({ windowMs: 15 * MINUTE }));
+      const long = await h.snipes.create(
+        h.userId,
+        h.snipeInput({
+          releaseMode: SnipeReleaseMode.DAILY_ROLLOVER,
+          windowDurationMs: 2 * 60 * MINUTE,
+        })
+      );
+      expect(compute).toHaveBeenLastCalledWith(expect.objectContaining({ windowMs: 30 * MINUTE }));
+
+      await h.snipes.refreshReleaseAt(usual);
+      expect(compute).toHaveBeenLastCalledWith(expect.objectContaining({ windowMs: 15 * MINUTE }));
+      // An older row with a longer window is asked with the clamped one
+      await h.snipes.refreshReleaseAt({ ...long, windowDurationMs: 2 * 60 * MINUTE });
+      expect(compute).toHaveBeenLastCalledWith(expect.objectContaining({ windowMs: 30 * MINUTE }));
+    });
   });
 
   describe('the booking link', () => {

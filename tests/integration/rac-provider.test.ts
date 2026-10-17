@@ -35,7 +35,6 @@ import { openDatabase } from '@main/database/connection';
 import { LocationRepository, ProviderStateRepository } from '@main/database/repositories';
 import { RAC_PARKS, racFactory, racManifest } from '@main/providers/rac';
 import { RAC_AVAILABILITY_PATH } from '@main/providers/rac/availability';
-import { RAC_RELEASE_INFO, RAC_ROLLING_RELEASE_INFO } from '@main/providers/rac/catalog';
 import { RAC_BLOCK_STATE_KEY, RacClient } from '@main/providers/rac/client';
 import { FixtureHttpClient } from '@main/testing/fixture-http-client';
 import type {
@@ -68,6 +67,10 @@ const RAC = 'https://parksandresorts.rac.com.au';
 /** The day after the pages were recorded, 10 am in Perth. */
 const NOW = new Date('2026-10-17T02:00:00.000Z');
 const STAY: StayQuery = { arrival: '2026-11-06', departure: '2026-11-08', adults: 2 };
+/** A park's release info: its release policy's `describe()`, with the park's own hour. */
+const releaseInfo = (hour: number) =>
+  'New dates open daily at midnight AWST, 364 days ahead. School holidays open on ' +
+  `RAC's release days at ${hour} am AWST, 48 hours earlier for members.`;
 const placeholder = (n: number) =>
   `https://driveau.newbook.cloud/crop_800_450/instances_00000000000000000000000000000000_${n}.jpg`;
 
@@ -264,7 +267,7 @@ describe('RAC Parks & Resorts', () => {
       expect(detail.units[0].amenities).not.toContain('Pets allowed (up to 2)');
       // The gallery's photos, fetched live, the placeholders here
       expect(detail.imageUrls).toEqual(Array.from({ length: 12 }, (_, i) => placeholder(i + 1)));
-      expect(detail.releaseInfo).toBe(RAC_RELEASE_INFO);
+      expect(detail.releaseInfo).toBe(releaseInfo(8));
       expect(detail.fetchedAt).toBe(NOW.toISOString());
     });
 
@@ -306,19 +309,19 @@ describe('RAC Parks & Resorts', () => {
       ]);
     });
 
-    it.each<[string, number, number, string[]]>([
-      ['exmouth', 3, 17, ['campsite', 'cabin', 'room']],
-      ['karri-valley', 7, 12, ['campsite', 'cabin', 'room']],
-      ['monkey-mia', 2, 16, ['campsite', 'cabin', 'room', 'dorm']],
+    it.each<[string, number, number, string[], number]>([
+      ['exmouth', 3, 17, ['campsite', 'cabin', 'room'], 9],
+      ['karri-valley', 7, 12, ['campsite', 'cabin', 'room'], 8],
+      ['monkey-mia', 2, 16, ['campsite', 'cabin', 'room', 'dorm'], 8],
     ])(
       'gives the native park %s its categories from one availability POST for a near stay (blog %d, %d units)',
-      async (slug, blogId, count, kinds) => {
+      async (slug, blogId, count, kinds, hour) => {
         const { ctx, sent } = sendingContext();
         const detail = await racFactory(ctx).catalog!.getLocation(slug);
         expect(detail).toMatchObject({
           key: `rac:${slug}`,
           imageUrls: [],
-          releaseInfo: RAC_RELEASE_INFO,
+          releaseInfo: releaseInfo(hour),
           infoUrl: `${RAC}/${slug}/`,
         });
         expect(detail.units).toHaveLength(count);
@@ -408,13 +411,22 @@ describe('RAC Parks & Resorts', () => {
       );
     });
 
-    it('says Cable Beach opens its seasonal dates on set days, not on school-holiday days', async () => {
+    it('says Cable Beach opens its dry-season dates on set days, not on school-holiday days', async () => {
       const { ctx } = recordingContext(page('book-now-busselton.html'));
       const detail = await racFactory(ctx).catalog!.getLocation('cable-beach');
-      expect(detail.releaseInfo).toBe(RAC_ROLLING_RELEASE_INFO);
-      expect(RAC_ROLLING_RELEASE_INFO).toBe(
-        'Bookings open 364 days ahead, at midnight Perth time. Seasonal dates open on set days.'
+      expect(detail.releaseInfo).toBe(
+        'New dates open daily at midnight AWST, 364 days ahead. Dry-season dates, 15 May to ' +
+          '15 October, open on set days: choose a time you set.'
       );
+    });
+
+    it("gives Esperance and Margaret River their 7 am release hour, from the release policy's describe()", async () => {
+      const { ctx } = recordingContext(page('book-now-margaret-river.html'));
+      const provider = racFactory(ctx);
+      expect((await provider.catalog!.getLocation('margaret-river')).releaseInfo).toBe(
+        releaseInfo(7)
+      );
+      expect(await provider.release!.describe('margaret-river')).toBe(releaseInfo(7));
     });
 
     it.each<[string, string, string[]]>([

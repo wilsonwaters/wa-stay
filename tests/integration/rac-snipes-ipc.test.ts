@@ -2,8 +2,9 @@
  * RAC snipes over IPC (`snipes:create`), through P3's harness against a real container with the
  * built-in RAC module, at 10 am Perth on 17 Oct 2026: a stay its release policy times is
  * created as an alert at that instant, with RAC's cadence and window; each refusal of the
- * policy is VALIDATION on `releaseAt` with its message; there is no cancellation mode
- * (`releaseMode`), and no hold (`action`). Nothing is sent: the policy reads no page.
+ * policy is VALIDATION on `releaseAt` with its message, a release whose passing is measured by
+ * the snipe's own window; there is no cancellation mode (`releaseMode`), and no hold
+ * (`action`). Nothing is sent: the policy reads no page.
  */
 
 import { EventEmitter } from 'events';
@@ -115,6 +116,13 @@ describe('RAC snipes over IPC', () => {
       'These dates are already open on RAC. Set a watch to hear about cancellations.',
     ],
     [
+      "a stay in Cable Beach's dry season",
+      busselton('2027-08-01', '2027-08-03', {
+        location: { externalId: 'cable-beach', name: 'RAC Cable Beach Holiday Park' },
+      }),
+      'RAC Cable Beach Holiday Park opens its dry-season dates on set days. Choose a time you set, or set a watch.',
+    ],
+    [
       'a scheduled release without a time',
       busselton('2027-08-01', '2027-08-03', { releaseMode: SnipeReleaseMode.SCHEDULED }),
       'A scheduled release needs a time',
@@ -127,6 +135,22 @@ describe('RAC snipes over IPC', () => {
       issues: ['releaseAt'],
     });
     expect(container.repositories.snipes.findAll()).toEqual([]);
+  });
+
+  it("measures a release's passing by the snipe's own window: 20 minutes after it, 15 is refused and 30 is created", async () => {
+    jest.setSystemTime(new Date('2027-02-05T00:20:00.000Z'));
+    await expect(call('snipes:create', busselton('2027-12-20', '2027-12-23'))).resolves.toEqual({
+      success: false,
+      code: 'VALIDATION',
+      error: 'These dates are already open on RAC. Set a watch to hear about cancellations.',
+      issues: ['releaseAt'],
+    });
+    const created = await call<SiteSnipe>(
+      'snipes:create',
+      busselton('2027-12-20', '2027-12-23', { windowDurationMs: 1_800_000 })
+    );
+    expect(created).toMatchObject({ success: true, data: { windowDurationMs: 1_800_000 } });
+    expect(new Date(created.data!.releaseAt!).toISOString()).toBe('2027-02-05T00:00:00.000Z');
   });
 
   it('has no cancellation mode: VALIDATION on releaseMode', async () => {

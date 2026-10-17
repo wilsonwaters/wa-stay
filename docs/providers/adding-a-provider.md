@@ -1468,11 +1468,14 @@ interface AccessGate {
 When dates become bookable, for Site Sniper (`release`). ParkStay: `release-policy.ts`.
 
 - `supports(mode)` must accept every `releaseModes` id (the registry checks it).
-- `computeReleaseAt({ mode, externalId, stay, params, requestedAt, unitIds, unitKinds, now,
-  signal })` returns the instant the stay opens, or `null` for "poll continuously" (a
-  cancellation mode). `unitIds` and `unitKinds` are the snipe's unit choice (none: any unit),
-  for a policy that times a category differently. A stay it cannot time (RAC: school holidays
-  not announced yet, dates past its release calendar, dates already open) is a `ProviderError`
+- `computeReleaseAt({ mode, externalId, stay, params, requestedAt, unitIds, unitKinds,
+  windowMs, now, signal })` returns the instant the stay opens, or `null` for "poll
+  continuously" (a cancellation mode). `unitIds` and `unitKinds` are the snipe's unit choice
+  (none: any unit), for a policy that times a category differently. `windowMs` is how long the
+  snipe keeps trying after the release (its window, clamped to `maxWindowMinutes`; none for an
+  availability check), for a policy that refuses a release that has passed. A stay it cannot
+  time (RAC: school holidays not announced yet, dates past its release calendar, Cable Beach's
+  dry season, dates already open) is a `ProviderError`
   whose message the person sees: the core refuses the snipe with `VALIDATION` on `releaseAt`.
   The core asks a `daily_rollover` snipe's instant again each time it arms one (start, resume,
   a daily re-arm), keeping the stored one when it is refused then, so read whatever can change

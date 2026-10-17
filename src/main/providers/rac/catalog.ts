@@ -18,6 +18,8 @@
  *   two adults; `availability.ts`): every category RAC lists, whatever its availability, as
  *   `cat:<category id>` with its kind and its kind's group as its type. Nothing of that stay's
  *   availability or prices is kept. An answer with no category is a `ProviderParseError`.
+ * - Every park's **release info** is the release policy's `describe()`: new dates daily at
+ *   midnight, and its school-holiday hour with the members' pre-sale, or its own season.
  * - A park the seed does not have (Ningaloo) rejects with a `ProviderError`, unsent.
  */
 
@@ -32,20 +34,12 @@ import { addDays, todayIn } from '@shared/utils/calendar-date';
 import { makeLocationKey } from '@shared/utils/location-key';
 import type { ProviderContext } from '../sdk/context';
 import { ProviderError, ProviderParseError, throwIfAborted } from '../sdk/errors';
-import type { FullCatalogModule, ProviderLinks } from '../sdk/provider';
+import type { FullCatalogModule, ProviderLinks, ReleasePolicy } from '../sdk/provider';
 import { categoryUnitId, type CategoryKindOf, type RacAvailability } from './availability';
 import { readBookNowPage, type BookNowCategory, type BookNowPage } from './book-now';
 import type { RacClient } from './client';
 import { RAC_PARKS, racPark, type RacPark } from './parks';
 import { unitTypeOfKind } from './unit-kinds';
-
-/** When a park's dates open, for the place page's booking rules. */
-export const RAC_RELEASE_INFO =
-  'Bookings open 364 days ahead, at midnight Perth time. School-holiday dates open on set days.';
-
-/** Cable Beach is not in the school-holiday releases; its seasonal dates open on set days. */
-export const RAC_ROLLING_RELEASE_INFO =
-  'Bookings open 364 days ahead, at midnight Perth time. Seasonal dates open on set days.';
 
 /** How far ahead a native park's near stay is, to list its categories: 14 days. */
 export const RAC_NATIVE_LOOKAHEAD_DAYS = 14;
@@ -93,6 +87,8 @@ export interface RacCatalogDeps {
   /** For a native park's categories. */
   availability: RacAvailability;
   kindOf: CategoryKindOf;
+  /** When a park's dates open, for the place page and Site Sniper's release step. */
+  release: Pick<ReleasePolicy, 'describe'>;
 }
 
 export function createRacCatalog({
@@ -101,6 +97,7 @@ export function createRacCatalog({
   links,
   availability,
   kindOf,
+  release,
 }: RacCatalogDeps): FullCatalogModule {
   function toUnit(park: RacPark, page: BookNowPage, category: BookNowCategory): UnitSummary {
     const unit: UnitSummary = {
@@ -185,12 +182,18 @@ export function createRacCatalog({
       const detail: LocationDetail = {
         ...toLocationSummary(ctx.id, park, links),
         units: [],
-        releaseInfo: park.schoolHolidays ? RAC_RELEASE_INFO : RAC_ROLLING_RELEASE_INFO,
         fetchedAt: ctx.clock().toISOString(),
+      };
+      // When its dates open: the park's own hour and the members' pre-sale, or its season. Read
+      // after the request, so the request takes its place in the queue at once.
+      const withReleaseInfo = async (): Promise<LocationDetail> => {
+        const releaseInfo = await release.describe(park.slug, signal);
+        if (releaseInfo) detail.releaseInfo = releaseInfo;
+        return detail;
       };
       if (park.bookNow === 'native') {
         detail.units = await nativeUnits(park, signal);
-        return detail;
+        return withReleaseInfo();
       }
 
       const response = await client.getPage(`/${park.slug}/book-now/`, { signal });
@@ -206,7 +209,7 @@ export function createRacCatalog({
       detail.imageUrls = [...new Set(page.categories.flatMap((category) => category.imageUrls))];
       const notices = noticesOf(page);
       if (notices.length > 0) detail.notices = notices;
-      return detail;
+      return withReleaseInfo();
     },
   };
 }

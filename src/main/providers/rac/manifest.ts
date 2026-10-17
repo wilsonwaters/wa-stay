@@ -107,7 +107,7 @@ export const racManifest: ProviderManifest = {
       id: SnipeReleaseMode.SCHEDULED,
       label: 'At a time you set',
       description:
-        'For dates released on a day you know, such as seasonal dates at Cable Beach. ' +
+        "For dates released on a day you know, such as Cable Beach's dry-season dates. " +
         'Site Sniper checks from the time you set.',
       usesAccessGate: false,
       maxWindowMinutes: RAC_SNIPE_WINDOW_MINUTES,

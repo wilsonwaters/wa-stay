@@ -191,7 +191,7 @@ export const RAC_MANIFEST: ProviderManifest = {
       id: 'scheduled',
       label: 'At a time you set',
       description:
-        'For dates released on a day you know, such as seasonal dates at Cable Beach. ' +
+        "For dates released on a day you know, such as Cable Beach's dry-season dates. " +
         'Site Sniper checks from the time you set.',
       usesAccessGate: false,
       maxWindowMinutes: 30,

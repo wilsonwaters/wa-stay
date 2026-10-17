@@ -1,8 +1,9 @@
 /**
  * RAC's school-holiday release calendar (`src/main/providers/rac/release-calendar.ts`): the
  * periods from summer 2026–27 to summer 2028–29, from RAC's school-holiday page (the announced
- * ones) and the WA Department of Education's term dates (the rest); each night in at most one
- * period, both ends included; and how far the calendar covers.
+ * ones) and the WA Department of Education's term dates (the rest, an unannounced one from the
+ * last school day); each night in at most one period, both ends included; and how far the
+ * calendar covers.
  */
 
 import {
@@ -40,9 +41,10 @@ describe('RAC release calendar', () => {
         '2028-04-24',
         { memberPreSale: '2027-04-28', publicRelease: '2027-04-30' },
       ],
-      ['Winter 2028', '2028-07-01', '2028-07-16', 'unannounced'],
-      ['Spring 2028', '2028-09-23', '2028-10-08', 'unannounced'],
-      ['Summer 2028–29', '2028-12-15', '2029-01-30', 'unannounced'],
+      // From the last school day (Fri 30 Jun, Fri 22 Sep, Thu 14 Dec) to the last break day
+      ['Winter 2028', '2028-06-30', '2028-07-16', 'unannounced'],
+      ['Spring 2028', '2028-09-22', '2028-10-08', 'unannounced'],
+      ['Summer 2028–29', '2028-12-14', '2029-01-30', 'unannounced'],
     ]);
   });
 
@@ -79,7 +81,12 @@ describe('RAC release calendar', () => {
     ['2027-10-10', undefined],
     ['2028-04-07', 'Autumn 2028'],
     ['2028-04-24', 'Autumn 2028'],
-    ['2028-07-01', 'Winter 2028'],
+    ['2028-06-29', undefined],
+    ['2028-06-30', 'Winter 2028'],
+    ['2028-09-21', undefined],
+    ['2028-09-22', 'Spring 2028'],
+    ['2028-12-13', undefined],
+    ['2028-12-14', 'Summer 2028–29'],
     ['2029-01-30', 'Summer 2028–29'],
     ['2029-01-31', undefined],
   ])('puts the night of %s in %s (both ends included)', (night, name) => {
