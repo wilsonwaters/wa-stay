@@ -340,6 +340,9 @@ better-sqlite3's Electron build loads and `dist/main` opens and migrates the dat
 - `seedAlertSnipe(userDataDir, …)`: an armed ParkStay snipe that alerts, watching for
   cancellations, and nothing else: the app's scheduler checks the place at once and records the
   alert and its `snipe_alert` notification itself (`alert-snipe.spec.ts`, with dated fixtures).
+  A seed may name another provider and release mode: `rac-member-number.spec.ts` seeds an RAC
+  snipe at Busselton for the next school holidays RAC's calendar announces (read from the
+  built `dist/main`), whose release the app works out, and checks it moves with the number.
 - `seedHeldWatch(userDataDir, …)`: a watch whose automatic hold holds a unit, with the
   provider's experiment choices stored first when given (`rac-auto-cart.spec.ts`: RAC's
   auto-cart on and a held cart with a made-up reference). No cart or hold is ever created.
