@@ -363,7 +363,7 @@ against the descriptor (type, options, `min`/`max`, `pattern`, `required`) and f
 | `type` | Drawn as | Its value in `params` | Checked against |
 | --- | --- | --- | --- |
 | `select` | A select of its `options` (at least one, each `{ value, label }`) | The chosen option's `value`, a string | `options` |
-| `number` | A stepper | A number | `min` and `max` |
+| `number` | A stepper | A whole number (a count) | `min` and `max`, whole numbers too |
 | `text` | A text field | A string | `pattern`, a regular expression the whole value must match |
 | `boolean` | A checkbox | `true` or `false` | |
 
@@ -1442,9 +1442,11 @@ person saves it once, and WA Stay keeps it encrypted on the computer. A `credent
   the rest with `VALIDATION`, issue `values.<key>`); reformatting, such as removing spaces or
   dashes inside a number, is yours. It runs within 15 s, at interactive priority. Answer
   `signed-in` to store the values, `signed-out` to refuse them ("{shortName} didn't accept these
-  details"), or `unknown` when you cannot tell; a rejection counts as `unknown`, and nothing is
-  stored. A local check (the format) needs no request at all. Never put a value in an error
-  message, a log line, or a request that does not need it.
+  details", or your own `message`, such as "That doesn't look like an RAC member number": plain
+  text, at most 200 characters, and ignored when it quotes what was typed), or `unknown` when you
+  cannot tell; a rejection counts as `unknown`, and nothing is stored. A local check (the
+  format) needs no request at all. Never put a value in an error message, a log line, or a
+  request that does not need it.
 - **Your own form of a value:** a `signed-in` answer may carry `values`
   (`CredentialsSignInResult`), and the core stores those instead of what was typed, so the saved
   value, the one `ctx.secrets` reads and the one "Copy" puts on the clipboard are yours: a
@@ -1459,12 +1461,17 @@ The core keeps each value as `account.<key>` in your scoped secret vault, so you
 it with `ctx.secrets.get('account.<key>')` (undefined when nothing is saved). Saving again
 replaces every value, all or nothing. Settings → Accounts shows "Add {label}", then "{label}
 saved" with Replace, Remove and Copy; Remove (`accounts.signOut`) deletes the values, clears no
-session and is never refused. No value is ever sent back to the window or written to a log.
+session and is never refused. A copyable saved value also gets "Copy {label}" beside "Book on
+{shortName}" and "Pay now". After each save and removal the core asks your availability again
+(nothing cached is kept) and re-arms your `daily_rollover` snipes, so prices and release times
+that depend on the value follow it. No value is ever sent back to the window or written to a
+log. Read only whether a value is saved where you can (RAC's `membership.ts` gives its modules
+a boolean), so no other module ever has it.
 
 | `kind` | How the person signs in | Status |
 | --- | --- | --- |
 | `browser-session` | On the provider's own pages, in an app window on your partition, as above. | Implemented. ParkStay uses it ([sign-in](parkstay/authentication.md)). |
-| `credentials` | The app asks for `fields`, with `confirmations` ticked, and calls `signIn(values, http)`; the values are kept in `ctx.secrets` as `account.<key>`. | Implemented ([saved details](#saved-details-credentials)). No built-in provider uses it yet. |
+| `credentials` | The app asks for `fields`, with `confirmations` ticked, and calls `signIn(values, http)`; the values are kept in `ctx.secrets` as `account.<key>`. | Implemented ([saved details](#saved-details-credentials)). RAC uses it for the person's member number. |
 | `automation` | `signIn(browser)` signs in through browser automation. | Declared and validated; the account service does not implement it yet. |
 
 ## 8. Other optional modules

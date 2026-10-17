@@ -191,7 +191,7 @@ npm run build:e2e            # no Mapbox token: Explore is list-only, determinis
 xvfb-run -a npm run test:e2e # or just npm run test:e2e with a display
 ```
 
-Playwright's `_electron` launcher drives the **built** app through 26 journeys in 15 specs
+Playwright's `_electron` launcher drives the **built** app through 27 journeys in 16 specs
 (`tests/e2e/*.spec.ts`): launch, navigation, Explore and its dates, resizing the window, a place
 to a watch, a place's campground map, creating a watch and a snipe, a held snipe paid from its notification,
 an alert snipe whose own alert opens "Book on ParkStay" (and a new snipe that alerts), bookings, the
