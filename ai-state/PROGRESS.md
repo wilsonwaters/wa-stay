@@ -11,8 +11,8 @@ Phase 3–4 (task specs, then execution). The stakeholder approved the 20-task p
 
 ## Currently in flight
 - **R18 (#65)**: implementation agent in `/home/user/lanes/r18`.
-- **R13 (#60)**: implementation agent in `/home/user/lanes/r13` (at `348d6d2`).
-- **R14 (#61)** done on `lane/r14` (`e3bc75c`, `04716dd`, `a548063`; 5158 tests, e2e 24; one anonymous GET of the WA Department of Education's term dates). Review running (instants verified independently).
+- **R13 (#60)** done on `lane/r13` (`d6f8040`, `762df18`, `3a30472`; 5135 tests, e2e 25, axe 0 violations); merging the integration branch (R11, R17) before review.
+- **R14 (#61)**: review APPROVE (139/140 hand-computed instants; the miss was the reviewer's) with fixes requested (Cable Beach dry season → RQ6 default; the snipe's own window; unannounced periods' first night; `describe()`); the implementer is fixing.
 - Next: R16 (after R11, R13, R14, R15), R18 (after R12, R17), R19, R20.
 
 ## Completed
