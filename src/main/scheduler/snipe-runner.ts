@@ -64,6 +64,11 @@ interface SnipeRun {
   releaseGate?: () => void;
   /** The step in flight (release-time refresh, queue, attempt). */
   inFlight?: Promise<void>;
+  /**
+   * What the provider times the release by changed while a step was in flight
+   * (`rearmProvider`): the run is re-armed once its attempt settles, instead of polling on.
+   */
+  rearmPending?: boolean;
 }
 
 /** Wraps a release so it runs once, however often it is called. */
@@ -147,8 +152,9 @@ export class SnipeRunner {
    * for it: an RAC member number moves the member pre-sale), its snipes whose release the
    * provider works out (`daily_rollover`) ask for it again: each one armed (a refresh in flight
    * is aborted) or sniping between two checks starts a new run, whose prepare asks the
-   * provider for the instant again. One with a check in flight is left alone (it may be
-   * placing a hold); an active snipe with no run is armed. Other providers' snipes are
+   * provider for the instant again. One with a check in flight is not interrupted (it may be
+   * placing a hold): it is re-armed once that check settles, unless the check ended it
+   * (`rearmPending`). An active snipe with no run is armed. Other providers' snipes are
    * untouched.
    */
   rearmProvider(providerId: string): void {
@@ -162,6 +168,7 @@ export class SnipeRunner {
       }
       if (snipe.releaseMode !== SnipeReleaseMode.DAILY_ROLLOVER) continue;
       if (snipe.status === SnipeStatus.ARMED || !run.inFlight) this.arm(snipe.id);
+      else run.rearmPending = true;
     }
   }
 
@@ -444,6 +451,12 @@ export class SnipeRunner {
     if (!this.isCurrent(id, run)) return;
 
     if (outcome.next === 'done') return this.finish(id, run);
+    if (run.rearmPending) {
+      // The provider's timing changed during the check: ask for the release again
+      log.info(`Snipe ${id}: re-armed after its check (gen ${run.gen})`);
+      this.arm(id);
+      return;
+    }
     if (outcome.next === 'access-gate' && plan.gate) {
       const snipe = this.live(id);
       if (!snipe) return this.finish(id, run);

@@ -20,7 +20,7 @@ import { LocationRepository, ProviderStateRepository } from '@main/database/repo
 import { ProviderRegistry } from '@main/providers/registry';
 import { SnipeReleaseMode, SnipeStatus } from '@shared/types/common.types';
 import type { StayQuery } from '@shared/types/provider.types';
-import { createCoreHarness, type CoreHarness } from '@tests/utils/core-harness';
+import { createCoreHarness, fakeDateOnly, type CoreHarness } from '@tests/utils/core-harness';
 import {
   createFakeProvider,
   createMemoryLogger,
@@ -190,5 +190,37 @@ describe("re-arming one provider's snipes (JobScheduler.rearmSnipes)", () => {
     for (const snipe of [rolling, scheduled, elsewhere]) {
       expect(h.scheduler.snipeRunner.isScheduled(snipe.id)).toBe(true);
     }
+  });
+
+  it('a snipe sniping with a check in flight is not interrupted: it re-arms once the check settles (R16 review)', async () => {
+    // Its release (180 days before arrival, 00:00 UTC) came a minute ago: it is sniping
+    await h.close();
+    fakeDateOnly(new Date('2026-12-03T00:01:00.000Z'));
+    const slow = createFakeProvider({ delays: { availability: 300 } });
+    h = createCoreHarness({ providers: [slow] });
+    slow.setAvailability('1', { u1: 'booked' });
+    const snipe = await h.snipes.create(
+      h.userId,
+      h.snipeInput({
+        stay: { arrival: '2027-06-01', departure: '2027-06-03', adults: 2 },
+        releaseMode: SnipeReleaseMode.DAILY_ROLLOVER,
+        windowDurationMs: 30 * 60_000,
+      })
+    );
+    const checks = () =>
+      slow.calls.filter((call) => call.module === 'availability' && call.method === 'check');
+    h.scheduler.start();
+    await until(() => checks().length === 1);
+    expect(h.snipeRepo.findById(snipe.id)?.status).toBe(SnipeStatus.SNIPING);
+
+    // The member number changes while that check is in flight
+    const before = computes(slow);
+    h.scheduler.rearmSnipes('fake');
+    expect(computes(slow)).toBe(before);
+    // Re-armed once the check was recorded: it ran to its end (an aborted one records nothing)
+    await until(() => computes(slow) === before + 1);
+    expect(h.snipeRepo.findById(snipe.id)?.attemptsCount).toBeGreaterThanOrEqual(1);
+    expect(h.scheduler.snipeRunner.isScheduled(snipe.id)).toBe(true);
+    jest.useRealTimers();
   });
 });
