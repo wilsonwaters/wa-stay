@@ -247,7 +247,7 @@ export interface StayFieldDescriptor {
   type: 'select' | 'number' | 'text' | 'boolean';
   /** For `select`. */
   options?: { value: string; label: string }[];
-  /** For `number`. */
+  /** For `number`, a whole number (a count): its value, `min`, `max` and `default` are whole. */
   min?: number;
   max?: number;
   /** For `text`: a regular expression the whole value must match, e.g. `^\d{4}$`. */
@@ -430,7 +430,12 @@ export interface LocationAvailability {
   /** ISO timestamp. */
   checkedAt: string;
   units: UnitAvailability[];
-  release?: { opensAt?: string; open: boolean };
+  /**
+   * Whether the stay's nights are released yet: `open`, and when not, `opensAt` (ISO) when the
+   * provider can time it, or `refused` (§12.35): why its release policy can't, in its own words
+   * ("…opens its dry-season dates on set days. Choose a time you set, or set a watch.").
+   */
+  release?: { opensAt?: string; open: boolean; refused?: string };
   /**
    * A stay-specific deep link (§12.17). Prefer it over `LocationDetail.bookingUrl`. A booking
    * link, by the rule on `UnitAvailability.bookingUrl`: https on the provider's own site, a
@@ -599,6 +604,15 @@ export const StayFieldDescriptorSchema = z
     }
     if (field.default !== undefined && typeof field.default !== DEFAULT_TYPE[field.type]) {
       ctx.addIssue({ code: 'custom', path: ['default'], message: `Not a ${field.type} value` });
+    }
+    // A number field is a count: what bounds or starts it is a whole number too
+    if (field.type === 'number') {
+      for (const key of ['min', 'max', 'default'] as const) {
+        const value = field[key];
+        if (typeof value === 'number' && !Number.isInteger(value)) {
+          ctx.addIssue({ code: 'custom', path: [key], message: 'Not a whole number' });
+        }
+      }
     }
   });
 assertTypeEquals<z.input<typeof StayFieldDescriptorSchema>, StayFieldDescriptor>(true);

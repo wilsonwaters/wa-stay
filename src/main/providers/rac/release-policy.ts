@@ -31,10 +31,12 @@
  * - a night after `CALENDAR_COVERS_UNTIL`, at such a park;
  * - every window has passed.
  *
- * `isMember()` is asked at every daily-rollover compute and never kept, so a member number saved
- * or removed shows at the snipe's next arm; when it fails, the person counts as no member (a
- * warning names no value). There is no `cancellation` mode: watches cover cancellations, every
- * 15 minutes at most.
+ * `isMember()` (`membership.ts`: whether a member number is saved) is asked at every
+ * daily-rollover compute and never kept, so a member number saved or removed shows at the
+ * snipe's next arm (the container re-arms RAC's snipes when it changes); when it fails, the
+ * person counts as no member (a warning names no value). `forStay` gives an availability check
+ * the same answer, so its tariffs and its release agree. There is no `cancellation` mode:
+ * watches cover cancellations, every 15 minutes at most.
  */
 
 import { SnipeReleaseMode } from '@shared/types/common.types';
@@ -142,8 +144,8 @@ interface StayInstants {
 export interface RacReleasePolicyDeps {
   providerId: ProviderId;
   /**
-   * Whether the person has saved an RAC member number. Asked at every compute, never kept.
-   * The factory answers false until the member number can be saved.
+   * Whether the person has saved an RAC member number (the factory passes `hasMemberNumber`,
+   * `membership.ts`). Asked at every compute, never kept.
    */
   isMember: () => Promise<boolean>;
   /** For the warning when `isMember` fails. */
@@ -152,8 +154,15 @@ export interface RacReleasePolicyDeps {
 
 /** What an availability check needs to know about a stay's release, for this person. */
 export interface StayRelease {
+  /**
+   * Whether the person has saved a member number, as asked for this check (one `isMember()`):
+   * the same answer times the release and decides which tariffs count (`mapping.ts`).
+   */
+  member: boolean;
   /** When the stay opens (`daily_rollover`), unless the policy would refuse it. */
   opensAt?: Date;
+  /** Why the policy would refuse to time the stay (its refusal's message), when it would. */
+  refused?: string;
   /** Whether the night is held back for a school-holiday release still to come, for the unit. */
   heldBack(night: CalendarDate, unit: { unitId?: string; unitKind?: UnitKind }): boolean;
 }
@@ -223,14 +232,18 @@ export class RacReleasePolicy implements ReleasePolicy {
     const member = await this.isMember();
     throwIfAborted(signal);
     let opensAt: Date | undefined;
+    let refused: string | undefined;
     try {
       opensAt = this.openingFor(this.instants(park, stay, member, unitIds, []), now);
     } catch (error) {
       if (!(error instanceof ProviderError)) throw error;
+      refused = error.message;
     }
     const holidays = park.schoolHolidays;
     return {
+      member,
       ...(opensAt ? { opensAt } : {}),
+      ...(refused ? { refused } : {}),
       heldBack(night, unit) {
         const release = holidays && holidayRelease(night, holidays);
         if (!release) return false;

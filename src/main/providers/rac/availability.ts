@@ -15,7 +15,11 @@
  * - **Booking links.** A unit's `bookingUrl` is the `online_booking_url` RAC sent when it is a
  *   booking page of the park (`racBookingPage`: https on RAC's site, under `/<slug>/booking/`,
  *   no cart key), else `links.booking` for the stay and the unit. The location's is the
- *   book-now page for the stay. Never a cart address.
+ *   book-now page for the stay, with `membership_type` for this person. Never a cart address.
+ * - **Members** (terms rule 14). One `isMember()` per check (`release.forStay`, through
+ *   `membership.ts`) decides both which tariffs count (a members' tariff only with a member
+ *   number saved, `mapping.ts`) and when held-back nights open, so prices, free nights and the
+ *   release always agree. The number itself is never read here, and never sent.
  * - **Releases** (`release-policy.ts`). A night that is not open yet is `not-released`: one RAC
  *   refuses as beyond its 364-day window (site code 9, or tariff code 5), or one RAC does not
  *   report free in a school-holiday period whose release is still to come for this person (the
@@ -23,7 +27,9 @@
  *   one). A night RAC reports free stays free: its engine decides (terms rule 16). The result's
  *   `release` is `{ open: false, opensAt }` when a night is not open yet, with `opensAt` the
  *   policy's `daily_rollover` instant for the stay (left out when the policy would refuse it),
- *   else `{ open: true }`; none when no unit is in the answer.
+ *   else `{ open: true }`; none when no unit is in the answer. A stay that is not open and that
+ *   the policy would refuse to time carries the refusal's words as `refused` (Cable Beach's dry
+ *   season, holidays RAC has not announced), for Site Sniper's release preview.
  * - **Refusals.** A park the seed does not have, a stay that is not two calendar dates in order,
  *   or pets outside 0–2 reject with a `ProviderError` and nothing is sent. An answer that is no
  *   answer (`readAvailability`) is a `ProviderParseError`. A block, a 5xx or a network failure
@@ -42,9 +48,9 @@ import { eachNight, isCalendarDate } from '@shared/utils/calendar-date';
 import { makeLocationKey } from '@shared/utils/location-key';
 import type { ProviderContext } from '../sdk/context';
 import { ProviderError, ProviderParseError, throwIfAborted } from '../sdk/errors';
-import type { AvailabilityCheckOptions, AvailabilityModule, ProviderLinks } from '../sdk/provider';
+import type { AvailabilityCheckOptions, AvailabilityModule } from '../sdk/provider';
 import type { RacClient } from './client';
-import { racBookingPage } from './links';
+import { racBookingPage, type RacLinks } from './links';
 import {
   categoryAvailability,
   petsOf,
@@ -69,7 +75,7 @@ export type CategoryKindOf = (
 export interface RacAvailabilityDeps {
   ctx: Pick<ProviderContext, 'id' | 'manifest' | 'clock'>;
   client: RacClient;
-  links: ProviderLinks;
+  links: RacLinks;
   kindOf: CategoryKindOf;
   /** When the stay opens, and which nights a school-holiday release still holds back. */
   release: Pick<RacReleasePolicy, 'forStay'>;
@@ -199,7 +205,12 @@ export function createRacAvailability({
     return reading.categories;
   }
 
-  function toUnit(park: RacPark, stay: StayQuery, category: RawCategory): UnitAvailability {
+  function toUnit(
+    park: RacPark,
+    stay: StayQuery,
+    category: RawCategory,
+    member: boolean
+  ): UnitAvailability {
     const unitId = categoryUnitId(category);
     const unitKind = kindOf(park, {
       catId: String(category.category_id),
@@ -216,14 +227,15 @@ export function createRacAvailability({
       unitName: category.category_name,
       ...(unitType ? { unitType } : {}),
       unitKind,
-      ...categoryAvailability(category, eachNight(stay.arrival, stay.departure)),
+      ...categoryAvailability(category, eachNight(stay.arrival, stay.departure), { member }),
       ...(bookingUrl ? { bookingUrl } : {}),
     };
   }
 
   /**
    * The categories as units, nights held back marked (`withHeldBackNights`), and the stay's
-   * release for this person (one `isMember()`): what `check` and bulk both read.
+   * release for this person (one `isMember()`, which also decides which tariffs count): what
+   * `check` and bulk both read.
    */
   async function unitsAndRelease(
     park: RacPark,
@@ -240,7 +252,9 @@ export function createRacAvailability({
     const wanted = unitIds?.length ? new Set(unitIds) : undefined;
     const units = answered
       .filter((category) => !wanted || wanted.has(categoryUnitId(category)))
-      .map((category) => withHeldBackNights(toUnit(park, stay, category), stayRelease));
+      .map((category) =>
+        withHeldBackNights(toUnit(park, stay, category, stayRelease.member), stayRelease)
+      );
     return { units, stayRelease };
   }
 
@@ -263,8 +277,8 @@ export function createRacAvailability({
         signal,
       });
       const open = !units.some((unit) => unit.nights.some((n) => n.state === 'not-released'));
-      const { opensAt } = stayRelease;
-      const bookingUrl = links.booking(park.slug, stay);
+      const { opensAt, refused } = stayRelease;
+      const bookingUrl = links.bookNow(park.slug, stay, stayRelease.member);
       return {
         key: makeLocationKey(ctx.id, park.slug),
         checkedAt: ctx.clock().toISOString(),
@@ -275,7 +289,11 @@ export function createRacAvailability({
           : {
               release: open
                 ? { open: true }
-                : { open: false, ...(opensAt ? { opensAt: opensAt.toISOString() } : {}) },
+                : {
+                    open: false,
+                    ...(opensAt ? { opensAt: opensAt.toISOString() } : {}),
+                    ...(refused ? { refused } : {}),
+                  },
             }),
         ...(bookingUrl ? { bookingUrl } : {}),
       };

@@ -156,6 +156,41 @@ export function keyAccount(overrides: Partial<ProviderAccount> = {}): ProviderAc
 
 export const KEY_SAVED = keyAccount({ status: 'signed-in', savedFields: ['memberNumber'] });
 
+/**
+ * RAC's member number as main describes it (R16; `tests/unit/providers/rac/auth.test.ts` pins
+ * it to `createRacAuth`). Tests use made-up numbers only.
+ */
+export const RAC_MEMBER_NUMBER_FIELD = {
+  key: 'memberNumber',
+  label: 'RAC member number',
+  help: "On your RAC card or in myRAC. Kept encrypted on this computer and never sent. You type it at RAC's checkout.",
+  secret: true,
+  copyable: true,
+};
+
+export const RAC_CONFIRMATIONS = [
+  { key: 'ownNumber', label: 'This is my own RAC member number' },
+  { key: 'willStay', label: 'I will stay at the park myself' },
+  { key: 'nameOnCard', label: 'I will book in the name on my RAC card' },
+];
+
+/** RAC's account (`credentials`, optional): no member number saved unless overridden. */
+export function racAccount(overrides: Partial<ProviderAccount> = {}): ProviderAccount {
+  return {
+    providerId: 'rac',
+    requirement: 'optional',
+    authKind: 'credentials',
+    status: 'signed-out',
+    fields: [RAC_MEMBER_NUMBER_FIELD],
+    confirmations: RAC_CONFIRMATIONS,
+    savedFields: [],
+    ...overrides,
+  };
+}
+
+/** RAC with a member number saved. */
+export const RAC_SAVED = racAccount({ status: 'signed-in', savedFields: ['memberNumber'] });
+
 /** Noon on Sat 3 Oct 2026 in the computer's time zone, so it reads "Sat 3 Oct 2026" anywhere. */
 export const LAST_SIGN_IN = new Date(2026, 9, 3, 12).toISOString();
 

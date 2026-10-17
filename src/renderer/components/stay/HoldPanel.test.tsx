@@ -1,8 +1,9 @@
-import { act, render, screen, waitFor, within } from '@testing-library/react';
+import { act, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { FAKE_MANIFEST, PARKSTAY_MANIFEST } from '@tests/utils/renderer/manifests';
-import { politeAnnouncement } from '@tests/utils/renderer/renderWithProviders';
-import { AnnouncerProvider } from '../ui';
+import { politeAnnouncement, renderWithProviders } from '@tests/utils/renderer/renderWithProviders';
+import { AppProviders } from '../../app/AppProviders';
+import { ToastViewport } from '../ui';
 import { HoldPanel, type HoldPanelProps } from './HoldPanel';
 
 /** A provider that can let a hold go (`holdRelease`, with its holds on, R18). */
@@ -19,25 +20,30 @@ function renderPanel(
   const onPay = jest.fn();
   const user = userEvent.setup(userOptions);
   const panelOf = (more: Partial<HoldPanelProps>) => (
-    <AnnouncerProvider>
-      <HoldPanel
-        unit="CAMPSITE 02"
-        expiresAt={new Date(Date.now() + 23 * 60_000)}
-        manifest={PARKSTAY_MANIFEST}
-        label="Hold at Bungarra"
-        onPay={onPay}
-        paying={false}
-        {...props}
-        {...more}
-      />
-    </AnnouncerProvider>
+    <HoldPanel
+      unit="CAMPSITE 02"
+      expiresAt={new Date(Date.now() + 23 * 60_000)}
+      manifest={PARKSTAY_MANIFEST}
+      label="Hold at Bungarra"
+      onPay={onPay}
+      paying={false}
+      {...props}
+      {...more}
+    />
   );
-  const { rerender } = render(panelOf({}));
+  // The app's providers (React Query, toasts, the announcer): "Copy …" sits beside Pay now
+  const { rerender, queryClient } = renderWithProviders(panelOf({}));
   return {
     onPay,
     user,
     panel: () => screen.getByRole('region', { name: 'Hold at Bungarra' }),
-    rerender: (more: Partial<HoldPanelProps>) => rerender(panelOf(more)),
+    rerender: (more: Partial<HoldPanelProps>) =>
+      rerender(
+        <AppProviders queryClient={queryClient}>
+          {panelOf(more)}
+          <ToastViewport />
+        </AppProviders>
+      ),
   };
 }
 

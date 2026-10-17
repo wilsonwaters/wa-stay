@@ -15,6 +15,10 @@
  * line (debug included), any request the provider's HTTP client sees, or the database in
  * plain text (while the values are stored, and after they are removed). The clipboard
  * (Electron's `clipboard`, mocked) receives the normalised member number exactly once, on copy.
+ *
+ * RAC's own member number sign-in (R16) goes through the same channels: typed with hyphens, it
+ * is stored and copied as its digits, and is in no answer, event, log line, request or plain
+ * row either (its sign-in sends no request at all).
  */
 
 import { Writable } from 'stream';
@@ -24,6 +28,7 @@ import { openDatabase } from '@main/database/connection';
 import { SqliteKeyValueStore } from '@main/database/repositories';
 import { registerIpcHandlers } from '@main/ipc';
 import { parkstayFactory } from '@main/providers/parkstay';
+import { racFactory } from '@main/providers/rac';
 import { createProviderContext } from '@main/providers/sdk';
 import { logger } from '@main/utils/logger';
 import type { APIResponse } from '@shared/types';
@@ -243,6 +248,72 @@ describe('credentials values never leak', () => {
       expect(JSON.stringify(http.requests)).not.toContain(sentinel);
       expect(savedDatabase).not.toContain(sentinel);
       expect(removedDatabase).not.toContain(sentinel);
+    }
+  });
+
+  it("RAC's member number: stored and copied as its digits, sent nowhere, in no answer, event, log line or plain row", async () => {
+    const racHttp = new RecordingHttpClient({ providerId: 'rac' });
+    container.providers.register(racFactory, (manifest) =>
+      createProviderContext(manifest, {
+        createHttp: () => racHttp,
+        createState: (id) => new SqliteKeyValueStore(container.repositories.providerState, id),
+        vault: container.vault,
+        logger,
+        providersDir: TEST_PROVIDERS_DIR,
+        unpaced: true,
+      })
+    );
+    const typed = '1234-5678-90123';
+    const responses: Array<APIResponse<unknown>> = [];
+    const record = async (pending: Promise<APIResponse<unknown>>) => {
+      const response = await pending;
+      responses.push(response);
+      return response;
+    };
+    const statements = ['ownNumber', 'willStay', 'nameOnCard'];
+
+    await expect(
+      record(
+        call('accounts:save-credentials', {
+          providerId: 'rac',
+          values: { memberNumber: `${typed}x` },
+          confirmed: statements,
+        })
+      )
+    ).resolves.toMatchObject({ success: false, code: 'VALIDATION' });
+    await expect(
+      record(
+        call('accounts:save-credentials', {
+          providerId: 'rac',
+          values: { memberNumber: typed },
+          confirmed: statements,
+        })
+      )
+    ).resolves.toMatchObject({ success: true, data: { savedFields: ['memberNumber'] } });
+    await record(call('accounts:list'));
+    await record(call('accounts:status', { providerId: 'rac' }));
+    await expect(
+      record(call('accounts:copy-credential', { providerId: 'rac', key: 'memberNumber' }))
+    ).resolves.toEqual({ success: true });
+    const savedDatabase = plainDatabase();
+    expect(savedDatabase).toContain('secret:account.memberNumber');
+    await record(call('accounts:sign-out', { providerId: 'rac' }));
+
+    // Copied once, as RAC's checkout takes it: the digits, as text
+    expect(clipboard.writeText.mock.calls).toEqual([[NUMBER]]);
+    expect(racHttp.requests).toEqual([]);
+    const updates = renderer.sent.filter(
+      ([name, payload]) =>
+        name === 'account:updated' && (payload as ProviderAccount).providerId === 'rac'
+    );
+    expect(updates.length).toBeGreaterThanOrEqual(2);
+    const logs = logLines.join('\n');
+    for (const sentinel of [NUMBER, typed]) {
+      expect(JSON.stringify(responses)).not.toContain(sentinel);
+      expect(JSON.stringify(updates)).not.toContain(sentinel);
+      expect(logs).not.toContain(sentinel);
+      expect(savedDatabase).not.toContain(sentinel);
+      expect(plainDatabase()).not.toContain(sentinel);
     }
   });
 });

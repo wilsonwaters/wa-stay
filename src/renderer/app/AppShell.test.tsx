@@ -162,6 +162,25 @@ describe('App shell', () => {
     });
   });
 
+  describe('saved details', () => {
+    it("drops a provider's availability on screen when its saved details change (R16)", async () => {
+      const { mock, queryClient } = renderWithApp();
+      await screen.findByRole('heading', { level: 1, name: 'Explore places to stay' });
+      const stay = { arrival: '2026-11-06', departure: '2026-11-08', adults: 2 };
+      queryClient.setQueryData(['catalog', 'check', 'rac:busselton', stay], { seeded: true });
+      act(() =>
+        mock!.emit('account:updated', {
+          providerId: 'rac',
+          requirement: 'optional',
+          authKind: 'credentials',
+          status: 'signed-in',
+          savedFields: ['memberNumber'],
+        })
+      );
+      expect(queryClient.getQueryData(['catalog', 'check', 'rac:busselton', stay])).toBeUndefined();
+    });
+  });
+
   describe('account menu', () => {
     it('opens with Enter; Settings goes to /settings', async () => {
       const { user } = renderWithApp({ route: '/watches' });

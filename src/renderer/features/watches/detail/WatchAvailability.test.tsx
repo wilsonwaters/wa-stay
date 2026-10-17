@@ -1,4 +1,5 @@
-import { render, screen, within } from '@testing-library/react';
+import { screen, within } from '@testing-library/react';
+import { renderWithProviders } from '@tests/utils/renderer/renderWithProviders';
 import { WatchResult } from '../../../../shared/types/common.types';
 import { eachNight } from '../../../../shared/utils/calendar-date';
 import { PARKSTAY_MANIFEST } from '@tests/utils/renderer/manifests';
@@ -23,7 +24,7 @@ function renderFor(arrival: string, departure: string, units = 2, overrides = {}
     ),
     ...overrides,
   });
-  render(<WatchAvailability watch={watch} manifest={PARKSTAY_MANIFEST} now={NOW} />);
+  renderWithProviders(<WatchAvailability watch={watch} manifest={PARKSTAY_MANIFEST} now={NOW} />);
   return nights;
 }
 
@@ -83,14 +84,14 @@ describe('WatchAvailability (NightGrid)', () => {
   });
 
   it('says when the watch has not been checked, or its units were not in the check', () => {
-    const { unmount } = render(
+    const { unmount } = renderWithProviders(
       <WatchAvailability watch={makeWatch()} manifest={PARKSTAY_MANIFEST} now={NOW} />
     );
     expect(
       screen.getByText('No check yet. Use Check now to see availability.')
     ).toBeInTheDocument();
     unmount();
-    render(
+    renderWithProviders(
       <WatchAvailability
         watch={makeWatch({ unitIds: ['99'], lastAvailability: [], lastCheckedAt: NOW })}
         manifest={PARKSTAY_MANIFEST}
@@ -120,7 +121,9 @@ describe('WatchAvailability (NightGrid)', () => {
         ...overrides,
       });
     const show = (watch: ReturnType<typeof makeWatch>, now = NOW) =>
-      render(<WatchAvailability watch={watch} manifest={PARKSTAY_MANIFEST} now={now} />);
+      renderWithProviders(
+        <WatchAvailability watch={watch} manifest={PARKSTAY_MANIFEST} now={now} />
+      );
     const bookLink = () =>
       screen.queryByRole('link', { name: 'Book on ParkStay (opens in your browser)' });
 

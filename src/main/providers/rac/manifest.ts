@@ -5,8 +5,9 @@
  *
  * The parks are on Explore with their categories (the catalogue) and their free units for the
  * dates Explore is given, each park's availability for a stay is checked per category, watches
- * run on it, and Site Sniper alerts when a stay's dates open (snipes without holds). The member
- * number comes later; until then every other capability is off. RAC's terms (`index.ts`) set
+ * run on it, and Site Sniper alerts when a stay's dates open (snipes without holds). The account
+ * is optional: the person's own RAC member number, saved in the app, brings members' rates and
+ * the member pre-sale's times. Every other capability is off. RAC's terms (`index.ts`) set
  * the limits: one request at a time, 10 s apart in the background, watches every 15 minutes at
  * most, a snipe's checks 10 s apart for at most 30 minutes after the release, and at most two
  * pets.
@@ -56,7 +57,9 @@ export const racManifest: ProviderManifest = {
     // Never: the app does not cancel or change an RAC booking (terms rule 10).
     bookingImport: false,
     accessGate: false,
-    account: 'none',
+    // The person's own member number, saved in Settings → Accounts (`auth.ts`): optional, and
+    // nothing waits on it (members' rates and pre-sale times with it, public ones without)
+    account: 'optional',
   },
   limits: {
     // Terms rule 3: no faster than ParkStay's watches.

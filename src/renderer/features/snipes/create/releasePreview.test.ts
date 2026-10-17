@@ -20,6 +20,22 @@ describe('releasePreview', () => {
     expect(RELEASE_UNKNOWN).toBe('Release time unknown. Site Sniper will keep checking.');
   });
 
+  it("says the provider's own reason when it can't time the stay (R16), instead of unknown", () => {
+    const refused =
+      'RAC Cable Beach Holiday Park opens its dry-season dates on set days. Choose a time you set, or set a watch.';
+    expect(releasePreview({ ...base, release: { open: false, refused } })).toBe(refused);
+    expect(releasePreview({ ...base, release: { open: false, refused: '  ' } })).toBe(
+      RELEASE_UNKNOWN
+    );
+    // Anything but text is not a reason
+    const odd = { open: false, refused: 42 } as unknown as { open: boolean; refused?: string };
+    expect(releasePreview({ ...base, release: odd })).toBe(RELEASE_UNKNOWN);
+    // Open nights are open, whatever the policy says about timing them
+    expect(releasePreview({ ...base, release: { open: true, refused } })).toBe(
+      'Sites for Sat 10 Apr 2027 are already open for booking.'
+    );
+  });
+
   it('says the nights are open already', () => {
     expect(releasePreview({ ...base, arrival: '2026-11-07', release: { open: true } })).toBe(
       'Sites for Sat 7 Nov are already open for booking.'

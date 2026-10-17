@@ -50,8 +50,9 @@
  *   most 256 characters) and every confirmation ticked (`VALIDATION`, with `values.<key>` or
  *   `confirmed`), then asks the provider's `signIn` (15 s, at interactive priority). Only a
  *   `signed-in` answer stores the values, each as `account.<key>` in the provider's scoped
- *   secret vault (`registry.secretsOf`), all or nothing. Saving again replaces them; saves and
- *   removals for a provider run one after another.
+ *   secret vault (`registry.secretsOf`), all or nothing. A `signed-out` one is `VALIDATION`, in
+ *   the provider's own words (`message`) when they repeat no part of a value. Saving again
+ *   replaces them; saves and removals for a provider run one after another.
  * - The status is worked out from what is stored: signed in when every field has a readable
  *   value. `isSignedIn` is never called and no request is made; `refreshStale` skips them.
  * - `signOut(id)` deletes the values and stores `signed-out`: no session to clear, never
@@ -81,11 +82,12 @@ import type { ProviderRegistry } from '../../providers/registry';
 import type { ProviderLogger } from '../../providers/sdk/context';
 import { ProviderAuthRequiredError, ProviderCapabilityError } from '../../providers/sdk/errors';
 import { withRequestPriority } from '../../providers/sdk/pacing';
-import type {
-  AccommodationProvider,
-  BrowserSessionAuth,
-  CredentialsAuth,
-  CredentialsSignInResult,
+import {
+  CREDENTIALS_MESSAGE_MAX_LENGTH,
+  type AccommodationProvider,
+  type BrowserSessionAuth,
+  type CredentialsAuth,
+  type CredentialsSignInResult,
 } from '../../providers/sdk/provider';
 import { matchesOrigin, matchesUrlPattern } from '../../providers/sdk/url-patterns';
 import { AppError } from '../../utils/app-error';
@@ -371,7 +373,13 @@ export class ProviderAccountService implements AccountGate {
       throw new AppError('INTERNAL', `Couldn't read your saved ${field.label}. Add it again.`);
     }
     if (!value) throw new AppError('NOT_FOUND', `No ${field.label} is saved`);
-    this.clipboard.writeText(value);
+    try {
+      this.clipboard.writeText(value);
+    } catch (error) {
+      // The clipboard's own error is not passed on: only its name is logged
+      this.log.warn(`Account ${providerId}: ${key} could not be copied (${errorName(error)})`);
+      throw new AppError('INTERNAL', `Couldn't copy your ${field.label}. Try again.`);
+    }
     this.log.info(`Account ${providerId}: ${key} copied to the clipboard`);
   }
 
@@ -521,7 +529,10 @@ export class ProviderAccountService implements AccountGate {
     const providerId = manifest.id;
     const answer = await this.askProvider(provider, auth, values);
     if (answer.state === 'signed-out') {
-      throw new AppError('VALIDATION', `${manifest.shortName} didn't accept these details`, {
+      const refusal =
+        refusalMessage(answer.message, [values, answer.values]) ??
+        `${manifest.shortName} didn't accept these details`;
+      throw new AppError('VALIDATION', refusal, {
         issues: auth.fields.map((field) => `values.${field.key}`),
       });
     }
@@ -1021,6 +1032,58 @@ function checkCredentials(
 
   if (issues.length) throw new AppError('VALIDATION', message, { issues });
   return checked;
+}
+
+/** How many characters in a row of a value a refusal may not repeat (`refusalMessage`). */
+const QUOTED_RUN = 4;
+
+/** Text as compared for quoting: NFKC, lower case, letters and digits only. */
+function comparable(text: string): string {
+  return text
+    .normalize('NFKC')
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}]/gu, '');
+}
+
+/**
+ * Whether `message` repeats any of `value`: any run of `QUOTED_RUN` characters of it (the whole
+ * value when it is shorter), compared as letters and digits only (`comparable`), with and
+ * without its leading zeros. So "ending 0123", "12345678…" and "1.234.567.890.123" all quote
+ * `1234567890123`, and "12345678" quotes `012345678`.
+ */
+function quotesValue(message: string, value: string): boolean {
+  const haystack = comparable(message);
+  const plain = comparable(value);
+  for (const form of new Set([plain, plain.replace(/^0+/, '')])) {
+    if (!form) continue;
+    if (form.length < QUOTED_RUN) {
+      if (haystack.includes(form)) return true;
+      continue;
+    }
+    for (let at = 0; at + QUOTED_RUN <= form.length; at++) {
+      if (haystack.includes(form.slice(at, at + QUOTED_RUN))) return true;
+    }
+  }
+  return false;
+}
+
+/**
+ * A refusal's own words (`CredentialsSignInResult.message`), or undefined when they cannot be
+ * shown: not text, empty, over `CREDENTIALS_MESSAGE_MAX_LENGTH` characters once trimmed, or
+ * repeating any part of a value it was given, typed or returned (`quotesValue`), so a
+ * provider's refusal never puts what was typed on screen, whole or in part.
+ */
+function refusalMessage(
+  message: unknown,
+  values: ReadonlyArray<Readonly<Record<string, unknown>> | undefined>
+): string | undefined {
+  if (typeof message !== 'string') return undefined;
+  const text = message.trim();
+  if (!text || [...text].length > CREDENTIALS_MESSAGE_MAX_LENGTH) return undefined;
+  const given = values.flatMap((set) =>
+    Object.values(set ?? {}).filter((value): value is string => typeof value === 'string')
+  );
+  return given.some((value) => quotesValue(text, value)) ? undefined : text;
 }
 
 /**

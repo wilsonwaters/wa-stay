@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { CreditCard, Timer } from 'lucide-react';
 import type { ProviderManifest } from '../../../shared/types/provider.types';
 import { useHasPassed } from '../../hooks/useNow';
+import { CopyCredentialButton } from '../accounts/CopyCredentialButton';
 import { Countdown } from '../Countdown';
 import { timeInZone } from '../timeFormat';
 import { Button, ConfirmDialog, useAnnounce } from '../ui';
@@ -48,9 +49,11 @@ export interface HoldPanelProps {
 /**
  * A held unit and the time left to pay for it, the same for a watch's automatic hold and a
  * snipe's: "CAMPSITE 02 is held for you · Held until 10:42 am · 23:10 left", with "Pay now"
- * opening the provider's payment window on the session that holds it, and (for a provider that
- * can let a hold go) "Let it go". Once the hold ends the buttons go and its heading says so,
- * with why when it was let go (`endedMessage`). A hold without an expiry shows no timer.
+ * opening the provider's payment window on the session that holds it, "Copy {label}" beside it
+ * when the person saved a detail the provider's checkout asks for (an RAC member number), and
+ * (for a provider that can let a hold go) "Let it go". Once the hold ends the buttons go and its
+ * heading says so, with why when it was let go (`endedMessage`). A hold without an expiry shows
+ * no timer.
  *
  * Focus: "Let it go" asks in a ConfirmDialog (Cancel first); cancelling returns to "Let it go",
  * and once the hold has ended (let go, or run out while asking) focus goes to the heading.
@@ -187,6 +190,7 @@ export function HoldPanel({
           >
             Pay now
           </Button>
+          <CopyCredentialButton providerId={manifest?.id} />
         </div>
       </div>
       {page && (

@@ -149,7 +149,7 @@ export const RAC_MANIFEST: ProviderManifest = {
     holds: false,
     bookingImport: false,
     accessGate: false,
-    account: 'none',
+    account: 'optional',
   },
   limits: {
     minWatchIntervalMinutes: 15,

@@ -357,9 +357,10 @@ export interface CredentialsAuth extends AuthBase {
   /**
    * Checks the values (trimmed, every declared field, none empty) before they are stored,
    * within 15 s: `signed-in` stores them, `signed-out` refuses them ("{shortName} didn't accept
-   * these details"), and `unknown` or a rejection stores nothing ("Couldn't check these
-   * details"). A `signed-in` answer may carry `values` to store instead, in the provider's own
-   * form (see `CredentialsSignInResult`). Never put a value in an error message or a log line.
+   * these details", or the answer's own `message`), and `unknown` or a rejection stores nothing
+   * ("Couldn't check these details"). A `signed-in` answer may carry `values` to store instead,
+   * in the provider's own form (see `CredentialsSignInResult`). Never put a value in an error
+   * message, a refusal's `message` or a log line.
    */
   signIn(
     values: Readonly<Record<string, string>>,
@@ -378,7 +379,18 @@ export interface CredentialsAuth extends AuthBase {
  */
 export interface CredentialsSignInResult extends AccountStatus {
   values?: Readonly<Record<string, string>>;
+  /**
+   * With `signed-out` only: why, in the provider's own words, said on the field instead of
+   * "{shortName} didn't accept these details" ("That doesn't look like an RAC member number").
+   * Plain text, at most `CREDENTIALS_MESSAGE_MAX_LENGTH` characters, quoting nothing the person
+   * typed: the core ignores one that is not text, is empty or longer, or contains a value it
+   * was given, and says its own words instead.
+   */
+  message?: string;
 }
+
+/** The most characters a `credentials` refusal's `message` may have. */
+export const CREDENTIALS_MESSAGE_MAX_LENGTH = 200;
 
 /** Sign-in that browser automation performs (§12.30). Declared and validated only. */
 export interface AutomationAuth extends AuthBase {

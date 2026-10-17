@@ -49,6 +49,13 @@ describe('stayFieldProblem (shared by main and the renderer)', () => {
     expect(stayFieldProblem(vehicles, Number.NaN)).toBe('Vehicles must be a number');
   });
 
+  it('takes whole numbers only: a number field is a count (pets: 1.5 is refused here)', () => {
+    expect(stayFieldProblem(vehicles, 1.5)).toBe('Vehicles must be a whole number');
+    expect(stayFieldProblem(vehicles, 0.1)).toBe('Vehicles must be a whole number');
+    expect(stayFieldProblem(vehicles, 2.0)).toBeUndefined();
+    expect(stayFieldProblem(vehicles, Number.POSITIVE_INFINITY)).toBe('Vehicles must be a number');
+  });
+
   it('matches the whole text against the pattern', () => {
     expect(stayFieldProblem(postcode, '6000')).toBeUndefined();
     expect(stayFieldProblem(postcode, '60001')).toBe('Postcode is not in the expected format');

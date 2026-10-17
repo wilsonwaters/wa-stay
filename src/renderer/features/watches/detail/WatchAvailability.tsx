@@ -1,6 +1,7 @@
 import { WatchResult } from '../../../../shared/types/common.types';
 import type { ProviderManifest } from '../../../../shared/types/provider.types';
 import type { Watch } from '../../../../shared/types/watch.types';
+import { CopyCredentialButton } from '../../../components/accounts/CopyCredentialButton';
 import { ExternalLink } from '../../../components/ExternalLink';
 import { NightGrid } from '../../../components/NightGrid';
 import { stayRangeLabel } from '../../../components/nightGridModel';
@@ -19,7 +20,9 @@ export interface WatchAvailabilityProps {
  * What the watch's last check saw, night by night (E2's NightGrid: nights only, honest about
  * nights not released or not reported), with when it was checked. When the check found a
  * stay and it has not begun, "Book on {shortName}" opens the provider's booking page for it
- * in the browser, right after the result line (with a partial match's dates).
+ * in the browser, right after the result line (with a partial match's dates), with "Copy
+ * {label}" beside it when the person saved a detail its checkout asks for (an RAC member
+ * number).
  */
 export function WatchAvailability({ watch, manifest, now }: WatchAvailabilityProps) {
   const noun = watchNoun(watch, manifest);
@@ -47,6 +50,7 @@ export function WatchAvailability({ watch, manifest, now }: WatchAvailabilityPro
       <ExternalLink href={link.url} variant="primary">
         Book on {manifest?.shortName ?? "the provider's website"}
       </ExternalLink>
+      <CopyCredentialButton providerId={manifest?.id} />
       {partialStay && (
         <span className="text-sm text-fg-secondary">
           For {stayRangeLabel(link.arrival, link.departure)}

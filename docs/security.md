@@ -40,6 +40,14 @@ Account details are write-only over IPC too (`src/main/core/accounts/provider-ac
 - `tests/integration/credentials-leak.test.ts` checks every `accounts` response, every
   `account:updated` payload, every log line, every request the provider's HTTP client makes and
   the database for a made-up value; only the clipboard gets it, once.
+- **RAC's member number** is one of these. Its format is checked on the computer and it is
+  never sent to RAC or anywhere else: the person types or pastes it at RAC's own checkout, and
+  WA Stay never fills that field. RAC's modules learn only whether one is saved (a yes or no,
+  from `providers/rac/membership.ts`, the one file that reads it). A number that can't be read
+  (the data was copied to another computer) counts as none. "Copy RAC member number" sits
+  beside "Book on RAC" and "Pay now" too; main writes the clipboard there as well.
+  `tests/integration/rac-member-number.test.ts` checks that a made-up number is in no RAC
+  request, log line, IPC answer, alert or email.
 
 Provider sign-in (ParkStay) stores no secret of the app's: the person signs in on the
 provider's own page in an app window, and the session cookies stay in the provider's

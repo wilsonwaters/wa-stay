@@ -233,7 +233,7 @@ npm run test:electron -- http-transport
 
 ## Electron smoke tests (E2E)
 
-`tests/e2e/` holds the Electron smoke suite: 26 journeys in 15 specs through the **built** app
+`tests/e2e/` holds the Electron smoke suite: 27 journeys in 16 specs through the **built** app
 (main, preload and renderer together), driven by Playwright's `_electron` launcher. It
 catches what Jest cannot: startup crashes, preload or sandbox breakage, CSP violations,
 broken routing and focus, and a quit that hangs.
@@ -303,8 +303,9 @@ The `launchWaStay()` fixture starts the app with:
   other built-in providers are not registered, so the journeys' counts and pre-selections
   (ParkStay's 11 places, ParkStay chosen for you) hold however many providers are built in. A
   journey that counts or expects a pre-selection passes its list explicitly
-  (`rac-catalogue.spec.ts`, `rac-watch.spec.ts` and `rac-explore.spec.ts` pass
-  `['parkstay', 'rac']`: RAC's eight parks beside ParkStay's 11 campgrounds). An id that is not a built-in provider stops the app at start-up, with the reason
+  (`rac-catalogue.spec.ts`, `rac-watch.spec.ts`, `rac-explore.spec.ts` and
+  `rac-member-number.spec.ts` pass `['parkstay', 'rac']`: RAC's eight parks beside ParkStay's 11
+  campgrounds). An id that is not a built-in provider stops the app at start-up, with the reason
   in the main process's output.
 - **A production renderer**: `NODE_ENV=production`, no `ELECTRON_RENDERER_URL`, no Mapbox
   token, `TZ=Australia/Perth`, `LANG=en_AU.UTF-8`.
@@ -359,7 +360,10 @@ availability answer (its night keys, the dates in `online_booking_url`, and its 
 and each ParkStay campground availability view (its nights and release date, from its own
 `arrival`) to a stay arriving 7 days after today in Perth (`arrivalInDays` for another); the
 launch passes `env: { WA_STAY_E2E_FIXTURES_DIR: fixtures.dir }`. `rac-watch.spec.ts`,
-`rac-explore.spec.ts` (tomorrow, `arrivalInDays: 1`) and `alert-snipe.spec.ts` use it.
+`rac-explore.spec.ts` (tomorrow, `arrivalInDays: 1`), `rac-member-number.spec.ts` and
+`alert-snipe.spec.ts` use it. `rac-member-number.spec.ts` also reads the clipboard from the
+main process (`app.evaluate(({ clipboard }) => clipboard.readText())`) for a made-up member
+number, and attaches a screenshot of each step.
 
 ### Adding a journey
 

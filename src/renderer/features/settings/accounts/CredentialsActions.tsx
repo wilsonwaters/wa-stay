@@ -1,20 +1,17 @@
 import { useRef, useState } from 'react';
-import { Copy, KeyRound, Trash2 } from 'lucide-react';
-import { useCopyCredential, useSaveCredentials, useSignOut } from '../../../api';
-import type {
-  AccountFieldDescriptor,
-  ProviderAccount,
-  ProviderManifest,
-} from '../../../../shared/types/provider.types';
-import { Button, ConfirmDialog, useAnnounce, useToast } from '../../../components/ui';
+import { KeyRound, Trash2 } from 'lucide-react';
+import { useSaveCredentials, useSignOut } from '../../../api';
+import type { ProviderAccount, ProviderManifest } from '../../../../shared/types/provider.types';
+import { CopyCredentialButton } from '../../../components/accounts/CopyCredentialButton';
+import { Button, ConfirmDialog, useAnnounce } from '../../../components/ui';
 import { mergeRefs } from '../../../components/ui/refs';
 import {
   CREDENTIALS_TEXT,
   addCredentialsLabel,
-  copyCredentialLabel,
   credentialsRemovedAnnouncement,
   credentialsSaved,
   credentialsSavedAnnouncement,
+  removeCredentialsMessage,
   removeCredentialsTitle,
 } from './accountText';
 import { CredentialsDialog } from './CredentialsDialog';
@@ -31,10 +28,11 @@ export interface CredentialsActionsProps {
 
 /**
  * A `credentials` row's buttons (Settings → Accounts): "Add {label}" while nothing is saved;
- * then "Replace", "Remove" and "Copy {label}" for each copyable saved field. Add and Replace
- * open the details form; Remove asks first, then calls `accounts.signOut`; Copy asks main to
- * put the value on the clipboard (the renderer never has it). Each outcome is announced
- * politely, and focus comes back to the row's first button.
+ * then "Replace", "Remove" and "Copy {label}" for each copyable saved field
+ * (`CopyCredentialButton`, the same button as beside a booking link). Add and Replace open the
+ * details form; Remove asks first, then calls `accounts.signOut`; Copy asks main to put the
+ * value on the clipboard (the renderer never has it). Each outcome is announced politely;
+ * after a save or a removal, focus comes back to the row's first button.
  */
 export function CredentialsActions({
   manifest,
@@ -44,16 +42,11 @@ export function CredentialsActions({
 }: CredentialsActionsProps) {
   const saveCredentials = useSaveCredentials();
   const signOut = useSignOut();
-  const copy = useCopyCredential();
   const announce = useAnnounce();
-  const toast = useToast();
   const [editing, setEditing] = useState(false);
   const [removing, setRemoving] = useState(false);
   const firstButton = useRef<HTMLButtonElement | HTMLAnchorElement | null>(null);
   const saved = credentialsSaved(account);
-  const copyable = (account.fields ?? []).filter(
-    (field) => field.copyable && account.savedFields?.includes(field.key)
-  );
 
   // Once the row shows its new buttons (Add becomes Replace, and back)
   const focusFirstButton = () => requestAnimationFrame(() => firstButton.current?.focus());
@@ -70,17 +63,6 @@ export function CredentialsActions({
     setRemoving(false);
     announce(credentialsRemovedAnnouncement(result));
     focusFirstButton();
-  };
-
-  const copyField = async (field: AccountFieldDescriptor) => {
-    try {
-      await copy.mutateAsync({ providerId: manifest.id, key: field.key });
-      announce(CREDENTIALS_TEXT.copied);
-    } catch (error) {
-      toast.error(
-        error instanceof Error && error.message ? error.message : CREDENTIALS_TEXT.copyFailed
-      );
-    }
   };
 
   const firstRef = mergeRefs(focusRef, firstButton);
@@ -106,18 +88,7 @@ export function CredentialsActions({
             >
               {CREDENTIALS_TEXT.remove}
             </Button>
-            {copyable.map((field) => (
-              <Button
-                key={field.key}
-                variant="secondary"
-                aria-describedby={statusId}
-                loading={copy.isPending && copy.variables?.key === field.key}
-                leadingIcon={<Copy size={18} aria-hidden="true" />}
-                onClick={() => void copyField(field)}
-              >
-                {copyCredentialLabel(field)}
-              </Button>
-            ))}
+            <CopyCredentialButton providerId={manifest.id} aria-describedby={statusId} />
           </>
         ) : (
           <Button
@@ -144,7 +115,7 @@ export function CredentialsActions({
       <ConfirmDialog
         open={removing}
         title={removeCredentialsTitle(account)}
-        message={CREDENTIALS_TEXT.removeMessage}
+        message={removeCredentialsMessage(account)}
         confirmLabel={CREDENTIALS_TEXT.remove}
         onConfirm={confirmRemove}
         onCancel={() => setRemoving(false)}
