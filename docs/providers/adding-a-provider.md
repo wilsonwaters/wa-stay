@@ -403,8 +403,11 @@ Site Sniper shows them as choices, and the core asks your `release.computeReleas
 … })` for the instant. A mode with `usesAccessGate` needs `capabilities.accessGate`.
 `maxWindowMinutes` caps how long a snipe keeps checking after the release: the core clamps
 the snipe's window to it, so a provider whose terms ask for gentle use can bound it (a snipe
-also never polls faster than `release.pollFloorMs`). ParkStay's modes are `daily_rollover`,
-`scheduled` and `cancellation`, with no cap.
+also never polls faster than `release.pollFloorMs`). It bounds timed releases only, a mode
+whose `computeReleaseAt` gives an instant: a `cancellation` mode has no release instant and no
+window, so it polls (at `pollFloorMs.continuous` at the fastest) until it ends some other way.
+ParkStay's modes are `daily_rollover`, `scheduled` and `cancellation`, with no cap. RAC's are
+`daily_rollover` and `scheduled`, each capped at 30 minutes, with a 10 s `pollFloorMs.window`.
 
 Without `holds`, every snipe of the provider is an alert: when the dates are free it ends
 **Alert sent** with a desktop alert and email that link to your booking page (the unit's
@@ -1465,14 +1468,24 @@ interface AccessGate {
 When dates become bookable, for Site Sniper (`release`). ParkStay: `release-policy.ts`.
 
 - `supports(mode)` must accept every `releaseModes` id (the registry checks it).
-- `computeReleaseAt({ mode, externalId, stay, params, requestedAt, unitIds, unitKinds, now,
-  signal })` returns the instant the stay opens, or `null` for "poll continuously" (a
-  cancellation mode). `unitIds` and `unitKinds` are the snipe's unit choice (none: any unit),
-  for a policy that times a category differently.
+- `computeReleaseAt({ mode, externalId, stay, params, requestedAt, unitIds, unitKinds,
+  windowMs, now, signal })` returns the instant the stay opens, or `null` for "poll
+  continuously" (a cancellation mode). `unitIds` and `unitKinds` are the snipe's unit choice
+  (none: any unit), for a policy that times a category differently. `windowMs` is how long the
+  snipe keeps trying after the release (its window, clamped to `maxWindowMinutes`; none for an
+  availability check), for a policy that refuses a release that has passed. A stay it cannot
+  time (RAC: school holidays not announced yet, dates past its release calendar, Cable Beach's
+  dry season, dates already open) is a `ProviderError`
+  whose message the person sees: the core refuses the snipe with `VALIDATION` on `releaseAt`.
+  The core asks a `daily_rollover` snipe's instant again each time it arms one (start, resume,
+  a daily re-arm), keeping the stored one when it is refused then, so read whatever can change
+  (a saved member number, a calendar) at every call rather than keeping it.
 - `describe(externalId)` returns a sentence for the location's page, such as "Bookings open
   180 days ahead at 2:00 am AWST".
 - `pollFloorMs: { window, continuous }` are the fastest the core may poll inside a release
   window and continuously. Pick them for the provider's capacity, not yours.
+- `availability.check` can say when a stay not released yet opens: `release: { open: false,
+  opensAt }`, with `opensAt` from the same policy (Site Sniper's release step shows it).
 
 ### Bookings
 

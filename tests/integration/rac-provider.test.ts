@@ -34,8 +34,8 @@ import { LocationCatalogService } from '@main/core/catalog/location-catalog.serv
 import { openDatabase } from '@main/database/connection';
 import { LocationRepository, ProviderStateRepository } from '@main/database/repositories';
 import { RAC_PARKS, racFactory, racManifest } from '@main/providers/rac';
+import { racPark, type RacPark } from '@main/providers/rac/parks';
 import { RAC_AVAILABILITY_PATH } from '@main/providers/rac/availability';
-import { RAC_RELEASE_INFO, RAC_ROLLING_RELEASE_INFO } from '@main/providers/rac/catalog';
 import { RAC_BLOCK_STATE_KEY, RacClient } from '@main/providers/rac/client';
 import { FixtureHttpClient } from '@main/testing/fixture-http-client';
 import type {
@@ -57,6 +57,7 @@ import {
   type HopAnswer,
 } from '@tests/utils/fake-paced-provider';
 import { describeProviderContract } from '@tests/utils/provider-contract';
+import { fakeDateOnly } from '@tests/utils/core-harness';
 
 /** Holds `rac/manifest.json`, which lists the recorded pages by request path. */
 const FIXTURES_DIR = path.join(__dirname, '../fixtures/providers');
@@ -67,6 +68,10 @@ const RAC = 'https://parksandresorts.rac.com.au';
 /** The day after the pages were recorded, 10 am in Perth. */
 const NOW = new Date('2026-10-17T02:00:00.000Z');
 const STAY: StayQuery = { arrival: '2026-11-06', departure: '2026-11-08', adults: 2 };
+/** A park's release info: its release policy's `describe()`, with the park's own hour. */
+const releaseInfo = (hour: number) =>
+  'New dates open daily at midnight AWST, 364 days ahead. School holidays open on ' +
+  `RAC's release days at ${hour} am AWST, 48 hours earlier for members.`;
 const placeholder = (n: number) =>
   `https://driveau.newbook.cloud/crop_800_450/instances_00000000000000000000000000000000_${n}.jpg`;
 
@@ -109,11 +114,24 @@ const page = (name: string) => fs.readFileSync(path.join(RAC_FIXTURES, name), 'u
 
 afterAll(() => fs.rmSync(UNEXPECTED_LOG, { force: true }));
 
-describeProviderContract('rac', () => ({
-  provider: racFactory(fixtureContext()),
-  sample: { externalId: 'busselton', stay: STAY },
-  unknownExternalId: 'ningaloo',
-}));
+/**
+ * The contract suite asks for each release mode's instant at the time it runs. RAC refuses a
+ * `daily_rollover` stay that is already open (a watch suits it), so the suite runs at NOW, on a
+ * stay whose release is still ahead then: the window edge, whose last night (18 Oct 2027) opens
+ * at midnight on 19 Oct 2026, Perth time.
+ */
+const UNRELEASED_STAY: StayQuery = { arrival: '2027-10-13', departure: '2027-10-19', adults: 2 };
+
+describe('at NOW', () => {
+  beforeAll(() => fakeDateOnly(NOW));
+  afterAll(() => jest.useRealTimers());
+
+  describeProviderContract('rac', () => ({
+    provider: racFactory(fixtureContext()),
+    sample: { externalId: 'busselton', stay: UNRELEASED_STAY },
+    unknownExternalId: 'ningaloo',
+  }));
+});
 
 describe('RAC Parks & Resorts', () => {
   // Registered in a fresh registry, as the app registers it.
@@ -250,7 +268,7 @@ describe('RAC Parks & Resorts', () => {
       expect(detail.units[0].amenities).not.toContain('Pets allowed (up to 2)');
       // The gallery's photos, fetched live, the placeholders here
       expect(detail.imageUrls).toEqual(Array.from({ length: 12 }, (_, i) => placeholder(i + 1)));
-      expect(detail.releaseInfo).toBe(RAC_RELEASE_INFO);
+      expect(detail.releaseInfo).toBe(releaseInfo(8));
       expect(detail.fetchedAt).toBe(NOW.toISOString());
     });
 
@@ -292,19 +310,19 @@ describe('RAC Parks & Resorts', () => {
       ]);
     });
 
-    it.each<[string, number, number, string[]]>([
-      ['exmouth', 3, 17, ['campsite', 'cabin', 'room']],
-      ['karri-valley', 7, 12, ['campsite', 'cabin', 'room']],
-      ['monkey-mia', 2, 16, ['campsite', 'cabin', 'room', 'dorm']],
+    it.each<[string, number, number, string[], number]>([
+      ['exmouth', 3, 17, ['campsite', 'cabin', 'room'], 9],
+      ['karri-valley', 7, 12, ['campsite', 'cabin', 'room'], 8],
+      ['monkey-mia', 2, 16, ['campsite', 'cabin', 'room', 'dorm'], 8],
     ])(
       'gives the native park %s its categories from one availability POST for a near stay (blog %d, %d units)',
-      async (slug, blogId, count, kinds) => {
+      async (slug, blogId, count, kinds, hour) => {
         const { ctx, sent } = sendingContext();
         const detail = await racFactory(ctx).catalog!.getLocation(slug);
         expect(detail).toMatchObject({
           key: `rac:${slug}`,
           imageUrls: [],
-          releaseInfo: RAC_RELEASE_INFO,
+          releaseInfo: releaseInfo(hour),
           infoUrl: `${RAC}/${slug}/`,
         });
         expect(detail.units).toHaveLength(count);
@@ -394,13 +412,22 @@ describe('RAC Parks & Resorts', () => {
       );
     });
 
-    it('says Cable Beach opens its seasonal dates on set days, not on school-holiday days', async () => {
+    it('says Cable Beach opens its dry-season dates on set days, not on school-holiday days', async () => {
       const { ctx } = recordingContext(page('book-now-busselton.html'));
       const detail = await racFactory(ctx).catalog!.getLocation('cable-beach');
-      expect(detail.releaseInfo).toBe(RAC_ROLLING_RELEASE_INFO);
-      expect(RAC_ROLLING_RELEASE_INFO).toBe(
-        'Bookings open 364 days ahead, at midnight Perth time. Seasonal dates open on set days.'
+      expect(detail.releaseInfo).toBe(
+        'New dates open daily at midnight AWST, 364 days ahead. Dry-season dates, 15 May to ' +
+          '15 October, open on set days: choose a time you set.'
       );
+    });
+
+    it("gives Esperance and Margaret River their 7 am release hour, from the release policy's describe()", async () => {
+      const { ctx } = recordingContext(page('book-now-margaret-river.html'));
+      const provider = racFactory(ctx);
+      expect((await provider.catalog!.getLocation('margaret-river')).releaseInfo).toBe(
+        releaseInfo(7)
+      );
+      expect(await provider.release!.describe('margaret-river')).toBe(releaseInfo(7));
     });
 
     it.each<[string, string, string[]]>([
@@ -567,11 +594,15 @@ describe('RAC bulk availability', () => {
     return park ? { body: page(ANSWER_FILES[park.slug]) } : { status: 404, body: '' };
   };
   /** The provider on an unpaced recording client, with a log to read. */
-  function recordingBulk(respond: (hop: HopRequest) => HopAnswer = byPark, delayMs = 0) {
+  function recordingBulk(
+    respond: (hop: HopRequest) => HopAnswer = byPark,
+    delayMs = 0,
+    clock: Date = NOW
+  ) {
     const http = new RecordingHttpClient({ providerId: 'rac', respond, delayMs });
     const logger = createMemoryLogger();
     const provider = racFactory(
-      createTestProviderContext(racManifest, { http, logger, clock: () => NOW })
+      createTestProviderContext(racManifest, { http, logger, clock: () => clock })
     );
     const search = (stay: StayQuery, signal?: AbortSignal) =>
       provider.availability!.search!(stay, signal);
@@ -658,9 +689,11 @@ describe('RAC bulk availability', () => {
     });
 
     /** One park's answer, `body`, for `stay` (the other parks fail). */
-    async function entryFor(slug: string, body: string, stay: StayQuery) {
-      const { search } = recordingBulk((hop) =>
-        parkOf(hop.body)?.slug === slug ? { body } : { status: 503, body: '' }
+    async function entryFor(slug: string, body: string, stay: StayQuery, clock: Date = NOW) {
+      const { search } = recordingBulk(
+        (hop) => (parkOf(hop.body)?.slug === slug ? { body } : { status: 503, body: '' }),
+        0,
+        clock
       );
       const entries = await search(stay);
       expect(entries).toHaveLength(1);
@@ -796,42 +829,121 @@ describe('RAC bulk availability', () => {
       expect(ANSWERS.length).toBeGreaterThanOrEqual(16);
     });
 
-    it.each(ANSWERS.map((answer) => [answer.file, answer] as const))(
-      'bulk agrees with check: %s',
-      async (file, { park, stay, categories }) => {
-        const body = page(file);
-        const entry = await entryFor(park.slug, body, stay);
-        const { provider } = recordingBulk(() => ({ body }));
-        const { units } = await provider.availability!.check(park.slug, stay);
-        const whole = new Map(
-          categories.map((c) => [`cat:${c.category_id}`, c.stay_through_sites_available])
-        );
-        // The units `check` marks free for the whole stay, by their whole-stay count
-        const free = (list: UnitAvailability[]) =>
-          list.filter((u) => u.fullyAvailable).reduce((sum, u) => sum + whole.get(u.unitId)!, 0);
-        // A category can be booked when one of its nights is neither closed nor not released
-        const counts = (list: UnitAvailability[]) =>
-          list.some((u) => u.nights.some((n) => n.state !== 'closed' && n.state !== 'not-released'))
-            ? { availableUnits: free(list) }
-            : { availableUnits: free(list), bookableUnits: 0 };
-
-        expect(entry).toStrictEqual({
-          key: `rac:${park.slug}`,
-          ...counts(units),
-          byKind: expect.any(Object),
+    /** Busselton's answer moved to two nights from `arrival`, its powered site taken or free. */
+    function moved(arrival: string, poweredFree: boolean): string {
+      const [first, second, departure] = [arrival, addDays(arrival, 1), addDays(arrival, 2)];
+      const json = JSON.parse(
+        page(ANSWER_FILES.busselton)
+          .replaceAll('2026-11-06', first)
+          .replaceAll('2026-11-07', second)
+          .replaceAll('2026-11-08', departure)
+      ) as { data: Record<string, Record<string, unknown>> };
+      if (!poweredFree) {
+        Object.assign(json.data['4'], {
+          sites_available: { [first]: 0, [second]: 0 },
+          sites_code: { [first]: 3, [second]: 3 },
+          stay_through_sites_available: 0,
+          stay_through_sites_code: 3,
         });
-        const kinds = UNIT_KINDS.filter(
-          (kind) => park.unitKinds.includes(kind) || units.some((u) => u.unitKind === kind)
-        );
-        expect(Object.keys(entry.byKind!)).toEqual(kinds);
-        for (const kind of kinds) {
-          expect([kind, entry.byKind![kind]]).toStrictEqual([
-            kind,
-            counts(units.filter((u) => u.unitKind === (kind as UnitKind))),
-          ]);
-        }
       }
-    );
+      return JSON.stringify(json);
+    }
+
+    /** 20 Jan 2027: 20–21 Dec 2027 are in the 364-day window, held back until 5 Feb 2027. */
+    const BEFORE_HOLIDAY_RELEASE = new Date('2027-01-20T02:00:00.000Z');
+    const HELD_BACK: Array<{
+      name: string;
+      park: RacPark;
+      stay: StayQuery;
+      body: string;
+      clock: Date;
+    }> = [
+      {
+        name: 'Busselton, 20–21 Dec 2027 before its release, all taken',
+        park: racPark('busselton')!,
+        stay: { arrival: '2027-12-20', departure: '2027-12-22', adults: 2 },
+        body: moved('2027-12-20', false),
+        clock: BEFORE_HOLIDAY_RELEASE,
+      },
+      {
+        name: 'Busselton, 20–21 Dec 2027 before its release, the powered site free',
+        park: racPark('busselton')!,
+        stay: { arrival: '2027-12-20', departure: '2027-12-22', adults: 2 },
+        body: moved('2027-12-20', true),
+        clock: BEFORE_HOLIDAY_RELEASE,
+      },
+      {
+        name: 'Cable Beach, 1–2 Aug 2027 (dry season), all taken',
+        park: racPark('cable-beach')!,
+        stay: { arrival: '2027-08-01', departure: '2027-08-03', adults: 2 },
+        body: moved('2027-08-01', false),
+        clock: NOW,
+      },
+    ];
+
+    it('reads a stay whose nights a holiday release holds back as "Not open", as check does', async () => {
+      const [taken] = HELD_BACK;
+      const entry = await entryFor(taken.park.slug, taken.body, taken.stay, taken.clock);
+      const none = { availableUnits: 0, bookableUnits: 0 };
+      expect(entry).toStrictEqual({
+        key: 'rac:busselton',
+        ...none,
+        byKind: { campsite: none, cabin: none },
+      });
+      const { provider } = recordingBulk(() => ({ body: taken.body }), 0, taken.clock);
+      const check = await provider.availability!.check('busselton', taken.stay);
+      expect(check.units.flatMap((unit) => unit.nights.map((night) => night.state))).toEqual(
+        Array(4).fill('not-released')
+      );
+    });
+
+    it.each(
+      [
+        ...ANSWERS.map(({ file, park, stay }) => ({
+          name: file,
+          park,
+          stay,
+          body: page(file),
+          clock: NOW,
+        })),
+        ...HELD_BACK,
+      ].map((answer) => [answer.name, answer] as const)
+    )('bulk agrees with check: %s', async (_, { park, stay, body, clock }) => {
+      const categories = Object.values((JSON.parse(body) as { data: object }).data) as Array<{
+        category_id: number;
+        stay_through_sites_available: number;
+      }>;
+      const entry = await entryFor(park.slug, body, stay, clock);
+      const { provider } = recordingBulk(() => ({ body }), 0, clock);
+      const { units } = await provider.availability!.check(park.slug, stay);
+      const whole = new Map(
+        categories.map((c) => [`cat:${c.category_id}`, c.stay_through_sites_available])
+      );
+      // The units `check` marks free for the whole stay, by their whole-stay count
+      const free = (list: UnitAvailability[]) =>
+        list.filter((u) => u.fullyAvailable).reduce((sum, u) => sum + whole.get(u.unitId)!, 0);
+      // A category can be booked when one of its nights is neither closed nor not released
+      const counts = (list: UnitAvailability[]) =>
+        list.some((u) => u.nights.some((n) => n.state !== 'closed' && n.state !== 'not-released'))
+          ? { availableUnits: free(list) }
+          : { availableUnits: free(list), bookableUnits: 0 };
+
+      expect(entry).toStrictEqual({
+        key: `rac:${park.slug}`,
+        ...counts(units),
+        byKind: expect.any(Object),
+      });
+      const kinds = UNIT_KINDS.filter(
+        (kind) => park.unitKinds.includes(kind) || units.some((u) => u.unitKind === kind)
+      );
+      expect(Object.keys(entry.byKind!)).toEqual(kinds);
+      for (const kind of kinds) {
+        expect([kind, entry.byKind![kind]]).toStrictEqual([
+          kind,
+          counts(units.filter((u) => u.unitKind === (kind as UnitKind))),
+        ]);
+      }
+    });
   });
 
   describe('failures', () => {

@@ -4,16 +4,26 @@
  * no other code in the app names it.
  *
  * The parks are on Explore with their categories (the catalogue) and their free units for the
- * dates Explore is given, each park's availability for a stay is checked per category, and
- * watches run on it. Release alerts and the member number come later; until then every other
- * capability is off. RAC's terms (`index.ts`) set the limits: one request at a time, 10 s apart
- * in the background, watches every 15 minutes at most, and at most two pets.
+ * dates Explore is given, each park's availability for a stay is checked per category, watches
+ * run on it, and Site Sniper alerts when a stay's dates open (snipes without holds). The member
+ * number comes later; until then every other capability is off. RAC's terms (`index.ts`) set
+ * the limits: one request at a time, 10 s apart in the background, watches every 15 minutes at
+ * most, a snipe's checks 10 s apart for at most 30 minutes after the release, and at most two
+ * pets.
  */
 
+import { SnipeReleaseMode } from '@shared/types/common.types';
 import type { ProviderManifest } from '@shared/types/provider.types';
 import { RAC_SITE_URL } from './client';
 
 export const RAC_PROVIDER_ID = 'rac';
+
+/**
+ * How long a snipe keeps checking after its release, in minutes: every release mode's
+ * `maxWindowMinutes`. The rolling window's exact opening moment is unmeasured (closed at 23:42,
+ * open at 00:01:40), so checking from midnight for 30 minutes covers it.
+ */
+export const RAC_SNIPE_WINDOW_MINUTES = 30;
 
 export const racManifest: ProviderManifest = {
   // Stored in every watch, snipe, booking and notification, so it never changes once shipped.
@@ -39,7 +49,9 @@ export const racManifest: ProviderManifest = {
     // Explore's free counts: one POST per park, free units only, no total (`bulk.ts`).
     bulkAvailability: true,
     watches: true,
-    snipes: false,
+    // Release alerts: a snipe checks when the dates open and alerts with RAC's booking page.
+    snipes: true,
+    // Never holds or carts (no live cart): every RAC snipe is an alert.
     holds: false,
     // Never: the app does not cancel or change an RAC booking (terms rule 10).
     bookingImport: false,
@@ -77,5 +89,28 @@ export const racManifest: ProviderManifest = {
     'children',
     'infants',
     'params.pets',
+  ],
+  // Both timed: a snipe checks every 10 s from the release for at most 30 minutes (terms rules
+  // 2 and 3; `release-policy.ts`). No cancellation mode: watches cover cancellations, every 15
+  // minutes at most.
+  releaseModes: [
+    {
+      id: SnipeReleaseMode.DAILY_ROLLOVER,
+      label: 'When these dates open',
+      description:
+        'New dates open each midnight, 364 days ahead, and school holidays on their own release ' +
+        'days. Site Sniper works out when yours open and checks then.',
+      usesAccessGate: false,
+      maxWindowMinutes: RAC_SNIPE_WINDOW_MINUTES,
+    },
+    {
+      id: SnipeReleaseMode.SCHEDULED,
+      label: 'At a time you set',
+      description:
+        "For dates released on a day you know, such as Cable Beach's dry-season dates. " +
+        'Site Sniper checks from the time you set.',
+      usesAccessGate: false,
+      maxWindowMinutes: RAC_SNIPE_WINDOW_MINUTES,
+    },
   ],
 };

@@ -16,6 +16,14 @@
  *   booking page of the park (`racBookingPage`: https on RAC's site, under `/<slug>/booking/`,
  *   no cart key), else `links.booking` for the stay and the unit. The location's is the
  *   book-now page for the stay. Never a cart address.
+ * - **Releases** (`release-policy.ts`). A night that is not open yet is `not-released`: one RAC
+ *   refuses as beyond its 364-day window (site code 9, or tariff code 5), or one RAC does not
+ *   report free in a school-holiday period whose release is still to come for this person (the
+ *   member pre-sale's instant for a category in it, with a member number; else the public
+ *   one). A night RAC reports free stays free: its engine decides (terms rule 16). The result's
+ *   `release` is `{ open: false, opensAt }` when a night is not open yet, with `opensAt` the
+ *   policy's `daily_rollover` instant for the stay (left out when the policy would refuse it),
+ *   else `{ open: true }`; none when no unit is in the answer.
  * - **Refusals.** A park the seed does not have, a stay that is not two calendar dates in order,
  *   or pets outside 0–2 reject with a `ProviderError` and nothing is sent. An answer that is no
  *   answer (`readAvailability`) is a `ProviderParseError`. A block, a 5xx or a network failure
@@ -25,6 +33,7 @@
 
 import type {
   LocationAvailability,
+  NightStatus,
   StayQuery,
   UnitAvailability,
   UnitKind,
@@ -44,6 +53,7 @@ import {
   type RawCategory,
 } from './mapping';
 import { racPark, type RacPark } from './parks';
+import type { RacReleasePolicy, StayRelease } from './release-policy';
 import { unitTypeOfKind } from './unit-kinds';
 
 /** RAC's availability endpoint, at the site's root (the park is the form's `blog_id`). */
@@ -61,6 +71,27 @@ export interface RacAvailabilityDeps {
   client: RacClient;
   links: ProviderLinks;
   kindOf: CategoryKindOf;
+  /** When the stay opens, and which nights a school-holiday release still holds back. */
+  release: Pick<RacReleasePolicy, 'forStay'>;
+}
+
+/**
+ * The unit with each night that is not free and is held back for a release still to come
+ * marked `not-released` (its closed days kept).
+ */
+function withHeldBackNights(unit: UnitAvailability, release: StayRelease): UnitAvailability {
+  if (!unit.nights.some((night) => night.state !== 'available')) return unit;
+  const nights = unit.nights.map((night): NightStatus => {
+    if (night.state === 'available' || night.state === 'not-released') return night;
+    if (!release.heldBack(night.date, unit)) return night;
+    return {
+      date: night.date,
+      state: 'not-released',
+      ...(night.noArrival ? { noArrival: true } : {}),
+      ...(night.noDeparture ? { noDeparture: true } : {}),
+    };
+  });
+  return { ...unit, nights };
 }
 
 /** The form RAC's page posts for `stay` at `park`, with `pets` as `animals`. */
@@ -113,8 +144,16 @@ export interface RacAvailability extends AvailabilityModule {
     signal?: AbortSignal,
     onSend?: () => void
   ): Promise<RawCategory[]>;
-  /** The categories as `check` gives them, one unit each, in their order (bulk counts them). */
-  unitsOf(park: RacPark, stay: StayQuery, categories: readonly RawCategory[]): UnitAvailability[];
+  /**
+   * The categories as `check` gives them, one unit each, in their order, with the nights a
+   * school-holiday release still holds back for this person marked `not-released`: the same
+   * function `check` uses, so Explore's counts (bulk) and the place page cannot disagree.
+   */
+  unitsOf(
+    park: RacPark,
+    stay: StayQuery,
+    categories: readonly RawCategory[]
+  ): Promise<UnitAvailability[]>;
 }
 
 export function createRacAvailability({
@@ -122,6 +161,7 @@ export function createRacAvailability({
   client,
   links,
   kindOf,
+  release,
 }: RacAvailabilityDeps): RacAvailability {
   const refuse = (message: string): ProviderError =>
     new ProviderError({ providerId: ctx.id, message: `${ctx.manifest.name}: ${message}` });
@@ -181,10 +221,33 @@ export function createRacAvailability({
     };
   }
 
+  /**
+   * The categories as units, nights held back marked (`withHeldBackNights`), and the stay's
+   * release for this person (one `isMember()`): what `check` and bulk both read.
+   */
+  async function unitsAndRelease(
+    park: RacPark,
+    stay: StayQuery,
+    answered: readonly RawCategory[],
+    options: { unitIds?: readonly string[]; signal?: AbortSignal } = {}
+  ): Promise<{ units: UnitAvailability[]; stayRelease: StayRelease }> {
+    const { unitIds, signal } = options;
+    const stayRelease = await release.forStay(park.slug, stay, {
+      unitIds,
+      now: ctx.clock(),
+      signal,
+    });
+    const wanted = unitIds?.length ? new Set(unitIds) : undefined;
+    const units = answered
+      .filter((category) => !wanted || wanted.has(categoryUnitId(category)))
+      .map((category) => withHeldBackNights(toUnit(park, stay, category), stayRelease));
+    return { units, stayRelease };
+  }
+
   return {
     categories,
 
-    unitsOf: (park, stay, answered) => answered.map((category) => toUnit(park, stay, category)),
+    unitsOf: async (park, stay, answered) => (await unitsAndRelease(park, stay, answered)).units,
 
     async check(
       externalId: string,
@@ -195,15 +258,25 @@ export function createRacAvailability({
       throwIfAborted(signal);
       const park = parkOf(externalId);
       const answered = await categories(park, stay, signal);
-      const wanted = unitIds?.length ? new Set(unitIds) : undefined;
-      const units = answered
-        .filter((category) => !wanted || wanted.has(categoryUnitId(category)))
-        .map((category) => toUnit(park, stay, category));
+      const { units, stayRelease } = await unitsAndRelease(park, stay, answered, {
+        unitIds,
+        signal,
+      });
+      const open = !units.some((unit) => unit.nights.some((n) => n.state === 'not-released'));
+      const { opensAt } = stayRelease;
       const bookingUrl = links.booking(park.slug, stay);
       return {
         key: makeLocationKey(ctx.id, park.slug),
         checkedAt: ctx.clock().toISOString(),
         units,
+        // With no unit, nothing says whether the stay is open
+        ...(units.length === 0
+          ? {}
+          : {
+              release: open
+                ? { open: true }
+                : { open: false, ...(opensAt ? { opensAt: opensAt.toISOString() } : {}) },
+            }),
         ...(bookingUrl ? { bookingUrl } : {}),
       };
     },

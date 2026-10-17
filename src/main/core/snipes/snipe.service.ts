@@ -451,9 +451,9 @@ export class SiteSniperService {
   }
 
   /**
-   * A daily-rollover snipe's release instant, asked of the provider again and stored when it
-   * changed (a v8-migrated row may still carry the old midnight instant). Keeps the stored
-   * one when the provider cannot answer.
+   * A daily-rollover snipe's release instant, asked of the provider again (with the snipe's
+   * units, stay types and clamped window) and stored when it changed (a v8-migrated row may
+   * still carry the old midnight instant). Keeps the stored one when the provider cannot answer.
    */
   async refreshReleaseAt(snipe: SiteSnipe, signal?: AbortSignal): Promise<Date | undefined> {
     if (snipe.releaseMode !== SnipeReleaseMode.DAILY_ROLLOVER) return snipe.releaseAt;
@@ -467,6 +467,7 @@ export class SiteSniperService {
         params: snipe.stayParams,
         unitIds: [...snipe.unitIds],
         unitKinds: [...snipe.unitKinds],
+        windowMs: clampWindow(provider, snipe.releaseMode, snipe.windowDurationMs),
         now: this.clock(),
         signal,
       });
@@ -951,8 +952,8 @@ export class SiteSniperService {
    * What create and update work out with the provider: the release mode is supported, the
    * dates are good where the provider is, the stay fields (with defaults), the release
    * instant (a scheduled one before check-in; the provider is told the snipe's units or stay
-   * types), whether the queue is used, the poll cadence (never below the floor) and the window
-   * (never above the mode's `maxWindowMinutes`).
+   * types and its window), whether the queue is used, the poll cadence (never below the floor)
+   * and the window (never above the mode's `maxWindowMinutes`).
    */
   private async prepare(
     provider: SnipeProvider,
@@ -980,6 +981,11 @@ export class SiteSniperService {
     }
     this.assertStay(manifest.timezone, input.stay);
     const stayParams: StayParams = resolveStayParams(manifest, ['snipe', 'hold'], input.stayParams);
+    const windowDurationMs = clampWindow(
+      provider,
+      input.releaseMode,
+      input.windowDurationMs ?? DEFAULT_SNIPE_WINDOW_MS
+    );
 
     let releaseAt: Date | undefined;
     try {
@@ -999,6 +1005,7 @@ export class SiteSniperService {
         requestedAt,
         unitIds: [...(input.unitIds ?? [])],
         unitKinds: [...(input.unitKinds ?? [])],
+        windowMs: windowDurationMs,
         now: this.clock(),
       });
       releaseAt = at ?? undefined;
@@ -1027,11 +1034,7 @@ export class SiteSniperService {
       releaseAt,
       accessGateEnabled: this.usesGate(provider, input.releaseMode, input.accessGateEnabled),
       pollIntervalMs: Math.max(input.pollIntervalMs ?? DEFAULT_SNIPE_POLL_INTERVAL_MS, floor),
-      windowDurationMs: clampWindow(
-        provider,
-        input.releaseMode,
-        input.windowDurationMs ?? DEFAULT_SNIPE_WINDOW_MS
-      ),
+      windowDurationMs,
     };
   }
 

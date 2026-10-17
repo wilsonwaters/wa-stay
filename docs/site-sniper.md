@@ -16,8 +16,9 @@ the release instant, and then does what the snipe is set to do:
 Site Sniper never pays for you. A snipe holds when its provider can place holds, and alerts
 otherwise; a provider that places no holds offers alerts only.
 
-ParkStay WA is the only provider with Site Sniper today. Its snipes hold by default (you can
-choose an alert instead), and its hold lasts **30 minutes**.
+Two providers have Site Sniper. ParkStay WA's snipes hold by default (you can choose an alert
+instead), and its hold lasts **30 minutes**. RAC Parks & Resorts' snipes alert: WA Stay places
+no holds on RAC.
 
 ## How ParkStay releases sites
 
@@ -33,6 +34,31 @@ Joining the DBCA queue early gives no advantage: for scheduled releases DBCA re-
 queue places at random at the release time. WA Stay joins genuinely at the start of its
 warm-up and keeps the session refreshed as ParkStay's own page does. It never fakes activity
 to get around the queue's inactivity rules.
+
+## How RAC releases dates
+
+RAC has two modes. Both are timed: an RAC snipe starts at the release, checks every 10 seconds
+at the fastest, for at most 30 minutes, and alerts you when the dates are free.
+
+| Mode             | In the app                | What happens                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| ---------------- | ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `daily_rollover` | **When these dates open** | RAC takes bookings 364 days ahead, and one more night opens at midnight Perth time each day, so your stay opens at midnight on the day its last night comes 364 days ahead. WA school holidays are held back and open on RAC's own release days, at each park's hour, Perth time: 7 am at Esperance and Margaret River, 8 am at Busselton, Karri Valley and Monkey Mia, 9 am at Cervantes and Exmouth. Site Sniper works out the later of the two for your stay. Cable Beach has no school-holiday release: outside its dry season only the 364-day window applies. |
+| `scheduled`      | **At a time you set**     | For dates RAC releases on a day it announces, such as Cable Beach's dry-season dates (15 May to 15 October), which open on RAC's own monthly release days. Site Sniper checks from the time you set.                                                                                                                                                                                                                                                                                                                                                                |
+
+- **Members' pre-sale.** RAC members can book school holidays 48 hours before everyone else, at
+  the same hour (except Margaret River's dorms). Site Sniper will time a snipe to the pre-sale
+  once you can save your RAC member number in WA Stay, which is coming; until then it uses the
+  public release.
+- **When Site Sniper can't time it**, it says so and the snipe isn't created: school holidays
+  RAC hasn't announced yet (from the last school day), dates beyond the release days WA Stay
+  knows, or Cable Beach's dry season, whose release days WA Stay doesn't know. Set a watch, or
+  choose **At a time you set** when you know the release. WA Stay learns new release days with
+  an app update, and a waiting snipe picks them up when it is next armed.
+- **Dates already open** can't be sniped: set a watch to hear about cancellations. A release
+  counts as passed once your snipe's own **Keep trying for** has run out after it (so 20
+  minutes after a release, a snipe that keeps trying for 15 is refused). A member whose
+  pre-sale has passed that way is timed to the public release instead. RAC has no "When
+  someone cancels" mode, as a watch covers it, every 15 minutes at most.
 
 ## Creating a snipe
 
@@ -58,12 +84,13 @@ and dates). The flow has five steps:
    page in WA Stay), where the provider places holds; ParkStay holds by default. For a provider
    without holds, or one whose holds are turning off (an experiment switched off, until WA Stay
    restarts), one line says the snipe alerts. **Advanced timing**: Start early (seconds, default
-   120), Check every (seconds, default 1.5; never under 0.5), Keep trying for (minutes, default
-   15; a provider may set a limit for a release mode, `maxWindowMinutes`: the field says it, "Up
-   to 30 minutes on {provider}", and refuses a longer window, and an older, longer one is cut to
-   it), Most attempts (no limit by default). When the provider cannot time the stay in the mode
-   chosen (dates already open, a release it has not announced), creating the snipe is refused,
-   and the mode's card and the Review say why instead of the preview.
+   120), Check every (seconds, default 1.5; never under 0.5, nor under the provider's own floor:
+   10 for RAC), Keep trying for (minutes, default 15; a provider may set a limit for a release
+   mode, `maxWindowMinutes`: the field says it, "Up to 30 minutes on {provider}", and refuses a
+   longer window, and an older, longer one is cut to it; 30 for RAC), Most attempts (no limit by
+   default). When the provider cannot time the stay in the mode chosen (dates already open, a
+   release it has not announced), creating the snipe is refused, and the mode's card and the
+   Review say why instead of the preview.
 5. **Review**: the summary, the queue use, what happens when the dates are free, a name and
    notes, and **Book responsibly**. For a snipe that holds, with an optional account (ParkStay)
    it suggests connecting before the release so checkout is quicker; for a provider whose holds
@@ -71,15 +98,15 @@ and dates). The flow has five steps:
 
 ## What a snipe does
 
-| Status                        | Meaning                                                                                                                                                       |
-| ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Armed                         | Scheduled; a timer is set for the release.                                                                                                                    |
-| Waiting for release           | Counting down to the release, less the early start.                                                                                                           |
-| Queueing                      | Joining or holding the provider's queue.                                                                                                                      |
-| Sniping                       | Checking availability every few seconds across the release.                                                                                                   |
-| Held                          | A site is held for you: pay before the countdown ends.                                                                                                        |
-| Alert sent                    | The dates were free and you were alerted with a link to book on the provider's site. Nothing is held. It can be started again.                                |
-| Booked                        | The payment was confirmed; the booking is under Bookings.                                                                                                     |
+| Status                        | Meaning                                                                                                                                                                                           |
+| ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Armed                         | Scheduled; a timer is set for the release.                                                                                                                                                        |
+| Waiting for release           | Counting down to the release, less the early start.                                                                                                                                               |
+| Queueing                      | Joining or holding the provider's queue.                                                                                                                                                          |
+| Sniping                       | Checking availability every few seconds across the release.                                                                                                                                       |
+| Held                          | A site is held for you: pay before the countdown ends.                                                                                                                                            |
+| Alert sent                    | The dates were free and you were alerted with a link to book on the provider's site. Nothing is held. It can be started again.                                                                    |
+| Booked                        | The payment was confirmed; the booking is under Bookings.                                                                                                                                         |
 | Failed, Expired, Hold expired | It ended: no site within the window or attempts, the arrival date passed, the hold ran out unpaid, or the provider turned the check away. A snipe you stop is disabled, and can be started again. |
 
 - Each snipe has its own timer chain (`src/main/scheduler/snipe-runner.ts`), re-armed after
@@ -160,6 +187,9 @@ not a fleet of bots.
   `src/main/scheduler/snipe-runner.ts`; payment: `src/main/core/holds/hold-payment.service.ts`.
 - ParkStay's release rules, holds and queue: `src/main/providers/parkstay/` (`release-policy.ts`,
   `holds.ts`, `queue/`), described in [ParkStay endpoints](providers/parkstay/endpoints.md).
+- RAC's release rules: `src/main/providers/rac/release-policy.ts`, and its school-holiday release
+  days in `release-calendar.ts`, whose header says how to update them when RAC announces a
+  release. The policy sends no request; `availability.check` uses it for `release.opensAt`.
 - A new provider gets Site Sniper by declaring `snipes`, release modes and a release policy
   ([Adding a provider](providers/adding-a-provider.md#release-policy)); its snipes alert. With
   `holds` too, they can hold. A snipe's `action` (`alert` or `hold`), its `alert` and the

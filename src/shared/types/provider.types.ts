@@ -103,7 +103,7 @@ export interface ProviderCapabilities {
   bulkAvailability: boolean;
   /** Usable in Watches. */
   watches: boolean;
-  /** Usable in Site Sniper (needs availability, holds and a release policy). */
+  /** Usable in Site Sniper (needs availability and a release policy; holds optional, §12.35). */
   snipes: boolean;
   holds: boolean;
   bookingImport: boolean;
@@ -269,7 +269,9 @@ export interface ReleaseModeDescriptor {
   usesAccessGate: boolean;
   /**
    * The longest a snipe in this mode keeps trying after the release, in whole minutes (1 to
-   * 1440): the core clamps the snipe's window to it (§12.35). None: the person's choice.
+   * 1440): the core clamps the snipe's window to it (§12.35). None: the person's choice. It
+   * bounds timed releases only (a mode whose `computeReleaseAt` gives an instant): a mode with
+   * no release instant (`cancellation`) has no window, and polls until it ends otherwise.
    */
   maxWindowMinutes?: number;
   /** Extra inputs this mode needs. */

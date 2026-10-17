@@ -11,13 +11,14 @@ import fs from 'fs';
 import os from 'os';
 import path from 'path';
 import {
+  defineProvider,
   isAbortError,
   ProviderError,
   ProviderHttpError,
   ProviderParseError,
   type ProviderContext,
 } from '@main/providers/sdk';
-import { racFactory, racManifest } from '@main/providers/rac';
+import { createRacModules, racFactory, racManifest } from '@main/providers/rac';
 import { partialMatches } from '@main/core/watches/matching';
 import { RAC_AVAILABILITY_PATH } from '@main/providers/rac/availability';
 import { isMemberTariff } from '@main/providers/rac/mapping';
@@ -915,5 +916,128 @@ describe('RAC availability: never a cart address', () => {
     }));
     const ensuite = unit(await provider.availability!.check('busselton', BUSSELTON), 'cat:7');
     expect(ensuite.bookingUrl).toBe(provider.links.booking('busselton', BUSSELTON, 'cat:7'));
+  });
+});
+
+describe('RAC availability: releases (release.opensAt)', () => {
+  /** 23:36 AWST on 16 Oct 2026, when the window-edge answer was recorded. */
+  const EDGE_CHECKED = new Date('2026-10-16T15:36:00.000Z');
+  /** Nights 20 and 21 Dec 2027, in the summer 2027–28 holidays (released 5 Feb 2027, 8 am). */
+  const HOLIDAYS: StayQuery = { arrival: '2027-12-20', departure: '2027-12-22', adults: 2 };
+
+  /** The Busselton answer (powered site free, ensuite booked) moved to 20–21 Dec 2027. */
+  const holidayAnswer = () =>
+    answer('2026-11-06-2n')
+      .replaceAll('2026-11-06', '2027-12-20')
+      .replaceAll('2026-11-07', '2027-12-21');
+
+  /** RAC at `clock`, for a person with a member number or not, answering `body`. */
+  function providerAt(clock: Date, member: boolean, body = holidayAnswer()) {
+    const http = new RecordingHttpClient({ providerId: 'rac', respond: () => ({ body }) });
+    const factory = defineProvider(racManifest, (ctx) =>
+      createRacModules(ctx, { isMember: async () => member })
+    );
+    return factory(createTestProviderContext(racManifest, { http, clock: () => clock }));
+  }
+
+  it('the window edge, 13–18 Oct 2027 at 23:36 AWST: 16–18 not released, closed, opening 2026-10-18T16:00Z', async () => {
+    const provider = racFactory(fixtureContext({ clock: () => EDGE_CHECKED }));
+    const result = await provider.availability!.check('busselton', WINDOW_EDGE);
+    expect(states(unit(result, 'cat:4')).slice(3)).toEqual([
+      ['2027-10-16', 'not-released'],
+      ['2027-10-17', 'not-released'],
+      ['2027-10-18', 'not-released'],
+    ]);
+    // Departure 19 Oct 2027 − 365 days = 19 Oct 2026, 00:00 AWST
+    expect(result.release).toEqual({ open: false, opensAt: '2026-10-18T16:00:00.000Z' });
+  });
+
+  it('an open stay is open, with no opensAt', async () => {
+    const result = await fixtureProvider().availability!.check('busselton', BUSSELTON);
+    expect(result.release).toEqual({ open: true });
+  });
+
+  it('says nothing about the release when no unit is in the answer', async () => {
+    const provider = racFactory(fixtureContext({ clock: () => EDGE_CHECKED }));
+    const result = await provider.availability!.check('busselton', WINDOW_EDGE, {
+      unitIds: ['cat:999'],
+    });
+    expect(result.units).toEqual([]);
+    expect(result.release).toBeUndefined();
+  });
+
+  it('a stay beyond the window that the policy would refuse has no opensAt', async () => {
+    // Leavers, 20 Nov 2027 (site code 9), asked an hour after its rolling window closed
+    const provider = racFactory(
+      fixtureContext({ clock: () => new Date('2026-11-20T17:00:00.000Z') })
+    );
+    const result = await provider.availability!.check('busselton', LEAVERS);
+    expect(states(unit(result, 'cat:4'))).toEqual([['2027-11-20', 'not-released']]);
+    expect(result.release).toEqual({ open: false });
+  });
+
+  it('holds back nights RAC does not report free in holidays still to come; a free night stays free', async () => {
+    // 20 Jan 2027: the nights are inside the 364-day window, the release is on 5 Feb
+    const result = await providerAt(
+      new Date('2027-01-20T02:00:00.000Z'),
+      false
+    ).availability!.check('busselton', HOLIDAYS);
+    expect(states(unit(result, 'cat:7'))).toEqual([
+      ['2027-12-20', 'not-released'],
+      ['2027-12-21', 'not-released'],
+    ]);
+    // RAC's engine decides (terms rule 16): what it reports free is free
+    expect(states(unit(result, 'cat:4'))).toEqual([
+      ['2027-12-20', 'available'],
+      ['2027-12-21', 'available'],
+    ]);
+    expect(unit(result, 'cat:4').fullyAvailable).toBe(true);
+    expect(result.release).toEqual({ open: false, opensAt: '2027-02-05T00:00:00.000Z' });
+  });
+
+  it('with a member number, the pre-sale releases them 48 hours earlier', async () => {
+    // 4 Feb 2027: after the pre-sale (3 Feb, 8 am), before the public release (5 Feb, 8 am)
+    const between = new Date('2027-02-04T00:00:00.000Z');
+    const member = await providerAt(between, true).availability!.check('busselton', HOLIDAYS);
+    expect(states(unit(member, 'cat:7'))).toEqual([
+      ['2027-12-20', 'booked'],
+      ['2027-12-21', 'booked'],
+    ]);
+    expect(member.release).toEqual({ open: true });
+    const everyone = await providerAt(between, false).availability!.check('busselton', HOLIDAYS);
+    expect(states(unit(everyone, 'cat:7'))[0]).toEqual(['2027-12-20', 'not-released']);
+    expect(everyone.release).toEqual({ open: false, opensAt: '2027-02-05T00:00:00.000Z' });
+    // Before the pre-sale, a member's stay opens at it
+    const before = await providerAt(new Date('2027-01-20T02:00:00.000Z'), true).availability!.check(
+      'busselton',
+      HOLIDAYS
+    );
+    expect(before.release).toEqual({ open: false, opensAt: '2027-02-03T00:00:00.000Z' });
+  });
+
+  it("keeps Margaret River's dorms to the public release for a member", async () => {
+    // The ensuite answer as the 26-bed dorm (category 3, type 4) at Margaret River
+    const body = holidayAnswer().replaceAll('Ensuite Site', 'Dorm Room - Sleeps 26');
+    const json = JSON.parse(body) as RawAnswer;
+    json.data['7'].category_id = 3;
+    json.data['7'].category_type_id = '4';
+    const between = new Date('2027-02-04T00:00:00.000Z');
+    const result = await providerAt(between, true, JSON.stringify(json)).availability!.check(
+      'margaret-river',
+      HOLIDAYS
+    );
+    expect(unit(result, 'cat:3').unitKind).toBe('dorm');
+    expect(states(unit(result, 'cat:3'))[0]).toEqual(['2027-12-20', 'not-released']);
+    // The member's window has passed, so the stay opens at Margaret River's public time, 7 am
+    expect(result.release).toEqual({ open: false, opensAt: '2027-02-04T23:00:00.000Z' });
+  });
+
+  it('marks nothing held back at Cable Beach, which is in no school-holiday release', async () => {
+    const result = await providerAt(new Date('2027-01-20T02:00:00.000Z'), true).availability!.check(
+      'cable-beach',
+      HOLIDAYS
+    );
+    expect(states(unit(result, 'cat:7'))[0]).toEqual(['2027-12-20', 'booked']);
+    expect(result.release).toEqual({ open: true });
   });
 });

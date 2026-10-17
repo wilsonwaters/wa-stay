@@ -188,6 +188,12 @@ export interface ReleaseComputeInput {
    */
   unitIds?: string[];
   unitKinds?: UnitKind[];
+  /**
+   * How long the snipe keeps trying after its release, in ms: its own window, clamped to the
+   * mode's `maxWindowMinutes` (§12.35). A policy that refuses a release whose window has
+   * already passed measures it with this. None (an availability check): the policy's own.
+   */
+  windowMs?: number;
   now: Date;
   signal?: AbortSignal;
 }
