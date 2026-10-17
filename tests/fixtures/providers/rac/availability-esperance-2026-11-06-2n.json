@@ -1,0 +1,278 @@
+{
+  "_fixture": "Trimmed from RAC Parks & Resorts' availability answer for RAC Esperance Holiday Park (blog 10), 6-8 Nov 2026, 2 adults, fetched anonymously; only the fields WA Stay reads, 4 of its 18 categories, the NewBook key and cart addresses redacted. (Fetched 17 Oct 2026, 16:39 Perth.)",
+  "success": "true",
+  "message": "",
+  "timestamp": "2026-10-17 16:39:56",
+  "timezone": "Australia/Perth",
+  "api_key": "<redacted>",
+  "data": {
+    "14": {
+      "category_id": 14,
+      "category_type_id": "2",
+      "category_name": "Powered Mat Site",
+      "sort": 12,
+      "sites_available": {
+        "2026-11-06": 75,
+        "2026-11-07": 73
+      },
+      "sites_code": {
+        "2026-11-06": 0,
+        "2026-11-07": 0
+      },
+      "sites_message": {
+        "2026-11-06": "",
+        "2026-11-07": ""
+      },
+      "stay_through_sites_available": 69,
+      "stay_through_sites_code": 0,
+      "stay_through_sites_message": "",
+      "online_booking_url": "https://parksandresorts.rac.com.au/esperance/booking/?available_from=2026-11-06&available_to=2026-11-08&force_category_id=14&adults=2&children=0&infants=0&animals=0",
+      "tariffs_available": [
+        {
+          "tariff_label": "Standard Rate",
+          "tariff_success": "true",
+          "tariff_code": 0,
+          "tariff_message": "",
+          "tariff_total": 138,
+          "tariffs_quoted": {
+            "2026-11-06": {
+              "amount": 69,
+              "minimum_periods": "1",
+              "close_arrival": 0,
+              "close_departure": 0
+            },
+            "2026-11-07": {
+              "amount": 69,
+              "minimum_periods": "1",
+              "close_arrival": 0,
+              "close_departure": 0
+            }
+          },
+          "online_cart_url": "<redacted>"
+        },
+        {
+          "tariff_label": "RAC Member Rate",
+          "tariff_success": "true",
+          "tariff_code": 0,
+          "tariff_message": "",
+          "tariff_total": 122,
+          "tariffs_quoted": {
+            "2026-11-06": {
+              "amount": 60,
+              "minimum_periods": "1",
+              "close_arrival": 0,
+              "close_departure": 0
+            },
+            "2026-11-07": {
+              "amount": 62,
+              "minimum_periods": "1",
+              "close_arrival": 0,
+              "close_departure": 0
+            }
+          },
+          "online_cart_url": "<redacted>"
+        }
+      ]
+    },
+    "17": {
+      "category_id": 17,
+      "category_type_id": "2",
+      "category_name": "Powered Sites",
+      "sort": 17,
+      "sites_available": {
+        "2026-11-06": 0,
+        "2026-11-07": 0
+      },
+      "sites_code": {
+        "2026-11-06": 3,
+        "2026-11-07": 3
+      },
+      "sites_message": {
+        "2026-11-06": "There is no availability for this date",
+        "2026-11-07": "There is no availability for this date"
+      },
+      "stay_through_sites_available": 0,
+      "stay_through_sites_code": 3,
+      "stay_through_sites_message": "There is no availability for this date",
+      "online_booking_url": "https://parksandresorts.rac.com.au/esperance/booking/?available_from=2026-11-06&available_to=2026-11-08&force_category_id=17&adults=2&children=0&infants=0&animals=0",
+      "tariffs_available": [
+        {
+          "tariff_label": "Standard Rate",
+          "tariff_success": "true",
+          "tariff_code": 0,
+          "tariff_message": "",
+          "tariff_total": 138,
+          "tariffs_quoted": {
+            "2026-11-06": {
+              "amount": 69,
+              "minimum_periods": "1",
+              "close_arrival": 0,
+              "close_departure": 0
+            },
+            "2026-11-07": {
+              "amount": 69,
+              "minimum_periods": "1",
+              "close_arrival": 0,
+              "close_departure": 0
+            }
+          }
+        },
+        {
+          "tariff_label": "RAC Member Rate",
+          "tariff_success": "true",
+          "tariff_code": 0,
+          "tariff_message": "",
+          "tariff_total": 122,
+          "tariffs_quoted": {
+            "2026-11-06": {
+              "amount": 60,
+              "minimum_periods": "1",
+              "close_arrival": 0,
+              "close_departure": 0
+            },
+            "2026-11-07": {
+              "amount": 62,
+              "minimum_periods": "1",
+              "close_arrival": 0,
+              "close_departure": 0
+            }
+          }
+        }
+      ]
+    },
+    "23": {
+      "category_id": 23,
+      "category_type_id": "5",
+      "category_name": "Two Bedroom Bay Villa",
+      "sort": 3,
+      "sites_available": {
+        "2026-11-06": 6,
+        "2026-11-07": 6
+      },
+      "sites_code": {
+        "2026-11-06": 0,
+        "2026-11-07": 0
+      },
+      "sites_message": {
+        "2026-11-06": "",
+        "2026-11-07": ""
+      },
+      "stay_through_sites_available": 6,
+      "stay_through_sites_code": 0,
+      "stay_through_sites_message": "",
+      "online_booking_url": "https://parksandresorts.rac.com.au/esperance/booking/?available_from=2026-11-06&available_to=2026-11-08&force_category_id=23&adults=2&children=0&infants=0&animals=0",
+      "tariffs_available": [
+        {
+          "tariff_label": "Standard Rate",
+          "tariff_success": "true",
+          "tariff_code": 0,
+          "tariff_message": "",
+          "tariff_total": 1068,
+          "tariffs_quoted": {
+            "2026-11-06": {
+              "amount": 548,
+              "minimum_periods": "2",
+              "close_arrival": 0,
+              "close_departure": 0
+            },
+            "2026-11-07": {
+              "amount": 520,
+              "minimum_periods": "2",
+              "close_arrival": 0,
+              "close_departure": 0
+            }
+          },
+          "online_cart_url": "<redacted>"
+        },
+        {
+          "tariff_label": "RAC Member Rate",
+          "tariff_success": "true",
+          "tariff_code": 0,
+          "tariff_message": "",
+          "tariff_total": 914,
+          "tariffs_quoted": {
+            "2026-11-06": {
+              "amount": 468,
+              "minimum_periods": "2",
+              "close_arrival": 0,
+              "close_departure": 0
+            },
+            "2026-11-07": {
+              "amount": 446,
+              "minimum_periods": "2",
+              "close_arrival": 0,
+              "close_departure": 0
+            }
+          },
+          "online_cart_url": "<redacted>"
+        }
+      ]
+    },
+    "25": {
+      "category_id": 25,
+      "category_type_id": "5",
+      "category_name": "One Bedroom Studio",
+      "sort": 2,
+      "sites_available": {
+        "2026-11-06": 1,
+        "2026-11-07": 0
+      },
+      "sites_code": {
+        "2026-11-06": 0,
+        "2026-11-07": 3
+      },
+      "sites_message": {
+        "2026-11-06": "",
+        "2026-11-07": "There is no availability for this date"
+      },
+      "stay_through_sites_available": 0,
+      "stay_through_sites_code": 3,
+      "stay_through_sites_message": "There is no longer availability for the dates given (<strong>6 Nov 2026 14:00</strong> to <strong>8 Nov 2026 10:00</strong>)",
+      "online_booking_url": "https://parksandresorts.rac.com.au/esperance/booking/?available_from=2026-11-06&available_to=2026-11-08&force_category_id=25&adults=2&children=0&infants=0&animals=0",
+      "tariffs_available": [
+        {
+          "tariff_label": "Standard Rate",
+          "tariff_success": "true",
+          "tariff_code": 0,
+          "tariff_message": "",
+          "tariff_total": 695,
+          "tariffs_quoted": {
+            "2026-11-06": {
+              "amount": 356,
+              "minimum_periods": "1",
+              "close_arrival": 0,
+              "close_departure": 0
+            },
+            "2026-11-07": {
+              "amount": 339,
+              "minimum_periods": "1",
+              "close_arrival": 0,
+              "close_departure": 0
+            }
+          }
+        },
+        {
+          "tariff_label": "RAC Member Rate",
+          "tariff_success": "true",
+          "tariff_code": 0,
+          "tariff_message": "",
+          "tariff_total": 559,
+          "tariffs_quoted": {
+            "2026-11-06": {
+              "amount": 285,
+              "minimum_periods": "1",
+              "close_arrival": 0,
+              "close_departure": 0
+            },
+            "2026-11-07": {
+              "amount": 274,
+              "minimum_periods": "1",
+              "close_arrival": 0,
+              "close_departure": 0
+            }
+          }
+        }
+      ]
+    }
+  }
+}

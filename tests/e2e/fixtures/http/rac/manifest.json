@@ -24,7 +24,7 @@
       "form": {
         "blog_id": "9"
       },
-      "file": "availability-cable-beach-2026-11-06-2n-synthetic.json"
+      "file": "availability-cable-beach-2026-11-06-2n.json"
     },
     {
       "method": "POST",
@@ -32,7 +32,7 @@
       "form": {
         "blog_id": "5"
       },
-      "file": "availability-cervantes-2026-11-06-2n-synthetic.json"
+      "file": "availability-cervantes-2026-11-06-2n.json"
     },
     {
       "method": "POST",
@@ -40,7 +40,7 @@
       "form": {
         "blog_id": "10"
       },
-      "file": "availability-esperance-2026-11-06-2n-synthetic.json"
+      "file": "availability-esperance-2026-11-06-2n.json"
     },
     {
       "method": "POST",
@@ -48,7 +48,7 @@
       "form": {
         "blog_id": "8"
       },
-      "file": "availability-margaret-river-2026-11-06-2n-synthetic.json"
+      "file": "availability-margaret-river-2026-11-06-2n.json"
     },
     {
       "method": "POST",
@@ -56,7 +56,7 @@
       "form": {
         "blog_id": "3"
       },
-      "file": "availability-exmouth-2026-11-06-2n-synthetic.json"
+      "file": "availability-exmouth-2026-11-06-2n.json"
     },
     {
       "method": "POST",
@@ -64,7 +64,7 @@
       "form": {
         "blog_id": "7"
       },
-      "file": "availability-karri-valley-2026-11-06-2n-synthetic.json"
+      "file": "availability-karri-valley-2026-11-06-2n.json"
     },
     {
       "method": "POST",
@@ -72,7 +72,7 @@
       "form": {
         "blog_id": "2"
       },
-      "file": "availability-monkey-mia-2026-11-06-2n-synthetic.json"
+      "file": "availability-monkey-mia-2026-11-06-2n.json"
     }
   ]
 }

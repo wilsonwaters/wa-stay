@@ -5,7 +5,8 @@
  * nights by `support/dated-fixtures.ts`): each RAC card reads its free units with their noun
  * and no total ("51 spots free", RS12) beside ParkStay's "2 of 3 sites available". Stay type →
  * "Cabins & villas" counts only the cabins: Busselton's answer lists no cabin, so its card turns
- * to "No cabins open for these dates", and Exmouth's reads its two free cabins. Fixture mode
+ * to "No cabins open for these dates", Esperance's reads its six free cabins, and Cervantes',
+ * whose villas are booked out, "No cabin free every night". Fixture mode
  * refuses no request, and the window logs no errors. Roles and accessible names only.
  */
 
@@ -19,8 +20,8 @@ import { expect, test, withoutGuardedRequests, withoutRemoteImages } from './sup
 const CATALOGUE_TIMEOUT_MS = 30_000;
 /** ParkStay's 11 campgrounds and RAC's 8 parks. */
 const ALL_PLACES = 19;
-/** ParkStay's 3 campgrounds with a site free, and RAC's 7 parks with a spot free. */
-const AVAILABLE = 10;
+/** ParkStay's 3 campgrounds with a site free, and RAC's 8 parks, each with a spot free. */
+const AVAILABLE = 11;
 
 test('RAC parks read their free spots beside ParkStay’s “N of M”, and Stay type counts only cabins', async ({
   launchWaStay,
@@ -76,11 +77,8 @@ test('RAC parks read their free spots beside ParkStay’s “N of M”, and Stay
   await expect(busselton).toHaveAccessibleDescription(/51 spots free/);
   await expect(busselton).not.toHaveAccessibleDescription(/\b\d+ of \d+\b/);
   await expect(busselton.getByText('51 spots free', { exact: true })).toBeVisible();
-  await expect(card('RAC Monkey Mia Dolphin Resort')).toHaveAccessibleDescription(/47 spots free/);
-  // Esperance has room, but not on one unit every night: none free, not "not open"
-  await expect(card('RAC Esperance Holiday Park')).toHaveAccessibleDescription(
-    /No spot free every night/
-  );
+  await expect(card('RAC Monkey Mia Dolphin Resort')).toHaveAccessibleDescription(/75 spots free/);
+  await expect(card('RAC Margaret River Nature Park')).toHaveAccessibleDescription(/2 spots free/);
   // ParkStay keeps its total
   await expect(card('Bungarra')).toHaveAccessibleDescription(/2 of 3 sites available/);
 
@@ -98,8 +96,11 @@ test('RAC parks read their free spots beside ParkStay’s “N of M”, and Stay
   // Busselton's answer lists no cabin: from its spots to its cabins, none of which is open
   await expect(busselton).toHaveAccessibleDescription(/No cabins open for these dates/);
   await expect(busselton).not.toHaveAccessibleDescription(/spots free/);
-  await expect(card('RAC Exmouth Cape Holiday Park')).toHaveAccessibleDescription(/2 cabins free/);
-  await expect(card('RAC Cervantes Holiday Park')).toHaveAccessibleDescription(/1 cabin free/);
+  await expect(card('RAC Esperance Holiday Park')).toHaveAccessibleDescription(/6 cabins free/);
+  // Cervantes' villas are booked out: none free, not "not open"
+  await expect(card('RAC Cervantes Holiday Park')).toHaveAccessibleDescription(
+    /No cabin free every night/
+  );
 
   // Nothing left the fixtures, and the window logged no errors
   const requests = wa.unexpectedRequests();

@@ -5,7 +5,7 @@
  * POST, cached by the core for 6 h), and the terms rules a request can break: RAC's host only
  * (rule 1), one request at a time 10 s apart (rules 2 and 4), the block cool-down on the
  * synthetic 403, 429 and challenge pages (rule 5). RAC's bulk availability (Explore's free
- * counts, `bulk.ts`): its counts agree with `check` on every recorded and synthetic answer, its
+ * counts, `bulk.ts`): its counts agree with `check` on every recorded answer, its
  * interactive pace through the core on Jest's fake timers, its deadlines with a place page or a
  * date change in the middle, and its failures (a park that fails, a block, an abort, a newer
  * search). A FixtureHttpClient or a recording client answers every request, so nothing is sent
@@ -556,14 +556,9 @@ describe('RAC bulk availability', () => {
     const blogId = new URLSearchParams(body).get('blog_id');
     return RAC_PARKS.find((park) => String(park.blogId) === blogId);
   };
-  /** Each park's answer for 6–8 Nov 2026: Busselton's recorded, the rest synthetic. */
+  /** Each park's recorded answer for 6–8 Nov 2026. */
   const ANSWER_FILES: Readonly<Record<string, string>> = Object.fromEntries(
-    RAC_PARKS.map((park) => [
-      park.slug,
-      park.slug === 'busselton'
-        ? 'availability-busselton-2026-11-06-2n.json'
-        : `availability-${park.slug}-2026-11-06-2n-synthetic.json`,
-    ])
+    RAC_PARKS.map((park) => [park.slug, `availability-${park.slug}-2026-11-06-2n.json`])
   );
   /** Answers a POST with its park's answer, and a book-now GET with Busselton's page. */
   const byPark = (hop: HopRequest): HopAnswer => {
@@ -590,67 +585,52 @@ describe('RAC bulk availability', () => {
   afterEach(() => jest.useRealTimers());
 
   describe('counts', () => {
-    it('counts every park for 6–8 Nov 2026 from the fixtures, in the seed order, with no total', async () => {
+    it('counts every park for 6–8 Nov 2026 from the recorded answers, in the seed order, with no total', async () => {
       const entries = await racFactory(fixtureContext()).availability!.search!(STAY);
       const none = { availableUnits: 0, bookableUnits: 0 };
+      const free = (availableUnits: number) => ({ availableUnits });
       expect(entries).toStrictEqual<BulkAvailabilityEntry[]>([
         {
           key: 'rac:busselton',
           availableUnits: 51,
-          byKind: { campsite: { availableUnits: 51 }, cabin: none },
+          byKind: { campsite: free(51), cabin: none },
         },
         {
           key: 'rac:cable-beach',
-          availableUnits: 13,
-          byKind: { campsite: { availableUnits: 11 }, cabin: { availableUnits: 2 } },
+          availableUnits: 35,
+          byKind: { campsite: free(31), cabin: free(4) },
         },
         {
+          // Its villas are booked out: none free, but bookable
           key: 'rac:cervantes',
-          availableUnits: 19,
-          byKind: { campsite: { availableUnits: 18 }, cabin: { availableUnits: 1 } },
+          availableUnits: 57,
+          byKind: { campsite: free(57), cabin: free(0) },
         },
         {
+          // A studio free the first night only adds nothing
           key: 'rac:esperance',
-          availableUnits: 0,
-          byKind: { campsite: { availableUnits: 0 }, cabin: { availableUnits: 0 } },
+          availableUnits: 75,
+          byKind: { campsite: free(69), cabin: free(6) },
         },
         {
           key: 'rac:margaret-river',
-          availableUnits: 9,
-          byKind: {
-            campsite: { availableUnits: 7 },
-            cabin: none,
-            dorm: { availableUnits: 1 },
-            glamping: { availableUnits: 1 },
-          },
+          availableUnits: 2,
+          byKind: { campsite: free(0), cabin: free(0), dorm: free(1), glamping: free(1) },
         },
         {
           key: 'rac:exmouth',
-          availableUnits: 8,
-          byKind: {
-            campsite: { availableUnits: 5 },
-            cabin: { availableUnits: 2 },
-            room: { availableUnits: 1 },
-          },
+          availableUnits: 110,
+          byKind: { campsite: free(110), cabin: free(0), room: free(0) },
         },
         {
           key: 'rac:karri-valley',
-          availableUnits: 12,
-          byKind: {
-            campsite: { availableUnits: 10 },
-            cabin: { availableUnits: 0 },
-            room: { availableUnits: 2 },
-          },
+          availableUnits: 5,
+          byKind: { campsite: free(5), cabin: free(0), room: free(0) },
         },
         {
           key: 'rac:monkey-mia',
-          availableUnits: 47,
-          byKind: {
-            campsite: { availableUnits: 36 },
-            cabin: { availableUnits: 0 },
-            room: { availableUnits: 9 },
-            dorm: { availableUnits: 2 },
-          },
+          availableUnits: 75,
+          byKind: { campsite: free(57), cabin: free(0), room: free(14), dorm: free(4) },
         },
       ]);
     });
@@ -705,11 +685,20 @@ describe('RAC bulk availability', () => {
       });
     });
 
-    it('a closed category (site code 2) adds nothing and makes nothing bookable, beside a free one', async () => {
-      // Margaret River's lodge: closed both nights
-      const entry = await entryFor('margaret-river', page(ANSWER_FILES['margaret-river']), STAY);
-      expect(entry.byKind?.cabin).toStrictEqual({ availableUnits: 0, bookableUnits: 0 });
-      expect(entry).not.toHaveProperty('bookableUnits');
+    it('a category closed for the stay (stop sold) adds nothing and makes nothing bookable, beside a free one', async () => {
+      // Exmouth's family cabin (stay-through code 2, every tariff stop sold) and its powered sites
+      const json = JSON.parse(page(ANSWER_FILES.exmouth)) as { data: Record<string, unknown> };
+      json.data = { '4': json.data['4'], '43': json.data['43'] };
+      const entry = await entryFor('exmouth', JSON.stringify(json), STAY);
+      expect(entry).toStrictEqual({
+        key: 'rac:exmouth',
+        availableUnits: 110,
+        byKind: {
+          campsite: { availableUnits: 110 },
+          cabin: { availableUnits: 0, bookableUnits: 0 },
+          room: { availableUnits: 0, bookableUnits: 0 },
+        },
+      });
     });
 
     it('a stay beyond the 364-day window (code 9, a special date) counts 0 of 0: "Not open"', async () => {
@@ -781,7 +770,7 @@ describe('RAC bulk availability', () => {
       expect(entry).not.toHaveProperty('bookableUnits');
     });
 
-    /** Every recorded and synthetic answer, with its park and its stay (from its nights). */
+    /** Every recorded answer, with its park and its stay (from its nights). */
     const ANSWERS = fs
       .readdirSync(RAC_FIXTURES)
       .filter((file) => /^availability-.+\.json$/.test(file))
@@ -802,7 +791,7 @@ describe('RAC bulk availability', () => {
         return { file, park, stay, categories };
       });
 
-    it('has an answer for every park, recorded or synthetic', () => {
+    it('has a recorded answer for every park', () => {
       expect(new Set(ANSWERS.map((answer) => answer.park.slug))).toEqual(new Set(SEED));
       expect(ANSWERS.length).toBeGreaterThanOrEqual(16);
     });
