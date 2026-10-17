@@ -72,9 +72,13 @@ export type SnipeFormValues = z.infer<typeof shape>;
 export type SnipeFieldName = Exclude<keyof SnipeFormValues, 'stayParams'> | `stayParams.${string}`;
 export type SnipeStepId = 'provider' | 'location' | 'stay' | 'release' | 'review';
 
-/** The provider's stay fields a snipe asks for: its own, and what a hold needs. */
+/**
+ * The provider's stay fields a snipe asks for: its own, and what a hold needs when the provider
+ * holds (a provider whose holds are an experiment that is off asks for none of a hold's: RAC's
+ * equipment).
+ */
 export function snipeStayFields(manifest: ProviderManifest | undefined): StayFieldDescriptor[] {
-  return stayFieldsFor(manifest, ['snipe', 'hold']);
+  return stayFieldsFor(manifest, manifest?.capabilities.holds ? ['snipe', 'hold'] : ['snipe']);
 }
 
 /** The ms or s value as text without trailing zeros: 1500 ms → "1.5". */
