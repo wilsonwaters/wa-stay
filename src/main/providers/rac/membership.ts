@@ -9,6 +9,7 @@
  * - `hasMemberNumber(ctx)`: true when a number is saved. A secret that cannot be read (the
  *   data was copied to another computer, `SecretUnreadableError`, or any other failure) counts
  *   as no number, with a warning that names the error's kind only, never a value.
+ *   `memberNumberState(ctx)` tells that case apart (`unreadable`), for `isSignedIn`.
  * - `createMembership(isMember, logger)`: what the modules share. `read()` asks `isMember()`
  *   (false, with a warning, when it fails) and remembers the answer; `last()` is that answer,
  *   for the one synchronous reader, `links.booking`'s `membership_type`. Nothing else caches it:
@@ -26,19 +27,29 @@ function kindOf(error: unknown): string {
   return error instanceof Error ? error.name : typeof error;
 }
 
-/** Whether a member number is saved; false, with a warning naming no value, when unreadable. */
-export async function hasMemberNumber(
+/**
+ * Whether a member number is saved: `saved`, `none`, or `unreadable` (a warning names the
+ * error's kind, never a value). Never the number.
+ */
+export async function memberNumberState(
   ctx: Pick<ProviderContext, 'secrets' | 'logger'>
-): Promise<boolean> {
+): Promise<'saved' | 'none' | 'unreadable'> {
   try {
     const saved = await ctx.secrets.get(RAC_MEMBER_NUMBER_SECRET);
-    return typeof saved === 'string' && saved.length > 0;
+    return typeof saved === 'string' && saved.length > 0 ? 'saved' : 'none';
   } catch (error) {
     ctx.logger.warn(
       `RAC: the saved member number can't be read (${kindOf(error)}); public prices and release times`
     );
-    return false;
+    return 'unreadable';
   }
+}
+
+/** Whether a member number is saved; false, with a warning naming no value, when unreadable. */
+export async function hasMemberNumber(
+  ctx: Pick<ProviderContext, 'secrets' | 'logger'>
+): Promise<boolean> {
+  return (await memberNumberState(ctx)) === 'saved';
 }
 
 export interface RacMembership {

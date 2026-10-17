@@ -90,6 +90,12 @@ export function createRacModules(
   const kindOf = createKindResolver((message) => ctx.logger.warn(message));
   // One place every module learns membership from: a boolean, never the number
   const membership = createMembership(options.isMember ?? (() => hasMemberNumber(ctx)), ctx.logger);
+  // `links.booking` is synchronous, so it reads the last answer: read once now (a local vault
+  // read, no request), then at every check, bulk search and release compute. After a save or
+  // removal it is current from the next of those (the core asks a release again at once for
+  // an armed snipe). Only a book-now link with a stay and no category carries it, which the core
+  // never asks for (its links name a category); a check's own link uses its own answer.
+  void membership.read();
   const links = createRacLinks(membership.last);
   const release = new RacReleasePolicy({
     providerId: ctx.id,

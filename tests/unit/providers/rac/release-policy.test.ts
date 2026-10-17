@@ -501,7 +501,7 @@ describe('RAC release policy', () => {
       expect(wantsPreSale(margaretRiver, ['cat:9'], ['cabin', 'dorm'])).toBe(true);
     });
 
-    it('is no member through the factory until the member number can be saved', async () => {
+    it('is no member through the factory while no member number is saved', async () => {
       const provider = racFactory(createTestProviderContext(racManifest, { clock: () => NOW }));
       const instant = await provider.release!.computeReleaseAt({
         mode: SnipeReleaseMode.DAILY_ROLLOVER,

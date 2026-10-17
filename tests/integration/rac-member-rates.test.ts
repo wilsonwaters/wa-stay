@@ -230,6 +230,15 @@ describe('RAC booking links with a member number, and without', () => {
     );
   });
 
+  it('links.booking knows a number saved before start, with no check yet (R16 review)', async () => {
+    const { provider, http } = await rac({ member: true });
+    // The modules read the vault once as they are built (no request)
+    await new Promise((resolve) => setImmediate(resolve));
+    const link = new URL(provider.links.booking('busselton', STAY)!);
+    expect(link.searchParams.get('membership_type')).toBe('member');
+    expect(http.requests).toEqual([]);
+  });
+
   it("as the app builds them: a check's link and links.booking follow the saved number", async () => {
     for (const saved of [false, true]) {
       const { provider, http } = await rac({ member: saved });

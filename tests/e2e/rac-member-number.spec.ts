@@ -112,13 +112,14 @@ test('an RAC member number: saved with its statements, copied beside "Book on RA
   const copy = stayCard.getByRole('button', { name: 'Copy RAC member number' });
   await expect(book).toBeVisible();
   await expect(copy).toBeVisible();
-  // Beside it: the next control in the card, with no value in its name or a title
-  expect(
-    await book.evaluate((link, name) => {
-      const next = link.nextElementSibling;
-      return next?.tagName === 'BUTTON' && next.textContent?.includes(name);
-    }, 'Copy RAC member number')
-  ).toBe(true);
+  // Beside it: in the same "Check your dates" region, the control right after "Book on RAC" in
+  // reading order (its links and buttons, by role), with no value in its name or a title
+  const controls = stayCard.getByRole('link').or(stayCard.getByRole('button'));
+  const names = (await controls.allInnerTexts()).map((text) => text.replace(/\s+/g, ' ').trim());
+  const bookAt = names.findIndex((name) => name.startsWith('Book on RAC'));
+  expect(bookAt).toBeGreaterThanOrEqual(0);
+  expect(names[bookAt + 1]).toBe('Copy RAC member number');
+  await expect(copy).toHaveAccessibleName('Copy RAC member number');
   await expect(copy).not.toHaveAttribute('title');
 
   // 5. Its check: the member rate on the powered site

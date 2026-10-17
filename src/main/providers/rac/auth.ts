@@ -15,8 +15,10 @@
  *   the digits as the value to store, so a typed "1234 5678" is kept and copied as "12345678",
  *   and a leading zero stays: the number is text from end to end, never a `Number`. Anything
  *   else is refused with "That doesn't look like an RAC member number", which quotes nothing.
- * - **`isSignedIn`**: signed in while a number is saved (`membership.ts`), else signed out. No
- *   request. (The core works a `credentials` account's status out itself and never calls it.)
+ * - **`isSignedIn`**: signed in while a number is saved (`membership.ts`), signed out while none
+ *   is, and `unknown` when the saved one can't be read (it cannot tell, so never signed out). No
+ *   request. (The core works a `credentials` account's status out itself, counting an
+ *   unreadable value as not saved, and never calls it.)
  *
  * Neither function logs, and neither puts what was typed in an answer other than the digits to
  * store. Neither sends a request, so a save never waits in RAC's paced queue (10 s between
@@ -26,7 +28,7 @@
 import type { ProviderContext } from '../sdk/context';
 import { throwIfAborted } from '../sdk/errors';
 import type { CredentialsAuth } from '../sdk/provider';
-import { hasMemberNumber } from './membership';
+import { memberNumberState } from './membership';
 
 /** The field's key: the core keeps the value as `account.memberNumber`. */
 export const RAC_MEMBER_NUMBER_FIELD = 'memberNumber';
@@ -74,7 +76,9 @@ export function createRacAuth(ctx: Pick<ProviderContext, 'secrets' | 'logger'>):
     },
     async isSignedIn(_http, signal) {
       throwIfAborted(signal);
-      return { state: (await hasMemberNumber(ctx)) ? 'signed-in' : 'signed-out' };
+      const state = await memberNumberState(ctx);
+      if (state === 'unreadable') return { state: 'unknown', reason: 'unreadable' };
+      return { state: state === 'saved' ? 'signed-in' : 'signed-out' };
     },
   };
 }

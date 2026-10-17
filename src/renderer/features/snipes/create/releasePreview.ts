@@ -55,7 +55,8 @@ export function releasePreview({ arrival, release, timeZone, now, noun }: Releas
   const today = todayIn(timeZone, now);
   const units = `${capitalise(noun.many)} for ${nightLabel(arrival, today)}`;
   if (release?.open) return `${units} are already open for booking.`;
-  const refused = release?.refused?.trim();
+  // Main's answer crosses IPC: only text is shown
+  const refused = typeof release?.refused === 'string' ? release.refused.trim() : '';
   if (refused) return refused;
   const opensAt = release?.opensAt ? new Date(release.opensAt) : undefined;
   if (!opensAt || Number.isNaN(opensAt.getTime())) return RELEASE_UNKNOWN;

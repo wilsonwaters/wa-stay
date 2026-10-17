@@ -138,6 +138,27 @@ describe("RAC's member number sign-in (auth.ts)", () => {
     await expect(auth.isSignedIn(http)).resolves.toEqual({ state: 'signed-out' });
     expect(touched).toEqual([]);
   });
+
+  it("isSignedIn: unknown, never signed out, when the saved number can't be read (R16 review)", async () => {
+    const logger = createMemoryLogger();
+    const ctx = racContext({
+      logger,
+      secrets: {
+        get: () =>
+          Promise.reject(new SecretUnreadableError('key-missing', 'The key file is missing')),
+        set: () => Promise.resolve(),
+        delete: () => Promise.resolve(),
+      },
+    });
+    const { http, touched } = untouchableHttp();
+    await expect(createRacAuth(ctx).isSignedIn(http)).resolves.toEqual({
+      state: 'unknown',
+      reason: 'unreadable',
+    });
+    // Everything else still counts it as none
+    await expect(hasMemberNumber(ctx)).resolves.toBe(false);
+    expect(touched).toEqual([]);
+  });
 });
 
 describe('whether a member number is saved (membership.ts)', () => {

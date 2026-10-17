@@ -27,6 +27,9 @@ describe('releasePreview', () => {
     expect(releasePreview({ ...base, release: { open: false, refused: '  ' } })).toBe(
       RELEASE_UNKNOWN
     );
+    // Anything but text is not a reason
+    const odd = { open: false, refused: 42 } as unknown as { open: boolean; refused?: string };
+    expect(releasePreview({ ...base, release: odd })).toBe(RELEASE_UNKNOWN);
     // Open nights are open, whatever the policy says about timing them
     expect(releasePreview({ ...base, release: { open: true, refused } })).toBe(
       'Sites for Sat 10 Apr 2027 are already open for booking.'
