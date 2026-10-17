@@ -7,10 +7,10 @@ _Last updated: 2026-10-17 (orchestrator)_
 Branch `ccr-573ddb1d-hir0sq` (from `main` at `4bd5d62`, the v2.0.0 release). The brief is the Project 2 section of `ai-state/brief.md`.
 
 ## Phase
-Phase 3–4 (task specs, then execution). The stakeholder approved the 20-task plan and decided R6–R8 (alert clicks for every provider, a phone booking link in alert emails, interactive pacing).
+Phase 5 (integration and system verification). All 20 tasks are merged; a system verification agent is checking the brief's success criteria 1–9 in the built app (fixture mode) and the terms rules, from a detached worktree at `d0685b8`.
 
 ## Currently in flight
-- Next: system verification of the whole stream, final review against the brief, report to the stakeholder.
+- Next: final review against the brief, report to the stakeholder, ask whether to open the PR.
 
 ## Completed
 - **R20 (#67) merged**: `docs/providers/rac/` (README with "Verifying it" for the stakeholder's first genuine booking, `endpoints.md` with a status legend and a doc test binding it to the code, `release-calendar.md` with the 2 Feb 2028 refresh deadline); user guide, watches, Site Sniper, security (member number, clipboard sync, cart guard), troubleshooting, overview, providers READMEs, README, CLAUDE.md; website RAC row (`--provider-rac`), independence notice, Questions (member number kept encrypted and never sent; NewBook photo host); CHANGELOG `[Unreleased]`. Code: a check in flight during a watch edit keeps nothing (a provider block still recorded); the place page's rate-limit message is provider-neutral; Settings copy without "site". Review APPROVE-WITH-MINORS → fixes → APPROVE (part 1); cart part APPROVE (22 cart claims true), last doc lines fixed in `e8b9917`. Gate: 5943 tests, test:tz 8, e2e 29, RAC preview passed.
