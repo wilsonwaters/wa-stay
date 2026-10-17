@@ -4,11 +4,11 @@ import { PARKSTAY_MANIFEST, ok } from '@tests/utils/renderer/createMockApi';
 import { catalogGet, makeMixedDetail, makeWatch } from '@tests/fixtures/renderer/watches';
 import { renderWithApp } from '@tests/utils/renderer/renderWithApp';
 
-function api(watch: Watch) {
+function api(watch: Watch, detail = makeMixedDetail()) {
   return {
     providers: { list: jest.fn().mockResolvedValue(ok([PARKSTAY_MANIFEST])) },
     catalog: {
-      get: catalogGet(makeMixedDetail()),
+      get: catalogGet(detail),
       search: jest.fn().mockResolvedValue(ok({ items: [], total: 0 })),
       status: jest
         .fn()
@@ -65,6 +65,25 @@ describe('EditWatchPage: stay types', () => {
     await user.click(glamping);
     await user.click(screen.getByRole('button', { name: 'Save changes' }));
     await waitFor(() => expect(mock.watches.update).toHaveBeenCalledWith(5, { unitKinds: [] }));
+  });
+
+  it('keeps a stored stay type’s chip, and the focus, when it is turned off, so it can be turned back on', async () => {
+    // A place of one kind: without the stored stay type there would be no chips at all.
+    const mock = api(makeWatch({ id: 5, unitKinds: ['cabin'] }), makeMixedDetail({}, 'campsite'));
+    const { user } = renderWithApp({ route: '/watches/5/edit', api: mock });
+    const cabins = within(await stayTypes()).getByRole('button', { name: 'Cabins & villas' });
+    expect(cabins).toHaveAttribute('aria-pressed', 'true');
+
+    cabins.focus();
+    await user.keyboard('{Enter}');
+    expect(cabins).toHaveAttribute('aria-pressed', 'false');
+    expect(cabins).toBeInTheDocument();
+    expect(cabins).toHaveFocus();
+    expect(screen.getByRole('group', { name: 'Stay type' })).toBeInTheDocument();
+
+    await user.keyboard('{Enter}');
+    expect(cabins).toHaveAttribute('aria-pressed', 'true');
+    expect(cabins).toHaveFocus();
   });
 
   it('will not save an automatic hold at a mixed place with neither a stay type nor a site', async () => {

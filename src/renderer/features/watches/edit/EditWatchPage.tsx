@@ -133,6 +133,7 @@ function EditWatchForm({ watch, manifest }: { watch: Watch; manifest: ProviderMa
             units={units}
             noun={noun}
             fieldNotes={notes}
+            keepKinds={initial.unitKinds}
           />
         </Section>
         <Section title="Alerts">

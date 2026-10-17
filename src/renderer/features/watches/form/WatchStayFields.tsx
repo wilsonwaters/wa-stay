@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import { useFormContext } from 'react-hook-form';
 import type { UnitSummary } from '../../../../shared/types/catalog.types';
-import type { ProviderManifest } from '../../../../shared/types/provider.types';
+import type { ProviderManifest, UnitKind } from '../../../../shared/types/provider.types';
 import { ProviderStayFields } from '../../../components/stay/ProviderStayFields';
 import { StayTypeChips } from '../../../components/stay/StayTypeChips';
 import { placeUnitKinds, stayTypeOptions } from '../../../components/stay/stayTypes';
@@ -19,6 +19,11 @@ export interface WatchStayFieldsProps {
   noun: UnitNoun;
   /** Notes on stored values that had to change (Edit), by stay field key. */
   fieldNotes?: Partial<Record<string, string>>;
+  /**
+   * Edit: the watch's stored stay types, offered for the life of the form even where the place
+   * no longer has them, so turning one off never takes its chip (and the focus) away.
+   */
+  keepKinds?: readonly UnitKind[];
 }
 
 /**
@@ -31,6 +36,7 @@ export function WatchStayFields({
   units,
   noun,
   fieldNotes,
+  keepKinds = [],
 }: WatchStayFieldsProps) {
   const { register, watch, formState, getFieldState, trigger } = useFormContext<WatchFormValues>();
   const set = useSetWatchField();
@@ -49,7 +55,7 @@ export function WatchStayFields({
   const fields = watchStayFields(manifest).watch;
   const provider = manifest?.shortName ?? 'the provider';
   const placeKinds = useMemo(() => (units ? placeUnitKinds(units) : undefined), [units]);
-  const stayTypes = placeKinds ? stayTypeOptions(placeKinds, unitKinds) : [];
+  const stayTypes = placeKinds ? stayTypeOptions(placeKinds, [...unitKinds, ...keepKinds]) : [];
   // An automatic hold needs a stay type or a unit at a mixed place (Alerts): once that error
   // shows, a new choice here checks it again.
   const recheckHold = () => {
