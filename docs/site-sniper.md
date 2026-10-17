@@ -140,12 +140,13 @@ for when you are away from that computer.
 If the hold runs out unpaid, ParkStay releases the site and the snipe shows Hold expired.
 
 A provider that can let a hold go early adds **Let it go** beside **Pay now**: after "Let this
-hold go?", the provider lets it go and the snipe ends with why ("You let it go.", or "{provider}
-no longer holds it. If you paid, look for {provider}'s confirmation email."), freeing its nights
-for another hold. Such a provider may also let the hold go when its payment window closes without
-a confirmed payment; it checks its own side first, so a paid stay is never let go. Deleting a
-held snipe lets its hold go first. When the provider can only guess how long its hold lasts, the
-panel and the alert say "about". ParkStay does none of this: its hold runs out on its own.
+hold go?", the provider lets it go and the snipe ends with why: **Hold let go** ("You let it
+go."), or **Hold ended** ("{provider} no longer holds it. If you paid, look for {provider}'s
+confirmation email."), freeing its nights for another hold. Such a provider may also let the
+hold go when its payment window closes without a confirmed payment; it checks its own side first,
+so a paid stay is never let go. Deleting a held snipe lets its hold go first. When the provider
+can only guess how long its hold lasts, the panel and the alert say "about". ParkStay does none
+of this: its hold runs out on its own.
 
 ## Book responsibly
 

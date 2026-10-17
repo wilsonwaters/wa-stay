@@ -65,6 +65,11 @@ import type { EventSink } from '@shared/contracts/events';
 import type { BookingInput, SiteSnipe, Watch } from '@shared/types';
 import { SnipeStatus, WatchResult } from '@shared/types/common.types';
 import { providerLimits, type ProviderId } from '@shared/types/provider.types';
+import {
+  HOLD_RELEASED_MESSAGE,
+  HOLD_RELEASED_ON_CLOSE_MESSAGE,
+  holdGoneMessage,
+} from '@shared/utils/hold-release';
 import type {
   LocationRepository,
   SiteSniperRepository,
@@ -189,18 +194,16 @@ export const PAYMENT_WINDOW_BUSY_MESSAGE = 'Finish or close the open payment win
 export const HOLD_RELEASING_MESSAGE = 'The hold is being let go.';
 
 /** A released hold's message: the person let it go ("Let it go", or deleting its row). */
-export const RELEASED_MESSAGE = 'You let it go.';
+export const RELEASED_MESSAGE = HOLD_RELEASED_MESSAGE;
 
 /** A released hold's message when its payment window closed with no confirmed payment. */
-export const RELEASED_ON_CLOSE_MESSAGE = 'Let go when the payment window closed.';
+export const RELEASED_ON_CLOSE_MESSAGE = HOLD_RELEASED_ON_CLOSE_MESSAGE;
 
 /**
- * The message when the provider no longer held the hold (`gone`): the person may have paid, so
- * it points to the provider's confirmation and never says "booked".
+ * The message when the provider no longer held the hold (`gone`); shared with the renderer,
+ * which tells such a hold by it (`holdEndingOf`).
  */
-export function holdGoneMessage(shortName: string): string {
-  return `${shortName} no longer holds it. If you paid, look for ${shortName}'s confirmation email.`;
-}
+export { holdGoneMessage };
 
 /** What a decline answers when the provider could not be asked (the hold stays). */
 export function releaseFailedMessage(shortName: string): string {

@@ -99,4 +99,21 @@ describe('SnipeDetailPage: Let it go', () => {
     );
     expect(within(hold).getByRole('button', { name: 'Pay now' })).toBeInTheDocument();
   });
+
+  it('a snipe whose hold was let go says so when opened again: "Hold let go", never "Hold expired"', async () => {
+    const held = makeHeldSnipe(23);
+    renderWithApp({
+      route: '/site-sniper/7',
+      api: {
+        providers: { list: jest.fn().mockResolvedValue(ok([RELEASING])) },
+        snipes: { get: jest.fn().mockResolvedValue(ok(ended(held))) },
+        catalog: { get: catalogGet(detail) },
+      },
+    });
+    const notice = (await screen.findByText('You let it go.')).closest('[role="status"]');
+    expect(notice).toHaveTextContent(/^Hold let go/);
+    const progress = screen.getByRole('list', { name: 'Progress' });
+    expect(within(progress).getByText('Hold let go')).toBeInTheDocument();
+    expect(screen.queryByText('Hold expired')).toBeNull();
+  });
 });
