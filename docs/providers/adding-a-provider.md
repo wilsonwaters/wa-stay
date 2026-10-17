@@ -341,7 +341,10 @@ change; `HttpRequestOptions.priority` (`'interactive'` or `'background'`) overri
 for one request. Long-lived work your module starts during an interactive call (a timer, a
 keep-alive) inherits the interactive priority, so pass `priority: 'background'` for its
 requests. A request's `timeoutMs` counts from when it is sent, not while it waits, and an
-aborted `signal` takes a waiting request out of the queue at once. A module's own
+aborted `signal` takes a waiting request out of the queue at once. `HttpRequestOptions.onSend`
+is called when the request is sent (when its turn comes), never for one aborted while it
+waits: a module that calls off stale work (RAC's bulk search, when the dates change) can then
+call off what is still waiting and let what the site is already answering finish. A module's own
 `createLimiter` honours priorities as well: it starts a waiting interactive task before waiting
 background ones (first in, first out within each), and the task keeps its caller's priority,
 so the person's request still goes next. Pacing covers `ctx.http` only, not `ctx.browser`'s
@@ -811,8 +814,8 @@ it has an answer for:
 | --- | --- |
 | `key` | The place's location key, `makeLocationKey(ctx.id, externalId)`. Main keeps only entries for places of this provider that are in the stored catalogue (and in the area Explore shows). |
 | `availableUnits` | How many units are free on **every** night of the stay. A unit free on some nights only does not count. |
-| `bookableUnits` | How many units can be booked online for these dates at all, free or not: the place's total, or 0 when none can be booked (not released yet, closed, or past the provider's booking window). |
-| `byKind` | Optional: the same two counts for each unit kind the place has, e.g. `{ campsite: { availableUnits: 2, bookableUnits: 5 }, cabin: { availableUnits: 0, bookableUnits: 3 } }`, so a filter on cabins counts only the cabins. Set it for a place with more than one kind. Main passes it on as you give it. |
+| `bookableUnits` | Optional: how many units can be booked online for these dates at all, free or not: the place's total, or 0 when none can be booked (not released yet, closed, or past the provider's booking window). Leave it out when the provider gives no unit total (RAC counts free units only); 0 still means none can be booked. |
+| `byKind` | Optional: the same two counts for each unit kind the place has, e.g. `{ campsite: { availableUnits: 2, bookableUnits: 5 }, cabin: { availableUnits: 0, bookableUnits: 3 } }`, so a filter on cabins counts only the cabins. Set it for a place with more than one kind. Each kind's `bookableUnits` is optional too, by the same rule; a sum of kinds has no total when any kind in it has none. Main passes it on as you give it. |
 
 The names invite a swap: `availableUnits` is the smaller number, the free ones, and
 `bookableUnits` the total. Explore reads them as:
@@ -820,12 +823,13 @@ The names invite a swap: `availableUnits` is the smaller number, the free ones, 
 | Entry | The card says |
 | --- | --- |
 | `availableUnits` above 0 | "2 of 5 sites available" (only "2 sites available" if `bookableUnits` is smaller) |
-| `availableUnits` 0, `bookableUnits` above 0 | "No site free every night" |
+| `availableUnits` above 0, no `bookableUnits` | "2 sites free" ("2 free" on its map pin), never "of" a total |
+| `availableUnits` 0, `bookableUnits` above 0 or left out | "No site free every night" |
 | Both 0 | "No sites open for these dates" |
 | No entry for the place | "Availability unknown" |
 
 So leave out a place you have no answer for rather than send zeros, which would read as full or
-not open. ParkStay's own names read the other way round (its `total_available` is a
+not open, and leave out `bookableUnits` rather than guess a total. ParkStay's own names read the other way round (its `total_available` is a
 campground's site count, `total_bookable` the sites free every night): map a provider's numbers
 by what they mean, not by their names.
 
@@ -1471,8 +1475,10 @@ A paced provider's catalogue bounds (`minRequestIntervalMs` above 0) grow with t
 may wait: for each request the call counts, the bound adds the gap before it (1 s for the
 person's requests, the provider's own interval for background ones) and a 10 s allowance. A
 place's detail and its check count 2 requests (their own and one already in flight ahead of
-them); Explore's availability (bulk `availability.search`) and a `full` catalogue sync count one
-per stored place, and at least 1. With a 10 s interval and 8 places, Explore's availability gets
+them), so a paced provider's bulk `search` must send its requests one after another, never all
+at once: a place page opened meanwhile then waits for one of them, not the whole search. Explore's
+availability (bulk `availability.search`) and a `full` catalogue sync count one per stored place,
+and at least 1. With a 10 s interval and 8 places, Explore's availability gets
 20 s + 8 × 11 s = 108 s, and a sync 60 s + 8 × 20 s = 220 s. A `search` catalogue's pages and
 the sign-in check keep their bounds.
 

@@ -75,6 +75,8 @@ export interface RacAjaxOptions {
   /** The park's book-now page, sent as the `Referer`, as RAC's own page does. */
   referer: string;
   signal?: AbortSignal;
+  /** Called once the POST is sent (`HttpRequestOptions.onSend`), not while it waits its turn. */
+  onSend?: () => void;
 }
 
 export interface RacClientDeps {
@@ -219,6 +221,7 @@ export class RacClient {
           );
     return this.send('POST', path, {
       signal: options.signal,
+      onSend: options.onSend,
       body: body.toString(),
       headers: {
         Accept: 'application/json, text/javascript, */*; q=0.01',
@@ -236,6 +239,8 @@ export class RacClient {
     request: {
       query?: Record<string, QueryValue>;
       signal?: AbortSignal;
+      /** Called when the first hop is sent; a redirect is the same request. */
+      onSend?: () => void;
       headers: Record<string, string>;
       body?: string;
     }
@@ -261,6 +266,7 @@ export class RacClient {
           body,
           signal,
           redirect: 'manual',
+          ...(hop === 0 && request.onSend ? { onSend: request.onSend } : {}),
         });
         const location = response.headers.get('location');
         if (!REDIRECT_STATUSES.has(response.status) || location === null) {

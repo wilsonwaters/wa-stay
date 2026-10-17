@@ -164,6 +164,29 @@ describe('RacClient: host and headers', () => {
     expect(http.hops[1].headers.get('content-type')).toBeNull();
   });
 
+  it('says once that an AJAX POST was sent, redirects included, and never for one called off while it waits', async () => {
+    const client = makeClient((hop) =>
+      hop.method === 'POST'
+        ? { status: 302, headers: { location: '/done/' }, delayMs: 20 }
+        : { body: '{}' }
+    );
+    const onSend = jest.fn();
+    const first = client.postAjax('/ajax.php', { a: 1 }, { referer: BOOK_NOW, onSend });
+    const controller = new AbortController();
+    const waiting = jest.fn();
+    const second = client.postAjax(
+      '/ajax.php',
+      { a: 2 },
+      { referer: BOOK_NOW, signal: controller.signal, onSend: waiting }
+    );
+    controller.abort();
+    expect(isAbortError(await second.catch((e: unknown) => e))).toBe(true);
+    await first;
+    expect(onSend).toHaveBeenCalledTimes(1);
+    expect(waiting).not.toHaveBeenCalled();
+    expect(http.hops).toHaveLength(2);
+  });
+
   it('sends one request at a time', async () => {
     const client = makeClient();
     await Promise.all([client.getPage('/a/'), client.getPage('/b/'), client.getPage('/c/')]);

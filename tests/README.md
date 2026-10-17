@@ -233,7 +233,7 @@ npm run test:electron -- http-transport
 
 ## Electron smoke tests (E2E)
 
-`tests/e2e/` holds the Electron smoke suite: 24 journeys in 13 specs through the **built** app
+`tests/e2e/` holds the Electron smoke suite: 25 journeys in 14 specs through the **built** app
 (main, preload and renderer together), driven by Playwright's `_electron` launcher. It
 catches what Jest cannot: startup crashes, preload or sandbox breakage, CSP violations,
 broken routing and focus, and a quit that hangs.
@@ -303,8 +303,8 @@ The `launchWaStay()` fixture starts the app with:
   other built-in providers are not registered, so the journeys' counts and pre-selections
   (ParkStay's 11 places, ParkStay chosen for you) hold however many providers are built in. A
   journey that counts or expects a pre-selection passes its list explicitly
-  (`rac-catalogue.spec.ts` and `rac-watch.spec.ts` pass `['parkstay', 'rac']`: RAC's eight
-  parks beside ParkStay's 11 campgrounds). An id that is not a built-in provider stops the app at start-up, with the reason
+  (`rac-catalogue.spec.ts`, `rac-watch.spec.ts` and `rac-explore.spec.ts` pass
+  `['parkstay', 'rac']`: RAC's eight parks beside ParkStay's 11 campgrounds). An id that is not a built-in provider stops the app at start-up, with the reason
   in the main process's output.
 - **A production renderer**: `NODE_ENV=production`, no `ELECTRON_RENDERER_URL`, no Mapbox
   token, `TZ=Australia/Perth`, `LANG=en_AU.UTF-8`.
@@ -352,8 +352,10 @@ Recorded provider responses live in `tests/e2e/fixtures/http/<providerId>/`, wit
 instead, so it never goes stale: `writeDatedFixtures(tempDir('dated'))`
 (`tests/e2e/support/dated-fixtures.ts`) copies `fixtures/http/` and moves every RAC
 availability answer (its night keys, the dates in `online_booking_url`, and its route's
-`available_from`) to a stay arriving 7 days after today in Perth; the launch passes
-`env: { WA_STAY_E2E_FIXTURES_DIR: fixtures.dir }`. `rac-watch.spec.ts` uses it.
+`available_from` if it has one; a route by `blog_id` alone moves from the answer's first night)
+to a stay arriving 7 days after today in Perth (`arrivalInDays` for another); the launch passes
+`env: { WA_STAY_E2E_FIXTURES_DIR: fixtures.dir }`. `rac-watch.spec.ts` and
+`rac-explore.spec.ts` (tomorrow, `arrivalInDays: 1`) use it.
 
 ### Adding a journey
 
