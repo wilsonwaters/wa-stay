@@ -240,14 +240,19 @@ export function createContainer({
     // Recorded answers need no pacing: fixture mode stays fast for the smoke tests.
     unpaced: Boolean(fixtureMode),
   };
+  // One booking per night across snipes and auto-hold watches; it also knows the holds in flight
+  const nightGuard = new NightGuard(repositories.snipes, repositories.watches);
   // Turning off a provider's holds, or signing out, would lose a queue place, a hold being
-  // placed, or a hold awaiting payment.
+  // placed (a snipe sniping, or any hold whose `holds.create` is still running), or a hold
+  // awaiting payment.
   const isBusy = (providerId: string, now: Date): boolean =>
+    nightGuard.reserving(providerId) ||
     repositories.snipes.countByStatus(providerId, [
       SnipeStatus.QUEUEING,
       SnipeStatus.SNIPING,
       SnipeStatus.HELD,
-    ]) > 0 || repositories.watches.countUnexpiredHolds(providerId, now) > 0;
+    ]) > 0 ||
+    repositories.watches.countUnexpiredHolds(providerId, now) > 0;
   const providers = new ProviderRegistry({ logger });
   // The person's experiment choices apply here, as each provider registers: after a restart
   const experiments = new ProviderExperiments({ state: providerState, providers, isBusy, logger });
@@ -326,7 +331,6 @@ export function createContainer({
     }
   );
   // Core services resolve every provider through the registry and its capabilities.
-  const nightGuard = new NightGuard(repositories.snipes, repositories.watches);
   const bookingService = new BookingService({
     bookings: repositories.bookings,
     providers,

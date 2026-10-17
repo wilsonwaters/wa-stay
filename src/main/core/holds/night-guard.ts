@@ -14,6 +14,10 @@
  * releases the reservation once the provider has answered; a placed hold is in the database
  * by then and keeps blocking from there. A conflict with a hold still in flight is reported
  * as transient: that hold may fail, so the other caller tries again later.
+ *
+ * `reserving(providerId)` says whether a hold is being placed on the provider right now: the
+ * container's `isBusy` counts it, so neither a sign-out nor turning off a holds experiment
+ * lands while `holds.create` is running.
  */
 
 import type { ProviderId } from '@shared/types/provider.types';
@@ -91,5 +95,10 @@ export class NightGuard {
     const entry = { ...request };
     this.pending.add(entry);
     return { ok: true, reservation: { release: () => void this.pending.delete(entry) } };
+  }
+
+  /** Whether a hold is being placed on the provider: a reservation not yet released. */
+  reserving(providerId: ProviderId): boolean {
+    return [...this.pending].some((request) => request.providerId === providerId);
   }
 }

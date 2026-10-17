@@ -39,9 +39,9 @@ const { autoUpdater } = jest.requireMock('electron-updater') as { autoUpdater: E
 const AUTO_CART: ProviderExperiment = {
   id: 'autoCart',
   label: 'Hold a stay in the cart',
-  description: 'When a watch finds your stay, WA Stay puts it in the cart for you.',
+  description: 'When a watch or a snipe finds your stay, WA Stay puts it in the cart for you.',
   warning: 'Only after a booking of your own has worked.',
-  turnsOn: ['holds'],
+  turnsOn: ['holds', 'snipes'],
 };
 const BUSY = 'A stay is held on ExpStay. Pay for it or let it go first.';
 const OFF: ProviderExperimentState = { id: 'autoCart', enabled: false, active: false };
@@ -65,15 +65,20 @@ describe('provider experiments over IPC', () => {
     fs.rmSync(dir, { recursive: true, force: true });
   });
 
-  /** Starts WA Stay on the database file (quitting the running one first). */
-  async function start(options: { fixtureMode?: boolean } = {}): Promise<AppContainer> {
+  /**
+   * Starts WA Stay on the database file (quitting the running one first). `holdDelayMs`: each
+   * `holds.create` takes this long, so a test can act while a hold is being placed.
+   */
+  async function start(
+    options: { fixtureMode?: boolean; holdDelayMs?: number } = {}
+  ): Promise<AppContainer> {
     await container?.dispose();
     fake = createFakeProvider({
       id: 'expstay',
       shortName: 'ExpStay',
-      capabilities: { snipes: false },
       experiments: [AUTO_CART],
       availability: { '1': { u1: 'available' } },
+      ...(options.holdDelayMs ? { delays: { holds: options.holdDelayMs } } : {}),
     });
     container = createContainer({
       db: openDatabase(file),
@@ -111,6 +116,13 @@ describe('provider experiments over IPC', () => {
         )
         .get(providerId) as { value: string } | undefined
     )?.value;
+  /** Resolves once the fake's `holds.create` has been called: a hold is being placed. */
+  const holdStarted = async () => {
+    for (let i = 0; i < 400 && !fake.calls.some((c) => c.module === 'holds'); i++) {
+      await new Promise((resolve) => setTimeout(resolve, 5));
+    }
+    expect(fake.calls.filter((c) => c.module === 'holds')).toHaveLength(1);
+  };
   const manifest = async () =>
     (await call<ProviderManifest[]>('providers:list')).data!.find((m) => m.id === 'expstay')!;
 
@@ -254,6 +266,51 @@ describe('provider experiments over IPC', () => {
       expect(container!.repositories.notifications.findByUserId(userId)).toEqual([
         expect.objectContaining({ providerId: 'expstay', relatedId: watch.id }),
       ]);
+    });
+
+    it('turning off is ACCOUNT_BUSY while a watch auto-hold is being placed, and the hold it lands keeps it busy', async () => {
+      await start({ holdDelayMs: 200 });
+      const watch = await container!.watchService.create(userId, {
+        providerId: 'expstay',
+        name: 'Banksia watch',
+        location: { externalId: '1', name: 'Banksia Camp' },
+        stay: { arrival: '2026-12-01', departure: '2026-12-04', adults: 2 },
+        checkIntervalMinutes: 60,
+        autoHold: true,
+      });
+      const running = container!.watchService.execute(watch.id);
+      await holdStarted();
+
+      // Nothing is held yet, but `holds.create` is running
+      expect(container!.repositories.watches.countUnexpiredHolds('expstay', new Date())).toBe(0);
+      expect(await setCart(false)).toMatchObject({
+        success: false,
+        code: 'ACCOUNT_BUSY',
+        error: BUSY,
+      });
+      expect(row()).toBe('{"autoCart":true}');
+
+      expect((await running).hold).toEqual(expect.objectContaining({ reference: 'EXPSTAY-1' }));
+      expect(await setCart(false)).toMatchObject({ success: false, code: 'ACCOUNT_BUSY' });
+      expect(row()).toBe('{"autoCart":true}');
+    });
+
+    it('turning off is ACCOUNT_BUSY while a manual run of an armed snipe is placing its hold', async () => {
+      await start({ holdDelayMs: 200 });
+      const snipe = await container!.siteSniperService.create(userId, snipeInput);
+      expect(container!.repositories.snipes.findById(snipe.id)?.status).toBe(SnipeStatus.ARMED);
+
+      const running = container!.siteSniperService.execute(snipe.id, { manual: true });
+      await holdStarted();
+      expect(await setCart(false)).toMatchObject({
+        success: false,
+        code: 'ACCOUNT_BUSY',
+        error: BUSY,
+      });
+      expect(row()).toBe('{"autoCart":true}');
+
+      expect((await running).result).toMatchObject({ held: true, holdReference: 'EXPSTAY-1' });
+      expect(await setCart(false)).toMatchObject({ success: false, code: 'ACCOUNT_BUSY' });
     });
 
     it("the provider's own state cannot read or change the row", async () => {

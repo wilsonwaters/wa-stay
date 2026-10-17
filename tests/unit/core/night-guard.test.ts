@@ -131,4 +131,22 @@ describe('NightGuard', () => {
     if (first.ok) first.reservation.release();
     expect(guard.tryReserve(request('2026-12-02', '2026-12-04', 'fake', 2)).ok).toBe(true);
   });
+
+  it('reserving(providerId): a hold is being placed on that provider until its reservation is released (R17 review)', () => {
+    expect(guard.reserving('fake')).toBe(false);
+    const first = guard.tryReserve(request('2026-12-01', '2026-12-03', 'fake', 1));
+    const other = guard.tryReserve(request('2026-12-01', '2026-12-03', 'fake2', 2));
+
+    expect(guard.reserving('fake')).toBe(true);
+    expect(guard.reserving('fake2')).toBe(true);
+    expect(guard.reserving('parkstay')).toBe(false);
+    if (first.ok) {
+      first.reservation.release();
+      first.reservation.release();
+    }
+    expect(guard.reserving('fake')).toBe(false);
+    expect(guard.reserving('fake2')).toBe(true);
+    if (other.ok) other.reservation.release();
+    expect(guard.reserving('fake2')).toBe(false);
+  });
 });
