@@ -5,7 +5,7 @@
  * `register(factory, context)` checks, in order:
  * 1. the provider id, and that it is not taken;
  * 2. the factory's manifest: `ProviderManifestSchema`, then the manifest-flag rules
- *    (`MANIFEST_RULES`), e.g. `snipes` needs `holds`, `availability` and release modes;
+ *    (`MANIFEST_RULES`), e.g. `snipes` needs `availability` and release modes (§12.35);
  * 3. the context, built from the parsed manifest when `context` is a function;
  * 4. the provider the factory builds: links, a valid `auth` definition, and a module behind
  *    every capability (`CONSISTENCY_RULES`).
@@ -58,7 +58,8 @@ interface CapabilityModules {
     availability: AvailabilityModule & Required<Pick<AvailabilityModule, 'search'>>;
   };
   holds: { holds: HoldsModule };
-  snipes: { availability: AvailabilityModule; holds: HoldsModule; release: ReleasePolicy };
+  // Holds are optional: a snipe without them alerts (§12.35)
+  snipes: { availability: AvailabilityModule; holds?: HoldsModule; release: ReleasePolicy };
   bookingImport: { bookings: BookingsModule & Required<Pick<BookingsModule, 'get'>> };
   accessGate: { access: AccessGate };
 }
@@ -87,11 +88,10 @@ const hasCheck = (p: AccommodationProvider): boolean => fn(p.availability?.check
 /** The manifest-flag rules on the manifest as it is. */
 const FLAG_RULES: readonly ManifestRule[] = [
   {
-    rule: 'snipes needs holds and availability',
+    // Holds are optional: a snipe without them alerts (§12.35, amends §12.30)
+    rule: 'snipes needs availability',
     violation: ({ capabilities: c }) =>
-      c.snipes && !(c.holds && c.availability)
-        ? 'capability snipes needs capabilities holds and availability'
-        : undefined,
+      c.snipes && !c.availability ? 'capability snipes needs capability availability' : undefined,
   },
   {
     rule: 'snipes needs release modes',
@@ -243,9 +243,8 @@ export const CONSISTENCY_RULES: readonly ConsistencyRule[] = [
   {
     rule: 'snipes',
     violation: (p) =>
-      p.manifest.capabilities.snipes &&
-      !(hasCheck(p) && p.holds !== undefined && fn(p.release?.computeReleaseAt))
-        ? 'capability snipes needs availability, holds and release'
+      p.manifest.capabilities.snipes && !(hasCheck(p) && fn(p.release?.computeReleaseAt))
+        ? 'capability snipes needs availability and release'
         : undefined,
   },
   {

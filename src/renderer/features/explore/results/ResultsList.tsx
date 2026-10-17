@@ -9,6 +9,7 @@ import {
   Store,
 } from 'lucide-react';
 import type { LocationSummary } from '../../../../shared/types/catalog.types';
+import type { UnitNoun } from '../../../../shared/utils/unit-noun';
 import type { PlaceLinkQuery } from '../../../app/routes';
 import { LocationCard, type CardAvailability } from '../../../components/LocationCard';
 import { placesLabel } from '../../../components/locationFormat';
@@ -35,8 +36,9 @@ export type ResultsState =
   /**
    * "Available only" is on and no place has a unit free for the dates (`range`), or, with
    * `checked` false, no provider could be asked (failed, or offline with nothing saved).
+   * `noun`: what the units counted are called ("No places have sites for 6–8 Nov").
    */
-  | { kind: 'none-available'; range: string; checked: boolean }
+  | { kind: 'none-available'; range: string; checked: boolean; noun: UnitNoun }
   | { kind: 'results' };
 
 export interface ResultsListProps {
@@ -338,7 +340,7 @@ export function ResultsList({
           icon={<CalendarX size={24} />}
           title={
             state.checked
-              ? `No places have sites for ${state.range}`
+              ? `No places have ${state.noun.many} for ${state.range}`
               : `Availability couldn't be checked for ${state.range}`
           }
           description={

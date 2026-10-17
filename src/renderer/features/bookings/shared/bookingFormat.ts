@@ -7,7 +7,7 @@ import { format } from 'date-fns';
 import type { Booking } from '../../../../shared/types/booking.types';
 import type { UnitSummary } from '../../../../shared/types/catalog.types';
 import type { ProviderManifest, StayParams } from '../../../../shared/types/provider.types';
-import { unitNoun } from '../../../components/locationFormat';
+import { capitalise, providerUnitKinds, unitNounFrom } from '../../../../shared/utils/unit-noun';
 import { stayDatesLabel, stayNightsLabel } from '../../../components/stay/stayFormat';
 import { parseIsoDate } from '../../../components/ui/calendar';
 
@@ -71,8 +71,8 @@ export function unitLabel(
   manifest: ProviderManifest | undefined,
   units?: readonly UnitSummary[]
 ): string | undefined {
-  const noun = unitNoun(manifest?.locationKinds[0]).one;
-  const Noun = noun.charAt(0).toUpperCase() + noun.slice(1);
+  // A booking keeps no unit kinds: its provider's default (ParkStay's sites)
+  const Noun = capitalise(unitNounFrom(providerUnitKinds(manifest)).one);
   const names = booking.unitIds.flatMap((id) => {
     if (CLASS_UNIT_ID.test(id)) {
       const known = units?.find((unit) => unit.unitId === id)?.unitName;

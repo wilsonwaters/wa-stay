@@ -270,20 +270,22 @@ export const exampleApiManifest: ProviderManifest = {
 ### Location kinds
 
 `locationKinds` comes from a fixed list (`LOCATION_KINDS` in `src/shared/types/provider.types.ts`).
-A place's kind sets its label and what its units are called on Explore's cards and the place
-page ("2 of 6 cabins available"):
+A place's kind sets its label. What its units are called, on Explore's cards, the place page and
+in alerts ("2 of 6 cabins available"), comes from their unit kinds (each unit's `unitKind`, else
+the place's `unitKinds`): one stay type gives its own noun (site, cabin, room, bunk or tent), and
+more than one, or `other`, gives "spots". A place that gives no unit kinds has those of its kind:
 
 | Kind | Shown as | Its units are called |
 | --- | --- | --- |
 | `campground` | Campground | sites |
 | `caravan-park` | Caravan park | sites |
-| `holiday-park` | Holiday park | sites |
+| `holiday-park` | Holiday park | spots |
 | `cabin` | Cabin | cabins |
 | `hut` | Hut | bunks |
 | `glamping` | Glamping | tents |
-| `farm-stay` | Farm stay | rooms |
-| `home` | Home | rooms |
-| `other` | Place to stay | units |
+| `farm-stay` | Farm stay | spots |
+| `home` | Home | spots |
+| `other` | Place to stay | spots |
 
 Map the provider's own words to these with an explicit table, and a word you do not know to
 `other` (so keep `other` in `locationKinds`).
@@ -301,7 +303,7 @@ behind it (`CONSISTENCY_RULES` and `MANIFEST_RULES` in `src/main/providers/regis
 | `bulkAvailability` | `availability.search` | Free-unit counts on Explore's pins and cards, "Available only" |
 | `watches` | `availability.check` | The provider in Watches |
 | `holds` | `holds.create` and `holds.paymentUrl` | "Hold a site automatically when found" on watches, and the payment window ([holds](#6-holds)) |
-| `snipes` | `availability`, `holds` and `release`, plus at least one release mode that `release.supports()` accepts | The provider in Site Sniper |
+| `snipes` | `availability` and `release`, plus at least one release mode that `release.supports()` accepts; `holds` is optional | The provider in Site Sniper: its snipes alert with a link to book on its site when the dates are free, or, with `holds`, can hold one for the person to pay |
 | `bookingImport` | `bookings.get` | "Import booking" on the Bookings page |
 | `accessGate` | `access` | Queue handling and the access-status chip; required by any release mode with `usesAccessGate` |
 | `account` | `auth` unless `none` | A row in Settings → Accounts ([sign-in](#7-sign-in)) |
@@ -389,13 +391,24 @@ interface ReleaseModeDescriptor {
   label: string; // "When new dates open"
   description: string;
   usesAccessGate: boolean; // a snipe in this mode waits in the provider's queue
+  maxWindowMinutes?: number; // the longest a snipe keeps trying after the release (1–1440)
   fields?: StayFieldDescriptor[]; // extra inputs this mode needs
 }
 ```
 
 Site Sniper shows them as choices, and the core asks your `release.computeReleaseAt({ mode,
 … })` for the instant. A mode with `usesAccessGate` needs `capabilities.accessGate`.
-ParkStay's modes are `daily_rollover`, `scheduled` and `cancellation`.
+`maxWindowMinutes` caps how long a snipe keeps checking after the release: the core clamps
+the snipe's window to it, so a provider whose terms ask for gentle use can bound it (a snipe
+also never polls faster than `release.pollFloorMs`). ParkStay's modes are `daily_rollover`,
+`scheduled` and `cancellation`, with no cap.
+
+Without `holds`, every snipe of the provider is an alert: when the dates are free it ends
+**Alert sent** with a desktop alert and email that link to your booking page (the unit's
+`bookingUrl`, else the check's, else `links.booking(externalId, stay, unitId)`), and holds
+nothing. With `holds`, the person chooses per snipe (`action: 'alert' | 'hold'`). A 403 or 429
+from your client while a snipe checks or holds (`isProviderBlock`) ends it **Failed** with the
+reason: nothing retries it.
 
 ### Bulk availability stay fields
 
@@ -1447,8 +1460,10 @@ interface AccessGate {
 When dates become bookable, for Site Sniper (`release`). ParkStay: `release-policy.ts`.
 
 - `supports(mode)` must accept every `releaseModes` id (the registry checks it).
-- `computeReleaseAt({ mode, externalId, stay, params, requestedAt, now, signal })` returns the
-  instant the stay opens, or `null` for "poll continuously" (a cancellation mode).
+- `computeReleaseAt({ mode, externalId, stay, params, requestedAt, unitIds, unitKinds, now,
+  signal })` returns the instant the stay opens, or `null` for "poll continuously" (a
+  cancellation mode). `unitIds` and `unitKinds` are the snipe's unit choice (none: any unit),
+  for a policy that times a category differently.
 - `describe(externalId)` returns a sentence for the location's page, such as "Bookings open
   180 days ahead at 2:00 am AWST".
 - `pollFloorMs: { window, continuous }` are the fastest the core may poll inside a release

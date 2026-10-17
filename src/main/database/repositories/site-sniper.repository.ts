@@ -1,13 +1,17 @@
-import { BaseRepository } from './base.repository';
+import { BaseRepository, readInstant } from './base.repository';
 import {
   locationKeyOf,
   SiteSnipe,
   SiteSnipeInput,
   SiteSnipeUpdate,
+  SNIPE_ACTIONS,
+  type SnipeAction,
+  type SnipeAlert,
   type SnipeListFilter,
 } from '@shared/types';
 import { SnipeResult, SnipeReleaseMode, SnipeStatus } from '@shared/types/common.types';
 import { AppError } from '../../utils/app-error';
+import { logger } from '../../utils/logger';
 import {
   readStay,
   readStayParams,
@@ -49,8 +53,75 @@ interface SiteSnipeRow extends StayRow {
   notes: string | null;
   // Migration v11
   unit_kinds: string | null;
+  // Migration v12
+  action: string | null;
+  alert: string | null;
   created_at: string;
   updated_at: string;
+}
+
+const log = logger.child({ module: 'repositories' });
+
+const ACTIONS: ReadonlySet<string> = new Set(SNIPE_ACTIONS);
+
+/** The action to write: `hold` when none is given (the column's default); anything else refused. */
+function actionToWrite(action: SnipeAction | undefined): SnipeAction {
+  if (action === undefined) return 'hold';
+  if (!ACTIONS.has(action)) {
+    throw new AppError('VALIDATION', `Unknown snipe action "${String(action)}"`, {
+      issues: ['action'],
+    });
+  }
+  return action;
+}
+
+/**
+ * The stored action. NULL reads as the column's default, `hold`. Anything else (only a hand
+ * edit could write it) reads as `alert`, which never places a hold, with a warning.
+ */
+function readAction(value: string | null, where: string): SnipeAction {
+  if (value === null || value === 'hold') return 'hold';
+  if (value === 'alert') return 'alert';
+  log.warn(`${where}: action is not "hold" or "alert"; read as "alert"`);
+  return 'alert';
+}
+
+/** `alert` as stored: JSON with an ISO `at`. Only `null` is NULL. */
+function alertToWrite(alert: SnipeAlert): string {
+  return JSON.stringify({ ...alert, at: alert.at.toISOString() });
+}
+
+/** JSON text as a plain object, or undefined. */
+function parseObject(json: string): Record<string, unknown> | undefined {
+  try {
+    const value: unknown = JSON.parse(json);
+    return value !== null && typeof value === 'object' && !Array.isArray(value)
+      ? (value as Record<string, unknown>)
+      : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * The stored alert, or none. NULL or empty reads as none; anything but an object with a
+ * readable `at` and a `unitId` reads as none with a warning. Optional members that are not
+ * text are dropped.
+ */
+function readAlert(json: string | null, where: string): SnipeAlert | undefined {
+  if (json === null || json === '') return undefined;
+  const raw = parseObject(json);
+  const at = typeof raw?.at === 'string' ? readInstant(raw.at) : undefined;
+  if (!raw || !at || Number.isNaN(at.getTime()) || typeof raw.unitId !== 'string') {
+    log.warn(`${where}: alert is not a readable alert; read as none`);
+    return undefined;
+  }
+  const alert: SnipeAlert = { at, unitId: raw.unitId };
+  for (const key of ['unitName', 'bookingUrl', 'note'] as const) {
+    const value = raw[key];
+    if (typeof value === 'string' && value !== '') alert[key] = value;
+  }
+  return alert;
 }
 
 /**
@@ -68,10 +139,10 @@ export class SiteSniperRepository extends BaseRepository<SiteSnipe> {
       INSERT INTO site_snipes (
         user_id, provider_id, name, location_external_id, location_name, area_name, unit_ids,
         unit_kinds, arrival_date, departure_date, num_adults, num_children, num_infants,
-        num_concessions, stay_params, release_mode, release_at, access_gate_enabled,
+        num_concessions, stay_params, release_mode, action, release_at, access_gate_enabled,
         lead_time_seconds, poll_interval_ms, window_duration_ms, status, is_active, max_attempts,
         notes
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
     const result = stmt.run(
@@ -86,6 +157,7 @@ export class SiteSniperRepository extends BaseRepository<SiteSnipe> {
       ...stayValues(input.stay),
       JSON.stringify(input.stayParams ?? {}),
       input.releaseMode,
+      actionToWrite(input.action),
       this.formatDate(input.releaseAt),
       input.accessGateEnabled ? 1 : 0,
       input.leadTimeSeconds ?? 120,
@@ -136,6 +208,7 @@ export class SiteSniperRepository extends BaseRepository<SiteSnipe> {
     }
     if (updates.stayParams !== undefined) push('stay_params', JSON.stringify(updates.stayParams));
     if (updates.releaseMode !== undefined) push('release_mode', updates.releaseMode);
+    if (updates.action !== undefined) push('action', actionToWrite(updates.action));
     if (updates.releaseAt !== undefined) push('release_at', this.formatDate(updates.releaseAt));
     if (updates.accessGateEnabled !== undefined) {
       push('access_gate_enabled', updates.accessGateEnabled ? 1 : 0);
@@ -153,7 +226,7 @@ export class SiteSniperRepository extends BaseRepository<SiteSnipe> {
     }
 
     const snipe = this.findById(id);
-    if (!snipe) throw new AppError('NOT_FOUND', 'Site snipe not found');
+    if (!snipe) throw new AppError('NOT_FOUND', 'Snipe not found');
     return snipe;
   }
 
@@ -267,16 +340,17 @@ export class SiteSniperRepository extends BaseRepository<SiteSnipe> {
   }
 
   /**
-   * Activate a snipe (arm it).
+   * Activate a snipe (arm it). An alert it sent before is cleared: an armed snipe has none.
    */
   activate(id: number): void {
     this.db
-      .prepare(`UPDATE site_snipes SET is_active = 1, status = ? WHERE id = ?`)
+      .prepare(`UPDATE site_snipes SET is_active = 1, status = ?, alert = NULL WHERE id = ?`)
       .run(SnipeStatus.ARMED, id);
   }
 
   /**
-   * Deactivate a snipe. Preserves terminal statuses (held/booked); otherwise disables.
+   * Deactivate a snipe. Preserves terminal statuses (held, booked, alerted, expired, failed);
+   * otherwise disables.
    */
   deactivate(id: number): void {
     const snipe = this.findById(id);
@@ -284,6 +358,7 @@ export class SiteSniperRepository extends BaseRepository<SiteSnipe> {
       snipe &&
       (snipe.status === SnipeStatus.HELD ||
         snipe.status === SnipeStatus.BOOKED ||
+        snipe.status === SnipeStatus.ALERTED ||
         snipe.status === SnipeStatus.EXPIRED ||
         snipe.status === SnipeStatus.FAILED);
     if (terminal) {
@@ -366,6 +441,28 @@ export class SiteSniperRepository extends BaseRepository<SiteSnipe> {
     })();
   }
 
+  /**
+   * The dates were free and the person is alerted: ALERTED with what it found, the attempt
+   * counted and checked at the alert's time, nothing due, inactive, in one statement (a restart
+   * never sees an active snipe that alerted). Nothing is held.
+   */
+  markAlerted(id: number, alert: SnipeAlert): void {
+    this.db
+      .prepare(
+        `UPDATE site_snipes
+         SET status = ?, last_result = ?, alert = ?, last_error = NULL, is_active = 0,
+             attempts_count = attempts_count + 1, last_checked_at = ?, next_check_at = NULL
+         WHERE id = ?`
+      )
+      .run(
+        SnipeStatus.ALERTED,
+        SnipeResult.ALERTED,
+        alertToWrite(alert),
+        alert.at.toISOString(),
+        id
+      );
+  }
+
   /** Ends the snipe: a terminal status (EXPIRED, FAILED), its result and message, inactive. */
   finish(id: number, status: SnipeStatus, result: SnipeResult, error?: string): void {
     this.db
@@ -432,6 +529,7 @@ export class SiteSniperRepository extends BaseRepository<SiteSnipe> {
 
   protected mapRow(row: SiteSnipeRow): SiteSnipe {
     const where = `site_snipes ${row.id}`;
+    const alert = readAlert(row.alert, where);
     return {
       id: row.id,
       userId: row.user_id,
@@ -448,6 +546,7 @@ export class SiteSniperRepository extends BaseRepository<SiteSnipe> {
       unitKinds: readUnitKinds(row.unit_kinds, where),
       stayParams: readStayParams(row.stay_params, where),
       releaseMode: row.release_mode as SnipeReleaseMode,
+      action: readAction(row.action, where),
       releaseAt: this.parseDate(row.release_at),
       accessGateEnabled: Boolean(row.access_gate_enabled),
       leadTimeSeconds: row.lead_time_seconds,
@@ -466,6 +565,7 @@ export class SiteSniperRepository extends BaseRepository<SiteSnipe> {
       holdUnitId: row.hold_unit_id || undefined,
       paymentUrl: row.payment_url || undefined,
       bookedReference: row.booked_reference || undefined,
+      ...(alert ? { alert } : {}),
       notes: row.notes || undefined,
       createdAt: this.parseDate(row.created_at)!,
       updatedAt: this.parseDate(row.updated_at)!,

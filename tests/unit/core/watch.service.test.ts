@@ -397,7 +397,7 @@ describe('WatchService', () => {
       expect(h.notifications.notifyWatchHeld).toHaveBeenCalledWith(
         expect.objectContaining({ id: watch.id }),
         expect.objectContaining({ reference: 'FAKE-1' }),
-        'Site u1',
+        expect.objectContaining({ unitName: 'Site u1' }),
         WHOLE_STAY
       );
       const held = await h.watches.get(watch.id);

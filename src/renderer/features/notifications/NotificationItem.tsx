@@ -22,6 +22,7 @@ const TYPE_ICONS: Record<NotificationType, LucideIcon> = {
   [NotificationType.WATCH_FOUND]: BellRing,
   [NotificationType.SNIPE_HELD]: Timer,
   [NotificationType.SNIPE_BOOKED]: CalendarCheck,
+  [NotificationType.SNIPE_ALERT]: BellRing,
   [NotificationType.BOOKING_CONFIRMED]: CalendarCheck,
   [NotificationType.ERROR]: CircleAlert,
   [NotificationType.WARNING]: TriangleAlert,

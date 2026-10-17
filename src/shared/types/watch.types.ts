@@ -133,6 +133,8 @@ export interface WatchMatch {
   unitId: string;
   unitName: string;
   unitType?: string;
+  /** The unit's kind, when the provider gave one: what copy calls it (`nounForKinds`). */
+  unitKind?: UnitKind;
   arrival: string;
   departure: string;
   partial: boolean;

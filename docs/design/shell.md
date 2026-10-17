@@ -164,7 +164,7 @@ With no `window.api` (the renderer opened in a plain browser with `npm run dev:r
 | Explore below 1024 px | button | Show map · Show list |
 | Place page title | heading level 1 | The place's name, or "This place isn't available" |
 | Place page | link, region, button | Explore (the back link) · Check your dates · Check availability |
-| Place hand-offs | link | Book on {shortName} (opens in your browser) · Watch for availability · Snipe a site, coming soon |
+| Place hand-offs | link | Book on {shortName} (opens in your browser) · Watch for availability · Snipe a site, coming soon (the place's own noun: "Snipe a cabin") |
 | Place gallery | button, dialog | Show all {n} photos · Photos of {name} |
 | Place results | region, table, switch | Availability · Availability by night, {dates} · Fully available only |
 | Bookings | heading level 1, button, tablist, tab | Bookings · Add booking (· Import booking, only when a provider can import) · Trips · "Upcoming, 2 trips", "Past, 1 trip", "Cancelled, 0 trips" |
@@ -173,7 +173,7 @@ With no `window.api` (the renderer opened in a plain browser with `npm run dev:r
 | Site Sniper | heading level 1, link, list, article | Site Sniper · New snipe · Snipes · the snipe's name |
 | Snipe card | timer, button | "Opens in 2 days 4 hours" · Arm, Disarm, Arm again or View booking · More actions for {name} (View details · Run now · Delete) |
 | Held snipe | region, timer, button, alert | Hold at {place} · "22 minutes left to pay" · Pay now · "Site held at {place}. Pay within {n} minutes." |
-| New snipe | navigation, radiogroup, button | New snipe steps · When are the sites released? · Advanced timing · Create snipe |
+| New snipe | navigation, radiogroup, button | New snipe steps · When are the sites released? (the place's own noun) · Advanced timing · Create snipe |
 
 ## Testing
 

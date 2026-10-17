@@ -8,7 +8,8 @@ import { isMixedPlace, placeUnitKinds, stayTypesText } from '../../../components
 import { relativeTime } from '../../../components/timeFormat';
 import { msToMinutes, msToSeconds } from '../create/snipeFormMapping';
 import { releaseText, stayFieldText } from '../shared/snipeFormat';
-import { unitLabel, unitNounFor } from '../shared/snipeState';
+import { heldUnitNoun, snipeNoun } from '../shared/snipeNouns';
+import { unitLabel } from '../shared/snipeState';
 
 function Group({ title, children }: { title: string; children: ReactNode }) {
   const id = `snipe-summary-${title.toLowerCase()}`;
@@ -46,7 +47,7 @@ export interface SnipeSummaryProps {
 /** The snipe's stay, and its release and timing, side by side. */
 export function SnipeSummary({ snipe, manifest, today, now, units }: SnipeSummaryProps) {
   const { stay } = snipe;
-  const noun = unitNounFor(manifest);
+  const noun = snipeNoun(snipe, manifest, units);
   const names = new Map((units ?? []).map((u) => [u.unitId, u.unitName]));
   const fields = (manifest?.stayFields ?? []).filter((f) => snipe.stayParams[f.key] !== undefined);
   const continuous = snipe.releaseMode === SnipeReleaseMode.CANCELLATION;
@@ -94,8 +95,8 @@ export function SnipeSummary({ snipe, manifest, today, now, units }: SnipeSummar
 export default SnipeSummary;
 
 /** The snipe's record so far, under its progress: attempts, the last try, and re-arming. */
-export function SnipeRecord({ snipe, manifest, now }: Omit<SnipeSummaryProps, 'today' | 'units'>) {
-  const noun = unitNounFor(manifest);
+export function SnipeRecord({ snipe, manifest, now, units }: Omit<SnipeSummaryProps, 'today'>) {
+  const noun = heldUnitNoun(snipe, manifest, units);
   const finished = snipe.status === SnipeStatus.HELD || snipe.status === SnipeStatus.BOOKED;
   return (
     <dl className="flex flex-col gap-2 text-sm">

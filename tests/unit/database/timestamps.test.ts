@@ -133,6 +133,22 @@ describe('instants SQLite writes read as UTC, whatever the host zone', () => {
     );
   });
 
+  it('a snipe alert’s instant (alert.at, v12) round-trips as the same UTC instant', () => {
+    const repo = new SiteSniperRepository(db);
+    const snipe = repo.create(userId, createMockSiteSnipeInput({ action: 'alert' }));
+    // Midnight in Perth, 5 Oct: 16:00 UTC the day before, so a zone mix-up shows as a date too
+    const at = new Date('2026-10-04T16:00:20.000Z');
+    repo.markAlerted(snipe.id, { at, unitId: '136' });
+
+    expect(repo.findById(snipe.id)?.alert?.at.getTime()).toBe(at.getTime());
+    expect(
+      db
+        .prepare('SELECT json_extract(alert, ?) FROM site_snipes WHERE id = ?')
+        .pluck()
+        .get('$.at', snipe.id)
+    ).toBe('2026-10-04T16:00:20.000Z');
+  });
+
   it('the local profile, settings and provider accounts', () => {
     const user = new UserRepository(db).findById(userId);
     readsAsStored(user?.createdAt, raw('SELECT created_at FROM users WHERE id = 1'));

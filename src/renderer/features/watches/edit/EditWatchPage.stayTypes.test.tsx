@@ -60,7 +60,8 @@ describe('EditWatchPage: stay types', () => {
     ).toEqual(['Camping', 'Cabins & villas', 'Glamping']);
     const glamping = within(group).getByRole('button', { name: 'Glamping' });
     expect(glamping).toHaveAttribute('aria-pressed', 'true');
-    expect(screen.getByText('No sites listed.')).toBeInTheDocument();
+    // Glamping chosen: the units it lists would be tents (R9)
+    expect(screen.getByText('No tents listed.')).toBeInTheDocument();
 
     await user.click(glamping);
     await user.click(screen.getByRole('button', { name: 'Save changes' }));
@@ -97,7 +98,8 @@ describe('EditWatchPage: stay types', () => {
     const { user } = renderWithApp({ route: '/watches/5/edit', api: mock });
     await stayTypes();
     await user.click(screen.getByRole('button', { name: 'Save changes' }));
-    const hold = screen.getByRole('checkbox', { name: 'Hold a site automatically when found' });
+    // Sites and cabins: "spot" (R9)
+    const hold = screen.getByRole('checkbox', { name: 'Hold a spot automatically when found' });
     await waitFor(() => expect(hold).toHaveFocus());
     expect(hold).toHaveAccessibleDescription(
       expect.stringContaining('Osprey Bay has more than one stay type.')

@@ -15,6 +15,7 @@ import { parkstayFactory } from '@main/providers/parkstay';
 import { ProviderRegistry } from '@main/providers/registry';
 import { NotificationType, RelatedType } from '@shared/types/common.types';
 import type { Watch } from '@shared/types';
+import { providerUnitKinds } from '@shared/utils/unit-noun';
 import { mockWatch } from '@tests/fixtures/watches';
 import { createTestProviderContext } from '@tests/utils/fake-provider';
 import type Database from 'better-sqlite3';
@@ -97,6 +98,7 @@ describe('desktop notifications', () => {
     service = new NotificationService(repo, undefined, events, {
       providerName: (id) => registry.tryGet(id)?.manifest.shortName,
       providerManifest: (id) => registry.tryGet(id)?.manifest,
+      providerUnitKinds: (id) => providerUnitKinds(registry.tryGet(id)?.manifest),
       showMainWindow,
       openExternal,
     });
@@ -234,7 +236,7 @@ describe('desktop notifications', () => {
     });
 
     it('a click on a held alert opens only the watch: the hold is paid for in the app', async () => {
-      await service.notifyWatchHeld(ospreyBay, hold, 'Site 07', BOOKING_URL);
+      await service.notifyWatchHeld(ospreyBay, hold, match, BOOKING_URL);
 
       click();
       await settle();

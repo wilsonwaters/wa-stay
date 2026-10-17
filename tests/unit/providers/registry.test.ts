@@ -216,9 +216,9 @@ describe('ProviderRegistry.register', () => {
     const cases: Array<[rule: string, options: Parameters<typeof createFakeProvider>[0], RegExp]> =
       [
         [
-          'snipes needs holds and availability',
-          { capabilities: { holds: false } },
-          /capability snipes needs capabilities holds and availability/,
+          'snipes needs availability',
+          { capabilities: { availability: false } },
+          /capability snipes needs capability availability/,
         ],
         ['snipes needs release modes', {}, /capability snipes needs at least one release mode/],
         [
@@ -270,9 +270,29 @@ describe('ProviderRegistry.register', () => {
       expectRegistrationError(fake, message);
     });
 
-    it('snipes also needs availability on', () => {
-      const fake = createFakeProvider({ capabilities: { availability: false } });
-      expectRegistrationError(fake, /snipes needs capabilities holds and availability/);
+    it('a snipes provider without holds registers: its snipes alert (§12.35)', () => {
+      const fake = createFakeProvider({ capabilities: { holds: false } });
+      expect(fake.holds).toBeUndefined();
+      const registry = new ProviderRegistry();
+      register(registry, fake);
+      const provider = registry.require('fake', 'snipes');
+      expect(provider.holds).toBeUndefined();
+      expect(typeof provider.availability.check).toBe('function');
+      expect(typeof provider.release.computeReleaseAt).toBe('function');
+      expect(() => registry.require('fake', 'holds')).toThrow(ProviderCapabilityError);
+    });
+
+    it('snipes without availability, or without a release policy, is still refused', () => {
+      expectRegistrationError(
+        createFakeProvider({ capabilities: { availability: false, holds: false } }),
+        /capability snipes needs capability availability/
+      );
+      const noRelease = createFakeProvider({ capabilities: { holds: false } });
+      delete noRelease.release;
+      expectRegistrationError(noRelease, /capability snipes needs availability and release/);
+      const noCheck = createFakeProvider({ capabilities: { holds: false } });
+      delete noCheck.availability;
+      expectRegistrationError(noCheck, /capability snipes needs availability and release/);
     });
 
     it('a paced provider with maxConcurrentRequests 1, or an interval of 0 with any, registers', () => {
@@ -380,7 +400,7 @@ describe('ProviderRegistry.register', () => {
           ]),
         /access\.waitingRoomOrigins must be https origins or https:\/\/\*\.<domain> patterns/,
       ],
-      ['snipes', {}, (p) => delete p.release, /snipes needs availability, holds and release/],
+      ['snipes', {}, (p) => delete p.release, /snipes needs availability and release/],
       [
         'release modes supported',
         {},

@@ -4,13 +4,20 @@
 > navigation marks it **Soon** and its page shows a "coming soon" banner. Use it with care,
 > and only for stays you will take.
 
-Site Sniper holds a hard-to-get site **the moment it is released**. It prepares ahead of time,
-joins the provider's queue when the release uses one, checks availability rapidly across the
-release instant, and places a temporary **hold** on the first matching site. You then pay for
-the hold on the provider's own payment page before it runs out. Site Sniper never pays for
-you.
+Site Sniper catches a hard-to-get site **the moment it is released**. It prepares ahead of
+time, joins the provider's queue when the release uses one, checks availability rapidly across
+the release instant, and then does what the snipe is set to do:
 
-ParkStay WA is the only provider with Site Sniper today. Its hold lasts **30 minutes**.
+- **Hold**: it places a temporary **hold** on the first matching site. You then pay for the
+  hold on the provider's own payment page before it runs out.
+- **Alert**: it sends a desktop alert (and an email, if set up) with a link to book on the
+  provider's own site, and holds nothing, so book it before someone else does.
+
+Site Sniper never pays for you. A snipe holds when its provider can place holds, and alerts
+otherwise; a provider that places no holds offers alerts only.
+
+ParkStay WA is the only provider with Site Sniper today. Its snipes hold, and its hold lasts
+**30 minutes**.
 
 ## How ParkStay releases sites
 
@@ -41,10 +48,12 @@ and dates). The flow has five steps:
    type or a site before it goes on (the same chips and rules as a watch:
    [Stay types](watches-and-notifications.md#stay-types)). A warning says when the stay is
    shorter than the sites usually take.
-4. **Release**: **When are the sites released?** For a scheduled release, the release date
+4. **Release**: **When are the sites released?** (or cabins, rooms…: the place's units as
+   it calls them). For a scheduled release, the release date
    and time (in the provider's time zone), which must be before your check-in day. **Advanced timing**: Start early (seconds, default
    120), Check every (seconds, default 1.5; never under 0.5), Keep trying for (minutes, default
-   15), Most attempts (no limit by default).
+   15; a provider may set a limit for a release mode, `maxWindowMinutes`, and a longer choice is
+   cut to it), Most attempts (no limit by default).
 5. **Review**: the summary, the queue use, a name and notes, and **Book responsibly**. For an
    optional account (ParkStay) it suggests connecting before the release so checkout is
    quicker; for a provider whose holds need an account, the snipe is created paused until you
@@ -59,33 +68,51 @@ and dates). The flow has five steps:
 | Queueing                      | Joining or holding the provider's queue.                                                                                                                      |
 | Sniping                       | Checking availability every few seconds across the release.                                                                                                   |
 | Held                          | A site is held for you: pay before the countdown ends.                                                                                                        |
+| Alert sent                    | The dates were free and you were alerted with a link to book on the provider's site. Nothing is held. It can be started again.                                |
 | Booked                        | The payment was confirmed; the booking is under Bookings.                                                                                                     |
-| Failed, Expired, Hold expired | It ended: no site within the window or attempts, the arrival date passed, or the hold ran out unpaid. A snipe you stop is disabled, and can be started again. |
+| Failed, Expired, Hold expired | It ended: no site within the window or attempts, the arrival date passed, the hold ran out unpaid, or the provider turned the check away. A snipe you stop is disabled, and can be started again. |
 
 - Each snipe has its own timer chain (`src/main/scheduler/snipe-runner.ts`), re-armed after
   the computer sleeps. A check starts only when the previous one has finished.
 - **One booking per night.** Before asking for a hold, the snipe reserves the stay's nights.
   A night already held or booked by another snipe or by a watch's automatic hold stops it with
-  a clear message (`core/holds/night-guard.ts`).
+  a clear message (`core/holds/night-guard.ts`). An alert holds nothing, so it reserves no
+  night.
 - **Which unit.** The first fully available unit of those you chose, or, with none chosen, of
   the stay types you chose (campsites, cabins and villas, rooms, dorms or glamping; none: any
   kind; a unit the provider gives no kind counts as "other"), and only in a stay the
   provider's stay rules allow (its minimum nights, and the days it takes arrivals and
-  departures), even when the provider says the unit is free. A snipe never takes "any unit"
+  departures), even when the provider says the unit is free. A snipe never holds "any unit"
   across stay types: with no units chosen, once one of its candidates comes free and they,
-  booked or free, are of more than one kind, it holds nothing, reserves no night and ends **Failed** with "Free units of
-  more than one stay type: choose a stay type or units for this snipe", and you get a
-  warning notification. The flow asks for one stay type or units at a place it knows is mixed,
-  so this happens only when the flow could not load the place's units, or they changed after the
-  snipe was made: choose a stay type or units and start it again.
+  booked or free, are of more than one kind, it holds nothing, reserves no night and alerts you
+  instead (**Alert sent**), with the note "The units this snipe could hold are of more than one
+  stay type: choose one stay type or units for it." The flow asks for one stay type or units at
+  a place it knows is mixed, so this happens only when the flow could not load the place's
+  units, or they changed after the snipe was made. A snipe set to hold whose provider no longer
+  places holds alerts too, with a note saying so.
+- **A provider that turns it away.** If the provider answers a check or a hold with HTTP 403 or
+  429 (a block, a challenge or "too many requests"), the snipe stops at once and ends **Failed**
+  with "{provider} refused the check (HTTP {status}). Site Sniper stopped and won't try again by
+  itself." Nothing retries it; start it again later if you want.
 - **Run now** runs one attempt immediately (only while the snipe is running).
 - **WA Stay must be running**, and the computer awake, at the release.
+
+## When a snipe alerts
+
+You get a desktop notification, "A site is free at Bungarra" (or a cabin, a spot…: the place's
+units as it calls them), and an email if set up. Clicking the notification opens the snipe in
+WA Stay and the provider's booking page, filled in with your stay, in your browser; the email has
+a **Book on {provider}** link to the same public page, so you can book from your phone. The
+link is only ever a page on the provider's own site, never a cart. Nothing is held, so book it
+before someone else does. The snipe keeps what was free and when, and can be started again.
 
 ## When a site is held
 
 You get a desktop notification (and an email, if set up), and the snipe shows "<site> is held
 for you · Held until 10:42 am AWST · 23:10 left", with **Pay now** (the same panel as a watch's
-automatic hold).
+automatic hold). Clicking the notification opens the snipe in WA Stay. The email says the hold is
+in WA Stay on the computer that placed it, and also gives the provider's public booking page,
+for when you are away from that computer.
 
 1. **Pay now** opens the provider's payment page in its own window, on the same session that
    holds the site. If the DBCA queue is active, the app first waits (at most a minute) to get
@@ -120,7 +147,9 @@ not a fleet of bots.
   `src/main/scheduler/snipe-runner.ts`; payment: `src/main/core/holds/hold-payment.service.ts`.
 - ParkStay's release rules, holds and queue: `src/main/providers/parkstay/` (`release-policy.ts`,
   `holds.ts`, `queue/`), described in [ParkStay endpoints](providers/parkstay/endpoints.md).
-- A new provider gets Site Sniper by declaring `snipes`, `holds`, release modes and a release
-  policy ([Adding a provider](providers/adding-a-provider.md#release-policy)).
+- A new provider gets Site Sniper by declaring `snipes`, release modes and a release policy
+  ([Adding a provider](providers/adding-a-provider.md#release-policy)); its snipes alert. With
+  `holds` too, they can hold. A snipe's `action` (`alert` or `hold`), its `alert` and the
+  ALERTED status are in architecture-notes §12.35.
 - No test or agent run places a real hold (architecture-notes §12.33); holds are tested with
   fixtures and seeded rows.

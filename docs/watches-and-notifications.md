@@ -99,7 +99,7 @@ on the first fully matching site, by the same path and safety rules as Site Snip
 - **never "any unit" across stay types**: a watch with no units chosen whose wanted units are of
   more than one kind (campsites and a hut, or the two stay types it asks for), booked or free,
   places no hold. It alerts as usual, with "Not held automatically: this place has more than one
-  stay type. Choose a stay type or units to let WA Stay hold one." So at a place the flow knows
+  stay type. Choose one stay type or units to let WA Stay hold one." So at a place the flow knows
   is mixed, **Hold a site automatically when found** needs one stay type or a site chosen on
   "Your stay" before the Alerts step (or Edit) goes on.
 
@@ -107,16 +107,22 @@ Hold only what you will use ([Book responsibly](site-sniper.md#book-responsibly)
 
 ## Notifications
 
+Alerts name units by what they are: "Sites available at Bungarra" for ParkStay's campsites,
+"Cabins available at …" or "Cabin held at …" for cabins, and "spots" when the units found are of
+more than one stay type ("Found 3 spots available at …"). The words come from the units found or
+held, else the watch's or snipe's stay types, else the provider's usual kind of place.
+
 ### Where they appear
 
 | Where | What |
 | --- | --- |
 | **The bell** (top right) | Every notification, newest first, with an unread count. Click one to open what it is about (a watch, a snipe, a booking). Mark read, mark all read, delete, clear all. |
-| **The desktop** | An OS notification for each one, titled with the provider, e.g. "ParkStay · Sites available at Bungarra". Clicking it brings WA Stay forward on that page. Clicking an alert that a watch found something also opens the provider's booking page for those dates in your browser, for every provider; an alert that a site is held opens only the watch, where you pay. Settings → Notifications: **Desktop notifications** and **Play a sound**. |
-| **Email** | Each notification, sent through your own email account (below). An alert that a watch found something has a **Book on {provider}** link to the provider's public booking page for those dates (the nights it found, for some nights), so you can book from your phone. An alert that a site is held says the hold is in WA Stay on the computer that placed it, and still gives the link. |
+| **The desktop** | An OS notification for each one, titled with the provider, e.g. "ParkStay · Sites available at Bungarra". Clicking it brings WA Stay forward on that page. Clicking an alert that a watch found something, or that a snipe found the dates free ("A site is free at …"), also opens the provider's booking page for those dates in your browser, for every provider; an alert that a site is held opens only the watch or snipe, where you pay. Settings → Notifications: **Desktop notifications** and **Play a sound**. |
+| **Email** | Each notification, sent through your own email account (below). An alert that a watch found something, or that a snipe found the dates free, has a **Book on {provider}** link to the provider's public booking page for those dates (the nights it found, for some nights), so you can book from your phone. An alert that a site is held says the hold is in WA Stay on the computer that placed it, and still gives the link. |
 
-What creates a notification: a watch finding sites (or some nights), a hold placed by a snipe
-or a watch, a payment confirmed (booked), the welcome notice after an upgrade, and errors that
+What creates a notification: a watch finding sites (or some nights), a snipe finding the dates
+free (an alert, [Site Sniper](site-sniper.md#when-a-snipe-alerts)), a hold placed by a snipe or
+a watch, a payment confirmed (booked), the welcome notice after an upgrade, and errors that
 need your attention.
 
 Notifications and the record of emails sent are deleted automatically after 30 days (the

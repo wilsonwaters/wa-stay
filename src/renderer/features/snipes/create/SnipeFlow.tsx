@@ -7,14 +7,17 @@ import { SnipeReleaseMode } from '../../../../shared/types/common.types';
 import type { ProviderManifest, UnitKind } from '../../../../shared/types/provider.types';
 import type { UnitNoun } from '../../../components/nightGridModel';
 import { providerToday } from '../../../components/stay/providerToday';
-import { placeUnitKinds, reconcileStayTypes } from '../../../components/stay/stayTypes';
+import {
+  chosenNoun,
+  placeUnitKinds,
+  reconcileStayTypes,
+  stayNoun,
+} from '../../../components/stay/stayTypes';
 import { ROUTES } from '../../../app/routes';
 import { StepFlow, type FlowStep } from '../../../components/StepFlow';
-import { unitNoun } from '../../../components/locationFormat';
 import { Notice, useToast } from '../../../components/ui';
 import { useNow } from '../../../hooks/useNow';
 import { releaseModeLabel } from '../shared/snipeFormat';
-import { unitNounFor } from '../shared/snipeState';
 import { whenInZone } from './releasePreview';
 import {
   emptySnipeForm,
@@ -86,11 +89,13 @@ export function SnipeFlow({ manifests, initialValues, initialStep, notices = [] 
   const values = watch();
   const manifest = manifestOf(values.providerId);
   const today = providerToday(manifest, now);
-  const noun = values.location?.kind ? unitNoun(values.location.kind) : unitNounFor(manifest);
   const detail = useLocationDetail(
     values.location ? `${values.providerId}:${values.location.externalId}` : null
   );
   const units = detail.isPlaceholderData ? undefined : detail.data?.units;
+  // The units listed (the Stay step), and those the snipe will take (release, Review)
+  const listedNoun = stayNoun(values.unitKinds, detail.data ?? values.location, units, manifest);
+  const noun = chosenNoun(values.unitIds, units, listedNoun);
   const placeKinds = useMemo(() => (units ? placeUnitKinds(units) : undefined), [units]);
   hold.current = { placeKinds, noun };
   const preview = useReleasePreview(
@@ -206,7 +211,7 @@ export function SnipeFlow({ manifests, initialValues, initialStep, notices = [] 
             <LocationStep manifest={manifest} place={detail.data} placeLoading={detail.isLoading} />
           )}
           {step === 'stay' && manifest && (
-            <StayStep manifest={manifest} today={today} units={units} noun={noun} />
+            <StayStep manifest={manifest} today={today} units={units} noun={listedNoun} />
           )}
           {step === 'release' && manifest && (
             <ReleaseStep

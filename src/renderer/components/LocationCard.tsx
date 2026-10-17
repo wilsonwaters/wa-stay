@@ -4,7 +4,7 @@ import { MapPinOff } from 'lucide-react';
 import type { LocationSummary } from '../../shared/types/catalog.types';
 import { ROUTES, type PlaceLinkQuery } from '../app/routes';
 import { amenityIcon } from './amenityIcons';
-import { areaLine, hasMapLocation, kindLabel, unitCountLabel } from './locationFormat';
+import { areaLine, hasMapLocation, kindLabel, placeNoun, unitCountLabel } from './locationFormat';
 import {
   Badge,
   PhotoPlaceholder,
@@ -237,7 +237,7 @@ export const LocationCard = memo(function LocationCard({
                 <>
                   <span aria-hidden="true">·</span>
                   <span className="tabular-nums">
-                    {unitCountLabel(location.kind, location.unitCount)}
+                    {unitCountLabel(location.unitCount, placeNoun(location))}
                   </span>
                 </>
               )}

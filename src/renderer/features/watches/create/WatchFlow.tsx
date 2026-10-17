@@ -8,8 +8,12 @@ import type { UnitNoun } from '../../../components/nightGridModel';
 import { ROUTES } from '../../../app/routes';
 import { StepFlow, type FlowStep } from '../../../components/StepFlow';
 import { stayFieldDefaults } from '../../../components/stay/stayFields';
-import { placeUnitKinds, reconcileStayTypes } from '../../../components/stay/stayTypes';
-import { unitNoun } from '../../../components/locationFormat';
+import {
+  chosenNoun,
+  placeUnitKinds,
+  reconcileStayTypes,
+  stayNoun,
+} from '../../../components/stay/stayTypes';
 import { Notice, useToast } from '../../../components/ui';
 import { useNow } from '../../../hooks/useNow';
 import { suggestedName, toWatchInput } from '../form/watchFormMapping';
@@ -21,7 +25,6 @@ import {
   type WatchFieldName,
   type WatchFormValues,
 } from '../form/watchFormSchema';
-import { unitNounFor } from '../shared/watchState';
 import { issueField } from './issueField';
 import { AlertsStep } from './steps/AlertsStep';
 import { LocationStep } from './steps/LocationStep';
@@ -76,19 +79,23 @@ export function WatchFlow({ manifests, initialValues, initialStep, notices = [] 
   });
   const { watch, setValue, getValues, trigger, getFieldState, setError } = form;
 
-  const [providerId, location, arrival, departure, autoHold] = watch([
+  const [providerId, location, arrival, departure, autoHold, unitKinds, unitIds] = watch([
     'providerId',
     'location',
     'arrival',
     'departure',
     'autoHold',
+    'unitKinds',
+    'unitIds',
   ]);
   const manifest = manifestOf(providerId);
   const today = providerToday(manifest, now);
-  const noun = location?.kind ? unitNoun(location.kind) : unitNounFor(manifest);
   // The place's units, for the unit choice (a search result has none until the detail loads).
   const detail = useLocationDetail(location ? `${providerId}:${location.externalId}` : null);
   const units = detail.isPlaceholderData ? undefined : detail.data?.units;
+  // The units listed (the Stay step), and those the watch will take (Alerts, Review)
+  const listedNoun = stayNoun(unitKinds, detail.data ?? location, units, manifest);
+  const noun = chosenNoun(unitIds, units, listedNoun);
   const placeKinds = useMemo(() => (units ? placeUnitKinds(units) : undefined), [units]);
   hold.current = { placeKinds, noun };
 
@@ -196,7 +203,7 @@ export function WatchFlow({ manifests, initialValues, initialStep, notices = [] 
             <LocationStep manifest={manifest} place={detail.data} placeLoading={detail.isLoading} />
           )}
           {step === 'stay' && manifest && (
-            <StayStep manifest={manifest} today={today} units={units} noun={noun} />
+            <StayStep manifest={manifest} today={today} units={units} noun={listedNoun} />
           )}
           {step === 'alerts' && manifest && <AlertsStep manifest={manifest} noun={noun} />}
           {step === 'review' && manifest && (

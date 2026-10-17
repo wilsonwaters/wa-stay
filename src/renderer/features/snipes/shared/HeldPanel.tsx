@@ -1,15 +1,17 @@
 import type { ProviderManifest } from '../../../../shared/types/provider.types';
 import type { SiteSnipe } from '../../../../shared/types/site-sniper.types';
 import { HoldPanel } from '../../../components/stay/HoldPanel';
+import type { PlaceUnits } from './usePlaceUnits';
 import type { SnipeActions } from './useSnipeActions';
-import { unitLabel, unitNounFor } from './snipeState';
+import { heldUnitNoun } from './snipeNouns';
+import { unitLabel } from './snipeState';
 
 export interface HeldPanelProps {
   snipe: SiteSnipe;
   manifest: ProviderManifest | undefined;
   actions: Pick<SnipeActions, 'payNow' | 'paying'>;
-  /** The place's own unit names, when known, for "Site 12 (powered)". */
-  unitNames?: ReadonlyMap<string, string>;
+  /** The place's units, when known: their own names ("Site 12 (powered)") and kinds. */
+  place?: PlaceUnits;
   /** `page`: the page's one coral button; `card`: a quieter one in a list. */
   variant?: 'page' | 'card';
   className?: string;
@@ -23,13 +25,13 @@ export function HeldPanel({
   snipe,
   manifest,
   actions,
-  unitNames,
+  place,
   variant = 'page',
   className,
 }: HeldPanelProps) {
   return (
     <HoldPanel
-      unit={unitLabel(snipe.holdUnitId, unitNounFor(manifest), unitNames)}
+      unit={unitLabel(snipe.holdUnitId, heldUnitNoun(snipe, manifest, place?.units), place?.names)}
       expiresAt={snipe.holdExpiresAt ? new Date(snipe.holdExpiresAt) : undefined}
       manifest={manifest}
       label={`Hold at ${snipe.location.name || snipe.name}`}

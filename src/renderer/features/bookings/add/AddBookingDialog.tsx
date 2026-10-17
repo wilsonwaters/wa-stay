@@ -167,7 +167,7 @@ export function AddBookingDialog({ open, onClose, bookings, onAdded }: AddBookin
       open={open}
       onClose={onClose}
       title="Add booking"
-      description="Keep a booking you made on a provider's site with the rest of your trips."
+      description="Keep a booking you made on a provider's website with the rest of your trips."
       size="lg"
       closeOnOverlayClick={false}
     >

@@ -54,7 +54,7 @@ describe('watch auto-hold', () => {
     expect(h.notifications.notifyWatchHeld).toHaveBeenCalledWith(
       expect.objectContaining({ id: watch.id }),
       result.hold,
-      'Site u1',
+      expect.objectContaining({ unitName: 'Site u1' }),
       BOOKING_URL
     );
     expect(h.notifications.notifyWatchFound).not.toHaveBeenCalled();
@@ -158,7 +158,7 @@ describe('watch auto-hold', () => {
       unitKinds: { s1: 'campsite', c1: 'cabin', d1: 'dorm' },
     };
     const MIXED_NOTE =
-      'Not held automatically: this place has more than one stay type. Choose a stay type or units to let WA Stay hold one.';
+      'Not held automatically: this place has more than one stay type. Choose one stay type or units to let WA Stay hold one.';
 
     /** Spies on the provider's holds.create and the night guard; returns both spies. */
     function spies() {

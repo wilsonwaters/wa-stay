@@ -31,7 +31,7 @@ export function ConnectToArmDialog({
       open={open}
       onClose={onClose}
       title={`Connect ${manifest.shortName} to arm ${snipeName}`}
-      description={`${manifest.shortName} holds sites only for people signed in to it.`}
+      description={`${manifest.shortName} places holds only for people signed in to it.`}
       footer={
         <>
           <Button variant="ghost" onClick={onClose}>

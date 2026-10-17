@@ -6,12 +6,14 @@ import type { ProviderManifest } from '../../../../shared/types/provider.types';
 import { WatchResult } from '../../../../shared/types/common.types';
 import type { Watch, WatchExecutionResult, WatchMatch } from '../../../../shared/types/watch.types';
 import { eachNight } from '../../../../shared/utils/calendar-date';
+import {
+  nounOfUnits,
+  unitCountLabel as count,
+  type UnitNoun,
+} from '../../../../shared/utils/unit-noun';
 import { isFullyAvailable } from '../../../components/nightGridModel';
-import type { UnitNoun } from '../../../components/stay/UnitPicker';
 import { timeInZone } from '../../../components/timeFormat';
 import { unitNameOf } from './watchState';
-
-const count = (n: number, noun: UnitNoun) => `${n} ${n === 1 ? noun.one : noun.many}`;
 
 /** Nights of the stay with at least one wanted unit free in the last check. */
 function availableNights(watch: Watch): number {
@@ -30,7 +32,10 @@ function matchedNights(matches: readonly WatchMatch[]): Set<string> {
   return nights;
 }
 
-/** A card's result line. */
+/**
+ * A card's result line. `noun` is the watch's (`watchNoun`); the units found are named by their
+ * own kinds when they say them.
+ */
 export function resultSummary(watch: Watch, noun: UnitNoun): string {
   if (!watch.lastResult || !watch.lastCheckedAt) return 'Not checked yet';
   const nights = eachNight(watch.stay.arrival, watch.stay.departure).length;
@@ -38,8 +43,10 @@ export function resultSummary(watch: Watch, noun: UnitNoun): string {
     case WatchResult.FOUND: {
       // Free every night as the night grid reads it (a night refused by stay rules is not)
       const stay = eachNight(watch.stay.arrival, watch.stay.departure);
-      const full = (watch.lastAvailability ?? []).filter((u) => isFullyAvailable(u, stay)).length;
-      return full > 0 ? `${count(full, noun)} available` : `${noun.many} available`;
+      const full = (watch.lastAvailability ?? []).filter((u) => isFullyAvailable(u, stay));
+      return full.length > 0
+        ? `${count(full.length, nounOfUnits(full, noun))} available`
+        : `${noun.many} available`;
     }
     case WatchResult.PARTIAL_FOUND:
       return `${availableNights(watch)} of ${nights} nights available`;
@@ -72,7 +79,8 @@ export function runResultMessage(
     return `${unit} held at ${place}.${by}`;
   }
   const full = result.matches.filter((m) => !m.partial);
-  if (full.length > 0) return `${count(full.length, noun)} available at ${place}`;
+  if (full.length > 0)
+    return `${count(full.length, nounOfUnits(full, noun))} available at ${place}`;
   const partial = result.matches.filter((m) => m.partial);
   if (partial.length > 0) {
     const nights = eachNight(watch.stay.arrival, watch.stay.departure).length;

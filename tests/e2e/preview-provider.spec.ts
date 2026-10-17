@@ -206,7 +206,7 @@ test.describe('preview a provider', () => {
       }
     } else {
       await expect(
-        stayCard.getByText(`${shortName} doesn't share availability with WA Stay`, { exact: false })
+        stayCard.getByText("WA Stay can't check availability here", { exact: false })
       ).toBeVisible();
     }
     await screenshot(window, testInfo, 'place');

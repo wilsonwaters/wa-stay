@@ -32,9 +32,9 @@ import { fromWatch, toWatchUpdate } from '../form/watchFormMapping';
 import { watchFormSchema, type WatchFormValues } from '../form/watchFormSchema';
 import { DeleteWatchDialog } from '../shared/DeleteWatchDialog';
 import { useWatchActions } from '../shared/useWatchActions';
-import { unitNounFor } from '../shared/watchState';
 import { providerToday } from '../../../components/stay/providerToday';
-import { placeUnitKinds } from '../../../components/stay/stayTypes';
+import { chosenNoun, placeUnitKinds, stayNoun } from '../../../components/stay/stayTypes';
+import type { UnitNoun } from '../../../../shared/utils/unit-noun';
 
 const PAGE = 'mx-auto flex w-full max-w-3xl flex-col gap-8 px-6 py-8 lg:px-8';
 
@@ -58,9 +58,9 @@ function EditWatchForm({ watch, manifest }: { watch: Watch; manifest: ProviderMa
   // The starting values are fixed when the page opens; later refetches do not reset typing.
   const [{ values: initial, notes }] = useState(() => fromWatch(watch, manifest));
   const today = providerToday(manifest, new Date());
-  const noun = useMemo(() => unitNounFor(manifest), [manifest]);
-  // The kinds of the place's units (below), for the hold rule, once they are known.
+  // The kinds of the place's units and what they are called (below), for the hold rule.
   const placeKindsRef = useRef<UnitKind[] | undefined>(undefined);
+  const nounRef = useRef<UnitNoun | undefined>(undefined);
   const resolver = useMemo<Resolver<WatchFormValues>>(
     () => (values, context, options) =>
       zodResolver(
@@ -70,10 +70,10 @@ function EditWatchForm({ watch, manifest }: { watch: Watch; manifest: ProviderMa
           keepArrival: watch.stay.arrival,
           keepInterval: watch.checkIntervalMinutes,
           placeKinds: placeKindsRef.current,
-          noun,
+          noun: nounRef.current,
         })
       )(values, context, options),
-    [manifest, today, watch.stay.arrival, watch.checkIntervalMinutes, noun]
+    [manifest, today, watch.stay.arrival, watch.checkIntervalMinutes]
   );
   const form = useForm<WatchFormValues>({ defaultValues: initial, resolver, mode: 'onTouched' });
   const { handleSubmit, register, watch: value, setValue, setError, formState } = form;
@@ -83,6 +83,10 @@ function EditWatchForm({ watch, manifest }: { watch: Watch; manifest: ProviderMa
   const units = place.isPlaceholderData ? undefined : place.data?.units;
   const placeKinds = useMemo(() => (units ? placeUnitKinds(units) : undefined), [units]);
   placeKindsRef.current = placeKinds;
+  // The units listed ("Your stay"), and those the watch will take (Alerts)
+  const listedNoun = stayNoun(value('unitKinds'), place.data ?? location, units, manifest);
+  const noun = chosenNoun(value('unitIds'), units, listedNoun);
+  nounRef.current = noun;
   const focusFirstInvalid = () =>
     requestAnimationFrame(() =>
       formRef.current?.querySelector<HTMLElement>('[aria-invalid="true"]')?.focus()
@@ -131,7 +135,7 @@ function EditWatchForm({ watch, manifest }: { watch: Watch; manifest: ProviderMa
             manifest={manifest}
             today={today}
             units={units}
-            noun={noun}
+            noun={listedNoun}
             fieldNotes={notes}
             keepKinds={initial.unitKinds}
           />

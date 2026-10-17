@@ -12,10 +12,11 @@ import { resultSummary } from '../shared/resultSummary';
 import { useWatchActions, type WatchActions } from '../shared/useWatchActions';
 import { WatchActionsBar } from '../shared/WatchActionsBar';
 import {
+  heldNoun,
   holdRegionLabel,
   statusPillFor,
   unitNameOf,
-  unitNounFor,
+  watchNoun,
   type WatchState,
 } from '../shared/watchState';
 import { PlacePhoto, type PhotoPlace } from '../../../components/PlacePhoto';
@@ -46,7 +47,7 @@ export function HoldLine({
 }) {
   const zone = manifest?.timezone ?? 'Australia/Perth';
   const provider = manifest?.shortName ?? 'the provider';
-  const unit = unitNameOf(watch, watch.hold?.unitId, unitNounFor(manifest));
+  const unit = unitNameOf(watch, watch.hold?.unitId, heldNoun(watch, manifest));
   const at = watch.hold ? timeInZone(new Date(watch.hold.expiresAt), zone) : undefined;
   if (state === 'held') {
     return (
@@ -132,7 +133,7 @@ export function WatchCard({
               {watch.name}
             </Link>
           </h2>
-          <StatusPill {...statusPillFor(state)} className="shrink-0" />
+          <StatusPill {...statusPillFor(state, heldNoun(watch, manifest))} className="shrink-0" />
         </div>
         <p className="flex min-w-0 items-center gap-2 text-sm text-fg-secondary">
           <ProviderBadge providerId={watch.providerId} size="sm" className="shrink-0" />
@@ -148,7 +149,7 @@ export function WatchCard({
         <div className="mt-auto flex flex-wrap items-center justify-between gap-x-3 gap-y-1 pt-1">
           <p className="min-w-0 text-sm text-fg-secondary">
             <span className="font-semibold text-fg">
-              {resultSummary(watch, unitNounFor(manifest))}
+              {resultSummary(watch, watchNoun(watch, manifest))}
             </span>
             {facts.map((fact) => (
               <span key={fact}> · {fact}</span>

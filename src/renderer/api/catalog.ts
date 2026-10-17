@@ -16,6 +16,7 @@ import {
   type CatalogStatus,
   type LocationDetail,
   type LocationSummary,
+  type UnitSummary,
 } from '../../shared/types/catalog.types';
 import type {
   BulkAvailabilityEntry,
@@ -249,6 +250,37 @@ export function useLocationDetail(key: string | null, options: { enabled?: boole
     enabled: Boolean(key) && (options.enabled ?? true),
     placeholderData: () => (key ? cachedSummary(queryClient, key) : undefined),
   });
+}
+
+/**
+ * A place's units, for words said once that must name a unit as its page does (a hold's alert,
+ * R9): from the detail cache at once when it has them, else a promise of them, loading the
+ * detail as `useLocationDetail` would. A detail that cannot be loaded gives none.
+ */
+export function usePlaceUnitsLoader(): (
+  key: string
+) => readonly UnitSummary[] | Promise<readonly UnitSummary[] | undefined> {
+  const queryClient = useQueryClient();
+  return useCallback(
+    (key: string) => {
+      const queryKey = queryKeys.catalog.detail(key);
+      const cached = queryClient.getQueryData<LocationDetail>(queryKey)?.units;
+      if (cached) return cached;
+      return queryClient
+        .ensureQueryData<LocationDetail>({
+          queryKey,
+          queryFn: () => unwrap((api) => api.catalog.get(key)),
+          staleTime: LOCATION_DETAIL_STALE_TIME_MS,
+          // For words said once: no retry of its own
+          retry: false,
+        })
+        .then(
+          (detail) => detail.units,
+          () => undefined
+        );
+    },
+    [queryClient]
+  );
 }
 
 /**

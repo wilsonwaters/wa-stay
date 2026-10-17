@@ -13,7 +13,7 @@ import {
 } from '../../api';
 import { buildPath, PATTERNS, placeLinkState, ROUTES } from '../../app/routes';
 import { parseStayTypes, stayParamsQuery, type StayParams } from '../../app/stayParams';
-import { areaLine, kindLabel, unitNoun } from '../../components/locationFormat';
+import { areaLine, kindLabel, placeNoun } from '../../components/locationFormat';
 import {
   BackLink,
   Badge,
@@ -289,7 +289,8 @@ export default function PlaceDetailPage() {
     );
   }
 
-  const noun = unitNoun(detail?.kind ?? 'other');
+  // Its units' kinds once loaded, else its own (a cached summary's), else its provider's
+  const noun = placeNoun(detail, manifest);
   const links = detail
     ? resolvePlaceLinks(detail, manifest?.website, checked ? check.data?.bookingUrl : undefined)
     : {};
@@ -299,7 +300,7 @@ export default function PlaceDetailPage() {
       : !manifest?.capabilities.availability
         ? {
             kind: 'unavailable',
-            message: `${shortName} doesn't share availability with WA Stay. Check dates on their website.`,
+            message: `WA Stay can't check availability here. Check dates on ${shortName}'s website.`,
           }
         : units.length === 0
           ? {
@@ -408,6 +409,7 @@ export default function PlaceDetailPage() {
             links={links}
             watchHref={manifest?.capabilities.watches ? ROUTES.watchNew(prefill) : undefined}
             snipeHref={manifest?.capabilities.snipes ? ROUTES.snipeNew(prefill) : undefined}
+            unitNoun={noun}
           />
         </div>
 
@@ -433,7 +435,7 @@ export default function PlaceDetailPage() {
           )}
           {detail && <FacilitiesSection amenities={detail.amenities} />}
           {loaded && detail && (
-            <SitesSection units={units} unitCount={detail.unitCount} kind={detail.kind} />
+            <SitesSection units={units} unitCount={detail.unitCount} noun={noun} />
           )}
           {loaded && detail && <BookingRulesSection releaseInfo={detail.releaseInfo} />}
         </div>

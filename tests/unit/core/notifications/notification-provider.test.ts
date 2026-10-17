@@ -14,6 +14,7 @@ import { NotificationRepository } from '@main/database/repositories';
 import { ProviderRegistry } from '@main/providers/registry';
 import { NotificationType, RelatedType } from '@shared/types/common.types';
 import type { Watch } from '@shared/types';
+import { providerUnitKinds } from '@shared/utils/unit-noun';
 import { mockWatch } from '@tests/fixtures/watches';
 import { mockSiteSnipe } from '@tests/fixtures/site-sniper';
 import { createFakeProvider, createTestProviderContext } from '@tests/utils/fake-provider';
@@ -51,6 +52,7 @@ describe('notifications carry their provider', () => {
       {
         providerName: (id) => registry.tryGet(id)?.manifest.shortName,
         providerManifest: (id) => registry.tryGet(id)?.manifest,
+        providerUnitKinds: (id) => providerUnitKinds(registry.tryGet(id)?.manifest),
       }
     );
     mockNotification.mockClear();
@@ -81,7 +83,7 @@ describe('notifications carry their provider', () => {
         unitId: 'u1',
         paymentUrl: 'https://fake.example/pay/FAKE-1',
       },
-      'Site u1'
+      { unitName: 'Site u1' }
     );
     await service.notifySnipeHeld(fakeSnipe);
     await service.notifySnipeBooked({ ...fakeSnipe, bookedReference: 'FAKE-6' });
@@ -155,7 +157,7 @@ describe('notifications carry their provider', () => {
         unitId: 'u1',
         paymentUrl: 'https://fake.example/pay/FAKE-3',
       },
-      'Site u1',
+      { unitName: 'Site u1' },
       onSite
     );
 
@@ -180,7 +182,7 @@ describe('notifications carry their provider', () => {
         unitId: 'u1',
         paymentUrl: 'https://fake.example/pay/FAKE-2',
       },
-      'Site u1'
+      { unitName: 'Site u1' }
     );
     expect(repo.findByUserId(userId)[0].message).toContain('within 25 minutes');
   });

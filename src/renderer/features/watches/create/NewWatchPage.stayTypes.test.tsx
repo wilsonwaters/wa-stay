@@ -64,7 +64,8 @@ describe('NewWatchPage at a place with sites and cabins', () => {
 
     await user.click(cabins);
     expect(cabins).toHaveAttribute('aria-pressed', 'true');
-    await user.click(button('Choose sites'));
+    // Only cabins listed now: the units are cabins (R9)
+    await user.click(button('Choose cabins'));
     expect(screen.getByRole('checkbox', { name: 'Cabin 1' })).toBeInTheDocument();
     expect(screen.queryByRole('checkbox', { name: 'Site 1' })).toBeNull();
 
@@ -84,20 +85,21 @@ describe('NewWatchPage at a place with sites and cabins', () => {
   it('groups the units by stay type, and Tab reaches the stay types before the units', async () => {
     const { user } = renderWithApp({ route: PREFILL, api: api() });
     const group = await stayTypes();
-    await user.click(button('Choose sites'));
+    // Sites and cabins: "spots" (R9)
+    await user.click(button('Choose spots'));
     expect(screen.getByRole('group', { name: 'Camping' })).toBeInTheDocument();
     expect(screen.getByRole('group', { name: 'Cabins & villas' })).toBeInTheDocument();
 
     within(group).getByRole('button', { name: 'Cabins & villas' }).focus();
     await user.tab();
-    expect(button('Choose sites')).toHaveFocus();
+    expect(button('Choose spots')).toHaveFocus();
   });
 
   it('unticks a site when only cabins are chosen, saying so', async () => {
     const mock = api();
     const { user } = renderWithApp({ route: PREFILL, api: mock });
     const group = await stayTypes();
-    await user.click(button('Choose sites'));
+    await user.click(button('Choose spots'));
     await user.click(screen.getByRole('checkbox', { name: 'Site 1' }));
     expect(screen.getByText(/1 site chosen/)).toBeInTheDocument();
 
@@ -106,7 +108,7 @@ describe('NewWatchPage at a place with sites and cabins', () => {
       'role',
       'status'
     );
-    expect(screen.getByText(/Any site\./)).toBeInTheDocument();
+    expect(screen.getByText(/Any cabin\./)).toBeInTheDocument();
     for (const name of ['Continue', 'Continue', 'Create watch']) {
       await user.click(button(name));
     }
@@ -119,9 +121,10 @@ describe('NewWatchPage at a place with sites and cabins', () => {
     await stayTypes();
     await user.click(button('Continue'));
     await step(/Alerts$/);
-    const hold = screen.getByRole('checkbox', { name: 'Hold a site automatically when found' });
+    const hold = screen.getByRole('checkbox', { name: 'Hold a spot automatically when found' });
+    // R9: "one stay type", the step's own title, and the mixed place's noun
     const message =
-      'Osprey Bay has more than one stay type. Choose a stay type or a site on the Stay step to hold one automatically.';
+      'Osprey Bay has more than one stay type. Choose one stay type or a spot under "Your stay" to hold one automatically.';
     await user.click(hold);
     // Said as the box is ticked, so Continue does not move when the box loses focus.
     expect(await screen.findByText(message)).toBeInTheDocument();
@@ -142,21 +145,21 @@ describe('NewWatchPage at a place with sites and cabins', () => {
     expect(await step(/Review$/)).toBeInTheDocument();
   });
 
-  it('holds automatically once a site is chosen instead', async () => {
+  it('holds automatically once a cabin is chosen instead, calling it a cabin', async () => {
     const { user } = renderWithApp({ route: PREFILL, api: api() });
     await stayTypes();
-    await user.click(button('Choose sites'));
+    await user.click(button('Choose spots'));
     await user.click(screen.getByRole('checkbox', { name: 'Cabin 2' }));
     await user.click(button('Continue'));
     await step(/Alerts$/);
     await user.click(
-      screen.getByRole('checkbox', { name: 'Hold a site automatically when found' })
+      screen.getByRole('checkbox', { name: 'Hold a cabin automatically when found' })
     );
     await user.click(button('Continue'));
     await step(/Review$/);
     expect(items(screen.getByRole('region', { name: 'Who' }))).toMatchObject({
       'Stay type': 'Any',
-      'Preferred sites': '1 chosen',
+      'Preferred cabins': '1 chosen',
     });
   });
 

@@ -14,9 +14,10 @@ import { HeldPanel } from '../shared/HeldPanel';
 import { ReleaseLine } from '../shared/ReleaseLine';
 import { SnipeActionsBar } from '../shared/SnipeActionsBar';
 import { compactProgress } from '../shared/SnipeTimeline';
+import { heldUnitNoun, snipeNoun } from '../shared/snipeNouns';
 import { isFinished, statusPillFor, timelineSteps } from '../shared/snipeState';
 import { useSnipeActions } from '../shared/useSnipeActions';
-import { useUnitNames } from '../shared/useUnitNames';
+import { usePlaceUnits } from '../shared/usePlaceUnits';
 
 export interface SnipeCardProps {
   snipe: SiteSnipe;
@@ -32,14 +33,14 @@ const attempts = (n: number) => `${n} ${n === 1 ? 'attempt' : 'attempts'}`;
 
 /**
  * One snipe in the list, photo first: whose and where, the stay, its status and current step,
- * when the sites open (the only part that ticks), the hold to pay for (its unit named as the
+ * when its units open (the only part that ticks), the hold to pay for (its unit named as the
  * place names it), and one action with a menu for the rest.
  */
 export function SnipeCard({ snipe, manifest, today, place, placeLoading }: SnipeCardProps) {
   const headingId = useId();
-  // The place's unit names (its cached catalogue detail), asked only for a held snipe.
-  const unitNames = useUnitNames(snipe, snipe.status === SnipeStatus.HELD);
-  const actions = useSnipeActions(snipe, manifest, unitNames);
+  // The place's units (its cached catalogue detail), asked only for a held snipe.
+  const units = usePlaceUnits(snipe, snipe.status === SnipeStatus.HELD);
+  const actions = useSnipeActions(snipe, manifest, units);
   const [confirming, setConfirming] = useState(false);
   const { location, stay } = snipe;
   const provider = manifest?.shortName ?? 'the provider';
@@ -67,7 +68,10 @@ export function SnipeCard({ snipe, manifest, today, place, placeLoading }: Snipe
               {snipe.name}
             </Link>
           </h2>
-          <StatusPill {...statusPillFor(snipe.status)} className="shrink-0" />
+          <StatusPill
+            {...statusPillFor(snipe.status, heldUnitNoun(snipe, manifest, units.units))}
+            className="shrink-0"
+          />
         </div>
         <p className="flex min-w-0 items-center gap-2 text-sm text-fg-secondary">
           <ProviderBadge providerId={snipe.providerId} size="sm" className="shrink-0" />
@@ -85,7 +89,7 @@ export function SnipeCard({ snipe, manifest, today, place, placeLoading }: Snipe
             snipe={snipe}
             manifest={manifest}
             actions={actions}
-            unitNames={unitNames}
+            place={units}
             variant="card"
           />
         )}
@@ -103,7 +107,7 @@ export function SnipeCard({ snipe, manifest, today, place, placeLoading }: Snipe
             manifest={manifest}
             when="required"
             compact
-            message={`${provider} needs you signed in before Site Sniper can hold a site.`}
+            message={`${provider} needs you signed in before Site Sniper can hold a ${snipeNoun(snipe, manifest, units.units).one}.`}
           />
         )}
         <div className="mt-auto flex flex-wrap items-center justify-between gap-x-3 gap-y-1 pt-1">

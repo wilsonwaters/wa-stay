@@ -5,8 +5,16 @@
  * counts as `other`, as in main's matching (`unitKindOfUnit`), so the flows and the watch and
  * snipe services agree on which places are mixed. Pure.
  */
-import { UNIT_KINDS, type UnitKind } from '../../../shared/types/provider.types';
-import { STAY_TYPES, unitKindOfUnit } from '../../../shared/utils/unit-kinds';
+import type { UnitSummary } from '../../../shared/types/catalog.types';
+import { UNIT_KINDS, type LocationKind, type UnitKind } from '../../../shared/types/provider.types';
+import { STAY_TYPES, unitKindOfUnit, unitKindsOf } from '../../../shared/utils/unit-kinds';
+import {
+  kindsOfUnits,
+  nounOfUnits,
+  providerUnitKinds,
+  unitNounFrom,
+  type UnitNoun,
+} from '../../../shared/utils/unit-noun';
 
 /** `kinds` without repeats, in `UNIT_KINDS` order (the stay types' order, then `other`). */
 export function orderedKinds(kinds: Iterable<UnitKind>): UnitKind[] {
@@ -62,6 +70,39 @@ export function holdNeedsChoice(
   const wanted =
     unitKinds.length > 0 ? placeKinds.filter((kind) => unitKinds.includes(kind)) : placeKinds;
   return wanted.length > 1;
+}
+
+/**
+ * What the create and edit flows call the place's units (R9): by the stay types chosen, else by
+ * the kinds its units say (`units`, once loaded), else by its own kinds or its kind's, else by
+ * the provider's. Choosing units does not change it: the unit choice lists them all.
+ */
+export function stayNoun(
+  chosen: readonly UnitKind[],
+  place: { kind?: LocationKind; unitKinds?: unknown } | null | undefined,
+  units: readonly UnitSummary[] | undefined,
+  manifest: { locationKinds: readonly LocationKind[] } | undefined
+): UnitNoun {
+  return unitNounFrom(
+    chosen,
+    kindsOfUnits(units),
+    place?.kind ? unitKindsOf({ kind: place.kind, unitKinds: place.unitKinds }) : undefined,
+    providerUnitKinds(manifest)
+  );
+}
+
+/**
+ * What the flows call the units a watch or snipe will take, once units are chosen: by the kinds
+ * of those chosen (by id, or by name for older records), else `noun` (`stayNoun`). "Hold a cabin
+ * automatically when found" once a cabin is chosen.
+ */
+export function chosenNoun(
+  unitIds: readonly string[],
+  units: readonly UnitSummary[] | undefined,
+  noun: UnitNoun
+): UnitNoun {
+  const chosen = units?.filter((u) => unitIds.includes(u.unitId) || unitIds.includes(u.unitName));
+  return nounOfUnits(chosen, noun);
 }
 
 /** "Cabins & villas", "Cabins & villas or Rooms", "Camping, Rooms or Dorms". */

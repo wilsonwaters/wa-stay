@@ -17,6 +17,7 @@ import {
 } from '../../components/ui';
 import { buttonClassName } from '../../components/ui/Button';
 import { InfoLink, MoreInformationLink } from './PlaceSections';
+import type { UnitNoun } from '../../components/nightGridModel';
 import type { CheckFailure, PlaceLinks } from './placeModel';
 
 /** The longest stay the dates allow (EQ6), as on Explore. */
@@ -50,6 +51,8 @@ export interface StayCardProps {
   /** The create-flow hand-offs, when the provider offers them. */
   watchHref?: string;
   snipeHref?: string;
+  /** What the place's units are called: "Snipe a site". */
+  unitNoun: UnitNoun;
 }
 
 function FailureNotice({
@@ -108,6 +111,7 @@ export function StayCard({
   links,
   watchHref,
   snipeHref,
+  unitNoun,
 }: StayCardProps) {
   const headingId = useId();
   const bookIsNext = checked || ability.kind === 'unavailable';
@@ -201,12 +205,12 @@ export function StayCard({
               className={buttonClassName({ variant: 'secondary', fullWidth: true })}
             >
               <CalendarClock size={18} aria-hidden="true" />
-              {/* The name comes whole from the hidden text: "Snipe a site, coming soon". */}
-              <span aria-hidden="true">Snipe a site</span>
+              {/* The name comes whole from the hidden text: "Snipe a cabin, coming soon". */}
+              <span aria-hidden="true">Snipe a {unitNoun.one}</span>
               <span aria-hidden="true">
                 <Badge tone="sun">Soon</Badge>
               </span>
-              <VisuallyHidden>Snipe a site, coming soon</VisuallyHidden>
+              <VisuallyHidden>Snipe a {unitNoun.one}, coming soon</VisuallyHidden>
             </Link>
           )}
         </div>

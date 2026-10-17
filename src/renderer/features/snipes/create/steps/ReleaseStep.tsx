@@ -52,7 +52,7 @@ export function ReleaseStep({ manifest, noun, releaseInfo, now }: ReleaseStepPro
   return (
     <>
       <RadioCardGroup
-        label="When are the sites released?"
+        label={`When are the ${noun.many} released?`}
         hint={releaseInfo ? `${location?.name ?? 'This place'}: ${releaseInfo}` : undefined}
         value={releaseMode}
         onValueChange={(id) =>

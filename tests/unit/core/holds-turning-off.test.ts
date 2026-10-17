@@ -1,15 +1,16 @@
 /**
  * A holds experiment turned off (R17): the provider's holds stay on until WA Stay restarts, but
  * no new hold is placed meanwhile (`holdsTurningOff`). A watch's auto-hold notifies the match
- * as usual, with a note; a hold snipe tells the person what is free instead of holding.
+ * as usual, with a note; a hold snipe alerts instead of holding (ALERTED, no night reserved).
  */
 
-import { RelatedType, SnipeResult, SnipeStatus, WatchResult } from '@shared/types/common.types';
+import { SnipeResult, SnipeStatus, WatchResult } from '@shared/types/common.types';
 import { createCoreHarness, fakeDateOnly, type CoreHarness } from '@tests/utils/core-harness';
 import { createFakeProvider } from '@tests/utils/fake-provider';
 
 const NOW = new Date('2026-10-04T02:00:00.000Z');
 const NOTE = 'Automatic holds on Fake are turning off. Restart WA Stay.';
+const HOLDS_OFF = 'Automatic holds are off for Fake, so Site Sniper alerted you instead.';
 
 describe('holds turning off (an experiment turned off, until the restart)', () => {
   let h: CoreHarness;
@@ -68,8 +69,8 @@ describe('holds turning off (an experiment turned off, until the restart)', () =
     expect(h.notifications.notifyWatchFound.mock.calls[0][2]).toBeUndefined();
   });
 
-  it('a hold snipe that finds a free unit holds nothing: it ends and tells the person what is free', async () => {
-    const snipe = await h.snipes.create(h.userId, h.snipeInput());
+  it('a hold snipe that finds a free unit holds nothing: it alerts, with the booking page and why', async () => {
+    const snipe = await h.snipes.create(h.userId, h.snipeInput({ action: 'hold' }));
     h.snipeRepo.updateStatus(snipe.id, SnipeStatus.SNIPING);
     const reserve = jest.spyOn(h.nightGuard, 'tryReserve');
     const outcome = await h.snipes.execute(snipe.id);
@@ -80,30 +81,27 @@ describe('holds turning off (an experiment turned off, until the restart)', () =
     expect(outcome).toEqual({
       next: 'done',
       result: expect.objectContaining({
-        result: SnipeResult.ERROR,
+        result: SnipeResult.ALERTED,
         held: false,
         matchedSiteId: 'u1',
-        error: NOTE,
       }),
     });
-    expect(h.snipeRepo.findById(snipe.id)).toMatchObject({
-      status: SnipeStatus.FAILED,
-      lastError: NOTE,
+    const alerted = h.snipeRepo.findById(snipe.id)!;
+    expect(alerted).toMatchObject({
+      action: 'hold',
+      status: SnipeStatus.ALERTED,
       isActive: false,
-      attemptsCount: 1,
+      alert: {
+        at: NOW,
+        unitId: 'u1',
+        unitName: 'Site u1',
+        bookingUrl: 'https://fake.example/book/1?arrival=2026-12-01&departure=2026-12-03',
+        note: HOLDS_OFF,
+      },
     });
-    expect(h.notifications.notifyWarning).toHaveBeenCalledWith(
-      h.userId,
-      'Site u1 is free at Banksia Camp',
-      `Site Sniper didn't hold it. ${NOTE}`,
-      {
-        providerId: 'fake',
-        relatedType: RelatedType.SNIPE,
-        relatedId: snipe.id,
-        locationName: 'Banksia Camp',
-      }
-    );
+    expect(h.notifications.notifySnipeAlert).toHaveBeenCalledWith(alerted, undefined);
     expect(h.notifications.notifySnipeHeld).not.toHaveBeenCalled();
+    expect(h.notifications.notifyWarning).not.toHaveBeenCalled();
   });
 
   it('a hold snipe with nothing free keeps polling: only a match is affected', async () => {

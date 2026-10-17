@@ -251,6 +251,7 @@ describe('createContainer', () => {
       {
         providerName: expect.any(Function),
         providerManifest: expect.any(Function),
+        providerUnitKinds: expect.any(Function),
         preferences: expect.any(Function),
       }
     );
@@ -260,6 +261,9 @@ describe('createContainer', () => {
     expect(notificationOptions?.providerManifest?.('parkstay')).toBe(
       container.providers.get('parkstay').manifest
     );
+    // What alerts call units nothing else names: the provider's default kinds (R9)
+    expect(notificationOptions?.providerUnitKinds?.('parkstay')).toEqual(['campsite']);
+    expect(notificationOptions?.providerUnitKinds?.('gone')).toEqual([]);
     expect(notificationOptions?.providerManifest?.('gone')).toBeUndefined();
     // Settings → Notifications, read from the stored settings (defaults while none stored)
     expect(notificationOptions?.preferences?.()).toEqual({ desktop: true, sound: true });

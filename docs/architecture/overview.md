@@ -138,13 +138,13 @@ The provider SDK and how to add a provider: [Providers](../providers/README.md) 
 
 One SQLite file, `<userData>/wa-stay.db`. `src/main/database/connection.ts` holds the schema
 and every migration; each runs in one transaction with a foreign-key check, and the database
-records the versions applied. At version 11 the tables are:
+records the versions applied. At version 12 the tables are:
 
 | Table | Holds |
 | --- | --- |
 | `users` | The local profile (one row, id 1): name, phone, an email hint. Nothing may delete it. |
 | `watches` | Availability watches: provider, location, stay (`YYYY-MM-DD` dates, party, `stay_params`), units, interval, last result and availability, automatic-hold fields. |
-| `site_snipes` | Snipes: provider, location, stay, release mode and time, access-gate use, timing, status, hold and payment fields. |
+| `site_snipes` | Snipes: provider, location, stay, release mode and time, access-gate use, timing, what it does when the dates are free (hold or alert), status, hold and payment fields, and what an alert found. |
 | `bookings` | Bookings, unique per `(provider_id, booking_reference)`. |
 | `notifications` | In-app notifications, with the provider they belong to. Deleted after 30 days. |
 | `notifiers` | Outbound notifier settings (email SMTP); the config is a SecretVault envelope. |
@@ -165,6 +165,7 @@ records the versions applied. At version 11 the tables are:
 | v9 | The v1.x ParkStay password columns dropped (run with `secure_delete`, then VACUUM); watch hold fields; `maintenance`. |
 | v10 | The never-written `job_logs` table dropped. |
 | v11 | Unit kinds: `unit_kinds` on locations (filled from each place's kind), watches and snipes. |
+| v12 | Release-alert snipes: `action` (`hold` for every existing snipe) and `alert` on snipes; `hold_expires_estimated` on watches and snipes. |
 
 Migration tests start from SQL dumps of a real v5 (v1.2.0) and v6 database
 (`tests/fixtures/db/`).
@@ -211,7 +212,7 @@ and v1.x auto-update finds WA Stay through GitHub's redirect from the renamed re
    (`%APPDATA%\parkstay-bookings\parkstay.db`, else the snapshot) to `wa-stay.db` with
    SQLite's online backup, writes `migration.json`, and leaves the v1.x folder untouched as
    the backup. A failed copy asks Retry, Start fresh or Quit.
-3. The migrations bring the copy to v11; the secret migration re-encrypts its notifier
+3. The migrations bring the copy to v12; the secret migration re-encrypts its notifier
    settings; the v1.x ParkStay password is dropped.
 4. A welcome notice says where the old data is kept, and launch at login is re-registered under
    WA Stay (with "Start minimised" on, as v1.x always started hidden).

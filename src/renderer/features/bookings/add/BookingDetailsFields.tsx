@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 import type { ProviderManifest } from '../../../../shared/types/provider.types';
 import { LocationCombobox } from '../../../components/LocationCombobox';
-import { unitNoun } from '../../../components/locationFormat';
+import { capitalise, providerUnitKinds, unitNounFrom } from '../../../../shared/utils/unit-noun';
 import { DateRangeField, Field, GuestsField, TextField, Textarea } from '../../../components/ui';
 import type { AddBookingErrors, AddBookingValues } from './addBookingForm';
 
@@ -29,8 +29,9 @@ export function BookingDetailsFields({
   errors,
   referenceError,
 }: BookingDetailsFieldsProps) {
-  const noun = unitNoun(manifest.locationKinds[0]).one;
-  const Noun = noun.charAt(0).toUpperCase() + noun.slice(1);
+  // A booking keeps no unit kinds: its provider's default (ParkStay's sites)
+  const noun = unitNounFrom(providerUnitKinds(manifest)).one;
+  const Noun = capitalise(noun);
   const currency = manifest.currency ?? 'AUD';
 
   return (

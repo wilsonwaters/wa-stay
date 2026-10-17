@@ -4,8 +4,12 @@
  *   arm ─► EXPIRED (window closed, or the arrival date has passed)
  *    ├─► ARMED ─(warm-up: releaseAt − lead)─► QUEUEING* ─► WAITING_RELEASE ─(release)─► SNIPING
  *    └─► SNIPING (continuous polling, or the release has already come within the window)
- *   SNIPING ─poll─► HELD | FAILED | EXPIRED, or the provider's queue ─► QUEUEING* ─► SNIPING
+ *   SNIPING ─poll─► HELD | ALERTED | FAILED | EXPIRED, or the provider's queue ─► QUEUEING* ─► SNIPING
  *   (* only when the snipe uses the provider's access gate)
+ *
+ * HELD, ALERTED, FAILED and EXPIRED are terminal (`TERMINAL_SNIPE_STATUSES`): a run ends there
+ * and nothing re-arms it, at start or after a resume. A provider that turns an attempt away
+ * (403, 429) ends it FAILED, so no further check is made.
  *
  * Correctness rules:
  * - **One chain per snipe.** Each `arm` starts a new run with a new generation token and its
@@ -40,6 +44,12 @@ const log = logger.child({ module: 'scheduler' });
 export const MAX_TIMER_MS = 2_000_000_000;
 /** How often a far-off release is re-armed. */
 export const REARM_INTERVAL_MS = 24 * 60 * 60 * 1000;
+
+/** Why a snipe's window closed, by what it does when the dates are free. */
+export const WINDOW_CLOSED_MESSAGE = {
+  hold: 'The snipe window closed without a hold',
+  alert: 'The window closed before the dates were free',
+} as const;
 
 interface SnipeRun {
   /** The generation token: the run is current while the runner's map holds this one. */
@@ -281,7 +291,7 @@ export class SnipeRunner {
       return undefined;
     }
     if (window && plan.windowEnd && now.getTime() >= plan.windowEnd.getTime()) {
-      this.snipes.expire(id, 'The snipe window closed without a hold');
+      this.snipes.expire(id, WINDOW_CLOSED_MESSAGE[snipe.action]);
       this.finish(id, run);
       return undefined;
     }

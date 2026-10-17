@@ -51,8 +51,9 @@ test('the Provider chip shows RAC’s eight parks, and a park’s page lists its
   await expect(
     window.getByRole('heading', { level: 1, name: 'RAC Margaret River Nature Park' })
   ).toBeVisible();
-  const sites = window.getByRole('region', { name: 'Sites' });
-  await sites.getByRole('button', { name: 'Show all 5 sites' }).click();
+  // Dorms, a safari tent, a lodge and a site: units of several kinds are "spots" (R9)
+  const spots = window.getByRole('region', { name: 'Spots' });
+  await spots.getByRole('button', { name: 'Show all 5 spots' }).click();
   for (const category of [
     'Dorm Room - Sleeps 26',
     'Dorm Room - Sleeps 5',
@@ -60,7 +61,7 @@ test('the Provider chip shows RAC’s eight parks, and a park’s page lists its
     '4 Bedroom Eco Lodge',
     'Powered Site',
   ]) {
-    await expect(sites.getByRole('listitem').filter({ hasText: category })).toBeVisible();
+    await expect(spots.getByRole('listitem').filter({ hasText: category })).toBeVisible();
   }
 
   // Nothing left the fixture: no request was refused
