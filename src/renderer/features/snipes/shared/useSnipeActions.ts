@@ -123,7 +123,13 @@ export function useSnipeActions(
    */
   const releaseHold = async () => {
     setReleaseAsked(true);
-    return (await release.mutateAsync(snipe.id)).lastError;
+    try {
+      return (await release.mutateAsync(snipe.id)).lastError;
+    } catch (error) {
+      // The hold stays: if it runs out later, the page says so as it always has
+      setReleaseAsked(false);
+      throw error;
+    }
   };
 
   /** For a ConfirmDialog: resolves once deleted (a rejection keeps the dialog open). */

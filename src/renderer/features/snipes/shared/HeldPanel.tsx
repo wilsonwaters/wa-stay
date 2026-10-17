@@ -10,7 +10,10 @@ import { unitLabel } from './snipeState';
 export interface HeldPanelProps {
   snipe: SiteSnipe;
   manifest: ProviderManifest | undefined;
-  /** With `releaseHold`, "Let it go" (for a provider that can let a hold go). */
+  /**
+   * With `releaseHold`, "Let it go" on the page (for a provider that can let a hold go): its
+   * page shows how the hold ended, and a list card keeps "Pay now" only.
+   */
   actions: Pick<SnipeActions, 'payNow' | 'paying'> & Partial<Pick<SnipeActions, 'releaseHold'>>;
   /** The place's units, when known: their own names ("Site 12 (powered)") and kinds. */
   place?: PlaceUnits;
@@ -42,7 +45,7 @@ export function HeldPanel({
       place={snipe.location.name || snipe.name}
       onPay={actions.payNow}
       paying={actions.paying}
-      onRelease={actions.releaseHold}
+      onRelease={variant === 'page' ? actions.releaseHold : undefined}
       endedMessage={snipe.status === SnipeStatus.EXPIRED ? snipe.lastError : undefined}
       variant={variant}
       className={className}
