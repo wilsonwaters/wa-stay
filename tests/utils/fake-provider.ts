@@ -30,6 +30,7 @@
  *   a `delays.holds` delays it); `onPaymentClose` also sets `releaseOnPaymentClose`. Without
  *   it the fake, like ParkStay, cannot let a hold go;
  * - `maxWindowMinutes`: every release mode's window limit;
+ * - `stayFields`: stay fields after its own `gearType` (for availability, watches and snipes);
  * - `account` / `setAccount(state)`: what `auth.isSignedIn` answers; `auth` replaces its
  *   sign-in URL, origins or completion pages;
  * - `experiments`: declared in the manifest, with the capabilities they turn on off there; the
@@ -91,6 +92,7 @@ import type {
   ProviderExperiment,
   ProviderLimits,
   ProviderManifest,
+  StayFieldDescriptor,
   StayQuery,
   UnitKind,
 } from '@shared/types/provider.types';
@@ -187,6 +189,8 @@ export interface FakeProviderOptions {
   experiments?: ProviderExperiment[];
   /** Every release mode's `maxWindowMinutes` (none by default). */
   maxWindowMinutes?: number;
+  /** Stay fields after the fake's own `gearType` (none by default). */
+  stayFields?: StayFieldDescriptor[];
   /**
    * `holds.release` and the manifest's `holdRelease` (R18); `onPaymentClose` also sets
    * `holds.releaseOnPaymentClose`. None by default: the fake cannot let a hold go.
@@ -367,6 +371,7 @@ export function createFakeProvider(options: FakeProviderOptions = {}): FakeProvi
         default: 'tent',
         appliesTo: ['availability', 'watch', 'snipe'],
       },
+      ...(options.stayFields ?? []),
     ],
     releaseModes: capabilities.snipes
       ? [
