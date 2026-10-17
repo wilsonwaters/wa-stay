@@ -62,6 +62,7 @@ const api: WindowApi = {
     deactivate: (id) => ({ id }),
     runNow: (id) => ({ id }),
     openPayment: (id) => ({ id }),
+    releaseHold: (id) => ({ id }),
   }),
 
   snipes: bind('snipes', {
@@ -74,6 +75,7 @@ const api: WindowApi = {
     deactivate: (id) => ({ id }),
     runNow: (id) => ({ id }),
     openPayment: (id) => ({ id }),
+    releaseHold: (id) => ({ id }),
   }),
 
   notifications: bind('notifications', {

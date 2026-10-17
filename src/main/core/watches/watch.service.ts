@@ -11,7 +11,9 @@
  * one-booking-per-night guard as snipes, and stops. Payment stays a human step. It never
  * picks between stay types: a watch with no units named whose wanted units are of more than
  * one kind (`kindsAmbiguous`) notifies with a note instead. Nor does it hold while the
- * provider's holds are turning off (an experiment turned off, until the restart: §12.35).
+ * provider's holds are turning off (an experiment turned off, until the restart: §12.35), and
+ * a watch cannot be set to hold then. `holds.create` runs at interactive priority (R18): a hold
+ * is one booking attempt the person opted into, even inside a background check.
  *
  * Booking links (brief R6, R7; `booking-link.ts`): each alert carries the provider's booking
  * page for what it found (the first full match, or the longest partial run with its dates),
@@ -44,6 +46,7 @@ import { cleanUnitKinds } from '@shared/utils/unit-kinds';
 import type { WatchRepository } from '../../database/repositories';
 import type { ProviderRegistry, ProviderWith } from '../../providers/registry';
 import { isAbortError, ProviderCapabilityError, toApiError } from '../../providers/sdk/errors';
+import { withRequestPriority } from '../../providers/sdk/pacing';
 import type { HoldSuccess } from '../../providers/sdk/provider';
 import { matchedStayLink } from '../booking-link';
 import { AppError } from '../../utils/app-error';
@@ -138,8 +141,9 @@ export class WatchService {
 
   /**
    * Creates a watch. Throws `ProviderCapabilityError` (`CAPABILITY`) when the provider has no
-   * watches, or no holds for `autoHold`; `UnknownProviderError` for an unknown provider. The
-   * new watch is due at once.
+   * watches, or no holds for `autoHold`; `VALIDATION` on `autoHold` while its holds are turning
+   * off (as a hold snipe is refused); `UnknownProviderError` for an unknown provider. The new
+   * watch is due at once.
    */
   async create(userId: number, input: WatchInput): Promise<Watch> {
     const provider = this.providers.require(input.providerId, 'watches');
@@ -176,7 +180,10 @@ export class WatchService {
     const watch = this.require(id);
     const provider = this.providers.require(watch.providerId, 'watches');
     const autoHold = updates.autoHold ?? watch.autoHold;
-    if (updates.autoHold !== undefined) this.assertAutoHold(provider, updates.autoHold);
+    // A watch that holds already may keep doing so (as a hold snipe keeps its action)
+    if (updates.autoHold !== undefined) {
+      this.assertAutoHold(provider, updates.autoHold, { turningOn: !watch.autoHold });
+    }
     if (updates.stay) this.assertStay(provider, updates.stay);
     const prepared: WatchUpdate = { ...updates };
     if (updates.unitKinds !== undefined) prepared.unitKinds = cleanUnitKinds(updates.unitKinds);
@@ -462,9 +469,26 @@ export class WatchService {
     return match ? matchedStayLink(provider, watch, match, units, { quiet: true }) : undefined;
   }
 
-  private assertAutoHold(provider: WatchProvider, autoHold: boolean | undefined): void {
-    if (autoHold && provider.manifest.capabilities.holds !== true) {
-      throw new ProviderCapabilityError(provider.manifest.id, 'holds');
+  /**
+   * `autoHold` needs the provider's holds (`CAPABILITY`). Turning it on (a new watch, or an
+   * edit from off) also needs holds that are not turning off: `VALIDATION` on `autoHold` then,
+   * as a new hold snipe is refused (`assertAction`), since the watch would hold nothing before
+   * the restart.
+   */
+  private assertAutoHold(
+    provider: WatchProvider,
+    autoHold: boolean | undefined,
+    { turningOn = true }: { turningOn?: boolean } = {}
+  ): void {
+    if (!autoHold) return;
+    const { id, shortName, capabilities } = provider.manifest;
+    if (capabilities.holds !== true) throw new ProviderCapabilityError(id, 'holds');
+    if (turningOn && this.holdsTurningOff(id)) {
+      throw new AppError(
+        'VALIDATION',
+        `Automatic holds on ${shortName} are turning off, so turn off the automatic hold`,
+        { issues: ['autoHold'] }
+      );
     }
   }
 
@@ -561,14 +585,18 @@ export class WatchService {
       };
     }
 
+    const holds = provider.holds;
     try {
-      const hold = await provider.holds.create(
-        {
-          externalId: watch.location.externalId,
-          unitId: match.unitId,
-          stay: toStayQuery(watch.stay, watch.stayParams),
-        },
-        signal
+      // Interactive (R18): the hold goes ahead of the provider's background requests
+      const hold = await withRequestPriority('interactive', () =>
+        holds.create(
+          {
+            externalId: watch.location.externalId,
+            unitId: match.unitId,
+            stay: toStayQuery(watch.stay, watch.stayParams),
+          },
+          signal
+        )
       );
       if (!hold.ok) {
         log.info(`Watch ${watch.id}: automatic hold refused (${hold.reason})`);
@@ -585,6 +613,7 @@ export class WatchService {
         this.repo.markHeld(watch.id, {
           reference: placed.reference,
           expiresAt: hold.expiresAt,
+          ...(placed.expiresEstimated ? { expiresEstimated: true } : {}),
           unitId: placed.unitId,
           paymentUrl: placed.paymentUrl,
         });
@@ -605,6 +634,7 @@ export class WatchService {
     return {
       reference: hold.reference,
       expiresAt: hold.expiresAt.toISOString(),
+      ...(hold.expiresAtEstimated === true ? { expiresEstimated: true } : {}),
       unitId: hold.unitId ?? match.unitId,
       paymentUrl: provider.holds?.paymentUrl(hold) ?? provider.manifest.website,
     };

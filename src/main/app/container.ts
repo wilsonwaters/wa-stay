@@ -117,7 +117,11 @@ export interface AppContainer {
   readonly documentWindows: DocumentWindows;
   /** The person's account with each provider: status, in-app sign-in, sign-out. */
   readonly accounts: ProviderAccountService;
-  /** Paying for a snipe's or watch's hold in a payment window (`*.openPayment`). */
+  /**
+   * Paying for a snipe's or watch's hold in a payment window (`*.openPayment`), and letting one
+   * go (`*.releaseHold`, before a delete, and on a payment window's close where the provider
+   * asks for it).
+   */
   readonly holdPayments: HoldPaymentService;
   readonly bookingService: BookingService;
   readonly notificationService: NotificationService;
@@ -244,10 +248,12 @@ export function createContainer({
   // One booking per night across snipes and auto-hold watches; it also knows the holds in flight
   const nightGuard = new NightGuard(repositories.snipes, repositories.watches);
   // Turning off a provider's holds, or signing out, would lose a queue place, a hold being
-  // placed (a snipe sniping, or any hold whose `holds.create` is still running), or a hold
-  // awaiting payment.
+  // placed (a snipe sniping, or any hold whose `holds.create` is still running), a hold
+  // awaiting payment, or a hold being let go (`holds.release` running: R18).
+  let releasingHold: (providerId: string) => boolean = () => false;
   const isBusy = (providerId: string, now: Date): boolean =>
     nightGuard.reserving(providerId) ||
+    releasingHold(providerId) ||
     repositories.snipes.countByStatus(providerId, [
       SnipeStatus.QUEUEING,
       SnipeStatus.SNIPING,
@@ -375,6 +381,7 @@ export function createContainer({
     locations: repositories.locations,
     logger,
   });
+  releasingHold = (providerId) => holdPayments.releasing(providerId);
   const autoUpdater = new AutoUpdaterService(rendererEvents);
   const scheduler = new JobScheduler({
     watches: watchService,

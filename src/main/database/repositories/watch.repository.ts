@@ -50,6 +50,8 @@ interface WatchRow extends StayRow {
   last_error: string | null;
   // Migration v11
   unit_kinds: string | null;
+  // Migration v12 (R18)
+  hold_expires_estimated: number | null;
   created_at: string;
   updated_at: string;
 }
@@ -294,25 +296,44 @@ export class WatchRepository extends BaseRepository<Watch> {
   }
 
   /**
-   * The auto-hold placed a hold: `last_result 'held'`, the hold's reference, expiry, unit and
-   * payment page, and the watch stops (one statement).
+   * The auto-hold placed a hold: `last_result 'held'`, the hold's reference, expiry (and
+   * whether it is the provider's guess, v12's `hold_expires_estimated`), unit and payment page,
+   * and the watch stops (one statement).
    */
   markHeld(id: number, hold: WatchHoldState): void {
     this.db
       .prepare(
         `UPDATE watches
          SET last_result = ?, is_active = 0, hold_reference = ?, hold_expires_at = ?,
-             hold_unit_id = ?, payment_url = ?, last_error = NULL
+             hold_expires_estimated = ?, hold_unit_id = ?, payment_url = ?, last_error = NULL
          WHERE id = ?`
       )
       .run(
         WatchResult.HELD,
         hold.reference,
         hold.expiresAt.toISOString(),
+        hold.expiresEstimated ? 1 : 0,
         hold.unitId ?? null,
         hold.paymentUrl ?? null,
         id
       );
+  }
+
+  /**
+   * The provider let the hold go, or no longer held it (R18): the hold ends at `at` (so the
+   * night guard and `HOLD_EXPIRED` see it expired, an exact time now) and `message` says why.
+   * The watch keeps `last_result 'held'`. Only while it still holds `reference`: a watch booked
+   * meanwhile, or holding another hold, is left as it is. Returns whether it changed.
+   */
+  endHold(id: number, reference: string, at: Date, message: string): boolean {
+    const result = this.db
+      .prepare(
+        `UPDATE watches
+         SET hold_expires_at = ?, hold_expires_estimated = 0, last_error = ?
+         WHERE id = ? AND last_result = ? AND hold_reference = ?`
+      )
+      .run(at.toISOString(), message, id, WatchResult.HELD, reference);
+    return result.changes > 0;
   }
 
   /** The hold was paid for: `last_result 'booked'`, inactive; the hold columns stay. */
@@ -346,7 +367,10 @@ export class WatchRepository extends BaseRepository<Watch> {
     this.db.prepare('UPDATE watches SET last_result = ? WHERE id = ?').run(result, id);
   }
 
-  /** `hold`, when the row has a hold reference and expiry (v9 columns). */
+  /**
+   * `hold`, when the row has a hold reference and expiry (v9 columns), with `expiresEstimated`
+   * when v12's `hold_expires_estimated` is set (absent, so false, for every other row).
+   */
   private readHold(row: WatchRow): { hold?: WatchHoldState } {
     const expiresAt = this.parseDate(row.hold_expires_at);
     if (!row.hold_reference || !expiresAt) return {};
@@ -354,6 +378,7 @@ export class WatchRepository extends BaseRepository<Watch> {
       hold: {
         reference: row.hold_reference,
         expiresAt,
+        ...(row.hold_expires_estimated ? { expiresEstimated: true } : {}),
         ...(row.hold_unit_id ? { unitId: row.hold_unit_id } : {}),
         ...(row.payment_url ? { paymentUrl: row.payment_url } : {}),
       },

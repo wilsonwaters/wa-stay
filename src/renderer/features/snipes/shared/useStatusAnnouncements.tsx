@@ -25,7 +25,9 @@ export function heldMessage(
     return `${unit} held at ${place}. Pay on ${manifest?.shortName ?? 'the provider'} before the hold runs out.`;
   }
   const minutes = Math.max(1, Math.ceil((new Date(snipe.holdExpiresAt).getTime() - now) / 60_000));
-  return `${unit} held at ${place}. Pay within ${minutes} ${minutes === 1 ? 'minute' : 'minutes'}.`;
+  // A guessed expiry is "about" (R18)
+  const about = snipe.holdExpiresEstimated ? 'about ' : '';
+  return `${unit} held at ${place}. Pay within ${about}${minutes} ${minutes === 1 ? 'minute' : 'minutes'}.`;
 }
 
 /**

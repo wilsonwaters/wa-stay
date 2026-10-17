@@ -245,6 +245,16 @@ describe('IPC contract', () => {
     }
   });
 
+  it('lets holds go: snipes.releaseHold and watches.releaseHold take an id (R18)', () => {
+    expect(contract.snipes.releaseHold.channel).toBe('snipes:release-hold');
+    expect(contract.watches.releaseHold.channel).toBe('watches:release-hold');
+    for (const method of [contract.snipes.releaseHold, contract.watches.releaseHold]) {
+      expect(method.request.safeParse({ id: 4 }).success).toBe(true);
+      expect(method.request.safeParse({ id: 'x' }).success).toBe(false);
+      expect(method.request.safeParse({}).success).toBe(false);
+    }
+  });
+
   describe('registration', () => {
     let container: AppContainer;
     let ipc: FakeIpcMain;

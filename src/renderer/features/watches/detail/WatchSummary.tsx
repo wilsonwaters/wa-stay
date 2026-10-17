@@ -115,7 +115,9 @@ export function WatchSummary({ watch, state, manifest, today, now, units }: Watc
               watch,
               state,
               noun,
-              watch.hold ? timeInZone(new Date(watch.hold.expiresAt), zone, now) : undefined
+              watch.hold
+                ? `${watch.hold.expiresEstimated ? 'about ' : ''}${timeInZone(new Date(watch.hold.expiresAt), zone, now)}`
+                : undefined
             )}
           </Item>
         )}

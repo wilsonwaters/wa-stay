@@ -109,7 +109,7 @@ function SnipeDetailView({ snipe, manifest, updating: fetching }: ViewProps) {
         }
       />
       <HoldAlert message={alert} />
-      {snipe.status === SnipeStatus.HELD && (
+      {(snipe.status === SnipeStatus.HELD || actions.letGo) && (
         <HeldPanel snipe={snipe} manifest={manifest} actions={actions} place={units} />
       )}
       {snipe.status === SnipeStatus.BOOKED && (
@@ -120,7 +120,7 @@ function SnipeDetailView({ snipe, manifest, updating: fetching }: ViewProps) {
           </Link>
         </Notice>
       )}
-      {terminal && (
+      {terminal && !actions.letGo && (
         <Notice
           tone={snipe.status === SnipeStatus.FAILED ? 'danger' : 'info'}
           title={terminal.label}

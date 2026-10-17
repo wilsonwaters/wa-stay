@@ -4,10 +4,11 @@ import {
   useAccountStatus,
   useDeleteSnipe,
   useOpenSnipePayment,
+  useReleaseSnipeHold,
   useRunSnipeNow,
   useSetSnipeActive,
 } from '../../../api';
-import { SnipeResult } from '../../../../shared/types/common.types';
+import { SnipeResult, SnipeStatus } from '../../../../shared/types/common.types';
 import type { ProviderManifest } from '../../../../shared/types/provider.types';
 import type { SiteSnipe, SnipeExecutionResult } from '../../../../shared/types/site-sniper.types';
 import { HOLD_EXPIRED_MESSAGE } from '../../../components/stay/HoldPanel';
@@ -58,9 +59,13 @@ export function useSnipeActions(
   const setActive = useSetSnipeActive();
   const run = useRunSnipeNow();
   const pay = useOpenSnipePayment();
+  const release = useReleaseSnipeHold();
   const remove = useDeleteSnipe();
   const account = useAccountStatus(manifest?.id);
   const [connectOpen, setConnectOpen] = useState(false);
+  // "Let it go" was asked here: once the hold has ended (EXPIRED), the page keeps the hold
+  // panel to say how (and focus its heading) instead of the ended snipe's notice
+  const [releaseAsked, setReleaseAsked] = useState(false);
   const running = useRef(false);
   const requirement = manifest?.capabilities.account;
   const needsAccount =
@@ -111,6 +116,16 @@ export function useSnipeActions(
         ),
     });
 
+  /**
+   * For the hold panel's "Let it go" (its ConfirmDialog): resolves with why the hold ended, for
+   * the panel to announce; a rejection keeps the dialog open with the error. It is marked asked
+   * first, so the page never drops the panel between the hold ending and the answer (`letGo`).
+   */
+  const releaseHold = async () => {
+    setReleaseAsked(true);
+    return (await release.mutateAsync(snipe.id)).lastError;
+  };
+
   /** For a ConfirmDialog: resolves once deleted (a rejection keeps the dialog open). */
   const deleteSnipe = async () => {
     await remove.mutateAsync(snipe.id);
@@ -126,6 +141,8 @@ export function useSnipeActions(
     running: run.isPending,
     payNow,
     paying: pay.isPending,
+    releaseHold,
+    letGo: releaseAsked && snipe.status === SnipeStatus.EXPIRED,
     deleteSnipe,
     needsAccount,
     connectOpen,

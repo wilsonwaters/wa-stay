@@ -103,3 +103,24 @@ export function useOpenSnipePayment() {
     },
   });
 }
+
+/**
+ * "Let it go": asks main to let a HELD snipe's hold go. Resolves with the snipe, EXPIRED with
+ * why (`lastError`), which goes straight into the cache. A failure (the hold ended meanwhile,
+ * the provider did not answer) refetches the snipe, so the page shows what is true.
+ */
+export function useReleaseSnipeHold() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: number): Promise<SiteSnipe> => unwrap((api) => api.snipes.releaseHold(id)),
+    onSuccess: (snipe: SiteSnipe) => {
+      queryClient.setQueryData<SiteSnipe[]>(queryKeys.snipes.list(), (list) =>
+        list?.map((item) => (item.id === snipe.id ? snipe : item))
+      );
+      queryClient.setQueryData(queryKeys.snipes.detail(snipe.id), snipe);
+    },
+    onError: () => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.snipes.all });
+    },
+  });
+}
