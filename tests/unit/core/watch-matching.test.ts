@@ -7,6 +7,7 @@
 import {
   fullMatches,
   kindsAmbiguous,
+  longestRun,
   partialMatches,
   priceCheck,
   wantedUnits,
@@ -257,5 +258,30 @@ describe('watch matching', () => {
 
   it('priceCheck: no nights is not a known price', () => {
     expect(priceCheck([], 10)).toEqual({ passes: true, priceKnown: false, total: undefined });
+  });
+
+  describe('longestRun (what a partial alert and its booking link name)', () => {
+    it('is the run with the most nights, wherever it is', () => {
+      const runs = partialMatches({}, [
+        unit('1', [night(D1, 'available'), night(D2, 'booked'), night(D3, 'available')]),
+        unit('2', [night(D1, 'booked'), night(D2, 'available'), night(D3, 'available')]),
+      ]);
+      expect(runs).toHaveLength(3);
+      expect(longestRun(runs)).toMatchObject({ unitId: '2', arrival: D2, departure: D4 });
+    });
+
+    it('is the first on a tie, and undefined for no runs', () => {
+      const runs = partialMatches({}, [
+        unit('1', [night(D1, 'available'), night(D2, 'booked'), night(D3, 'available')]),
+        unit('2', [night(D1, 'booked'), night(D2, 'booked'), night(D3, 'available')]),
+      ]);
+      expect(runs.map((r) => [r.unitId, r.arrival])).toEqual([
+        ['1', D1],
+        ['1', D3],
+        ['2', D3],
+      ]);
+      expect(longestRun(runs)).toBe(runs[0]);
+      expect(longestRun([])).toBeUndefined();
+    });
   });
 });

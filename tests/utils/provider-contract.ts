@@ -7,8 +7,10 @@
  *   }));
  *
  * It checks that the manifest is valid, the capabilities match the modules, location keys
- * round-trip, every module honours `AbortSignal`, failures are `ProviderError`s, and links
- * are absolute https URLs. Modules the provider does not have are skipped. For a
+ * round-trip, every module honours `AbortSignal`, failures are `ProviderError`s, links are
+ * absolute https URLs, and every booking link a check returns (the location's and each
+ * unit's `bookingUrl`) is on the provider's own site (`bookingLinkViolations`, the core's
+ * `isProviderBookingLink`). Modules the provider does not have are skipped. For a
  * browser-driven provider, `openPages` lets it check that no call leaves a page open.
  *
  * A `search`-mode catalogue is also checked over `searchBbox` (`searchAreaViolations`): its
@@ -25,11 +27,13 @@ import {
   type CatalogModule,
   type ProviderContext,
 } from '@main/providers/sdk';
+import { isProviderBookingLink } from '@main/core/booking-link';
 import { TEXT_SEARCH_MIN_CHARS } from '@main/core/catalog/location-catalog.service';
 import { providerViolations, ProviderRegistry } from '@main/providers/registry';
 import type { BoundingBox, LocationSummary } from '@shared/types/catalog.types';
 import {
   ProviderManifestSchema,
+  type LocationAvailability,
   type ProviderManifest,
   type StayQuery,
 } from '@shared/types/provider.types';
@@ -204,6 +208,28 @@ export async function searchTextViolations(
   return (items as LocationSummary[])
     .filter((item) => item.key !== makeLocationKey(providerId, item.externalId))
     .map((item) => `searchText("${text}"): ${item.key} is not a location of ${providerId}`);
+}
+
+/**
+ * What is wrong with the booking links of a check's answer, as messages ([] when nothing):
+ * a `bookingUrl` (the location's, or a unit's) that the core would refuse, because it is not
+ * https on the provider's own site (`isProviderBookingLink`: the website's host, or a
+ * subdomain of it, with no user name or password). Alerts never carry such a link.
+ */
+export function bookingLinkViolations(
+  manifest: Pick<ProviderManifest, 'website'>,
+  result: Pick<LocationAvailability, 'bookingUrl' | 'units'>
+): string[] {
+  const links: Array<[string, string | undefined]> = [
+    ['the location', result.bookingUrl],
+    ...result.units.map((unit): [string, string | undefined] => [
+      `unit ${unit.unitId}`,
+      unit.bookingUrl,
+    ]),
+  ];
+  return links
+    .filter(([, url]) => url !== undefined && !isProviderBookingLink(manifest, url))
+    .map(([owner, url]) => `${owner}'s bookingUrl ${url} is not on ${manifest.website}`);
 }
 
 /** A promise that rejects with an AbortError (the caller aborted). */
@@ -406,6 +432,12 @@ export function describeProviderContract(
             expect(night.date >= stay.arrival && night.date < stay.departure).toBe(true);
           }
         }
+      });
+
+      it("returns booking links on the provider's own site (https, its website's host)", async () => {
+        if (!provider.availability) return;
+        const result = await provider.availability.check(externalId, stay);
+        expect(bookingLinkViolations(provider.manifest, result)).toEqual([]);
       });
 
       it('searches with keys of this provider', async () => {

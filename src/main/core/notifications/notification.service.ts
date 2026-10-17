@@ -16,7 +16,10 @@ import { NotificationDispatcher } from './notification-dispatcher';
 import type { EventSink } from '@shared/contracts/events';
 import { Notification as ElectronNotification } from 'electron';
 import { getBrandIconPath } from '../../app/paths';
+import { describeUrl } from '../../providers/sdk/url-patterns';
 import { logger } from '../../utils/logger';
+import { firstBookingLink, type BookingLinkManifest } from '../booking-link';
+import { longestRun } from '../watches/matching';
 
 const log = logger.child({ module: 'notifications' });
 
@@ -29,9 +32,22 @@ function formatCalendarDate(date: string): string {
   return new Date(`${date}T00:00:00.000Z`).toLocaleDateString(undefined, { timeZone: 'UTC' });
 }
 
-/** What an email says a notification is about, beyond what is stored. */
+/** What an alert carries beyond what is stored: for email, and for a desktop click. */
 interface DispatchMeta {
   locationName?: string;
+  /**
+   * The provider's public booking page for what the alert found (`booking-link.ts`): the
+   * email's "Book on {shortName}" link, and a desktop click opens it in the browser. It must
+   * be a booking link of the notification's provider (`isProviderBookingLink`: https on its
+   * own site); `notify` checks it against the provider's manifest again and drops it
+   * otherwise. Never stored, in `notifications` or in the delivery log.
+   */
+  bookingUrl?: string;
+  /**
+   * The alert is about a hold WA Stay placed: a desktop click opens only the in-app page (the
+   * person pays there), and the email says where the hold is. Never stored.
+   */
+  heldInApp?: boolean;
 }
 
 /** What a general notification (`notifyWarning`) is about: a watch, snipe or booking. */
@@ -45,6 +61,9 @@ export interface NotificationSubject {
 
 /** A provider's short name (`ParkStay`), or undefined for an unknown provider. */
 export type ProviderNameResolver = (providerId: string) => string | undefined;
+
+/** A provider's manifest (its id and website), or undefined for an unknown provider. */
+export type ProviderManifestResolver = (providerId: string) => BookingLinkManifest | undefined;
 
 /** The person's notification preferences (Settings → Notifications). */
 export interface NotificationPreferences {
@@ -64,6 +83,11 @@ export interface NotificationServiceOptions {
   /** Resolves a provider's short name through the registry, for desktop titles. */
   providerName?: ProviderNameResolver;
   /**
+   * Resolves a provider's manifest through the registry, to check an alert's booking link
+   * against its website. Without it (or for an unknown provider) alerts carry no link.
+   */
+  providerManifest?: ProviderManifestResolver;
+  /**
    * The current preferences, read on every notification, so a change in Settings applies to
    * the next one with nothing to push. The container reads the stored settings.
    */
@@ -75,6 +99,11 @@ export interface NotificationServiceOptions {
    * Returns false when there is no window or the app is quitting: the click is then ignored.
    */
   showMainWindow?: () => boolean;
+  /**
+   * Opens a booking page in the system browser (`shell.openExternal`), after a click on an
+   * alert that carries one has opened its page in the app.
+   */
+  openExternal?: (url: string) => Promise<void>;
 }
 
 /**
@@ -105,8 +134,10 @@ export class NotificationService {
   private dispatcher: NotificationDispatcher | null = null;
   private events: EventSink | null = null;
   private readonly providerName: ProviderNameResolver;
+  private readonly providerManifest: ProviderManifestResolver;
   private readonly clock: () => Date;
   private readonly showMainWindow: () => boolean;
+  private readonly openExternal: (url: string) => Promise<void>;
   private readonly liveDesktop = new Set<ElectronNotification>();
   private readonly preferences: () => NotificationPreferences;
 
@@ -121,24 +152,33 @@ export class NotificationService {
     this.dispatcher = dispatcher || null;
     this.events = events || null;
     this.providerName = options.providerName ?? (() => undefined);
+    this.providerManifest = options.providerManifest ?? (() => undefined);
     this.clock = options.clock ?? (() => new Date());
     this.showMainWindow = options.showMainWindow ?? (() => false);
+    this.openExternal = options.openExternal ?? (() => Promise.resolve());
     this.preferences = options.preferences ?? (() => DEFAULT_NOTIFICATION_PREFERENCES);
   }
 
   /**
    * Create a notification
    * @param input - Notification data to store (its title without a provider prefix)
-   * @param dispatchMeta - The location, for external notifiers (email, etc.)
+   * @param dispatchMeta - The location for external notifiers (email, etc.), and an alert's
+   *   booking page and whether it is about a hold in the app; none of it is stored
    */
   async notify(input: NotificationInput, dispatchMeta?: DispatchMeta): Promise<Notification> {
     // Store notification in database
     const notification = this.notificationRepo.create(input);
+    const bookingUrl = this.checkedBookingLink(input, dispatchMeta?.bookingUrl);
+    const heldInApp = dispatchMeta?.heldInApp === true;
 
-    // The OS notification, if the person wants them; its sound is the OS's own (`silent`)
+    // The OS notification, if the person wants them; its sound is the OS's own (`silent`). A
+    // click on an alert about a hold opens only the app, where the person pays.
     const { desktop, sound } = this.preferences();
     if (desktop) {
-      await this.showDesktopNotification(notification, { silent: !sound });
+      await this.showDesktopNotification(notification, {
+        silent: !sound,
+        bookingUrl: heldInApp ? undefined : bookingUrl,
+      });
     }
 
     // Tell the renderer about the stored notification
@@ -154,6 +194,8 @@ export class NotificationService {
           type: notification.type,
           providerId: notification.providerId,
           locationName: dispatchMeta?.locationName,
+          ...(bookingUrl ? { bookingUrl } : {}),
+          ...(heldInApp ? { heldInApp } : {}),
         });
       } catch (error) {
         log.error('Error dispatching notification to providers:', error);
@@ -165,10 +207,30 @@ export class NotificationService {
   }
 
   /**
-   * Notify when a watch finds the whole stay. `note` is a sentence added to the message, such
-   * as why no automatic hold was placed.
+   * An alert's booking link, when it is one of the notification's provider (https on its own
+   * site, checked against its manifest), normalised; otherwise none (a refused one is logged by
+   * origin only).
    */
-  async notifyWatchFound(watch: Watch, matches: WatchMatch[], note?: string): Promise<void> {
+  private checkedBookingLink(
+    input: NotificationInput,
+    bookingUrl: string | undefined
+  ): string | undefined {
+    if (!bookingUrl || !input.providerId) return undefined;
+    const manifest = this.providerManifest(input.providerId);
+    return manifest ? firstBookingLink(manifest, [bookingUrl]) : undefined;
+  }
+
+  /**
+   * Notify when a watch finds the whole stay. `note` is a sentence added to the message, such
+   * as why no automatic hold was placed. `bookingUrl` is the provider's booking page for the
+   * stay found (`matchedStayLink`): a desktop click opens it, and the email links it.
+   */
+  async notifyWatchFound(
+    watch: Watch,
+    matches: WatchMatch[],
+    note?: string,
+    bookingUrl?: string
+  ): Promise<void> {
     const sitesText = matches.length === 1 ? '1 site' : `${matches.length} sites`;
     const message =
       `Found ${sitesText} available at ${watch.location.name} for ${formatCalendarDate(watch.stay.arrival)} - ${formatCalendarDate(watch.stay.departure)}` +
@@ -185,21 +247,23 @@ export class NotificationService {
         relatedType: RelatedType.WATCH,
         actionUrl: relatedPath(RelatedType.WATCH, watch.id),
       },
-      { locationName: watch.location.name }
+      { locationName: watch.location.name, bookingUrl }
     );
   }
 
   /**
-   * Notify when watch finds partial (consecutive subset) availability
+   * Notify when watch finds partial (consecutive subset) availability. The message names the
+   * longest run (`longestRun`), the run `bookingUrl` is for.
    */
-  async notifyWatchPartialFound(watch: Watch, partialResults: WatchMatch[]): Promise<void> {
-    // Highlight the longest consecutive block
-    const nightsOf = (r: WatchMatch): number => nightsBetween(r.arrival, r.departure);
-    const longestBlock = partialResults.reduce((best, r) =>
-      nightsOf(r) > nightsOf(best) ? r : best
-    );
+  async notifyWatchPartialFound(
+    watch: Watch,
+    partialResults: WatchMatch[],
+    bookingUrl?: string
+  ): Promise<void> {
+    const longestBlock = longestRun(partialResults);
+    if (!longestBlock) return;
 
-    const nights = nightsOf(longestBlock);
+    const nights = nightsBetween(longestBlock.arrival, longestBlock.departure);
     const nightsText = nights === 1 ? '1 night' : `${nights} consecutive nights`;
     const message = `Partial availability at ${watch.location.name}: ${nightsText} available from ${formatCalendarDate(longestBlock.arrival)} - ${formatCalendarDate(longestBlock.departure)}`;
 
@@ -214,14 +278,21 @@ export class NotificationService {
         relatedType: RelatedType.WATCH,
         actionUrl: relatedPath(RelatedType.WATCH, watch.id),
       },
-      { locationName: watch.location.name }
+      { locationName: watch.location.name, bookingUrl }
     );
   }
 
   /**
    * Notify when a watch's automatic hold was placed (payment still required), like a snipe's.
+   * A desktop click opens only the watch, where the person pays; the email says the hold is
+   * in WA Stay and gives `bookingUrl`, the public booking page, for booking away from it.
    */
-  async notifyWatchHeld(watch: Watch, hold: WatchHold, unitName: string): Promise<void> {
+  async notifyWatchHeld(
+    watch: Watch,
+    hold: WatchHold,
+    unitName: string,
+    bookingUrl?: string
+  ): Promise<void> {
     const arrival = formatCalendarDate(watch.stay.arrival);
     const departure = formatCalendarDate(watch.stay.departure);
     const minutesLeft = Math.max(
@@ -241,7 +312,7 @@ export class NotificationService {
         relatedType: RelatedType.WATCH,
         actionUrl: relatedPath(RelatedType.WATCH, watch.id),
       },
-      { locationName: watch.location.name }
+      { locationName: watch.location.name, bookingUrl, heldInApp: true }
     );
   }
 
@@ -376,11 +447,11 @@ export class NotificationService {
 
   /**
    * Show desktop notification. A click brings the main window forward and opens the
-   * notification's page.
+   * notification's page, then `bookingUrl` (an alert's booking page) in the browser.
    */
   private async showDesktopNotification(
     notification: Notification,
-    { silent }: { silent: boolean }
+    { silent, bookingUrl }: { silent: boolean; bookingUrl?: string }
   ): Promise<void> {
     try {
       const desktopNotification = new ElectronNotification({
@@ -393,7 +464,7 @@ export class NotificationService {
       this.keepAlive(desktopNotification);
       desktopNotification.on('click', () => {
         this.liveDesktop.delete(desktopNotification);
-        this.openFromDesktop(notification);
+        this.openFromDesktop(notification, bookingUrl);
       });
       desktopNotification.on('close', () => this.liveDesktop.delete(desktopNotification));
 
@@ -413,9 +484,10 @@ export class NotificationService {
 
   /**
    * A desktop notification was clicked: restore and focus the window, then ask the renderer
-   * to open the notification's page. Ignored while the app is quitting (no window to show).
+   * to open the notification's page, then open the alert's booking page (if it has one) in the
+   * browser. Ignored while the app is quitting (no window to show): nothing opens.
    */
-  private openFromDesktop(notification: Notification): void {
+  private openFromDesktop(notification: Notification, bookingUrl?: string): void {
     if (!this.showMainWindow()) {
       log.info('Ignored a desktop notification click: no window to show');
       return;
@@ -425,6 +497,22 @@ export class NotificationService {
     }
     const path = notificationLinkPath(notification);
     if (path) this.events?.emit('app:navigate', { path });
+    if (bookingUrl) this.openBookingPage(notification, bookingUrl);
+  }
+
+  /**
+   * Opens an alert's booking page in the system browser. A failure (no default browser) is
+   * logged by origin only, never the page's path or query; the app page is already open.
+   */
+  private openBookingPage(notification: Notification, url: string): void {
+    Promise.resolve()
+      .then(() => this.openExternal(url))
+      .catch((error: unknown) => {
+        const kind = error instanceof Error ? error.name : typeof error;
+        log.warn(
+          `Notification ${notification.id}: could not open ${describeUrl(url)} in the browser (${kind})`
+        );
+      });
   }
 
   /**

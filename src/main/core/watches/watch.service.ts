@@ -12,6 +12,12 @@
  * picks between stay types: a watch with no units named whose wanted units are of more than
  * one kind (`kindsAmbiguous`) notifies with a note instead.
  *
+ * Booking links (brief R6, R7; `booking-link.ts`): each alert carries the provider's booking
+ * page for what it found (the first full match, or the longest partial run with its dates),
+ * and every watch read (`get`, `list`, `watch:updated`) derives `bookingLink` the same way from
+ * the stored units while the result is found or partly found for the stay's own nights. The
+ * link is never stored.
+ *
  * `execute` never throws for a failed check (only `NOT_FOUND`); after its `signal` aborts it
  * writes nothing, except a hold the provider already placed.
  */
@@ -20,6 +26,7 @@ import {
   type AccountStatus,
   type ApiErrorCode,
   type Watch,
+  type WatchBookingLink,
   type WatchExecutionResult,
   type WatchHold,
   type WatchInput,
@@ -31,18 +38,19 @@ import type { EventSink } from '@shared/contracts/events';
 import { WatchResult } from '@shared/types/common.types';
 import type { StayFieldUse } from '@shared/types/provider.types';
 import { toStayQuery, type StayInput } from '@shared/types/stay.types';
-import { compareDates, isCalendarDate, todayIn } from '@shared/utils/calendar-date';
+import { compareDates, eachNight, isCalendarDate, todayIn } from '@shared/utils/calendar-date';
 import { cleanUnitKinds } from '@shared/utils/unit-kinds';
 import type { WatchRepository } from '../../database/repositories';
 import type { ProviderRegistry, ProviderWith } from '../../providers/registry';
 import { isAbortError, ProviderCapabilityError, toApiError } from '../../providers/sdk/errors';
 import type { HoldSuccess } from '../../providers/sdk/provider';
+import { matchedStayLink } from '../booking-link';
 import { AppError } from '../../utils/app-error';
 import { logger } from '../../utils/logger';
 import type { NightGuard } from '../holds/night-guard';
 import type { NotificationService } from '../notifications/notification.service';
 import { resolveStayParams } from '../stay-params';
-import { fullMatches, kindsAmbiguous, partialMatches, wantedUnits } from './matching';
+import { fullMatches, kindsAmbiguous, longestRun, partialMatches, wantedUnits } from './matching';
 import { effectiveIntervalMinutes, nextCheckAt } from './next-check';
 
 const log = logger.child({ module: 'watches' });
@@ -86,6 +94,17 @@ function stayFieldUses(autoHold: boolean): StayFieldUse[] {
 
 function needsAccountForHolds(requirement: string): boolean {
   return requirement === 'required' || requirement === 'required-for-holds';
+}
+
+/** Whether the stored units' nights are exactly the stay's nights. */
+function coversStayNights(
+  units: NonNullable<Watch['lastAvailability']>,
+  stay: Watch['stay']
+): boolean {
+  if (!isCalendarDate(stay.arrival) || !isCalendarDate(stay.departure)) return false;
+  const stayNights = eachNight(stay.arrival, stay.departure);
+  const stored = new Set(units.flatMap((unit) => unit.nights.map((night) => night.date)));
+  return stored.size === stayNights.length && stayNights.every((night) => stored.has(night));
 }
 
 export class WatchService {
@@ -133,11 +152,12 @@ export class WatchService {
   }
 
   async get(id: number): Promise<Watch | null> {
-    return this.repo.findById(id);
+    const watch = this.repo.findById(id);
+    return watch ? this.present(watch) : null;
   }
 
   async list(userId: number, filter: WatchListFilter = {}): Promise<Watch[]> {
-    return this.repo.findByUserId(userId, filter);
+    return this.repo.findByUserId(userId, filter).map((watch) => this.present(watch));
   }
 
   /**
@@ -160,6 +180,11 @@ export class WatchService {
       );
     }
     this.repo.update(id, prepared);
+    // Another place: the stored check (result, units) was the old place's, and would give the
+    // new one the old place's booking link, even while the watch is paused and not checked
+    if (updates.location && updates.location.externalId !== watch.location.externalId) {
+      this.repo.forgetLastCheck(id);
+    }
     const reschedule =
       updates.location !== undefined ||
       updates.stay !== undefined ||
@@ -175,7 +200,9 @@ export class WatchService {
   async delete(id: number): Promise<boolean> {
     const last = this.repo.findById(id);
     const deleted = this.repo.deleteById(id);
-    if (deleted && last) this.events?.emit('watch:updated', { ...last, isActive: false });
+    if (deleted && last) {
+      this.events?.emit('watch:updated', this.present({ ...last, isActive: false }));
+    }
     return deleted;
   }
 
@@ -311,6 +338,8 @@ export class WatchService {
 
       let hold: WatchHold | undefined;
       if (full.length > 0) {
+        // The booking page for the unit an automatic hold takes, the first full match
+        const link = matchedStayLink(provider, watch, full[0], units)?.url;
         const outcome = watch.autoHold
           ? await this.autoHold(watch, provider, full[0], kindsAmbiguous(watch, units), signal)
           : { note: undefined };
@@ -318,14 +347,17 @@ export class WatchService {
         // An automatic hold that was not placed says why (the run itself succeeded)
         if (!hold && outcome.note) this.repo.setLastError(watchId, outcome.note);
         if (hold) {
-          await this.notifications.notifyWatchHeld(watch, hold, full[0].unitName);
+          await this.notifications.notifyWatchHeld(watch, hold, full[0].unitName, link);
         } else {
           if (signal?.aborted) return result({ error: 'The check was stopped' });
-          await this.notifications.notifyWatchFound(watch, full, outcome.note);
+          await this.notifications.notifyWatchFound(watch, full, outcome.note, link);
           if (watch.notifyOnly) this.repo.deactivate(watchId);
         }
       } else if (partial.length > 0) {
-        await this.notifications.notifyWatchPartialFound(watch, partial);
+        // The run the alert names, with its own dates
+        const run = longestRun(partial);
+        const link = run ? matchedStayLink(provider, watch, run, units)?.url : undefined;
+        await this.notifications.notifyWatchPartialFound(watch, partial, link);
         if (watch.notifyOnly) this.repo.deactivate(watchId);
       }
 
@@ -371,15 +403,55 @@ export class WatchService {
    */
   private emitChanged(id: number): void {
     const watch = this.repo.findById(id);
-    if (watch) this.events?.emit('watch:updated', watch);
+    if (watch) this.events?.emit('watch:updated', this.present(watch));
   }
 
   /** Emits `watch:updated` with the stored watch, and returns it. */
   private changed(id: number): Watch {
-    const watch = this.repo.findById(id);
-    if (!watch) throw new AppError('NOT_FOUND', 'Watch not found');
+    const stored = this.repo.findById(id);
+    if (!stored) throw new AppError('NOT_FOUND', 'Watch not found');
+    const watch = this.present(stored);
     this.events?.emit('watch:updated', watch);
     return watch;
+  }
+
+  /**
+   * The watch as the renderer gets it: with its booking link, when it has one. A stored check
+   * that cannot be read (a malformed row) gives no link, never a failed read.
+   */
+  private present(watch: Watch): Watch {
+    let bookingLink: WatchBookingLink | undefined;
+    try {
+      bookingLink = this.bookingLinkOf(watch);
+    } catch (error) {
+      log.debug(
+        `Watch ${watch.id}: no booking link, its last check could not be read (${error instanceof Error ? error.name : 'error'})`
+      );
+    }
+    return bookingLink ? { ...watch, bookingLink } : watch;
+  }
+
+  /**
+   * The booking link for what the last check found, from its stored units, as the alert had
+   * it: for a found watch the first full match, for a partly found one the longest run. None
+   * for any other result, for stored nights that are not the stay's (the stay was edited
+   * since), or for a provider that is no longer registered.
+   */
+  private bookingLinkOf(watch: Watch): WatchBookingLink | undefined {
+    const { lastResult, lastAvailability } = watch;
+    if (lastResult !== WatchResult.FOUND && lastResult !== WatchResult.PARTIAL_FOUND) {
+      return undefined;
+    }
+    if (!lastAvailability || !coversStayNights(lastAvailability, watch.stay)) return undefined;
+    const provider = this.providers.tryGet(watch.providerId);
+    if (!provider) return undefined;
+    const units = wantedUnits(watch, lastAvailability);
+    const match =
+      lastResult === WatchResult.FOUND
+        ? fullMatches(watch, units)[0]
+        : longestRun(partialMatches(watch, units));
+    // Quiet: this runs on every read; the alert already logged what it refused
+    return match ? matchedStayLink(provider, watch, match, units, { quiet: true }) : undefined;
   }
 
   private assertAutoHold(provider: WatchProvider, autoHold: boolean | undefined): void {

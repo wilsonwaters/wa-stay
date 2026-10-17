@@ -755,7 +755,13 @@ The rules the normalised types carry (`src/shared/types/provider.types.ts`,
   each with one `NightStatus` per night of the stay (`available`, `booked`, `closed`,
   `not-released` or `unknown`, and `price` when known), `fullyAvailable` only when every night
   is `available`, and `total` when every night has a price. Honour `unitIds` (only those
-  units) and set `bookingUrl` to a stay-specific deep link when the provider has one.
+  units) and set `bookingUrl` to a stay-specific deep link when the provider has one; a unit
+  may carry its own `bookingUrl` too (the page for that unit or category and the stay). A
+  booking link is what "Book on {shortName}" opens from a watch's alert, its email and its
+  page: an absolute https URL on your own site (your `website`'s host, or a subdomain of it,
+  which the core and the contract suite check), a public page that works with no sign-in and
+  no app session, on a phone too, and **never** a URL that adds to a cart, holds or books when
+  it is opened.
 - **Dates and time zones.** Stays are calendar dates: never turn them into `Date` objects and
   back (a time zone shifts them). Convert to the provider's own format with a string
   transform, as ParkStay's `toParkStayDate` does (`2026-11-10` → `2026/11/10`). "Today" is
@@ -1360,9 +1366,12 @@ on a booking.
 
 ### Links and dispose
 
-`links.location(externalId)` and `links.booking(externalId, stay?)` are required (return
-`null` when there is no page); they must be absolute https URLs. `dispose()` is called on quit,
-after the access gate's; the registry also closes your browser.
+`links.location(externalId)` and `links.booking(externalId, stay?, unitId?)` are required
+(return `null` when there is no page); they must be absolute https URLs. With a stay,
+`links.booking` is a booking link (the rule under **Availability** in
+[An API provider](#4-an-api-provider)): the core asks it for a watch's alert with the stay
+found and the unit, which you may ignore (ParkStay does). `dispose()` is called on quit, after
+the access gate's; the registry also closes your browser.
 
 ## 9. Timeouts, failures and retries
 
@@ -1525,7 +1534,7 @@ first listed place and a two-night stay 30 days ahead):
 | `links` | `location` and `booking` (with and without the stay) for `sample`, and `manageBooking('REF-1')` | Each is an absolute https URL or `null`. |
 | `catalog` | `listLocations()`, or every `searchArea` page over `searchBbox` (default: the whole world); `getLocation` for `sample` and for `unknownExternalId` | At least one place; unique keys that round-trip and name the provider; kinds from `locationKinds`; a detail with the same key and a `units` array; an unknown place rejects with a `ProviderError`; every call rejects with an `AbortError` for a signal aborted before it and one aborted during it. |
 | `search` catalogue | `searchArea` page after page over `searchBbox`; `searchText(searchText)` if there is one | Items inside the box (to 0.01°); a `nextCursor` that is a non-empty string, changes, and ends within 100 pages; an abort honoured on the first and the next page; `searchText` finds places of this provider, and honours an abort. |
-| `availability` | `check` for `sample` and for `unknownExternalId`; `search(stay)` if there is one | Nights only inside the stay, under the location key, with a `checkedAt` date; an unknown place rejects with a `ProviderError`; `search`'s keys name the provider; both honour an abort. |
+| `availability` | `check` for `sample` and for `unknownExternalId`; `search(stay)` if there is one | Nights only inside the stay, under the location key, with a `checkedAt` date; every `bookingUrl` (the place's and each unit's) https on your own site, as the core takes it (`bookingLinkViolations`); an unknown place rejects with a `ProviderError`; `search`'s keys name the provider; both honour an abort. |
 | `access` | `status()`, `onStatus()` and its unsubscribe, `holdOpen()` released twice, `ensure()` | The status names the provider; `ensure` honours an abort. |
 | `release` | `computeReleaseAt` for every release mode | A `Date` or `null`; `pollFloorMs` above 0; an abort honoured. |
 | `holds` | `create({ externalId, stay })`, only with a signal aborted before the call or at once after it starts | It rejects with an `AbortError`. Nothing about a hold's answer is checked, and no hold is placed: test refusals, the answer's shape and `bookedReference` yourself, on recorded responses or a loopback server, as the example does. |
@@ -1716,7 +1725,9 @@ Once registered, with no other change:
   capability, with its stay fields and release modes. A watch's location step searches the
   stored catalogue (and, for a `search` catalogue with `searchText`, the provider).
 - **Settings → Accounts** shows its row and, with `browser-session`, its sign-in.
-- **Notifications** name the provider; desktop titles start with its `shortName`.
+- **Notifications** name the provider; desktop titles start with its `shortName`. A watch's
+  alert opens your booking page for the stay it found (a click on the desktop notification,
+  and "Book on {shortName}" in its email and on the watch's page).
 
 ## Checklist
 
@@ -1733,6 +1744,7 @@ What a finished provider looks like. (The steps to get there are in
 - [ ] Raw responses validated; words mapped explicitly; unknown is never `available`.
 - [ ] `check` and `search` work without `stay.params` (the field's default).
 - [ ] Only https image URLs; HTML left for main to sanitise.
+- [ ] Booking links on your own site, public, prefilled where they can be, and never a cart.
 - [ ] Every module honours its `AbortSignal`, stays inside the core's timeouts, and fails with
       a `ProviderError`; no retry loops.
 - [ ] Holds: refusals are results; `bookedReference` accepts only this hold's confirmation.
