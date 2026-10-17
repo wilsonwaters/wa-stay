@@ -5,8 +5,9 @@
  * - provider-facing docs (`docs/providers/**`) carry no internal references (plan sections,
  *   stage or brief codes, issue numbers) that mean nothing to an outside author;
  * - the guide's core timeouts are the code's (`DEFAULT_CATALOG_TIMINGS`, the sign-in check's
- *   `DEFAULT_ACCOUNT_TIMINGS`, the HTTP and page timeouts, how a paced provider's grow), and so
- *   are the search-mode limits the guides describe;
+ *   `DEFAULT_ACCOUNT_TIMINGS`, a hold release's `DEFAULT_HOLD_PAYMENT_TIMINGS`, the HTTP and page
+ *   timeouts, how a paced provider's grow), and so are the search-mode limits the guides
+ *   describe;
  * - the guide's lists of location kinds (with how each reads) and stay-field types are the
  *   types' own (`src/shared/types/provider.types.ts`), and so are the fields of a bulk
  *   availability entry, each documented on the type too;
@@ -20,6 +21,7 @@ import path from 'path';
 import ts from 'typescript';
 import { DEFAULT_ACCOUNT_TIMINGS } from '@main/core/accounts/provider-account.service';
 import { PACED_REQUEST_ALLOWANCE_MS, pacedDeadlineMs } from '@main/core/catalog/catalog-helpers';
+import { DEFAULT_HOLD_PAYMENT_TIMINGS } from '@main/core/holds/hold-payment.service';
 import {
   AREA_SEARCH_MAX_PAGES,
   AREA_SEARCHES_KEPT,
@@ -122,11 +124,13 @@ describe("the guide's core timeouts", () => {
         'bulkErrorTtlMs',
         'checkTtlMs',
         'probeTimeoutMs',
+        'releaseTimeoutMs',
       ])
     );
     const timings: Record<string, number> = {
       ...(DEFAULT_CATALOG_TIMINGS as unknown as Record<string, number>),
       probeTimeoutMs: DEFAULT_ACCOUNT_TIMINGS.probeTimeoutMs,
+      releaseTimeoutMs: DEFAULT_HOLD_PAYMENT_TIMINGS.releaseTimeoutMs,
     };
     // `timeoutMs` is the SDK's per-request option, checked below.
     values.delete('timeoutMs');
@@ -147,11 +151,17 @@ describe("the guide's core timeouts", () => {
       priority: 'interactive',
     });
     const sync = pacedDeadlineMs(syncTimeoutMs, paced, { requests: 8, priority: 'background' });
+    const { releaseTimeoutMs } = DEFAULT_HOLD_PAYMENT_TIMINGS;
+    const release = pacedDeadlineMs(releaseTimeoutMs, paced, {
+      requests: 2,
+      priority: 'interactive',
+    });
     for (const text of [
       `(${INTERACTIVE_REQUEST_GAP_MS / 1000} s for the person's requests`,
       `a ${PACED_REQUEST_ALLOWANCE_MS / 1000} s allowance`,
       `availability gets ${availabilityTimeoutMs / 1000} s + 8 × 11 s = ${bulk / 1000} s`,
       `a sync ${syncTimeoutMs / 1000} s + 8 × 20 s = ${sync / 1000} s`,
+      `release counts 2 requests at the person's gap (${releaseTimeoutMs / 1000} s + 2 × 11 s = ${release / 1000} s)`,
     ]) {
       expect([text, flat.includes(text)]).toEqual([text, true]);
     }

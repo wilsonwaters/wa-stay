@@ -321,9 +321,11 @@ export class NotificationService {
 
   /**
    * Notify when a watch's automatic hold was placed (payment still required), like a snipe's,
-   * on `unit` (the match it held: its name, and its kind for the title). A desktop click opens
-   * only the watch, where the person pays; the email says the hold is in WA Stay and gives
-   * `bookingUrl`, the public booking page, for booking away from it.
+   * on `unit` (the match it held: its name, and its kind for the title): "Complete payment
+   * within N minutes", "within about N minutes" when the expiry is the provider's guess
+   * (`expiresEstimated`). A desktop click opens only the watch, where the person pays; the
+   * email says the hold is in WA Stay and gives `bookingUrl`, the public booking page, for
+   * booking away from it.
    */
   async notifyWatchHeld(
     watch: Watch,
@@ -337,7 +339,9 @@ export class NotificationService {
       1,
       Math.round((Date.parse(hold.expiresAt) - this.clock().getTime()) / 60_000)
     );
-    const message = `${unit.unitName} held at ${watch.location.name} for ${arrival}–${departure}. Complete payment within ${minutesLeft} minutes.`;
+    // A guessed expiry (`expiresEstimated`) is "about" (R18)
+    const about = hold.expiresEstimated ? 'about ' : '';
+    const message = `${unit.unitName} held at ${watch.location.name} for ${arrival}–${departure}. Complete payment within ${about}${minutesLeft} minutes.`;
     const noun = this.nounFor(watch, [unit]);
 
     await this.notify(
@@ -356,10 +360,12 @@ export class NotificationService {
   }
 
   /**
-   * Notify when a Site Snipe places a temporary hold (payment still required). `unitKind` is
-   * the held unit's kind, when the provider gave one: what the alert calls it. A desktop click
-   * opens only the snipe, where the person pays; the email says the hold is in WA Stay and
-   * gives `bookingUrl`, the public booking page, for booking away from it (brief R7).
+   * Notify when a Site Snipe places a temporary hold (payment still required): "within N
+   * minutes", "within about N minutes" when the expiry is the provider's guess
+   * (`holdExpiresEstimated`). `unitKind` is the held unit's kind, when the provider gave one:
+   * what the alert calls it. A desktop click opens only the snipe, where the person pays; the
+   * email says the hold is in WA Stay and gives `bookingUrl`, the public booking page, for
+   * booking away from it (brief R7).
    */
   async notifySnipeHeld(snipe: SiteSnipe, unitKind?: UnitKind, bookingUrl?: string): Promise<void> {
     const arrival = formatCalendarDate(snipe.stay.arrival);
@@ -369,7 +375,11 @@ export class NotificationService {
     const minutesLeft = snipe.holdExpiresAt
       ? Math.max(1, Math.round((snipe.holdExpiresAt.getTime() - this.clock().getTime()) / 60_000))
       : undefined;
-    const deadline = minutesLeft ? ` within ${minutesLeft} minutes` : ' before the hold expires';
+    // A guessed expiry (`holdExpiresEstimated`) is "about" (R18)
+    const about = snipe.holdExpiresEstimated ? 'about ' : '';
+    const deadline = minutesLeft
+      ? ` within ${about}${minutesLeft} minutes`
+      : ' before the hold expires';
     const held = capitalise(this.nounFor(snipe, [{ unitKind }]).one);
     const message = `${held} held at ${where} for ${arrival}–${departure}. Complete payment${deadline}.`;
 

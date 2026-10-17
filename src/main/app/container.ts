@@ -117,7 +117,11 @@ export interface AppContainer {
   readonly documentWindows: DocumentWindows;
   /** The person's account with each provider: status, in-app sign-in, sign-out. */
   readonly accounts: ProviderAccountService;
-  /** Paying for a snipe's or watch's hold in a payment window (`*.openPayment`). */
+  /**
+   * Paying for a snipe's or watch's hold in a payment window (`*.openPayment`), and letting one
+   * go (`*.releaseHold`, before a delete, and on a payment window's close where the provider
+   * asks for it).
+   */
   readonly holdPayments: HoldPaymentService;
   readonly bookingService: BookingService;
   readonly notificationService: NotificationService;
@@ -247,13 +251,16 @@ export function createContainer({
   // - a queue place: any snipe in the queue, and any snipe sniping through it (its checks carry
   //   the queue session on the provider's partition), alert snipes included;
   // - a hold being placed: a hold snipe sniping, or any hold whose `holds.create` still runs;
-  // - a hold awaiting payment.
+  // - a hold awaiting payment;
+  // - a hold being let go (`holds.release` running: R18).
   // An alert snipe that uses no queue needs no session while it checks. A snipe through the
   // queue and waiting for its release (WAITING_RELEASE) is not counted, as before R13.
+  let releasingHold: (providerId: string) => boolean = () => false;
   const isBusy = (providerId: string, now: Date): boolean => {
     const snipes = repositories.snipes;
     return (
       nightGuard.reserving(providerId) ||
+      releasingHold(providerId) ||
       snipes.countByStatus(providerId, [SnipeStatus.QUEUEING]) > 0 ||
       snipes.countByStatus(providerId, [SnipeStatus.SNIPING], { accessGateEnabled: true }) > 0 ||
       snipes.countByStatus(providerId, [SnipeStatus.SNIPING, SnipeStatus.HELD], {
@@ -383,6 +390,7 @@ export function createContainer({
     locations: repositories.locations,
     logger,
   });
+  releasingHold = (providerId) => holdPayments.releasing(providerId);
   const autoUpdater = new AutoUpdaterService(rendererEvents);
   const scheduler = new JobScheduler({
     watches: watchService,

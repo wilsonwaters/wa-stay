@@ -73,8 +73,10 @@ export function runResultMessage(
   if (result.expired) return `The stay at ${place} has started, so the watch has stopped.`;
   if (result.hold) {
     const unit = unitNameOf(watch, result.hold.unitId, noun);
+    // A guessed expiry is "about" (R18)
+    const about = result.hold.expiresEstimated ? 'about ' : '';
     const by = manifest
-      ? ` Pay before ${timeInZone(new Date(result.hold.expiresAt), manifest.timezone)}.`
+      ? ` Pay before ${about}${timeInZone(new Date(result.hold.expiresAt), manifest.timezone)}.`
       : '';
     return `${unit} held at ${place}.${by}`;
   }

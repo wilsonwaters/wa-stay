@@ -2,7 +2,9 @@
  * `watches` handlers. Watches belong to the local profile; the renderer never sends a user id.
  * A new or re-activated watch is due at once, and the scheduler's due-loop picks it up; a
  * deactivated or deleted one has its check in flight stopped. `openPayment` opens the payment
- * window for a watch's automatic hold (`HoldPaymentService`).
+ * window for a watch's automatic hold, and `releaseHold` lets it go (`HoldPaymentService`); a
+ * delete lets an unexpired hold go first, on a provider that can (a failure is logged, and the
+ * delete goes ahead).
  */
 
 import { contract } from '@shared/contracts';
@@ -23,6 +25,7 @@ export function registerWatchesHandlers(handle: Handle, c: AppContainer): void {
 
   handle(watches.delete, async ({ id }) => {
     c.scheduler.cancelWatch(id);
+    await c.holdPayments.releaseBeforeDelete('watch', id);
     if (!(await c.watchService.delete(id))) throw new AppError('NOT_FOUND', 'Watch not found');
     return true;
   });
@@ -37,4 +40,6 @@ export function registerWatchesHandlers(handle: Handle, c: AppContainer): void {
   handle(watches.runNow, ({ id }) => c.scheduler.runWatchNow(id));
 
   handle(watches.openPayment, ({ id }) => c.holdPayments.openForWatch(id));
+
+  handle(watches.releaseHold, ({ id }) => c.holdPayments.releaseWatchHold(id));
 }

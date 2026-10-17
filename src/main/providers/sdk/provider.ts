@@ -226,6 +226,12 @@ export interface HoldSuccess {
   ok: true;
   reference: string;
   expiresAt: Date;
+  /**
+   * `expiresAt` is the provider's guess, not a time its answer gave (a cart that shows no
+   * countdown): the app says "about" before it ("Held until about 10:42 am", "within about 10
+   * minutes"). The night guard and `HOLD_EXPIRED` use the guess as it is.
+   */
+  expiresAtEstimated?: boolean;
   unitId?: string;
 }
 
@@ -236,6 +242,25 @@ export interface HoldFailure {
 }
 
 export type HoldResult = HoldSuccess | HoldFailure;
+
+/** A hold the core asks the provider to let go: as the core recorded it when it was placed. */
+export interface HoldToRelease {
+  reference: string;
+  unitId?: string;
+  expiresAt: Date;
+}
+
+/**
+ * What a release found:
+ * - `released`: the provider held it, and has let it go;
+ * - `gone`: the provider no longer held it (paid, expired, or removed on its own page), so
+ *   nothing was let go. Never touch a booking to answer this.
+ */
+export type HoldReleaseOutcome = 'released' | 'gone';
+
+export interface HoldReleaseResult {
+  outcome: HoldReleaseOutcome;
+}
 
 export interface HoldsModule {
   /** Places a temporary hold. A refusal is a `HoldFailure`, not a rejection. */
@@ -251,6 +276,23 @@ export interface HoldsModule {
    * payment completes.
    */
   bookedReference?(hold: { reference: string }, page: PaymentPage): Promise<string | null>;
+  /**
+   * Lets the hold go before it runs out: when the person declines it ("Let it go"), deletes
+   * its watch or snipe, or (with `releaseOnPaymentClose`) closes the payment window without a
+   * confirmed payment. **The provider decides**: the core never takes a closed window as
+   * unpaid, so look at your own side first, and answer `gone` when the hold is no longer there
+   * (the person may have paid). Reject only when the provider could not be asked (a failed
+   * request, a block, an abort): the hold then stays until it runs out, and nothing retries.
+   * The core calls it at interactive priority, at most once at a time per hold. Needs the
+   * manifest's `holdRelease`.
+   */
+  release?(hold: HoldToRelease, signal?: AbortSignal): Promise<HoldReleaseResult>;
+  /**
+   * Call `release` when the payment window closes with no confirmed payment (a provider with
+   * no confirmation page the app can read, whose hold must not outlive the person's visit).
+   * Not when the window's first page failed, nor on quit. Needs `release`.
+   */
+  readonly releaseOnPaymentClose?: boolean;
 }
 
 /** A page the payment window loaded, as `HoldsModule.bookedReference` may read it. */

@@ -25,6 +25,10 @@
  *   each unit's minimum stay (`UnitAvailability.minNights`): a shorter stay is refused, its
  *   nights with room answered `min-stay` and never `fullyAvailable`;
  * - `scriptHold(...results)`: the next `holds.create` calls answer these;
+ * - `holdRelease`: `holds.release` (R18) and the manifest's `holdRelease`; each call answers
+ *   the next `scriptRelease(...)` outcome, else `released` (`failNext('holds', …)` rejects it,
+ *   a `delays.holds` delays it); `onPaymentClose` also sets `releaseOnPaymentClose`. Without
+ *   it the fake, like ParkStay, cannot let a hold go;
  * - `maxWindowMinutes`: every release mode's window limit;
  * - `account` / `setAccount(state)`: what `auth.isSignedIn` answers; `auth` replaces its
  *   sign-in URL, origins or completion pages;
@@ -61,8 +65,10 @@ import {
   type CredentialsSignInResult,
   type ExternalBooking,
   type HttpClient,
+  type HoldReleaseOutcome,
   type HoldResult,
   type HoldSuccess,
+  type HoldToRelease,
   type PaymentPage,
   type ProviderContext,
   type ProviderFactory,
@@ -181,6 +187,11 @@ export interface FakeProviderOptions {
   experiments?: ProviderExperiment[];
   /** Every release mode's `maxWindowMinutes` (none by default). */
   maxWindowMinutes?: number;
+  /**
+   * `holds.release` and the manifest's `holdRelease` (R18); `onPaymentClose` also sets
+   * `holds.releaseOnPaymentClose`. None by default: the fake cannot let a hold go.
+   */
+  holdRelease?: { onPaymentClose?: boolean };
 }
 
 /** A `credentials` sign-in for the fake. Values here are made up; never a real number. */
@@ -229,6 +240,8 @@ export interface FakeProvider extends AccommodationProvider {
   setAvailability(externalId: string, units: Record<string, FakeUnitNights>): void;
   /** The next `holds.create` calls answer these, in order. */
   scriptHold(...results: HoldResult[]): void;
+  /** The next `holds.release` calls answer these outcomes, in order (then `released`). */
+  scriptRelease(...outcomes: HoldReleaseOutcome[]): void;
   /** The most calls into `module` in flight at once. */
   peakInFlight(module: FakeModule): number;
   /** How many `holdOpen()` releases are outstanding. */
@@ -310,6 +323,7 @@ export function createFakeProvider(options: FakeProviderOptions = {}): FakeProvi
     ...options.availability,
   };
   const scriptedHolds: HoldResult[] = [];
+  const scriptedReleases: HoldReleaseOutcome[] = [];
   const active = new Map<FakeModule, number>();
   const peaks = new Map<FakeModule, number>();
   let holdCount = 0;
@@ -331,6 +345,7 @@ export function createFakeProvider(options: FakeProviderOptions = {}): FakeProvi
     currency: 'AUD',
     capabilities: { ...capabilities, ...experimentalOff },
     ...(options.experiments ? { experiments: options.experiments } : {}),
+    ...(options.holdRelease ? { holdRelease: true } : {}),
     limits: {
       minWatchIntervalMinutes: 5,
       maxConcurrentRequests: 2,
@@ -685,6 +700,9 @@ export function createFakeProvider(options: FakeProviderOptions = {}): FakeProvi
     scriptHold(...results) {
       scriptedHolds.push(...results);
     },
+    scriptRelease(...outcomes) {
+      scriptedReleases.push(...outcomes);
+    },
     peakInFlight(module) {
       return peaks.get(module) ?? 0;
     },
@@ -792,6 +810,15 @@ export function createFakeProvider(options: FakeProviderOptions = {}): FakeProvi
             const onPage = page.url === paid || page.url.startsWith(`${paid}?`);
             return onPage && (await page.hasText(booked)) ? booked : null;
           },
+          ...(options.holdRelease
+            ? {
+                async release(hold: HoldToRelease, signal?: AbortSignal) {
+                  await enter('holds', 'release', [hold], signal);
+                  return { outcome: scriptedReleases.shift() ?? 'released' };
+                },
+                ...(options.holdRelease.onPaymentClose ? { releaseOnPaymentClose: true } : {}),
+              }
+            : {}),
         }
       : undefined,
 

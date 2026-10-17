@@ -130,4 +130,16 @@ export const snipes = {
     args: {} as [id: number],
     response: undefined as void,
   },
+  /**
+   * "Let it go": asks the provider to let a HELD snipe's hold go (closing its payment window
+   * first), and answers the snipe, EXPIRED with why (`lastError`). `NOT_FOUND`; `CAPABILITY`
+   * when the provider cannot let holds go (`manifest.holdRelease`); `HOLD_EXPIRED` when nothing
+   * unexpired is held; `PROVIDER_ERROR` when the provider could not be asked (the hold stays).
+   */
+  releaseHold: {
+    channel: C.releaseHold,
+    request: idPayload,
+    args: {} as [id: number],
+    response: {} as SiteSnipe,
+  },
 } satisfies Namespace;

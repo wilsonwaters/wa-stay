@@ -32,8 +32,16 @@ describe('holds turning off (an experiment turned off, until the restart)', () =
 
   const holdCalls = () => h.fake.calls.filter((c) => c.module === 'holds');
 
-  it("a watch's auto-hold places no hold, notes why, and the watch alerts as usual", async () => {
+  /** An auto-hold watch created while holds were on, checked now that they are turning off. */
+  async function autoHoldWatch() {
+    turningOff.mockReturnValue(false);
     const watch = await h.watches.create(h.userId, h.watchInput({ autoHold: true }));
+    turningOff.mockClear().mockReturnValue(true);
+    return watch;
+  }
+
+  it("a watch's auto-hold places no hold, notes why, and the watch alerts as usual", async () => {
+    const watch = await autoHoldWatch();
     const reserve = jest.spyOn(h.nightGuard, 'tryReserve');
     const result = await h.watches.execute(watch.id);
 
@@ -59,6 +67,37 @@ describe('holds turning off (an experiment turned off, until the restart)', () =
     await h.watches.execute(watch.id, { manual: true });
     expect(holdCalls()).toHaveLength(1);
     expect(h.watchRepo.findById(watch.id)?.lastResult).toBe(WatchResult.HELD);
+  });
+
+  it('a new watch cannot be set to hold (VALIDATION on autoHold), as a new hold snipe cannot', async () => {
+    const before = h.watchRepo.findByUserId(h.userId).length;
+    await expect(
+      h.watches.create(h.userId, h.watchInput({ autoHold: true }))
+    ).rejects.toMatchObject({
+      code: 'VALIDATION',
+      message: 'Automatic holds on Fake are turning off, so turn off the automatic hold',
+      issues: ['autoHold'],
+    });
+    expect(h.watchRepo.findByUserId(h.userId)).toHaveLength(before);
+    await expect(h.snipes.create(h.userId, h.snipeInput({ action: 'hold' }))).rejects.toMatchObject(
+      { code: 'VALIDATION', issues: ['action'] }
+    );
+
+    // Nor turned on by an edit; a watch that holds already keeps doing so, and may be edited
+    const plain = await h.watches.create(h.userId, h.watchInput());
+    await expect(h.watches.update(plain.id, { autoHold: true })).rejects.toMatchObject({
+      code: 'VALIDATION',
+      issues: ['autoHold'],
+    });
+    expect(h.watchRepo.findById(plain.id)?.autoHold).toBe(false);
+    const holding = await autoHoldWatch();
+    await expect(
+      h.watches.update(holding.id, { autoHold: true, name: 'Renamed' })
+    ).resolves.toMatchObject({ autoHold: true, name: 'Renamed' });
+    // Off is always allowed
+    await expect(h.watches.update(holding.id, { autoHold: false })).resolves.toMatchObject({
+      autoHold: false,
+    });
   });
 
   it('a watch without auto-hold is not asked', async () => {

@@ -328,6 +328,12 @@ export interface ProviderManifest {
   bulkAvailabilityStayFields?: StayKeyField[];
   /** What the provider ships switched off, for the person to turn on (`ProviderExperiment`). */
   experiments?: ProviderExperiment[];
+  /**
+   * The provider can let a hold go before it runs out (`holds.release`): the hold panel offers
+   * "Let it go". With `capabilities.holds` on it needs `holds.release`; with holds off (an
+   * experiment not turned on) it may stand alone.
+   */
+  holdRelease?: boolean;
 }
 
 /** Values for a provider's `stayFields`, keyed by `StayFieldDescriptor.key`. */
@@ -746,6 +752,7 @@ export const ProviderManifestSchema = z
         'Experiment ids must be unique'
       )
       .optional(),
+    holdRelease: z.boolean().optional(),
   })
   // An experiment turns on capabilities that are off, and they are on only once it is applied
   // (`withExperiments`), by itself or by another applied experiment.

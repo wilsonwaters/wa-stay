@@ -16,8 +16,10 @@
  * - `alert`: the snipe is ALERTED with what was free, when, and the provider's booking page
  *   (`SiteSnipe.alert`), and the person gets a desktop alert and email with the link. Nothing is
  *   held and no night is reserved; no sign-in is ever needed.
- * - `hold`: one-booking-per-night guard → `holds.create`. On a hold the snipe is HELD with the
- *   provider's reference, expiry, unit and payment URL, and stops. Payment stays a human step.
+ * - `hold`: one-booking-per-night guard → `holds.create`, at interactive priority (R18: the
+ *   hold is one booking attempt the person opted into; the polling stays background). On a hold
+ *   the snipe is HELD with the provider's reference, expiry (and whether it is the provider's
+ *   guess), unit and payment URL, and stops. Payment stays a human step.
  *   It alerts instead, with a note, when the provider has no holds (any more, or until WA Stay
  *   restarts after the person turned a holds experiment off: `holdsOf`), or when it names no
  *   units and its candidates are of more than one kind (`kindsAmbiguous`): it never picks
@@ -63,6 +65,7 @@ import {
   ProviderError,
   toApiError,
 } from '../../providers/sdk/errors';
+import { withRequestPriority } from '../../providers/sdk/pacing';
 import type { AccessGate, HoldsModule } from '../../providers/sdk/provider';
 import { AppError } from '../../utils/app-error';
 import { logger } from '../../utils/logger';
@@ -644,7 +647,10 @@ export class SiteSniperService {
 
       let hold;
       try {
-        hold = await holds.create({ externalId, unitId: matched.unitId, stay }, signal);
+        // Interactive (R18): the hold goes ahead of the provider's background requests
+        hold = await withRequestPriority('interactive', () =>
+          holds.create({ externalId, unitId: matched.unitId, stay }, signal)
+        );
       } finally {
         reserved.reservation.release();
       }
@@ -653,9 +659,17 @@ export class SiteSniperService {
         // Recorded even when the attempt was stopped meanwhile: the hold exists now.
         const paymentUrl = holds.paymentUrl(hold);
         const unitId = hold.unitId ?? matched.unitId;
+        const estimated = hold.expiresAtEstimated === true;
         try {
           this.repo.incrementAttempts(snipeId);
-          this.repo.markHeld(snipeId, hold.reference, hold.expiresAt, paymentUrl, unitId);
+          this.repo.markHeld(
+            snipeId,
+            hold.reference,
+            hold.expiresAt,
+            paymentUrl,
+            unitId,
+            estimated
+          );
         } catch (error) {
           log.error(`Snipe ${snipeId}: hold ${hold.reference} placed but not recorded`, error);
         }
@@ -681,6 +695,7 @@ export class SiteSniperService {
               lastResult: SnipeResult.HELD,
               holdReference: hold.reference,
               holdExpiresAt: hold.expiresAt,
+              ...(estimated ? { holdExpiresEstimated: true } : {}),
               holdUnitId: unitId,
               paymentUrl,
             },
@@ -889,7 +904,6 @@ export class SiteSniperService {
     if (snipe) this.events?.emit('snipe:updated', snipe);
   }
 
-  /** `VALIDATION` on `action` for `hold` on a provider that places no holds. */
   /**
    * The provider's holds, when it places them: `capabilities.holds` on, the module there, and
    * not turning off (an experiment the person turned off, until WA Stay restarts: §12.35).
@@ -902,6 +916,7 @@ export class SiteSniperService {
     return provider.holds;
   }
 
+  /** `VALIDATION` on `action` for `hold` on a provider that places no holds. */
   private assertAction(provider: SnipeProvider, action: SnipeAction): void {
     if (action === 'hold' && !this.holdsOf(provider)) {
       throw new AppError(

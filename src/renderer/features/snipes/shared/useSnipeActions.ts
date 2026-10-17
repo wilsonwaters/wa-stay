@@ -5,10 +5,11 @@ import {
   useCachedSnipe,
   useDeleteSnipe,
   useOpenSnipePayment,
+  useReleaseSnipeHold,
   useRunSnipeNow,
   useSetSnipeActive,
 } from '../../../api';
-import { SnipeResult } from '../../../../shared/types/common.types';
+import { SnipeResult, SnipeStatus } from '../../../../shared/types/common.types';
 import type { ProviderManifest } from '../../../../shared/types/provider.types';
 import type { SiteSnipe, SnipeExecutionResult } from '../../../../shared/types/site-sniper.types';
 import { HOLD_EXPIRED_MESSAGE } from '../../../components/stay/HoldPanel';
@@ -82,9 +83,17 @@ export function useSnipeActions(
   const setActive = useSetSnipeActive();
   const run = useRunSnipeNow();
   const pay = useOpenSnipePayment();
+  const release = useReleaseSnipeHold();
   const remove = useDeleteSnipe();
   const account = useAccountStatus(manifest?.id);
   const [connectOpen, setConnectOpen] = useState(false);
+  // "Let it go" was asked here: once the hold has ended (EXPIRED), the page keeps the hold
+  // panel to say how (and focus its heading) instead of the ended snipe's notice
+  const [releaseAsked, setReleaseAsked] = useState(false);
+  // Armed again (or anything but held or ended): a later end is not that hold's
+  if (releaseAsked && snipe.status !== SnipeStatus.HELD && snipe.status !== SnipeStatus.EXPIRED) {
+    setReleaseAsked(false);
+  }
   const running = useRef(false);
   // The snipe as main last pushed it: by the time Run now answers, the one it changed
   const cachedSnipe = useCachedSnipe();
@@ -142,6 +151,22 @@ export function useSnipeActions(
         ),
     });
 
+  /**
+   * For the hold panel's "Let it go" (its ConfirmDialog): resolves with why the hold ended, for
+   * the panel to announce; a rejection keeps the dialog open with the error. It is marked asked
+   * first, so the page never drops the panel between the hold ending and the answer (`letGo`).
+   */
+  const releaseHold = async () => {
+    setReleaseAsked(true);
+    try {
+      return (await release.mutateAsync(snipe.id)).lastError;
+    } catch (error) {
+      // The hold stays: if it runs out later, the page says so as it always has
+      setReleaseAsked(false);
+      throw error;
+    }
+  };
+
   /** For a ConfirmDialog: resolves once deleted (a rejection keeps the dialog open). */
   const deleteSnipe = async () => {
     await remove.mutateAsync(snipe.id);
@@ -157,6 +182,8 @@ export function useSnipeActions(
     running: run.isPending,
     payNow,
     paying: pay.isPending,
+    releaseHold,
+    letGo: releaseAsked && snipe.status === SnipeStatus.EXPIRED,
     deleteSnipe,
     needsAccount,
     connectOpen,

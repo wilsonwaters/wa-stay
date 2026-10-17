@@ -5,6 +5,7 @@
 import { CircleHelp } from 'lucide-react';
 import { SnipeReleaseMode, SnipeStatus } from '../../../../shared/types/common.types';
 import type { SiteSnipe } from '../../../../shared/types/site-sniper.types';
+import { holdEndingOf } from '../../../../shared/utils/hold-release';
 import { capitalise, type UnitNoun } from '../../../../shared/utils/unit-noun';
 import { statusPresets, type StatusPreset } from '../../../components/ui';
 
@@ -143,8 +144,11 @@ export function timelineSteps(snipe: SiteSnipe): TimelineStep[] {
     const wasHeld = Boolean(snipe.holdReference || snipe.holdExpiresAt);
     const reachedId = snipe.status === SnipeStatus.FAILED ? 'armed' : wasHeld ? 'held' : 'sniping';
     const reached = steps.findIndex((step) => step.id === reachedId);
+    // A hold that ended early says how (R18): let go, or gone from the provider
+    const ending = wasHeld ? holdEndingOf(snipe.lastError) : undefined;
+    const heldEnd = ending === 'let-go' ? 'Hold let go' : ending ? 'Hold ended' : 'Hold expired';
     const terminalLabel =
-      snipe.status === SnipeStatus.FAILED ? 'Failed' : wasHeld ? 'Hold expired' : 'Expired';
+      snipe.status === SnipeStatus.FAILED ? 'Failed' : wasHeld ? heldEnd : 'Expired';
     return [
       ...steps
         .filter((step) => step.id !== 'booked' && step.id !== 'alerted')
