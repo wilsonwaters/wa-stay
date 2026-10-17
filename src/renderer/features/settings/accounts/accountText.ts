@@ -10,7 +10,14 @@ import {
   type ProviderAccount,
   type ProviderManifest,
 } from '../../../../shared/types/provider.types';
+import { inSentence } from '../../../components/accounts/credentialText';
 import { formatDay } from '../format';
+
+export {
+  copyCredentialLabel,
+  credentialCopiedAnnouncement,
+  inSentence,
+} from '../../../components/accounts/credentialText';
 
 export type AccountAction = 'connect' | 'reconnect' | 'sign-out';
 
@@ -86,25 +93,30 @@ function neededForHolds({ holds, snipes, watches }: ProviderManifest['capabiliti
  * What the account is needed for, from the manifest's capabilities, or null for a provider
  * without accounts (its status line already says "No account needed"). Signed in to an
  * optional account, the suggestion to connect becomes what being signed in gives. A release
- * is mentioned only for a provider with Site Sniper (`snipes`).
+ * is mentioned only for a provider with Site Sniper (`snipes`). A `credentials` account (a
+ * detail saved in the app, such as a member number) is added, never connected: "Add your
+ * {label}".
  */
 export function accountPurpose(
   manifest: ProviderManifest,
-  account?: Pick<ProviderAccount, 'status'>
+  account?: Pick<ProviderAccount, 'status' | 'authKind' | 'fields'>
 ): string | null {
   const { capabilities } = manifest;
   const { account: requirement, holds, snipes, bookingImport } = capabilities;
   const name = manifest.shortName;
   const signedIn = account?.status === 'signed-in';
+  const when = snipes ? ' before a release' : '';
   let purpose: string;
   switch (requirement) {
     case 'none':
       return null;
     case 'optional':
-      if (!holds) purpose = 'Optional.';
-      else if (signedIn) purpose = "Optional. Checkout is quicker while you're signed in.";
+      if (!holds || (signedIn && account?.authKind === 'credentials')) purpose = 'Optional.';
+      else if (account?.authKind === 'credentials') {
+        const detail = inSentence(credentialsName(account));
+        purpose = `Optional. Add your ${detail}${when} if you have one. Holds work without it.`;
+      } else if (signedIn) purpose = "Optional. Checkout is quicker while you're signed in.";
       else {
-        const when = snipes ? ' before a release' : '';
         purpose = `Optional. Connect ${name}${when} so checkout is quicker. Holds work without it.`;
       }
       break;
@@ -137,11 +149,6 @@ export function missingAccountWarning(
 // `credentials` accounts: details saved in the app (a member number), write-only
 // ---------------------------------------------------------------------------------------
 
-/** A label inside a sentence: "Member number" → "member number"; "RAC number" is kept. */
-export function inSentence(label: string): string {
-  return /^[A-Z][a-z]/.test(label) ? label.charAt(0).toLowerCase() + label.slice(1) : label;
-}
-
 /** What the saved details are called: the one field's label, or "Details" for several. */
 export function credentialsName(account: Pick<ProviderAccount, 'fields'>): string {
   const fields = account.fields ?? [];
@@ -169,26 +176,31 @@ export const CREDENTIALS_TEXT = {
   remove: 'Remove',
   save: 'Save',
   cancel: 'Cancel',
-  copied: 'Copied',
   /** The statements' group. */
   statements: 'Before you save',
   saveFailed: "Couldn't save. Try again.",
-  copyFailed: "Couldn't copy it. Try again.",
   /** Under the statements while Save is disabled; Save is described by it. */
   tickEach: 'Tick each statement to save.',
-  /** The form's description: what happens to what is typed. */
-  storage: 'Kept encrypted on this computer. WA Stay never shows it again.',
-  removeMessage: 'WA Stay forgets it; you can add it again any time.',
 } as const;
+
+/** "it" for one saved detail, "them" for several. */
+const pronoun = (account: Pick<ProviderAccount, 'fields'>) =>
+  (account.fields ?? []).length > 1 ? 'them' : 'it';
+
+/** The form's description: what happens to what is typed. */
+export function credentialsStorageText(account: Pick<ProviderAccount, 'fields'>): string {
+  return `Kept encrypted on this computer. WA Stay never shows ${pronoun(account)} again.`;
+}
+
+/** What Remove says it does: "WA Stay forgets it…", or "…them…" for several details. */
+export function removeCredentialsMessage(account: Pick<ProviderAccount, 'fields'>): string {
+  const it = pronoun(account);
+  return `WA Stay forgets ${it}; you can add ${it} again any time.`;
+}
 
 /** "Add member number", or "Add details" when the provider asks for several. */
 export function addCredentialsLabel(account: ProviderAccount): string {
   return `Add ${inSentence(credentialsName(account))}`;
-}
-
-/** "Copy member number". */
-export function copyCredentialLabel(field: AccountFieldDescriptor): string {
-  return `Copy ${inSentence(field.label)}`;
 }
 
 /** The form's title: "RAC account". */

@@ -1,6 +1,7 @@
 import { CreditCard, Timer } from 'lucide-react';
 import type { ProviderManifest } from '../../../shared/types/provider.types';
 import { useHasPassed } from '../../hooks/useNow';
+import { CopyCredentialButton } from '../accounts/CopyCredentialButton';
 import { Countdown } from '../Countdown';
 import { timeInZone } from '../timeFormat';
 import { Button } from '../ui';
@@ -29,8 +30,10 @@ export interface HoldPanelProps {
 /**
  * A held unit and the time left to pay for it, the same for a watch's automatic hold and a
  * snipe's: "CAMPSITE 02 is held for you · Held until 10:42 am · 23:10 left", with "Pay now"
- * opening the provider's payment window on the session that holds it. Once the hold runs out
- * the button goes and it says so. A hold without an expiry shows no timer.
+ * opening the provider's payment window on the session that holds it, and beside it "Copy
+ * {label}" when the person saved a detail the provider's checkout asks for (an RAC member
+ * number). Once the hold runs out the buttons go and it says so. A hold without an expiry shows
+ * no timer.
  */
 export function HoldPanel({
   unit,
@@ -81,15 +84,18 @@ export function HoldPanel({
             </p>
           ) : null}
         </div>
-        {/* The card's strongest action, below the page's one coral button (the detail page's). */}
-        <Button
-          variant={page ? 'primary' : 'secondary'}
-          leadingIcon={<CreditCard size={18} />}
-          onClick={onPay}
-          loading={paying}
-        >
-          Pay now
-        </Button>
+        <div className="flex flex-wrap items-center gap-2">
+          {/* The card's strongest action, below the page's one coral button (the detail page's). */}
+          <Button
+            variant={page ? 'primary' : 'secondary'}
+            leadingIcon={<CreditCard size={18} />}
+            onClick={onPay}
+            loading={paying}
+          >
+            Pay now
+          </Button>
+          <CopyCredentialButton providerId={manifest?.id} />
+        </div>
       </div>
       {page && (
         <p className="text-sm text-fg-secondary">

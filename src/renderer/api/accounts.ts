@@ -1,5 +1,11 @@
 import { useCallback, useState } from 'react';
-import { useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
+import {
+  useMutation,
+  useQuery,
+  useQueryClient,
+  type Query,
+  type QueryClient,
+} from '@tanstack/react-query';
 import type { ProviderAccount, ProviderId } from '../../shared/types/provider.types';
 import { unwrap } from './client';
 import { useApiEvent } from './events';
@@ -25,6 +31,35 @@ function useAccountUpdates(): void {
         void queryClient.invalidateQueries({ queryKey: queryKeys.accounts.all });
       }, ACCOUNT_EVENT_COALESCE_MS)
     );
+  });
+}
+
+/**
+ * Whether a cached query is one of `providerId`'s availability answers: its bulk availability
+ * (`catalog.availability`) or a place's check (`catalog.checkLocation`).
+ */
+export function isAvailabilityOf(query: Pick<Query, 'queryKey'>, providerId: ProviderId): boolean {
+  const [namespace, kind, first, second] = query.queryKey;
+  if (namespace !== queryKeys.catalog.all[0]) return false;
+  if (kind === 'availability') return second === providerId;
+  return kind === 'check' && typeof first === 'string' && first.startsWith(`${providerId}:`);
+}
+
+/**
+ * A detail the person saved for a provider changed (a `credentials` account's
+ * `account:updated`: an RAC member number saved, replaced or removed). That provider's prices,
+ * free nights and release times depend on it, so its availability answers in the cache are
+ * reset: what is on screen asks again (main has dropped its own answers), and nothing shows the
+ * old prices meanwhile. Other providers' answers, and every other account change, are left
+ * alone. Mounted once, by the app shell.
+ */
+export function useCredentialChangeUpdates(): void {
+  const queryClient = useQueryClient();
+  useApiEvent('account:updated', (account) => {
+    if (account.authKind !== 'credentials') return;
+    void queryClient.resetQueries({
+      predicate: (query) => isAvailabilityOf(query, account.providerId),
+    });
   });
 }
 

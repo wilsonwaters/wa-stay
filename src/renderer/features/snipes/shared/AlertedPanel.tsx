@@ -2,6 +2,7 @@ import { useId } from 'react';
 import { BellRing } from 'lucide-react';
 import type { ProviderManifest } from '../../../../shared/types/provider.types';
 import type { SiteSnipe } from '../../../../shared/types/site-sniper.types';
+import { CopyCredentialButton } from '../../../components/accounts/CopyCredentialButton';
 import { ExternalLink } from '../../../components/ExternalLink';
 import { partyLabel, stayDatesLabel, stayNightsLabel } from '../../../components/stay/stayFormat';
 import { Button } from '../../../components/ui';
@@ -36,8 +37,10 @@ export interface AlertedPanelProps {
 /**
  * An alerted snipe on its page (the counterpart of `HeldPanel`): "{Unit} was free", when the
  * alert came, the stay and the alert's note, then "Book on {shortName}", the provider's own
- * booking page in the browser (the page's one coral action), and "Arm again". Nothing was held,
- * and it says so. An alert that could not be read reads "Dates were free", with no unit or link.
+ * booking page in the browser (the page's one coral action), with "Copy {label}" beside it when
+ * the person saved a detail the provider's checkout asks for (an RAC member number), and "Arm
+ * again". Nothing was held, and it says so. An alert that could not be read reads "Dates were
+ * free", with no unit or link.
  */
 export function AlertedPanel({
   snipe,
@@ -84,6 +87,7 @@ export function AlertedPanel({
             Book on {provider}
           </ExternalLink>
         )}
+        {url && <CopyCredentialButton providerId={manifest?.id} />}
         <Button
           variant="secondary"
           onClick={actions.arm}

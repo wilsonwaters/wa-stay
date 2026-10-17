@@ -2,7 +2,12 @@ import { useId, useRef, useState, type FormEvent } from 'react';
 import { ApiError } from '../../../api';
 import type { ProviderAccount, ProviderManifest } from '../../../../shared/types/provider.types';
 import { Button, Checkbox, Dialog, Field, Notice, TextField } from '../../../components/ui';
-import { CREDENTIALS_TEXT, credentialFieldError, credentialsDialogTitle } from './accountText';
+import {
+  CREDENTIALS_TEXT,
+  credentialFieldError,
+  credentialsDialogTitle,
+  credentialsStorageText,
+} from './accountText';
 
 export interface CredentialsDialogProps {
   manifest: ProviderManifest;
@@ -105,7 +110,7 @@ export function CredentialsDialog({
         if (!pending) onClose();
       }}
       title={credentialsDialogTitle(manifest)}
-      description={CREDENTIALS_TEXT.storage}
+      description={credentialsStorageText(account)}
       closeOnEsc={!pending}
       closeOnOverlayClick={!pending}
       footer={

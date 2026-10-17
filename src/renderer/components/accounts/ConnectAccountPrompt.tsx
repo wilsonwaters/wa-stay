@@ -1,11 +1,13 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router';
-import { CircleCheck, LogIn } from 'lucide-react';
+import { CircleCheck, KeyRound, LogIn } from 'lucide-react';
 import { useAccountCheck, useAccountStatus, useSignIn } from '../../api/accounts';
-import type { ProviderManifest } from '../../../shared/types/provider.types';
+import type { ProviderAccount, ProviderManifest } from '../../../shared/types/provider.types';
 import { ROUTES } from '../../app/routes';
 import { Button, Notice, useAnnounce } from '../ui';
+import { buttonClassName } from '../ui/Button';
 import { cx } from '../ui/cx';
+import { inSentence } from './credentialText';
 
 export interface ConnectAccountPromptProps {
   manifest: ProviderManifest;
@@ -15,7 +17,10 @@ export interface ConnectAccountPromptProps {
    * `required`: only the blocking prompt (a list card stays quiet for optional accounts).
    */
   when?: 'any' | 'required';
-  /** What signing in is for. Defaults to a generic line for the provider's requirement. */
+  /**
+   * What signing in is for. Defaults to a generic line for the provider's requirement. Not
+   * used for a `credentials` account, which is added in Settings rather than signed in to.
+   */
   message?: string;
   /** One line and a small button, for a card. */
   compact?: boolean;
@@ -29,12 +34,74 @@ const needsAccount = (manifest: ProviderManifest) =>
   manifest.capabilities.account === 'required' ||
   manifest.capabilities.account === 'required-for-holds';
 
+/** What a `credentials` account's details are called in a sentence: "RAC member number". */
+const detailsName = (account: ProviderAccount) => {
+  const fields = account.fields ?? [];
+  return fields.length === 1 ? inSentence(fields[0].label) : 'details';
+};
+
+/**
+ * For a provider whose account is details saved in the app (`credentials`, such as an RAC
+ * member number): there is no sign-in window (main answers `NOT_IMPLEMENTED`), so it points to
+ * Settings → Accounts, where they are added. Blocking for a provider whose holds need them, a
+ * soft line where they are optional; nothing once they are saved.
+ */
+function AddDetailsPrompt({
+  manifest,
+  account,
+  required,
+  compact,
+  className,
+}: {
+  manifest: ProviderManifest;
+  account: ProviderAccount;
+  required: boolean;
+  compact: boolean;
+  className?: string;
+}) {
+  const name = detailsName(account);
+  const to = ROUTES.settings('accounts', { provider: manifest.id });
+  if (!required) {
+    return (
+      <p className={cx('text-sm text-fg-secondary', className)}>
+        You can add your {name} in{' '}
+        <Link to={to} className="font-semibold text-brand-strong underline">
+          Settings → Accounts
+        </Link>
+        .
+      </p>
+    );
+  }
+  const text = `${manifest.shortName} needs your ${name} before it can hold anything for you.`;
+  const add = (
+    <Link to={to} className={buttonClassName({ variant: 'secondary', size: 'sm' })}>
+      <KeyRound size={16} aria-hidden="true" />
+      Add {name}
+    </Link>
+  );
+  if (!compact) {
+    return (
+      <Notice tone="warning" title={`Add your ${name}`} actions={add} className={className}>
+        {text}
+      </Notice>
+    );
+  }
+  return (
+    <div className={cx('flex flex-col gap-2 text-sm', className)}>
+      <p className="font-semibold text-warning-fg">{text}</p>
+      <div className="flex flex-wrap items-center gap-2">{add}</div>
+    </div>
+  );
+}
+
 /**
  * Asks the person to connect their account with a provider, on the provider's own sign-in page
  * in an app window (`accounts.signIn`). Blocking for a provider whose holds need an account, a
  * soft suggestion where it is optional (§12.32), and nothing once signed in or for a provider
  * without accounts. A status that failed to load or is unknown counts as signed out, with
- * Retry. When the window closes, focus comes back here and the outcome is announced.
+ * Retry. When the window closes, focus comes back here and the outcome is announced. A
+ * provider whose account is details saved in the app (`credentials`) gets a link to Settings →
+ * Accounts instead (`AddDetailsPrompt`): it has no sign-in window.
  */
 export function ConnectAccountPrompt({
   manifest,
@@ -64,6 +131,18 @@ export function ConnectAccountPrompt({
   if (manifest.capabilities.account === 'none' || (!required && when === 'required')) return null;
   // Not before the status is known, so a signed-in person never sees it flash.
   if (account.isPending) return null;
+  if (account.data?.authKind === 'credentials') {
+    if (signedIn) return null;
+    return (
+      <AddDetailsPrompt
+        manifest={manifest}
+        account={account.data}
+        required={required}
+        compact={compact}
+        className={className}
+      />
+    );
+  }
   if (signedIn) {
     if (outcome !== 'connected') return null;
     return (

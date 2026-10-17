@@ -1,12 +1,13 @@
-import { act, render, screen, within } from '@testing-library/react';
+import { act, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { renderWithProviders } from '@tests/utils/renderer/renderWithProviders';
 import { FAKE_MANIFEST, PARKSTAY_MANIFEST } from '@tests/utils/renderer/manifests';
 import { HoldPanel, type HoldPanelProps } from './HoldPanel';
 
 function renderPanel(props: Partial<HoldPanelProps> = {}) {
   const onPay = jest.fn();
   const user = userEvent.setup();
-  render(
+  renderWithProviders(
     <HoldPanel
       unit="CAMPSITE 02"
       expiresAt={new Date(Date.now() + 23 * 60_000)}

@@ -20,6 +20,7 @@ export {
   useAccounts,
   useAccountStatus,
   useCopyCredential,
+  useCredentialChangeUpdates,
   useOpenSignInLink,
   useSaveCredentials,
   useSignIn,

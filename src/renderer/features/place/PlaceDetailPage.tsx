@@ -392,6 +392,7 @@ export default function PlaceDetailPage() {
             the place; from 1024 px it is the sticky right-hand column. */}
         <div className="lg:sticky lg:top-22 lg:col-start-2 lg:row-start-1">
           <StayCard
+            providerId={providerId}
             shortName={shortName}
             dates={dates}
             guests={guests}

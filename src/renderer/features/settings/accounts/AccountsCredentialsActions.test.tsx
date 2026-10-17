@@ -71,7 +71,7 @@ describe('Settings → Accounts: saved details (credentials): replace, remove an
     expect(politeAnnouncement()).toBe('Member number removed');
   });
 
-  it('Copy asks main to copy (the renderer never has the value) and announces "Copied"; a failure shows a toast', async () => {
+  it('Copy asks main to copy (the renderer never has the value) and announces "Member number copied", focus kept; a failure shows a toast', async () => {
     const copyCredential = jest
       .fn()
       .mockResolvedValueOnce(ok(undefined))
@@ -88,7 +88,8 @@ describe('Settings → Accounts: saved details (credentials): replace, remove an
     expect(copy).toHaveAccessibleDescription('Member number saved');
     await user.click(copy);
     expect(mock.api.accounts.copyCredential).toHaveBeenCalledWith('keystay', 'memberNumber');
-    await waitFor(() => expect(politeAnnouncement()).toBe('Copied'));
+    await waitFor(() => expect(politeAnnouncement()).toBe('Member number copied'));
+    expect(copy).toHaveFocus();
 
     await user.click(copy);
     const toasts = screen.getByRole('region', { name: 'Notifications' });

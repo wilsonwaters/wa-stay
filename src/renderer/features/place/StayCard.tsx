@@ -1,6 +1,7 @@
 import { useId, type ReactNode } from 'react';
 import { Link } from 'react-router';
 import { BellRing, CalendarClock } from 'lucide-react';
+import { CopyCredentialButton } from '../../components/accounts/CopyCredentialButton';
 import { ExternalLink } from '../../components/ExternalLink';
 import {
   Badge,
@@ -30,6 +31,8 @@ export type CheckAbility =
   | { kind: 'unavailable'; message: string; showInfoLink?: boolean };
 
 export interface StayCardProps {
+  /** The place's provider: a saved member number of its gets "Copy …" beside Book. */
+  providerId: string;
   shortName: string;
   dates: DateRange;
   guests: Guests | undefined;
@@ -91,9 +94,11 @@ function FailureNotice({
  * "Check your dates": the stay (dates and guests, kept in the page's address), Check
  * availability, and the ways on from here: book on the provider's site, watch, snipe, or read
  * more there. One coral action at a time (design-language.md, principle 2): Check until the
- * dates are checked, then Book.
+ * dates are checked, then Book. A detail the person saved for the provider that its checkout
+ * asks for (an RAC member number) gets "Copy {label}" right after Book.
  */
 export function StayCard({
+  providerId,
   shortName,
   dates,
   guests,
@@ -190,6 +195,7 @@ export function StayCard({
               Book on {shortName}
             </ExternalLink>
           )}
+          {links.book && <CopyCredentialButton providerId={providerId} fullWidth />}
           {watchHref && (
             <Link
               to={watchHref}
