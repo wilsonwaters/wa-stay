@@ -21,6 +21,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Interactive pace**: what you start (your dates on Explore, a place's "Check availability", "Check now") goes first, while watches and snipes are spaced out in the background for a provider that asks for a pause between requests (RAC: 10 seconds) (#49).
 - Alerts and screens name what was found by its kind ("Cabins available at …", "A spot is free at …" for several kinds), not always "site" (#56).
 - Settings → Notifications no longer says "site" for what a watch finds or holds (#67).
+- A place's check that the provider rate-limits says "{provider} asked WA Stay to slow down. Try again later." rather than "Try again in a minute", which was wrong for RAC's longer pause (#67).
 
 ### Fixed
 - A watch check still running when the watch was moved to another place, or its dates, units, stay types or stay fields changed, could save what it found (or its error) for the old one and alert on it. Its answer and its failure are now dropped, and the watch checks again at once; only a provider turning the check away (HTTP 403 or 429) is still recorded, and then the watch waits its interval (#67).
