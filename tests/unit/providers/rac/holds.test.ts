@@ -623,6 +623,41 @@ describe('one at a time (one cart)', () => {
     expect(await holds.release(HOLD)).toEqual({ outcome: 'gone' });
     expect(http.sent).toHaveLength(4);
   });
+
+  it.each([
+    ['released', 'cart-page-one-stay.html', (page: string) => page],
+    ['gone', 'cart-page-empty.html', (page: string) => page],
+    // This stay's dates in another category: it can't tell, so it rejects
+    [
+      'rejected',
+      'cart-page-one-stay.html',
+      (page: string) => page.replace('>Powered Site<', '>Ensuite Site<'),
+    ],
+    ['aborted', 'cart-page-one-stay.html', (page: string) => page],
+  ])('after a release that ends %s, a create places a hold', async (outcome, file, edit) => {
+    setUp({ cartPage: { file: fixture(file, edit, 'now.html') } });
+    // Its record has run out, so nothing but a release still counted as running stops the create
+    await state.set(RAC_CART_STATE_KEY, {
+      ...RECORD,
+      expiresAt: new Date(NOW.getTime() - MINUTE).toISOString(),
+    });
+    await http.cookies.set({ url: RAC, name: 'PHPSESSID', value: 'session' });
+    const controller = new AbortController();
+    if (outcome === 'aborted') http.abortAfter = { match: /\/booking\/$/, controller };
+    const ended = await holds.release(HOLD, controller.signal).then(
+      (result) => result.outcome,
+      (error: unknown) => (isAbortError(error) ? 'aborted' : 'rejected')
+    );
+    expect(ended).toBe(outcome);
+
+    // The cart is empty now: the next hold goes in
+    http.abortAfter = undefined;
+    fixture('cart-page-empty.html', (page) => page, 'now.html');
+    expect(await holds.create(POWERED)).toEqual(
+      expect.objectContaining({ ok: true, unitId: 'cat:4' })
+    );
+    expect(cartAddresses()).toHaveLength(1);
+  });
 });
 
 describe('create: what is sent', () => {

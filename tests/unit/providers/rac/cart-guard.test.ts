@@ -197,6 +197,19 @@ describe('cartGuardRefusal', () => {
     ['?cart%5B%5D=', `${RAC}/busselton/booking/?cart%5B%5D=&rand=1`],
     ['?CART', `${RAC}/busselton/booking/?CART`],
     ['?rest api data id=', `${RAC}/busselton/booking/?rest+api+data+id=1`],
+    [
+      '?%20cart&rest_api_data_id=',
+      `${RAC}/busselton/booking/?%20cart&rest_api_data_id=${ZERO_TOKEN}`,
+    ],
+    [
+      '?cart%00x&rest_api_data_id%00y=',
+      `${RAC}/busselton/booking/?cart%00x&rest_api_data_id%00y=${ZERO_TOKEN}`,
+    ],
+    // Each alone, so only PHP's reading of the name makes it the cart's
+    ['?%20cart', `${RAC}/busselton/booking/?%20cart`],
+    ['?+cart', `${RAC}/busselton/booking/?+cart`],
+    ['?cart%00x', `${RAC}/busselton/booking/?cart%00x`],
+    ['?rest_api_data_id%00y=', `${RAC}/busselton/booking/?rest_api_data_id%00y=${ZERO_TOKEN}`],
   ])('with the cart off, a cart address spelled %s is refused', (_spelling, url) => {
     expect(cartGuardRefusal({ method: 'GET', url }, false)).toBe('the cart is off');
   });
@@ -245,6 +258,13 @@ describe('cartGuardRefusal', () => {
     expect(
       ['cart[]', 'cart[x]', 'rest.api.data.id', 'rest api_data[id', 'Query'].map(phpKey)
     ).toEqual(['cart', 'cart', 'rest_api_data_id', 'rest_api_data_id', 'query']);
+    expect([' cart', '  cart[]', 'cart\0x', 'rest_api_data_id\0y', '\0cart'].map(phpKey)).toEqual([
+      'cart',
+      'cart',
+      'cart',
+      'rest_api_data_id',
+      '',
+    ]);
   });
 
   it('names a path for the log, never a query', () => {

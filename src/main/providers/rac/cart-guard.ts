@@ -114,12 +114,16 @@ export function normalisedPath(pathname: string): string {
 }
 
 /**
- * A query or form name as PHP reads it: `cart[]` (or `cart[x]`) is `cart`, and `.`, a space and
- * an unclosed `[` become `_`; in lower case, so no spelling of a name escapes the rules.
+ * A query or form name as PHP reads it: cut at its first NUL (`cart%00x` is `cart`), its leading
+ * spaces dropped (`%20cart` and `+cart` are `cart`), `cart[]` (or `cart[x]`) is `cart`, and `.`,
+ * a space and an unclosed `[` become `_`; in lower case, so no spelling of a name escapes the
+ * rules.
  */
 export function phpKey(name: string): string {
-  const bracket = name.indexOf('[');
-  const base = bracket > 0 && name.indexOf(']', bracket) > bracket ? name.slice(0, bracket) : name;
+  const trimmed = name.split('\0')[0].replace(/^ +/, '');
+  const bracket = trimmed.indexOf('[');
+  const base =
+    bracket > 0 && trimmed.indexOf(']', bracket) > bracket ? trimmed.slice(0, bracket) : trimmed;
   return base.replace(/[. []/g, '_').toLowerCase();
 }
 
