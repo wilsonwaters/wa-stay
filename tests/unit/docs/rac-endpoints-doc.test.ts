@@ -84,6 +84,14 @@ function requestedPaths(code: string, constants: ReadonlyMap<string, string>): s
   return found;
 }
 
+/**
+ * Whether `code` sends a request itself rather than through the RAC client: any call on an
+ * `http` object (`ctx.http.getJson(…)`, `deps.http.postForm(…)`) or any `.request(…)`.
+ */
+function sendsOwnRequest(code: string): boolean {
+  return /\bhttp\.\w+\s*\(/.test(code) || /\.request\s*\(/.test(code);
+}
+
 /** The never-used names `code` contains. */
 function namesNeverUsed(code: string): string[] {
   return NEVER_USED_NAMES.filter((name) => code.includes(name));
@@ -134,8 +142,17 @@ describe(DOC, () => {
     expect(requested.filter((used) => !documented.includes(used))).toEqual([]);
     // Nothing sends a request but the client
     for (const [name, code] of callers) {
-      expect([name, /\.request\(/.test(code)]).toEqual([name, false]);
+      expect([name, sendsOwnRequest(code)]).toEqual([name, false]);
     }
+  });
+
+  it('tells a request sent around the client from a call to it', () => {
+    expect(sendsOwnRequest('await ctx.http.getJson(url, { signal })')).toBe(true);
+    expect(sendsOwnRequest('deps.http.postForm(url, form)')).toBe(true);
+    expect(sendsOwnRequest("http.request('GET', url, {})")).toBe(true);
+    expect(sendsOwnRequest('await transport.request(url)')).toBe(true);
+    expect(sendsOwnRequest('client.getPage(`/${park.slug}/book-now/`, { signal })')).toBe(false);
+    expect(sendsOwnRequest('async signIn(values, _http, signal) {')).toBe(false);
   });
 
   it('reads the paths of a request in code, and flags one it cannot read', () => {
