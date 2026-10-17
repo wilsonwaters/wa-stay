@@ -13,10 +13,10 @@ in the [architecture overview](architecture/overview.md#security).
 
 The app keeps these secrets on disk:
 
-| Secret | Where it is stored |
-| --- | --- |
-| Email (SMTP) notifier settings, including the app password | `notifiers.config` in the database |
-| Provider secrets (`ProviderContext.secrets`) | the provider's own state (`provider_state`), under `secret:<key>` |
+| Secret                                                                                 | Where it is stored                                                                     |
+| -------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------- |
+| Email (SMTP) notifier settings, including the app password                             | `notifiers.config` in the database                                                     |
+| Provider secrets (`ProviderContext.secrets`)                                           | the provider's own state (`provider_state`), under `secret:<key>`                      |
 | Account details a provider asks for (a `credentials` sign-in, such as a member number) | the provider's secrets, as `account.<key>`: `secret:account.<key>` in `provider_state` |
 
 ParkStay stores no secret of its own; RAC's only one is the person's member number, an account
@@ -82,11 +82,11 @@ The vault encrypts new secrets with one of two backends.
 **`os`: Electron `safeStorage`.** This is the normal case. The operating system protects
 the key:
 
-| Platform | Key protection | Where the key lives |
-| --- | --- | --- |
-| Windows | DPAPI, bound to the Windows user account | Wrapped with DPAPI in Chromium's `Local State` file inside userData (`os_crypt.encrypted_key`) |
-| macOS | Keychain | A Keychain item for the app |
-| Linux | Secret Service (GNOME Keyring, KWallet) | An item in the user's keyring. Nothing is written to userData. |
+| Platform | Key protection                           | Where the key lives                                                                            |
+| -------- | ---------------------------------------- | ---------------------------------------------------------------------------------------------- |
+| Windows  | DPAPI, bound to the Windows user account | Wrapped with DPAPI in Chromium's `Local State` file inside userData (`os_crypt.encrypted_key`) |
+| macOS    | Keychain                                 | A Keychain item for the app                                                                    |
+| Linux    | Secret Service (GNOME Keyring, KWallet)  | An item in the user's keyring. Nothing is written to userData.                                 |
 
 On Windows, `safeStorage` encrypts with AES-256-GCM, which detects any change to a
 ciphertext. On macOS and Linux it is Chromium's OSCrypt, which uses AES-128-CBC with no
@@ -149,11 +149,11 @@ Windows, because the `Local State` key no longer matches.
 v1.x used three schemes. Their keys came from constants in the source code, so they were
 obfuscation, not protection:
 
-| Secret | v1.x scheme |
-| --- | --- |
-| ParkStay password | AES-256-GCM, key `PBKDF2(machineId + app constant, constant salt)`, stored as hex in three columns. Not migrated: see below |
-| Notifier config | The same scheme with other constants, stored as `iv:authTag:ciphertext` |
-| `gmail-oauth.json` (Gmail OTP) | electron-store's AES-256-CBC with a hard-coded `encryptionKey`. Not migrated: see below |
+| Secret                         | v1.x scheme                                                                                                                 |
+| ------------------------------ | --------------------------------------------------------------------------------------------------------------------------- |
+| ParkStay password              | AES-256-GCM, key `PBKDF2(machineId + app constant, constant salt)`, stored as hex in three columns. Not migrated: see below |
+| Notifier config                | The same scheme with other constants, stored as `iv:authTag:ciphertext`                                                     |
+| `gmail-oauth.json` (Gmail OTP) | electron-store's AES-256-CBC with a hard-coded `encryptionKey`. Not migrated: see below                                     |
 
 `migrateLegacySecrets` (`src/main/security/legacy-migration.ts`) runs at every start,
 after the database migrations and before anything reads a secret. It:
@@ -221,10 +221,10 @@ keep the v1.x originals, so they are the only backup of the secrets as v1.x stor
 
 Every stored secret has a state (`SecretState`):
 
-| State | Meaning |
-| --- | --- |
-| `ok` | A secret is stored and the app can decrypt it. |
-| `missing` | Nothing is stored. |
+| State        | Meaning                                          |
+| ------------ | ------------------------------------------------ |
+| `ok`         | A secret is stored and the app can decrypt it.   |
+| `missing`    | Nothing is stored.                               |
 | `unreadable` | Something is stored, but it cannot be decrypted. |
 
 A secret becomes `unreadable` when:
@@ -242,10 +242,10 @@ a tampered one may decrypt to wrong data instead of reading as `unreadable`.
 An unreadable secret is never treated as empty, and it is never overwritten except by the
 user saving a new one. What the user sees:
 
-| Secret | When unreadable |
-| --- | --- |
-| Email notifier | The notifier shows `secretState: 'unreadable'`, status `error` and "Saved password could not be decrypted; re-enter it". Nothing is sent through it, and the skip is logged once. Saving the email settings again fixes it. |
-| Account details | The account reads as not saved ("Not added"), with one warning that names the field's key. "Copy" says "Couldn't read your saved {label}. Add it again." Adding the details again fixes it. |
+| Secret          | When unreadable                                                                                                                                                                                                             |
+| --------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Email notifier  | The notifier shows `secretState: 'unreadable'`, status `error` and "Saved password could not be decrypted; re-enter it". Nothing is sent through it, and the skip is logged once. Saving the email settings again fixes it. |
+| Account details | The account reads as not saved ("Not added"), with one warning that names the field's key. "Copy" says "Couldn't read your saved {label}. Add it again." Adding the details again fixes it.                                 |
 
 A locked keyring is usually temporary: unlock it and restart the app, and the secrets read
 again. Nothing was overwritten in the meantime.
@@ -271,7 +271,7 @@ by main: the `provider_state` row `('<provider id>', 'core.experiments')`, under
 (`providers.setExperiment`, after a confirmation); nothing a page or a provider sends turns one
 on. A choice takes effect when WA Stay next starts: the provider is registered with the
 capabilities the experiment turns on, so no code path of an experiment that is off can run.
-Turning off one that turns on holds is refused while one of the provider's snipes is running or
+Turning off one that turns on holds is refused while one of the provider's snipes set to hold is running or
 one of its holds is unexpired, being placed or being let go (`ACCOUNT_BUSY`); once it is off, no
 new hold is placed for that provider until the restart.
 
@@ -402,14 +402,14 @@ it packages the app (`electronFuses` in `electron-builder.json`), just before si
 apply to the installed `WA Stay.exe` (changing one means modifying the executable, which breaks
 its signature when the build is signed):
 
-| Fuse | Set to | Effect |
-| --- | --- | --- |
-| `RunAsNode` | off | `ELECTRON_RUN_AS_NODE` is ignored: the executable cannot be used as a plain Node.js runtime. Nothing in the app forks a Node process. |
-| `EnableNodeOptionsEnvironmentVariable` | off | `NODE_OPTIONS` and `NODE_EXTRA_CA_CERTS` are ignored, so no environment variable can load code (`--require`) into the main process. A TLS-inspecting proxy's certificate cannot be added that way; provider traffic goes through Chromium's network stack, which uses the system's certificates. |
-| `EnableNodeCliInspectArguments` | off | `--inspect`, `--inspect-brk` and `SIGUSR1` do not open Node's inspector on the main process. |
-| `OnlyLoadAppFromAsar` | on | The app is loaded only from `resources/app.asar`, never from a `resources/app` folder. |
-| `EnableEmbeddedAsarIntegrityValidation` | on | electron-builder records the SHA-256 of `app.asar`'s header in the executable (a Windows resource; `Info.plist` on macOS), and every file packed in the archive carries its own block hashes. Electron checks both as it reads, so a modified `app.asar` does not run. Windows and macOS only: Linux has no such check. Only the files kept outside the archive (`app.asar.unpacked`) are not covered: playwright-core, and better-sqlite3's one native binary (`prebuilds/<platform>-<arch>.node`, which cannot load from inside an archive). better-sqlite3's JavaScript is inside the archive and checked, and its C sources and other platforms' binaries are not packaged. |
-| `EnableCookieEncryption` | on | Cookie values on disk, such as a provider session's (`persist:provider-<id>`), are encrypted with the operating system's key (DPAPI on Windows), as Chrome does. It is one-way: cookies saved before are encrypted the next time they are written, and turning the fuse off again would make the stored cookies unreadable. |
+| Fuse                                    | Set to | Effect                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| --------------------------------------- | ------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `RunAsNode`                             | off    | `ELECTRON_RUN_AS_NODE` is ignored: the executable cannot be used as a plain Node.js runtime. Nothing in the app forks a Node process.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| `EnableNodeOptionsEnvironmentVariable`  | off    | `NODE_OPTIONS` and `NODE_EXTRA_CA_CERTS` are ignored, so no environment variable can load code (`--require`) into the main process. A TLS-inspecting proxy's certificate cannot be added that way; provider traffic goes through Chromium's network stack, which uses the system's certificates.                                                                                                                                                                                                                                                                                                                                                                                |
+| `EnableNodeCliInspectArguments`         | off    | `--inspect`, `--inspect-brk` and `SIGUSR1` do not open Node's inspector on the main process.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| `OnlyLoadAppFromAsar`                   | on     | The app is loaded only from `resources/app.asar`, never from a `resources/app` folder.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| `EnableEmbeddedAsarIntegrityValidation` | on     | electron-builder records the SHA-256 of `app.asar`'s header in the executable (a Windows resource; `Info.plist` on macOS), and every file packed in the archive carries its own block hashes. Electron checks both as it reads, so a modified `app.asar` does not run. Windows and macOS only: Linux has no such check. Only the files kept outside the archive (`app.asar.unpacked`) are not covered: playwright-core, and better-sqlite3's one native binary (`prebuilds/<platform>-<arch>.node`, which cannot load from inside an archive). better-sqlite3's JavaScript is inside the archive and checked, and its C sources and other platforms' binaries are not packaged. |
+| `EnableCookieEncryption`                | on     | Cookie values on disk, such as a provider session's (`persist:provider-<id>`), are encrypted with the operating system's key (DPAPI on Windows), as Chrome does. It is one-way: cookies saved before are encrypted the next time they are written, and turning the fuse off again would make the stored cookies unreadable.                                                                                                                                                                                                                                                                                                                                                     |
 
 The other fuses keep Electron's defaults; `GrantFileProtocolExtraPrivileges` stays on because
 the window loads its page from `file://`.

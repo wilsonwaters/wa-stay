@@ -246,9 +246,10 @@ Open Settings from the account menu (top right).
   one at a time, for you to pay on RAC's own page
   ([the auto-cart](watches-and-notifications.md#rac-the-auto-cart)). It takes effect when WA
   Stay restarts ("Turns on when WA Stay restarts" until then), and so does turning it off, which
-  can't be done while an RAC snipe is running or a stay is held, being held or being let go: pay
+  can't be done while an RAC snipe set to hold is running or a stay is held, being held or being let go: pay
   for it or let it go first. Once it is off, no new stay goes in the cart, even before the
   restart.
+
 - **Notifications.** **Desktop notifications** and **Play a sound**, and **Email**: your SMTP
   settings (Gmail, Outlook or your own server), where to send alerts, and **Send test email**.
   [Email setup](watches-and-notifications.md#email).

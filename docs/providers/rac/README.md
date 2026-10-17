@@ -28,31 +28,31 @@ answer an availability request with JSON, so no browser is driven.
 
 `racManifest` in `src/main/providers/rac/manifest.ts`:
 
-| Field | Value |
-| --- | --- |
-| `id`, `name`, `shortName` | `rac`, RAC Parks & Resorts, RAC |
-| `integration` | `api` (one JSON endpoint and one HTML page, through `ctx.http`; no browser automation) |
-| `brand` | `#3A3F47` (the app's dark slate) with the monogram `RAC`: plain text, never RAC's logo or its own colours |
-| `locationKinds` | holiday-park |
-| `timezone`, `currency` | `Australia/Perth`, `AUD` |
-| `limits` | watches every 15 min at most, 1 request in flight, 10 s between background requests (`minRequestIntervalMs`), catalogue fresh for 24 h |
-| `stayFields` | `pets` "Pets", 0–2, default 0 ("Up to 2, where pets are allowed."; availability, watches and snipes), sent to RAC as `animals`; and for a hold only (the auto-cart, [below](#the-auto-cart-experiment)), a site's `equipmentType` "Equipment" (none, or one of NewBook's 15 types), `equipmentLength` and `equipmentWidth` in metres ("6.5") |
-| `bulkAvailabilityStayFields` | `arrival`, `departure`, `adults`, `children`, `infants`, `params.pets`: RAC's request carries the party and the pets, so a change to any asks again |
-| `releaseModes` | `daily_rollover` "When these dates open" and `scheduled` "At a time you set", each `maxWindowMinutes: 30` |
-| `experiments` | `autoCart` "Put stays in my RAC cart automatically", off by default; it turns on `holds` ([below](#the-auto-cart-experiment)) |
-| `holdRelease` | `true`: with the experiment on, "Let it go" takes the stay out of the cart |
+| Field                        | Value                                                                                                                                                                                                                                                                                                                                        |
+| ---------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `id`, `name`, `shortName`    | `rac`, RAC Parks & Resorts, RAC                                                                                                                                                                                                                                                                                                              |
+| `integration`                | `api` (one JSON endpoint and one HTML page and, with the auto-cart on, its cart page and removal, through `ctx.http`; no browser automation)                                                                                                                                                                                                 |
+| `brand`                      | `#3A3F47` (the app's dark slate) with the monogram `RAC`: plain text, never RAC's logo or its own colours                                                                                                                                                                                                                                    |
+| `locationKinds`              | holiday-park                                                                                                                                                                                                                                                                                                                                 |
+| `timezone`, `currency`       | `Australia/Perth`, `AUD`                                                                                                                                                                                                                                                                                                                     |
+| `limits`                     | watches every 15 min at most, 1 request in flight, 10 s between background requests (`minRequestIntervalMs`), catalogue fresh for 24 h                                                                                                                                                                                                       |
+| `stayFields`                 | `pets` "Pets", 0–2, default 0 ("Up to 2, where pets are allowed."; availability, watches and snipes), sent to RAC as `animals`; and for a hold only (the auto-cart, [below](#the-auto-cart-experiment)), a site's `equipmentType` "Equipment" (none, or one of NewBook's 15 types), `equipmentLength` and `equipmentWidth` in metres ("6.5") |
+| `bulkAvailabilityStayFields` | `arrival`, `departure`, `adults`, `children`, `infants`, `params.pets`: RAC's request carries the party and the pets, so a change to any asks again                                                                                                                                                                                          |
+| `releaseModes`               | `daily_rollover` "When these dates open" and `scheduled` "At a time you set", each `maxWindowMinutes: 30`                                                                                                                                                                                                                                    |
+| `experiments`                | `autoCart` "Put stays in my RAC cart automatically", off by default; it turns on `holds` ([below](#the-auto-cart-experiment))                                                                                                                                                                                                                |
+| `holdRelease`                | `true`: with the experiment on, "Let it go" takes the stay out of the cart                                                                                                                                                                                                                                                                   |
 
-| Capability | | Module |
-| --- | --- | --- |
-| `catalog` (`catalogMode: 'full'`) | yes | `parks.ts` (the eight parks, a seed of facts: nothing is requested when the catalogue syncs) and `catalog.ts`; a park's categories from its book-now page (`book-now.ts`) or, at a park on NewBook's own engine, from one availability request |
-| `availability` | yes | `availability.ts` and `mapping.ts`: one request per park and stay, every category night by night, with prices and RAC's stay rules |
-| `bulkAvailability` | yes | `bulk.ts`: Explore's free counts, one request per park |
-| `watches` | yes | uses `availability` |
-| `snipes` | yes (Site Sniper is marked "coming soon") | `release-policy.ts` and `release-calendar.ts`; RAC snipes alert (with the auto-cart experiment on, they can hold) |
-| `holds` | off by default: the `autoCart` experiment turns it on | `holds.ts` (the cart), `cart-page.ts` (reading the cart page), and `cart-guard.ts` (what any request may be) |
-| `accessGate` | no | RAC has no queue |
-| `bookingImport` | no | WA Stay never cancels or changes an RAC booking |
-| `account` | `optional` | `auth.ts` and `membership.ts`: the person's own RAC member number ([below](#the-member-number)) |
+| Capability                        |                                                       | Module                                                                                                                                                                                                                                         |
+| --------------------------------- | ----------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `catalog` (`catalogMode: 'full'`) | yes                                                   | `parks.ts` (the eight parks, a seed of facts: nothing is requested when the catalogue syncs) and `catalog.ts`; a park's categories from its book-now page (`book-now.ts`) or, at a park on NewBook's own engine, from one availability request |
+| `availability`                    | yes                                                   | `availability.ts` and `mapping.ts`: one request per park and stay, every category night by night, with prices and RAC's stay rules                                                                                                             |
+| `bulkAvailability`                | yes                                                   | `bulk.ts`: Explore's free counts, one request per park                                                                                                                                                                                         |
+| `watches`                         | yes                                                   | uses `availability`                                                                                                                                                                                                                            |
+| `snipes`                          | yes (Site Sniper is marked "coming soon")             | `release-policy.ts` and `release-calendar.ts`; RAC snipes alert (with the auto-cart experiment on, they can hold)                                                                                                                              |
+| `holds`                           | off by default: the `autoCart` experiment turns it on | `holds.ts` (the cart), `cart-page.ts` (reading the cart page), and `cart-guard.ts` (what any request may be)                                                                                                                                   |
+| `accessGate`                      | no                                                    | RAC has no queue                                                                                                                                                                                                                               |
+| `bookingImport`                   | no                                                    | WA Stay never cancels or changes an RAC booking                                                                                                                                                                                                |
+| `account`                         | `optional`                                            | `auth.ts` and `membership.ts`: the person's own RAC member number ([below](#the-member-number))                                                                                                                                                |
 
 `links.ts` gives every link: a park's home page ("View on RAC"), and its booking pages ("Book on
 RAC", [below](#availability)). There is no link to manage a booking: that needs the park's own
@@ -64,16 +64,16 @@ sign-in on RAC's site. `client.ts` sends every request, and asks the cart guard
 The eight parks RAC books online, from `parks.ts`. The region is Explore's region name, so the
 Region filter works across providers.
 
-| Park | Town, region | Stay types | School holidays open at |
-| --- | --- | --- | --- |
-| RAC Busselton Holiday Park | Busselton, South West | Camping, cabins | 8 am |
-| RAC Cable Beach Holiday Park | Broome, Kimberley | Camping, cabins | Not in RAC's school-holiday releases |
-| RAC Cervantes Holiday Park | Cervantes, Midwest | Camping, cabins | 9 am |
-| RAC Esperance Holiday Park | Esperance, South Coast | Camping, cabins | 7 am |
-| RAC Margaret River Nature Park | Margaret River, South West | Camping, cabins, dorms, glamping | 7 am |
-| RAC Exmouth Cape Holiday Park | Exmouth, Pilbara | Camping, cabins, rooms | 9 am |
-| RAC Karri Valley Resort | Pemberton, Warren | Camping, cabins, rooms | 8 am |
-| RAC Monkey Mia Dolphin Resort | Shark Bay, Midwest | Camping, cabins, rooms, dorms | 8 am |
+| Park                           | Town, region               | Stay types                       | School holidays open at              |
+| ------------------------------ | -------------------------- | -------------------------------- | ------------------------------------ |
+| RAC Busselton Holiday Park     | Busselton, South West      | Camping, cabins                  | 8 am                                 |
+| RAC Cable Beach Holiday Park   | Broome, Kimberley          | Camping, cabins                  | Not in RAC's school-holiday releases |
+| RAC Cervantes Holiday Park     | Cervantes, Midwest         | Camping, cabins                  | 9 am                                 |
+| RAC Esperance Holiday Park     | Esperance, South Coast     | Camping, cabins                  | 7 am                                 |
+| RAC Margaret River Nature Park | Margaret River, South West | Camping, cabins, dorms, glamping | 7 am                                 |
+| RAC Exmouth Cape Holiday Park  | Exmouth, Pilbara           | Camping, cabins, rooms           | 9 am                                 |
+| RAC Karri Valley Resort        | Pemberton, Warren          | Camping, cabins, rooms           | 8 am                                 |
+| RAC Monkey Mia Dolphin Resort  | Shark Bay, Midwest         | Camping, cabins, rooms, dorms    | 8 am                                 |
 
 Two RAC parks are left out: **Ningaloo Reef Resort**, closed for redevelopment, and **Rose
 Gardens Holiday Park**, which RAC books on a site of its own, while WA Stay asks only RAC Parks &
