@@ -117,11 +117,12 @@ held, else the watch's or snipe's stay types, else the provider's usual kind of 
 | Where | What |
 | --- | --- |
 | **The bell** (top right) | Every notification, newest first, with an unread count. Click one to open what it is about (a watch, a snipe, a booking). Mark read, mark all read, delete, clear all. |
-| **The desktop** | An OS notification for each one, titled with the provider, e.g. "ParkStay · Sites available at Bungarra". Clicking it brings WA Stay forward on that page. Clicking an alert that a watch found something also opens the provider's booking page for those dates in your browser, for every provider; an alert that a site is held opens only the watch, where you pay. Settings → Notifications: **Desktop notifications** and **Play a sound**. |
-| **Email** | Each notification, sent through your own email account (below). An alert that a watch found something has a **Book on {provider}** link to the provider's public booking page for those dates (the nights it found, for some nights), so you can book from your phone. An alert that a site is held says the hold is in WA Stay on the computer that placed it, and still gives the link. |
+| **The desktop** | An OS notification for each one, titled with the provider, e.g. "ParkStay · Sites available at Bungarra". Clicking it brings WA Stay forward on that page. Clicking an alert that a watch found something, or that a snipe found the dates free ("A site is free at …"), also opens the provider's booking page for those dates in your browser, for every provider; an alert that a site is held opens only the watch or snipe, where you pay. Settings → Notifications: **Desktop notifications** and **Play a sound**. |
+| **Email** | Each notification, sent through your own email account (below). An alert that a watch found something, or that a snipe found the dates free, has a **Book on {provider}** link to the provider's public booking page for those dates (the nights it found, for some nights), so you can book from your phone. An alert that a site is held says the hold is in WA Stay on the computer that placed it, and still gives the link. |
 
-What creates a notification: a watch finding sites (or some nights), a hold placed by a snipe
-or a watch, a payment confirmed (booked), the welcome notice after an upgrade, and errors that
+What creates a notification: a watch finding sites (or some nights), a snipe finding the dates
+free (an alert, [Site Sniper](site-sniper.md#when-a-snipe-alerts)), a hold placed by a snipe or
+a watch, a payment confirmed (booked), the welcome notice after an upgrade, and errors that
 need your attention.
 
 Notifications and the record of emails sent are deleted automatically after 30 days (the

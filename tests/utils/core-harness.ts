@@ -22,6 +22,7 @@ import {
 } from '@main/database/repositories';
 import type { AccountGate } from '@main/core/accounts/ports';
 import { NightGuard } from '@main/core/holds/night-guard';
+import type { NotificationService } from '@main/core/notifications/notification.service';
 import { SiteSniperService, type SnipeNotifications } from '@main/core/snipes/snipe.service';
 import { WatchService, type WatchNotifications } from '@main/core/watches/watch.service';
 import { ProviderRegistry } from '@main/providers/registry';
@@ -31,8 +32,12 @@ import type { SiteSnipeInput, WatchInput } from '@shared/types';
 import { SnipeReleaseMode } from '@shared/types/common.types';
 import { createFakeProvider, createTestProviderContext, type FakeProvider } from './fake-provider';
 
-export type RecordingNotifications = WatchNotifications &
-  SnipeNotifications & { [K in keyof (WatchNotifications & SnipeNotifications)]: jest.Mock };
+/** Every alert the services send, plus `notifyWarning` (to show one is not sent), as mocks. */
+type Recorded = WatchNotifications &
+  SnipeNotifications &
+  Pick<NotificationService, 'notifyWarning'>;
+
+export type RecordingNotifications = Recorded & { [K in keyof Recorded]: jest.Mock };
 
 export interface CoreHarnessOptions {
   /** The providers to register (default: one FakeProvider `fake` with every capability). */
@@ -78,6 +83,7 @@ export function recordingNotifications(): RecordingNotifications {
     notifyWatchPartialFound: jest.fn().mockResolvedValue(undefined),
     notifyWatchHeld: jest.fn().mockResolvedValue(undefined),
     notifySnipeHeld: jest.fn().mockResolvedValue(undefined),
+    notifySnipeAlert: jest.fn().mockResolvedValue(undefined),
     notifyWarning: jest.fn().mockResolvedValue(undefined),
   };
 }

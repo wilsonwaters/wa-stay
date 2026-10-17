@@ -227,6 +227,11 @@ export interface ReleaseModeDescriptor {
   description: string;
   /** Whether a snipe in this mode waits in the provider's access gate. */
   usesAccessGate: boolean;
+  /**
+   * The longest a snipe in this mode keeps trying after the release, in whole minutes (1 to
+   * 1440): the core clamps the snipe's window to it (§12.35). None: the person's choice.
+   */
+  maxWindowMinutes?: number;
   /** Extra inputs this mode needs. */
   fields?: StayFieldDescriptor[];
 }
@@ -555,6 +560,7 @@ export const ReleaseModeDescriptorSchema = z.object({
   label: nonEmpty,
   description: nonEmpty,
   usesAccessGate: z.boolean(),
+  maxWindowMinutes: z.number().int().min(1).max(1440).optional(),
   fields: z.array(StayFieldDescriptorSchema).optional(),
 });
 assertTypeEquals<z.input<typeof ReleaseModeDescriptorSchema>, ReleaseModeDescriptor>(true);

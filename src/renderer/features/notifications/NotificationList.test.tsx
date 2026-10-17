@@ -53,6 +53,27 @@ describe('NotificationList', () => {
     ).toBeInTheDocument();
   });
 
+  it("shows a snipe's alert (snipe_alert) with the bell icon, linking to the snipe (R12)", async () => {
+    await openWith(
+      notificationsBackend([
+        notification({
+          id: 7,
+          type: NotificationType.SNIPE_ALERT,
+          relatedType: RelatedType.SNIPE,
+          relatedId: 7,
+          actionUrl: '/site-sniper/7',
+          title: 'A site is free at Osprey Bay',
+        }),
+      ])
+    );
+
+    const alert = item('A site is free at Osprey Bay');
+    expect(alert.querySelector('svg.lucide-bell-ring')).not.toBeNull();
+    expect(
+      within(alert).getByRole('link', { name: 'A site is free at Osprey Bay' })
+    ).toHaveAttribute('href', '#/site-sniper/7');
+  });
+
   it.each([
     [{ id: 12, relatedType: RelatedType.WATCH, actionUrl: '/watches/12' }, '/watches/12'],
     [{ id: 7, relatedType: RelatedType.SNIPE, actionUrl: '/site-sniper/7' }, '/site-sniper/7'],

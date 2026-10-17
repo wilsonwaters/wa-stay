@@ -55,6 +55,7 @@ export const statusPresets = {
     [SnipeStatus.FAILED]: { tone: 'danger', icon: CircleAlert, label: 'Failed' },
     [SnipeStatus.EXPIRED]: { tone: 'neutral', icon: CircleX, label: 'Expired' },
     [SnipeStatus.DISABLED]: { tone: 'neutral', icon: CirclePause, label: 'Paused' },
+    [SnipeStatus.ALERTED]: { tone: 'available', icon: BellRing, label: 'Alert sent' },
   },
   /** The outcome of a snipe attempt. */
   snipeResult: {
@@ -66,6 +67,7 @@ export const statusPresets = {
     [SnipeResult.QUEUE_FULL]: { tone: 'warning', icon: Hourglass, label: 'Queue full' },
     [SnipeResult.EXPIRED]: { tone: 'neutral', icon: CircleX, label: 'Expired' },
     [SnipeResult.ERROR]: { tone: 'danger', icon: CircleAlert, label: 'Error' },
+    [SnipeResult.ALERTED]: { tone: 'available', icon: BellRing, label: 'Alert sent' },
   },
   booking: {
     [BookingStatus.CONFIRMED]: { tone: 'available', icon: CircleCheck, label: 'Confirmed' },

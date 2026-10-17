@@ -11,6 +11,9 @@
  *   unit kinds keeps them.
  * - Re-running is a no-op, and a fresh database has the same normalised schema as the migrated
  *   ones.
+ *
+ * The fixture tests pin the target to v11 (`runMigrations(db, 11)`) so they keep testing
+ * exactly what v11 does; later versions have their own tests.
  */
 
 import Database from 'better-sqlite3';
@@ -149,9 +152,9 @@ describe.each(FIXTURES)('migration v11 from the %s fixture', (fixture) => {
   it('changes nothing when run again', () => {
     const schema = normalisedSchema(db);
     const data = snapshot(db);
-    runMigrations(db);
-    runMigrations(db);
-    expect(version(db)).toBe(LATEST_SCHEMA_VERSION);
+    runMigrations(db, 11);
+    runMigrations(db, 11);
+    expect(version(db)).toBe(11);
     expect(normalisedSchema(db)).toEqual(schema);
     expect(snapshot(db)).toEqual(data);
   });

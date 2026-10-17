@@ -48,6 +48,7 @@ export const mockSiteSnipe: SiteSnipe = {
   unitKinds: [],
   stayParams: { gearType: 'all', numVehicles: 1, postcode: '6000' },
   releaseMode: SnipeReleaseMode.DAILY_ROLLOVER,
+  action: 'hold',
   releaseAt: new Date('2026-01-19T16:00:00Z'),
   accessGateEnabled: false,
   leadTimeSeconds: 120,

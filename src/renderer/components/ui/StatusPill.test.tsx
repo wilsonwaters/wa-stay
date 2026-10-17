@@ -11,6 +11,23 @@ describe('StatusPill', () => {
     expect(pill.querySelector('svg')).toHaveAttribute('aria-hidden', 'true');
   });
 
+  it('an alerted snipe reads "Alert sent", with a bell icon, as its status and its last result (R12)', () => {
+    render(
+      <>
+        <StatusPill {...statusPresets.snipe[SnipeStatus.ALERTED]} />
+        <StatusPill {...statusPresets.snipeResult[SnipeResult.ALERTED]} />
+      </>
+    );
+    const pills = screen.getAllByText('Alert sent');
+    expect(pills).toHaveLength(2);
+    for (const pill of pills) {
+      expect(pill.querySelector('svg.lucide-bell-ring')).toHaveAttribute('aria-hidden', 'true');
+    }
+    // Good news, never a warning: nothing is held
+    expect(statusPresets.snipe[SnipeStatus.ALERTED].tone).toBe('available');
+    expect(statusPresets.snipeResult[SnipeResult.ALERTED].tone).toBe('available');
+  });
+
   it('replaces the icon with a decorative pulsing dot when live', () => {
     render(<StatusPill {...statusPresets.watch.active} />);
     const pill = screen.getByText('Watching');
