@@ -175,7 +175,7 @@ test.describe('preview a provider', () => {
       const noUnits = answered.getByText(/^No .+ were listed for these dates$/);
       const failed = stayCard
         .getByRole('alert')
-        .or(stayCard.getByText(/waiting queue right now|Too many checks/));
+        .or(stayCard.getByText(/waiting queue right now|asked WA Stay to slow down/));
       await step(
         `"Check availability" on the first place's page gave no answer for ${range}`,
         async () => {
