@@ -12,6 +12,8 @@ import { createCoreHarness, fakeDateOnly, type CoreHarness } from '@tests/utils/
 import { createFakeProvider } from '@tests/utils/fake-provider';
 
 const NOW = new Date('2026-10-04T02:00:00.000Z');
+/** The fake provider's booking page for the harness watch's stay (`links.booking`). */
+const BOOKING_URL = 'https://fake.example/book/1?arrival=2026-12-01&departure=2026-12-04';
 
 describe('watch auto-hold', () => {
   let h: CoreHarness;
@@ -48,10 +50,12 @@ describe('watch auto-hold', () => {
       isActive: false,
       lastResult: WatchResult.HELD,
     });
+    // With the public booking page, for the email's fallback
     expect(h.notifications.notifyWatchHeld).toHaveBeenCalledWith(
       expect.objectContaining({ id: watch.id }),
       result.hold,
-      'Site u1'
+      'Site u1',
+      BOOKING_URL
     );
     expect(h.notifications.notifyWatchFound).not.toHaveBeenCalled();
 
@@ -114,7 +118,8 @@ describe('watch auto-hold', () => {
     expect(h.notifications.notifyWatchFound).toHaveBeenCalledWith(
       expect.objectContaining({ id: watch.id }),
       expect.any(Array),
-      'Sign in to Fake to enable automatic holds'
+      'Sign in to Fake to enable automatic holds',
+      BOOKING_URL
     );
     expect(h.watchRepo.findById(watch.id)?.lastResult).toBe(WatchResult.FOUND);
   });
@@ -182,7 +187,8 @@ describe('watch auto-hold', () => {
       expect(h.notifications.notifyWatchFound).toHaveBeenCalledWith(
         expect.objectContaining({ id: watch.id }),
         expect.any(Array),
-        MIXED_NOTE
+        MIXED_NOTE,
+        BOOKING_URL
       );
       expect(h.notifications.notifyWatchHeld).not.toHaveBeenCalled();
       expect(h.watchRepo.findById(watch.id)).toMatchObject({

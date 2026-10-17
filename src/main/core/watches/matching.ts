@@ -15,7 +15,7 @@
  */
 
 import type { NightStatus, UnitAvailability, UnitKind, WatchMatch } from '@shared/types';
-import { addDays } from '@shared/utils/calendar-date';
+import { addDays, nightsBetween } from '@shared/utils/calendar-date';
 import { isUnitKind } from '@shared/utils/unit-kinds';
 
 /** What matching needs from a watch (or a snipe). */
@@ -158,4 +158,21 @@ export function partialMatches(
     endRun();
   }
   return matches;
+}
+
+/**
+ * The longest of `runs` (partial matches), by nights, the first one on a tie; undefined for
+ * none. A partial alert's message and its booking link both name this run.
+ */
+export function longestRun(runs: readonly WatchMatch[]): WatchMatch | undefined {
+  let longest: WatchMatch | undefined;
+  for (const run of runs) {
+    if (
+      !longest ||
+      nightsBetween(run.arrival, run.departure) > nightsBetween(longest.arrival, longest.departure)
+    ) {
+      longest = run;
+    }
+  }
+  return longest;
 }

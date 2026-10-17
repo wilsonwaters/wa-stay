@@ -170,6 +170,105 @@ describe('SmtpEmailNotifier: action links', () => {
   });
 });
 
+describe('SmtpEmailNotifier: "Book on {shortName}" (R7)', () => {
+  const BOOKING_URL = 'https://parkstay.dbca.wa.gov.au/search-availability/information/?a=1&b=2';
+  const HOLD_NOTE =
+    'This hold is in WA Stay on the computer that placed it. Open WA Stay there to pay before it expires. ' +
+    'Away from that computer? You can book on ParkStay instead. ' +
+    'What WA Stay held may show as taken there until the hold ends.';
+  /** The HTML's links: href (as written) and text. */
+  const anchors = (html: string) =>
+    Array.from(html.matchAll(/<a href="([^"]*)"[^>]*>([^<]*)<\/a>/g), (m) => ({
+      href: m[1],
+      text: m[2].trim(),
+    }));
+
+  it('links the booking page after the message: a coral text button in the HTML, a line in the text', async () => {
+    const mail = await sent({ ...WATCH_FOUND, bookingUrl: BOOKING_URL });
+    const html = String(mail.html);
+
+    expect(html).toContain(
+      '<a href="https://parkstay.dbca.wa.gov.au/search-availability/information/?a=1&amp;b=2"'
+    );
+    expect(anchors(html)).toEqual([
+      {
+        href: 'https://parkstay.dbca.wa.gov.au/search-availability/information/?a=1&amp;b=2',
+        text: 'Book on ParkStay',
+      },
+    ]);
+    expect(html.indexOf('Book on ParkStay')).toBeGreaterThan(html.indexOf(WATCH_FOUND.message));
+    expect(html).toMatch(/<a href="[^"]*"[^>]*background-color: #BF4520;[^>]*color: #FFFFFF;/);
+    // A text link, never an image alone
+    expect(html).not.toMatch(/<a [^>]*>\s*<img/);
+
+    expect(mail.text).toContain(`\nBook on ParkStay: ${BOOKING_URL}\n`);
+    expect(String(mail.text).indexOf('Book on ParkStay')).toBeGreaterThan(
+      String(mail.text).indexOf(WATCH_FOUND.message)
+    );
+    // The subject is unchanged
+    expect(mail.subject).toBe('WA Stay: Sites available at Dales · ParkStay');
+  });
+
+  it('a held email says the hold is in WA Stay, then gives the public link as the fallback', async () => {
+    const mail = await sent({
+      ...WATCH_FOUND,
+      title: 'Site held at Dales',
+      bookingUrl: BOOKING_URL,
+      heldInApp: true,
+    });
+    const html = String(mail.html);
+    const text = String(mail.text);
+
+    expect(html).toContain(HOLD_NOTE);
+    expect(html.indexOf(HOLD_NOTE)).toBeLessThan(html.indexOf('Book on ParkStay'));
+    expect(anchors(html).map((a) => a.text)).toEqual(['Book on ParkStay']);
+    expect(text).toContain(`${HOLD_NOTE}\n\nBook on ParkStay: ${BOOKING_URL}\n`);
+  });
+
+  it('a held email with no usable link says only where the hold is', async () => {
+    const mail = await sent({ ...WATCH_FOUND, heldInApp: true });
+    expect(mail.text).toContain(
+      'This hold is in WA Stay on the computer that placed it. Open WA Stay there to pay before it expires.\n'
+    );
+    expect(mail.text).not.toMatch(/Away from that computer|Book on/);
+    expect(mail.html).not.toMatch(/Away from that computer|Book on/);
+  });
+
+  it.each([
+    ['no link', undefined],
+    ['an http link', 'http://parkstay.dbca.wa.gov.au/search-availability/information/'],
+    ['a javascript: link', 'javascript:alert(1)'],
+    ['an in-app path', '/watches/7'],
+    ['a link with credentials', 'https://me:pw@parkstay.dbca.wa.gov.au/'],
+  ])('%s gives no "Book on"', async (_name, bookingUrl) => {
+    const mail = await sent({ ...WATCH_FOUND, ...(bookingUrl ? { bookingUrl } : {}) });
+    expect(mail.html).not.toContain('Book on');
+    expect(mail.text).not.toContain('Book on');
+    expect(mail.html).not.toMatch(/javascript:|http:\/\/parkstay|me:pw/);
+  });
+
+  it("names the provider's site for a provider the registry does not know", async () => {
+    const mail = await sent({ ...WATCH_FOUND, providerId: 'gone', bookingUrl: BOOKING_URL });
+    expect(mail.text).toContain(`Book on the provider's site: ${BOOKING_URL}`);
+    expect(mail.html).toContain('Book on the provider&#039;s site');
+  });
+
+  it('escapes &, \', " and non-ASCII in the href, and keeps the text part raw', async () => {
+    const url = `https://parkstay.dbca.wa.gov.au/s/O'Brien?q="x"><b>&place=Côte`;
+    const mail = await sent({ ...WATCH_FOUND, bookingUrl: url });
+    const [link] = anchors(String(mail.html));
+
+    expect(link).toEqual({
+      href: 'https://parkstay.dbca.wa.gov.au/s/O&#039;Brien?q=%22x%22%3E%3Cb%3E&amp;place=C%C3%B4te',
+      text: 'Book on ParkStay',
+    });
+    expect(mail.html).not.toContain('<b>');
+    expect(mail.text).toContain(
+      `Book on ParkStay: https://parkstay.dbca.wa.gov.au/s/O'Brien?q=%22x%22%3E%3Cb%3E&place=C%C3%B4te\n`
+    );
+  });
+});
+
 describe('SmtpEmailNotifier: logo', () => {
   it('shows the WA Stay icon inline beside the wordmark when the file exists', async () => {
     const mail = await sent(WATCH_FOUND, notifier({ logoPath: LOGO }));

@@ -135,6 +135,13 @@ export interface NotificationMessage {
   providerId?: string;
   /** The location it is about, e.g. a campground's name. */
   locationName?: string;
+  /**
+   * The provider's public booking page for what an alert found: the email's "Book on
+   * {shortName}" link (https only), so the person can book from a phone. Never a cart URL.
+   */
+  bookingUrl?: string;
+  /** The alert is about a hold WA Stay placed: the email says the hold is in the app. */
+  heldInApp?: boolean;
 }
 
 /**

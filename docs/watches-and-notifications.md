@@ -92,8 +92,8 @@ Hold only what you will use ([Book responsibly](site-sniper.md#book-responsibly)
 | Where | What |
 | --- | --- |
 | **The bell** (top right) | Every notification, newest first, with an unread count. Click one to open what it is about (a watch, a snipe, a booking). Mark read, mark all read, delete, clear all. |
-| **The desktop** | An OS notification for each one, titled with the provider, e.g. "ParkStay · Sites available at Bungarra". Clicking it brings WA Stay forward on that page. Settings → Notifications: **Desktop notifications** and **Play a sound**. |
-| **Email** | Each notification, sent through your own email account (below). |
+| **The desktop** | An OS notification for each one, titled with the provider, e.g. "ParkStay · Sites available at Bungarra". Clicking it brings WA Stay forward on that page. Clicking an alert that a watch found something also opens the provider's booking page for those dates in your browser, for every provider; an alert that a site is held opens only the watch, where you pay. Settings → Notifications: **Desktop notifications** and **Play a sound**. |
+| **Email** | Each notification, sent through your own email account (below). An alert that a watch found something has a **Book on {provider}** link to the provider's public booking page for those dates (the nights it found, for some nights), so you can book from your phone. An alert that a site is held says the hold is in WA Stay on the computer that placed it, and still gives the link. |
 
 What creates a notification: a watch finding sites (or some nights), a hold placed by a snipe
 or a watch, a payment confirmed (booked), the welcome notice after an upgrade, and errors that
@@ -119,11 +119,26 @@ Saving the settings with an empty password keeps the stored one, as long as the 
 and account are the same. If the stored password cannot be decrypted (for example after
 copying your data to another computer), the card says so and you enter it again.
 
+### The booking link
+
+When a watch finds a stay, the alert carries the provider's booking page for it
+(`core/booking-link.ts`): for a whole stay, the first matching unit's own page
+(`UnitAvailability.bookingUrl`) if the provider gives one, else `links.booking` with the stay's
+dates and the unit; for some nights, the longest run with its own dates. ParkStay's is its
+public search page with the campground and the dates. The core keeps a link only when it is
+https on the provider's own site (its website's host, or a subdomain of it); a link that adds to
+a cart is never one (the provider's rule). It is never stored: the watch's page works out the
+same link from the last check ("Book on {provider}" under the result, while the stay has not
+begun), and logs name only a link's origin.
+
 ### For developers
 
 - `NotificationService` (`core/notifications/notification.service.ts`) stores each
   notification (with its `provider_id`; the stored title has no provider prefix), shows the
-  desktop notification and emits `notification:created`.
+  desktop notification and emits `notification:created`. An alert's booking page and whether it
+  is about a hold in the app (`dispatchMeta.bookingUrl`, `heldInApp`) go to the notifiers and
+  the desktop click only, never to `notifications` or the delivery log; a click opens the
+  booking page with the `openExternal` option (`shell.openExternal`) after `app:navigate`.
 - `NotificationDispatcher` (`notification-dispatcher.ts`) sends it to every enabled notifier
   and records each delivery in `notification_delivery_logs`.
 - A **notifier** is an outbound channel (`notifiers/base.notifier.ts`); the only one is

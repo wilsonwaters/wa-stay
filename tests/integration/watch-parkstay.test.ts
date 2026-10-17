@@ -1,19 +1,30 @@
 /**
  * The rewired WatchService against the real ParkStay module and a fixture server: real
  * nightly prices from Bungarra's live sample, and partial matches from the same single
- * availability request.
+ * availability request. And the alert end to end (R7): a found ParkStay watch emails
+ * ParkStay's public booking page, through the real notification service, dispatcher and SMTP
+ * notifier (nodemailer's transport replaced), storing and logging nothing of it.
  */
 
 import type Database from 'better-sqlite3';
+import type Mail from 'nodemailer/lib/mailer';
+import { NotificationDispatcher } from '@main/core/notifications/notification-dispatcher';
+import { NotificationService } from '@main/core/notifications/notification.service';
+import { SmtpEmailNotifier } from '@main/core/notifications/notifiers/email-smtp.notifier';
 import { openDatabase } from '@main/database/connection';
-import { WatchRepository } from '@main/database/repositories';
+import {
+  NotificationRepository,
+  NotifierRepository,
+  WatchRepository,
+} from '@main/database/repositories';
 import { insertUser } from '@tests/utils/database-helper';
 import { NightGuard } from '@main/core/holds/night-guard';
 import { WatchService } from '@main/core/watches/watch.service';
 import { SiteSniperRepository } from '@main/database/repositories';
 import { WatchResult } from '@shared/types/common.types';
-import type { WatchInput } from '@shared/types';
+import { NotifierChannel, type WatchInput } from '@shared/types';
 import { FIXED_NOW } from '@tests/utils/fake-provider';
+import { testVault } from '@tests/utils/fake-safe-storage';
 import {
   parkStayFixture,
   startParkStayFixtureServer,
@@ -25,6 +36,25 @@ import {
   LUCKY_BAY_STAY,
   luckyBayView,
 } from '@tests/utils/parkstay-provider';
+
+const mockSendMail = jest.fn(async (_options: Mail.Options) => ({ messageId: 'message-1' }));
+jest.mock('nodemailer', () => ({
+  __esModule: true,
+  default: { createTransport: jest.fn(() => ({ sendMail: mockSendMail, verify: jest.fn() })) },
+}));
+
+jest.mock('@main/utils/logger', () => {
+  const log: Record<string, unknown> = {
+    info: jest.fn(),
+    warn: jest.fn(),
+    error: jest.fn(),
+    debug: jest.fn(),
+  };
+  log.child = () => log;
+  return { logger: log };
+});
+const mockLog = (jest.requireMock('@main/utils/logger') as { logger: Record<string, jest.Mock> })
+  .logger;
 
 // Only `Date` is faked (2 Oct 2026), so the fixture's November stay is in the future.
 const REAL_TIMERS = [
@@ -188,5 +218,80 @@ describe('WatchService on ParkStay (fixture server)', () => {
     expect(server.requestsTo('/api/campsite_availablity_view/20/')).toHaveLength(1);
     expect(notifications.notifyWatchPartialFound).toHaveBeenCalledTimes(1);
     expect((await service.get(watch.id))?.lastResult).toBe(WatchResult.PARTIAL_FOUND);
+  });
+
+  describe('the alert email (R7)', () => {
+    /** ParkStay's public search page for Bungarra and the stay, as `parkstay/links.ts` builds it. */
+    const BOOKING_URL =
+      'https://parkstay.dbca.wa.gov.au/search-availability/information/?campground_id=20&arrival=2026/11/10&departure=2026/11/12';
+
+    it('a found ParkStay watch emails its booking page, in the HTML and the text, and stores none of it', async () => {
+      mockSendMail.mockClear();
+      for (const level of ['info', 'warn', 'error', 'debug']) mockLog[level].mockClear();
+      const parkstay = createTestParkStay(server);
+      const providerName = (id: string) => parkstay.registry.tryGet(id)?.manifest.shortName;
+      const dispatcher = new NotificationDispatcher(new NotifierRepository(db, testVault().vault), [
+        new SmtpEmailNotifier({ providerName }),
+      ]);
+      dispatcher.configureNotifier(
+        NotifierChannel.EMAIL_SMTP,
+        {
+          host: 'smtp.example.com',
+          port: 587,
+          secure: false,
+          auth: { user: 'me@example.com', pass: 'pw' },
+        },
+        true
+      );
+      const notifier = new NotificationService(
+        new NotificationRepository(db),
+        dispatcher,
+        undefined,
+        {
+          providerName,
+          preferences: () => ({ desktop: false, sound: false }),
+        }
+      );
+      const watches = new WatchRepository(db);
+      const emailing = new WatchService({
+        watches,
+        providers: parkstay.registry,
+        notifications: notifier,
+        nightGuard: new NightGuard(new SiteSniperRepository(db), watches),
+      });
+      const watch = await emailing.create(userId, bungarra());
+
+      expect((await emailing.execute(watch.id)).found).toBe(true);
+
+      expect(mockSendMail).toHaveBeenCalledTimes(1);
+      const mail = mockSendMail.mock.calls[0][0];
+      expect(mail.subject).toBe('WA Stay: Sites available at Bungarra · ParkStay');
+      expect(mail.text).toContain(`Book on ParkStay: ${BOOKING_URL}`);
+      expect(String(mail.html)).toContain(`href="${BOOKING_URL.replaceAll('&', '&amp;')}"`);
+      expect(String(mail.html).replaceAll('&amp;', '&')).toContain(BOOKING_URL);
+      expect(mail.html).toMatch(/>Book on ParkStay<\/a>/);
+      // The watch's page has the same link
+      expect((await emailing.get(watch.id))?.bookingLink).toEqual({
+        url: BOOKING_URL,
+        arrival: '2026-11-10',
+        departure: '2026-11-12',
+      });
+
+      // Nothing new is stored: no booking URL in the notification or its delivery log
+      const stored = JSON.stringify([
+        db.prepare('SELECT * FROM notifications').all(),
+        db.prepare('SELECT * FROM notification_delivery_logs').all(),
+      ]);
+      expect(db.prepare('SELECT COUNT(*) AS n FROM notification_delivery_logs').get()).toEqual({
+        n: 1,
+      });
+      expect(stored).not.toMatch(/search-availability|campground_id/);
+      // And no log line carries its path or query
+      const logged = JSON.stringify([
+        ['info', 'warn', 'error', 'debug'].map((level) => mockLog[level].mock.calls),
+        parkstay.logger,
+      ]);
+      expect(logged).not.toMatch(/search-availability|campground_id/);
+    });
   });
 });

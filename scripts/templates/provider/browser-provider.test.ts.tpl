@@ -24,8 +24,11 @@ import {
   {{CAMEL}}Manifest,
 } from '@main/providers/{{ID}}';
 
-/** Any https address does: the fake browser answers from the made-up site. */
-const SITE_URL = 'https://www.{{ID}}.test';
+/**
+ * The manifest's website: the links are built on it, as booking links must be (the contract
+ * suite checks). The fake browser answers from the made-up site, so nothing is sent to it.
+ */
+const SITE_URL = new URL({{CAMEL}}Manifest.website).origin;
 const STAY: StayQuery = { arrival: '2026-11-10', departure: '2026-11-12', adults: 2 };
 // @if search
 /** Western Australia, `[west, south, east, north]`. */

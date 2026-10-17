@@ -311,8 +311,14 @@ export type ProviderAuth = BrowserSessionAuth | CredentialsAuth | AutomationAuth
 export interface ProviderLinks {
   /** The location's page on the provider's site. */
   location(externalId: string): string | null;
-  /** A booking deep link, for the stay when given. */
-  booking(externalId: string, stay?: StayQuery): string | null;
+  /**
+   * A booking deep link, for the stay when given, and for the unit (or category) `unitId`
+   * when the provider can prefill one (a provider may ignore it; ParkStay does). With a stay
+   * it is a booking link, by the rule on `UnitAvailability.bookingUrl`: https on the
+   * provider's own site, a public page that needs no sign-in, works on a phone, and never
+   * adds to a cart, holds or books when it is opened.
+   */
+  booking(externalId: string, stay?: StayQuery, unitId?: string): string | null;
   /** Where the person manages an existing booking (§12.5). */
   manageBooking?(reference: string): string | null;
 }

@@ -44,8 +44,24 @@ export interface Watch {
   hold?: WatchHoldState;
   /** Why the last run did not do what it should (a failed check or automatic hold). */
   lastError?: string;
+  /**
+   * The provider's booking page for what the last check found ("Book on {shortName}"): set
+   * only while `lastResult` is found or partly found and the stored nights are the stay's.
+   * Main derives it from `lastAvailability` on every read; it is never stored.
+   */
+  bookingLink?: WatchBookingLink;
   createdAt: Date;
   updatedAt: Date;
+}
+
+/**
+ * A booking link for a stay a watch found: the provider's public booking page, prefilled where
+ * it can, and the stay it is for (a partial match's run, or the whole stay). Calendar dates.
+ */
+export interface WatchBookingLink {
+  url: string;
+  arrival: string;
+  departure: string;
 }
 
 /** A watch's auto-hold as stored: pay for it with `watches.openPayment` until `expiresAt`. */

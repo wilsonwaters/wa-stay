@@ -119,6 +119,12 @@ export interface FakeProviderOptions {
   availability?: Record<string, Record<string, FakeUnitNights>>;
   /** What each unit is, by unit id, at every location (`unitKind`). Units left out have none. */
   unitKinds?: Record<string, UnitKind>;
+  /**
+   * Each unit of a check carries its own booking link (`UnitAvailability.bookingUrl`):
+   * `https://book.<id>.example/<externalId>/<unitId>?arrival=…&departure=…`, on a subdomain of
+   * the fake's website. Units have none by default.
+   */
+  unitBookingUrls?: boolean;
   /** The signed-in state `auth.isSignedIn` reports (`setAccount` changes it). */
   account?: AccountStatus['state'];
   /** Replaces parts of the `browser-session` auth (sign-in URL, origins, completion pages). */
@@ -379,6 +385,13 @@ export function createFakeProvider(options: FakeProviderOptions = {}): FakeProvi
             fullyAvailable && priced
               ? nights.reduce((sum, night) => sum + (night.price ?? 0), 0)
               : undefined,
+          ...(options.unitBookingUrls
+            ? {
+                bookingUrl:
+                  `https://book.${id}.example/${encodeURIComponent(externalId)}/` +
+                  `${encodeURIComponent(unitId)}?arrival=${stay.arrival}&departure=${stay.departure}`,
+              }
+            : {}),
         };
       });
     return {

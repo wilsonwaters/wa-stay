@@ -30,9 +30,13 @@ import {
 const FIXTURES_DIR = path.join(__dirname, '../fixtures/providers');
 /** Where a FixtureHttpClient logs a request that no fixture answers (it fails, unsent). */
 const UNEXPECTED_LOG = path.join(os.tmpdir(), `{{ID}}-unexpected-${process.pid}.log`);
-/** Any https addresses do: a FixtureHttpClient answers by path and never sends anything. */
+/** Any https address does: a FixtureHttpClient answers by path and never sends anything. */
 const API_URL = 'https://api.{{ID}}.test';
-const SITE_URL = 'https://www.{{ID}}.test';
+/**
+ * The manifest's website: the links are built on it, as booking links must be (the contract
+ * suite checks). Nothing is sent to it.
+ */
+const SITE_URL = new URL({{CAMEL}}Manifest.website).origin;
 const STAY: StayQuery = { arrival: '2026-11-10', departure: '2026-11-12', adults: 2 };
 // @if search
 /** Western Australia, `[west, south, east, north]`. */
