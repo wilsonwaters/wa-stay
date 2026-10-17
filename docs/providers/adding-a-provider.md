@@ -1291,8 +1291,42 @@ export function createExampleHolds(options: ExampleHoldsOptions): HoldsModule {
   Without it the app cannot tell when a payment completes. Be strict: Example Parks wants its
   own confirmation path with this hold's reference, and the reference on the page; ParkStay
   wants its `/success/` page with this hold's hash and its booking number.
+- **`expiresAtEstimated: true`** on a `HoldSuccess` says `expiresAt` is your guess, not a time
+  the provider gave (a cart page with no countdown). The app then says "about": "Held until
+  about 10:42 am", "within about 10 minutes" in the alert and its email. The night guard and
+  `HOLD_EXPIRED` use the guess as it is, so guess short rather than long.
 - **Never place a real hold** in a test or a trial run. Example Parks' holds are tested on a
   recorded 201 and a loopback server (`tests/unit/docs/example-providers.test.ts`).
+
+### Letting a hold go
+
+A provider whose hold should not outlive the person's interest (a cart the person declined, or
+left) can let it go before it runs out. Three optional pieces, all checked at registration:
+
+- **`holds.release({ reference, unitId?, expiresAt }, signal)`** resolves to
+  `{ outcome: 'released' }` when you let the hold go, or `{ outcome: 'gone' }` when you no longer
+  held it (paid, expired, or removed on your own page). Reject only when you could not ask (a
+  failed request, a 403 or 429, an abort): the hold then stays payable until it runs out, and
+  nothing retries it.
+- **`holds.releaseOnPaymentClose: true`**: the core also calls `release` when the payment window
+  closes with no confirmed payment (never when its first page failed, and never on quit). Needs
+  `release`.
+- **`manifest.holdRelease: true`**: the hold panel offers **Let it go** beside **Pay now**, and
+  `watches.releaseHold` / `snipes.releaseHold` call `release`. With `capabilities.holds` on it
+  needs `holds.release`, and `holds.release` needs it. With holds off (an
+  [experiment](#experiments) not turned on) it may stand alone.
+
+**The provider decides.** The core never takes "the window closed and no confirmation was read"
+as unpaid: without a `bookedReference` it cannot tell. So look at your own side first: if the
+stay is no longer in the hold (the person may have paid in the window), answer `gone` and touch
+nothing, never a booking. The person then reads "{shortName} no longer holds it. If you paid,
+look for {shortName}'s confirmation email." A `released` hold reads "You let it go." (or "Let go
+when the payment window closed."). Either way the core ends the hold now, so the night guard
+frees its nights; a snipe ends Expired, a watch keeps its hold, expired.
+
+The core calls `release` at interactive priority (as it does `create`), at most once at a time per
+hold, within `releaseTimeoutMs` ([timeouts](#timeouts)). Deleting a watch or snipe whose hold has
+not run out lets it go first; a failure there is logged and the delete goes ahead.
 
 ## 7. Sign-in
 
@@ -1498,8 +1532,9 @@ provider, except that a paced provider's grow with its gaps (below): the manifes
 set how often and how many, not how long. Keep each call well inside its bound; a call that
 runs over is aborted through its `signal`. The catalogue's bounds are `DEFAULT_CATALOG_TIMINGS`
 in `src/main/core/catalog/location-catalog.service.ts` (a paced provider's from
-`pacedDeadlineMs` in `catalog-helpers.ts` beside it), and the sign-in check's is
-`DEFAULT_ACCOUNT_TIMINGS` in `src/main/core/accounts/provider-account.service.ts`.
+`pacedDeadlineMs` in `catalog-helpers.ts` beside it), the sign-in check's is
+`DEFAULT_ACCOUNT_TIMINGS` in `src/main/core/accounts/provider-account.service.ts`, and a hold's
+release's is `DEFAULT_HOLD_PAYMENT_TIMINGS` in `src/main/core/holds/hold-payment.service.ts`.
 
 | Call | Bound | What happens then |
 | --- | --- | --- |
@@ -1511,7 +1546,8 @@ in `src/main/core/catalog/location-catalog.service.ts` (a paced provider's from
 | One `ctx.http` request | 30 s (`timeoutMs`) | `ProviderTimeoutError`. |
 | One `ctx.browser.withPage` call | 60 s (`timeoutMs`) | Playwright's `TimeoutError`. |
 | A sign-in check (`isSignedIn`), or a `credentials` save's `signIn`, `probeTimeoutMs` | 15 s | The account shows as unknown, never signed out; a save stores nothing. |
-| A watch check, a hold | none from the core | Only your own request and page timeouts apply. |
+| A watch check, a hold (`create`) | none from the core | Only your own request and page timeouts apply. |
+| Letting a hold go (`holds.release`), `releaseTimeoutMs` | 30 s | The release is aborted and the hold stays until it runs out; a decline answers `PROVIDER_ERROR`. |
 
 A paced provider's catalogue bounds (`minRequestIntervalMs` above 0) grow with the gaps a call
 may wait: for each request the call counts, the bound adds the gap before it (1 s for the
@@ -1521,8 +1557,9 @@ them), so a paced provider's bulk `search` must send its requests one after anot
 at once: a place page opened meanwhile then waits for one of them, not the whole search. Explore's
 availability (bulk `availability.search`) and a `full` catalogue sync count one per stored place,
 and at least 1. With a 10 s interval and 8 places, Explore's availability gets
-20 s + 8 × 11 s = 108 s, and a sync 60 s + 8 × 20 s = 220 s. A `search` catalogue's pages and
-the sign-in check keep their bounds.
+20 s + 8 × 11 s = 108 s, and a sync 60 s + 8 × 20 s = 220 s. A hold's release counts 2
+requests at the person's gap (30 s + 2 × 11 s = 52 s). A `search` catalogue's pages and the
+sign-in check keep their bounds.
 
 Other timings from the same table: the first sync starts once the window has been open for
 5 s (`startDelayMs`), stale catalogues are looked at every 60 minutes (`recheckMs`), a detail is

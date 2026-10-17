@@ -126,6 +126,14 @@ for when you are away from that computer.
 
 If the hold runs out unpaid, ParkStay releases the site and the snipe shows Hold expired.
 
+A provider that can let a hold go early adds **Let it go** beside **Pay now**: after "Let this
+hold go?", the provider lets it go and the snipe ends with why ("You let it go.", or "{provider}
+no longer holds it. If you paid, look for {provider}'s confirmation email."), freeing its nights
+for another hold. Such a provider may also let the hold go when its payment window closes without
+a confirmed payment; it checks its own side first, so a paid stay is never let go. Deleting a
+held snipe lets its hold go first. When the provider can only guess how long its hold lasts, the
+panel and the alert say "about". ParkStay does none of this: its hold runs out on its own.
+
 ## Book responsibly
 
 Site Sniper works within DBCA's terms, and you must too:
@@ -144,7 +152,9 @@ not a fleet of bots.
 ## For developers
 
 - Generic orchestration: `src/main/core/snipes/snipe.service.ts`; timers:
-  `src/main/scheduler/snipe-runner.ts`; payment: `src/main/core/holds/hold-payment.service.ts`.
+  `src/main/scheduler/snipe-runner.ts`; payment, and letting a hold go (`snipes.releaseHold`,
+  `holds.release`, [Letting a hold go](providers/adding-a-provider.md#letting-a-hold-go)):
+  `src/main/core/holds/hold-payment.service.ts`.
 - ParkStay's release rules, holds and queue: `src/main/providers/parkstay/` (`release-policy.ts`,
   `holds.ts`, `queue/`), described in [ParkStay endpoints](providers/parkstay/endpoints.md).
 - A new provider gets Site Sniper by declaring `snipes`, release modes and a release policy
