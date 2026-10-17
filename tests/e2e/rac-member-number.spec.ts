@@ -6,13 +6,26 @@
  * member number" right after "Book on RAC", which puts the made-up number on the clipboard with
  * its leading zero, and its check prices the powered site at the member rate ($68 a night,
  * "Rate: RAC member rate"; RAC's trimmed answer, moved to 7 and 8 days ahead). Removed, the
- * button goes and the check is back at the public rate ($75). Fixture mode refuses no request:
- * the number is never sent. Each step's screenshot is attached to the report.
+ * button goes and the check is back at the public rate ($75). A snipe at Busselton for the next
+ * school holidays RAC has announced (seeded, `support/seed.ts`) moves with the number, and its
+ * page shows it on coming back from Settings: the public release first, the member pre-sale's
+ * 48 hours earlier once the number is saved (main re-arms it while Settings is open), the public
+ * one again once it is removed. Fixture mode refuses no request: the number is never sent. Each
+ * step's screenshot is attached to the report.
  */
 
+import path from 'path';
 import type { Page, TestInfo } from '@playwright/test';
-import { addDays } from '../../src/shared/utils/calendar-date';
+import { timeInZone } from '../../src/renderer/components/timeFormat';
+import {
+  addDays,
+  compareDates,
+  todayIn,
+  type CalendarDate,
+} from '../../src/shared/utils/calendar-date';
 import { writeDatedFixtures } from './support/dated-fixtures';
+import { REPO_ROOT } from './support/paths';
+import { seedAlertSnipe } from './support/seed';
 import { chooseAccountMenuItem, currentRoute } from './support/shell';
 import { expect, test, withoutGuardedRequests, withoutRemoteImages } from './support/wa-stay';
 
@@ -28,6 +41,60 @@ const STATEMENTS = [
   'I will book in the name on my RAC card',
 ];
 
+const PERTH = 'Australia/Perth';
+const SNIPE_NAME = 'Busselton school holidays';
+/** RAC's modules as the built app has them (their sources import path aliases). */
+const RAC_BUILT = path.join(REPO_ROOT, 'dist', 'main', 'main', 'providers', 'rac');
+
+interface PreSaleStay {
+  arrival: CalendarDate;
+  departure: CalendarDate;
+  member: Date;
+  public: Date;
+}
+
+/**
+ * Two nights at Busselton in the first school holidays in RAC's calendar (`release-calendar.ts`)
+ * whose member pre-sale is still to come and later than the rolling window, with the instants
+ * they open at for a member and for everyone (Busselton's hour, Perth time). None when the
+ * calendar, updated by hand, announces no such holidays.
+ */
+function preSaleStay(): PreSaleStay | undefined {
+  /* eslint-disable @typescript-eslint/no-require-imports -- the built modules, as the app runs them */
+  const { SCHOOL_HOLIDAY_PERIODS } = require(path.join(RAC_BUILT, 'release-calendar')) as {
+    SCHOOL_HOLIDAY_PERIODS: readonly { first: CalendarDate; release: unknown }[];
+  };
+  const { RAC_PARKS } = require(path.join(RAC_BUILT, 'parks')) as {
+    RAC_PARKS: readonly { slug: string; schoolHolidays: { hour: number } | null }[];
+  };
+  /* eslint-enable @typescript-eslint/no-require-imports */
+  const hour = RAC_PARKS.find((park) => park.slug === 'busselton')?.schoolHolidays?.hour;
+  if (hour === undefined) return undefined;
+  const at = (day: CalendarDate) => new Date(`${day}T${String(hour).padStart(2, '0')}:00:00+08:00`);
+  const today = todayIn(PERTH);
+  for (const { first, release } of SCHOOL_HOLIDAY_PERIODS) {
+    if (typeof release !== 'object' || release === null) continue;
+    const { memberPreSale, publicRelease } = release as Record<string, CalendarDate>;
+    const arrival = addDays(first, 3);
+    const departure = addDays(arrival, 2);
+    if (compareDates(memberPreSale, today) <= 0) continue;
+    if (compareDates(addDays(departure, -365), memberPreSale) >= 0) continue;
+    return { arrival, departure, member: at(memberPreSale), public: at(publicRelease) };
+  }
+  return undefined;
+}
+
+/** Opens the snipe's page as a link would (no reload) and waits for its release to read `at`. */
+async function expectSnipeRelease(window: Page, snipeId: number, at: Date): Promise<void> {
+  await window.evaluate((hash) => {
+    location.hash = hash;
+  }, `#/site-sniper/${snipeId}`);
+  await expect(window.getByRole('heading', { level: 1, name: SNIPE_NAME })).toBeVisible();
+  await expect(window.getByRole('region', { name: 'Release' })).toContainText(
+    `When these dates open: ${timeInZone(at, PERTH)}`
+  );
+}
+
 async function screenshot(window: Page, testInfo: TestInfo, name: string): Promise<void> {
   const file = testInfo.outputPath(`${name}.png`);
   await window.screenshot({ path: file, fullPage: true });
@@ -42,9 +109,30 @@ test('an RAC member number: saved with its statements, copied beside "Book on RA
   const fixtures = writeDatedFixtures(tempDir('rac-dated'));
   const { arrival } = fixtures;
   const departure = addDays(arrival, 2);
+  const preSale = preSaleStay();
+  if (!preSale) {
+    testInfo.annotations.push({
+      type: 'warning',
+      description:
+        "RAC's release calendar announces no member pre-sale still to come: the snipe's release is not checked",
+    });
+  }
+  let snipeId = 0;
   const wa = await launchWaStay({
     providers: ['parkstay', 'rac'],
     env: { WA_STAY_E2E_FIXTURES_DIR: fixtures.dir },
+    prepare: (userDataDir) => {
+      if (!preSale) return;
+      ({ snipeId } = seedAlertSnipe(userDataDir, {
+        snipe: {
+          providerId: 'rac',
+          releaseMode: 'daily_rollover',
+          name: SNIPE_NAME,
+          location: { externalId: 'busselton', name: 'RAC Busselton Holiday Park' },
+          stay: { arrival: preSale.arrival, departure: preSale.departure, adults: 2 },
+        },
+      }));
+    },
   });
   const { app, window } = wa;
   const clipboard = () => app.evaluate(({ clipboard: board }) => board.readText());
@@ -54,6 +142,9 @@ test('an RAC member number: saved with its statements, copied beside "Book on RA
       .getByRole('region', { name: 'Results' })
       .getByRole('heading', { level: 2, name: `${ALL_PLACES} places` })
   ).toBeVisible({ timeout: CATALOGUE_TIMEOUT_MS });
+
+  // 0. The snipe, at the public release: no member number yet
+  if (preSale) await expectSnipeRelease(window, snipeId, preSale.public);
 
   // 1. Settings → Accounts: RAC's row, nothing saved
   await chooseAccountMenuItem(window, 'Settings');
@@ -101,6 +192,12 @@ test('an RAC member number: saved with its statements, copied beside "Book on RA
   await expect(settingsCopy).toBeFocused();
   await screenshot(window, testInfo, 'settings-rac-saved');
 
+  // 3b. Back on the snipe: main re-armed it while Settings was open, 48 hours earlier
+  if (preSale) {
+    await expectSnipeRelease(window, snipeId, preSale.member);
+    await screenshot(window, testInfo, 'snipe-member-release');
+  }
+
   // 4. RAC Busselton's page, with the dates: "Copy RAC member number" right after "Book on RAC"
   await clearClipboard();
   await window.evaluate((hash) => {
@@ -147,6 +244,8 @@ test('an RAC member number: saved with its statements, copied beside "Book on RA
   await expect(racRow.getByRole('button', { name: 'Add RAC member number' })).toBeVisible();
   await expect(racRow.getByRole('button', { name: 'Copy RAC member number' })).toHaveCount(0);
   await screenshot(window, testInfo, 'settings-rac-removed');
+  // The snipe is back at the public release
+  if (preSale) await expectSnipeRelease(window, snipeId, preSale.public);
   await window.evaluate((hash) => {
     location.hash = hash;
   }, `#/places/rac/busselton?arrival=${arrival}&departure=${departure}&adults=2`);
