@@ -117,6 +117,11 @@ export interface SnipeServiceDeps {
   events?: EventSink;
   /** Sign-in checks for providers whose holds need an account (none: never checked). */
   accounts?: AccountGate;
+  /**
+   * The provider's holds are on through an experiment the person has turned off: they go when
+   * WA Stay restarts, and until then no snipe holds (default: never).
+   */
+  holdsTurningOff?: (providerId: string) => boolean;
   clock?: () => Date;
 }
 
@@ -153,6 +158,7 @@ export class SiteSniperService {
   private readonly nightGuard: NightGuard;
   private readonly events?: EventSink;
   private readonly accounts?: AccountGate;
+  private readonly holdsTurningOff: (providerId: string) => boolean;
   private readonly clock: () => Date;
 
   constructor(deps: SnipeServiceDeps) {
@@ -162,6 +168,7 @@ export class SiteSniperService {
     this.nightGuard = deps.nightGuard;
     this.events = deps.events;
     this.accounts = deps.accounts;
+    this.holdsTurningOff = deps.holdsTurningOff ?? (() => false);
     this.clock = deps.clock ?? (() => new Date());
   }
 
@@ -496,6 +503,16 @@ export class SiteSniperService {
         return await this.failMixedKinds(snipe, checkedAt);
       }
 
+      // Holds turning off (an experiment turned off, until the restart): no hold, an alert
+      if (this.holdsTurningOff(snipe.providerId)) {
+        return await this.failHoldsTurningOff(
+          snipe,
+          provider.manifest.shortName,
+          matched,
+          checkedAt
+        );
+      }
+
       // An account the holds need, stored as not signed in: no hold (no network here)
       if (
         this.accounts &&
@@ -679,6 +696,51 @@ export class SiteSniperService {
         checkedAt,
         matchedSiteId: unitId,
         error: signIn,
+      },
+    };
+  }
+
+  /**
+   * A unit is free, but the provider's holds are turning off (§12.35): the snipe FAILS
+   * (counted), holding nothing, and the person is told what is free, with a link to the snipe.
+   */
+  private async failHoldsTurningOff(
+    snipe: SiteSnipe,
+    shortName: string,
+    unit: UnitAvailability,
+    checkedAt: Date
+  ): Promise<SnipeOutcome> {
+    const error = `Automatic holds on ${shortName} are turning off. Restart WA Stay.`;
+    log.info(`Snipe ${snipe.id}: no hold, holds on ${snipe.providerId} are turning off`);
+    this.repo.incrementAttempts(snipe.id);
+    this.repo.finish(snipe.id, SnipeStatus.FAILED, SnipeResult.ERROR, error);
+    this.changed(snipe.id);
+    const where = snipe.location.name || snipe.location.externalId;
+    try {
+      await this.notifications.notifyWarning(
+        snipe.userId,
+        `${unit.unitName || unit.unitId} is free at ${where}`,
+        `Site Sniper didn't hold it. ${error}`,
+        {
+          providerId: snipe.providerId,
+          relatedType: RelatedType.SNIPE,
+          relatedId: snipe.id,
+          ...(snipe.location.name ? { locationName: snipe.location.name } : {}),
+        }
+      );
+    } catch (notifyError) {
+      log.error(`Snipe ${snipe.id}: stopped but not notified`, notifyError);
+    }
+    return {
+      next: 'done',
+      result: {
+        snipeId: snipe.id,
+        success: false,
+        result: SnipeResult.ERROR,
+        held: false,
+        checkedAt,
+        matchedSiteId: unit.unitId,
+        error,
       },
     };
   }

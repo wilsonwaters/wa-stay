@@ -13,6 +13,7 @@ import {
   providerLimits,
   ProviderManifestSchema,
   StayQuerySchema,
+  type ProviderExperiment,
   type ProviderManifest,
 } from '@shared/types/provider.types';
 import { CATALOG_MAX_LIMIT, CatalogQuerySchema } from '@shared/types/catalog.types';
@@ -295,6 +296,120 @@ describe('ProviderManifestSchema', () => {
     ],
   ])('rejects %s', (_label, change, path) => {
     expect(issuesAt(ProviderManifestSchema.safeParse(withChange(change)))).toContain(path);
+  });
+});
+
+describe('ProviderManifestSchema: experiments (R17)', () => {
+  /** Watches and availability on; holds and snipes off, behind the experiment. */
+  const base: ProviderManifest = testManifest('expstay', {
+    capabilities: {
+      ...testManifest('expstay').capabilities,
+      catalog: true,
+      availability: true,
+      watches: true,
+    },
+  });
+  const autoCart: ProviderExperiment = {
+    id: 'autoCart',
+    label: 'Hold a stay in the cart',
+    description: 'When a watch finds your stay, WA Stay puts it in the cart for you.',
+    warning: 'Only after a booking of your own has worked.',
+    turnsOn: ['holds'],
+  };
+  const withExperiments = (...experiments: ProviderExperiment[]): ProviderManifest => ({
+    ...base,
+    experiments,
+  });
+
+  it('accepts a valid experiment, with or without a warning, and keeps it when parsed', () => {
+    const parsed = ProviderManifestSchema.safeParse(withExperiments(autoCart));
+    expect(issuesAt(parsed)).toEqual([]);
+    expect(parsed.success && parsed.data.experiments).toEqual([autoCart]);
+    const { warning: _warning, ...plain } = autoCart;
+    expect(issuesAt(ProviderManifestSchema.safeParse(withExperiments(plain)))).toEqual([]);
+    expect(issuesAt(ProviderManifestSchema.safeParse(base))).toEqual([]);
+  });
+
+  it.each<[string, () => ProviderManifest, string]>([
+    [
+      'a duplicate id',
+      () => withExperiments(autoCart, { ...autoCart, label: 'Again' }),
+      'experiments',
+    ],
+    [
+      'an id with a hyphen',
+      () => withExperiments({ ...autoCart, id: 'auto-cart' }),
+      'experiments.0.id',
+    ],
+    [
+      'an id starting with a capital',
+      () => withExperiments({ ...autoCart, id: 'AutoCart' }),
+      'experiments.0.id',
+    ],
+    ['a one-letter id', () => withExperiments({ ...autoCart, id: 'a' }), 'experiments.0.id'],
+    ['an empty label', () => withExperiments({ ...autoCart, label: ' ' }), 'experiments.0.label'],
+    [
+      'an empty description',
+      () => withExperiments({ ...autoCart, description: '' }),
+      'experiments.0.description',
+    ],
+    [
+      'an empty warning',
+      () => withExperiments({ ...autoCart, warning: '' }),
+      'experiments.0.warning',
+    ],
+    [
+      'an empty turnsOn',
+      () => withExperiments({ ...autoCart, turnsOn: [] }),
+      'experiments.0.turnsOn',
+    ],
+    [
+      'an unknown capability',
+      () => withExperiments({ ...autoCart, turnsOn: ['autoCart' as 'holds'] }),
+      'experiments.0.turnsOn.0',
+    ],
+    [
+      'account (not a boolean capability)',
+      () => withExperiments({ ...autoCart, turnsOn: ['account' as 'holds'] }),
+      'experiments.0.turnsOn.0',
+    ],
+    [
+      'catalogMode (not a boolean capability)',
+      () => withExperiments({ ...autoCart, turnsOn: ['catalogMode' as 'holds'] }),
+      'experiments.0.turnsOn.0',
+    ],
+    [
+      'a capability already on',
+      () => withExperiments({ ...autoCart, turnsOn: ['holds', 'watches'] }),
+      'experiments.0.turnsOn.1',
+    ],
+    [
+      'an applied experiment whose capability is off',
+      () => withExperiments({ ...autoCart, applied: true }),
+      'experiments.0.turnsOn.0',
+    ],
+  ])('refuses %s', (_label, manifest, path) => {
+    expect(issuesAt(ProviderManifestSchema.safeParse(manifest()))).toContain(path);
+  });
+
+  it('says why a capability already on is refused', () => {
+    const parsed = ProviderManifestSchema.safeParse(
+      withExperiments({ ...autoCart, turnsOn: ['watches'] })
+    );
+    expect(parsed.success).toBe(false);
+    expect(parsed.error?.issues.map((i) => i.message)).toEqual([
+      'Capability watches is already on, so experiment autoCart cannot turn it on',
+    ]);
+  });
+
+  it('accepts an applied manifest: the capabilities its applied experiments turn on are on', () => {
+    const second: ProviderExperiment = { ...autoCart, id: 'cartToo', turnsOn: ['holds'] };
+    const applied: ProviderManifest = {
+      ...withExperiments({ ...autoCart, applied: true }, second),
+      capabilities: { ...base.capabilities, holds: true },
+    };
+    // `cartToo` is not applied, but `holds` is on through `autoCart`
+    expect(issuesAt(ProviderManifestSchema.safeParse(applied))).toEqual([]);
   });
 });
 

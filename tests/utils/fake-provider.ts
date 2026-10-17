@@ -27,6 +27,9 @@
  * - `scriptHold(...results)`: the next `holds.create` calls answer these;
  * - `account` / `setAccount(state)`: what `auth.isSignedIn` answers; `auth` replaces its
  *   sign-in URL, origins or completion pages;
+ * - `experiments`: declared in the manifest, with the capabilities they turn on off there; the
+ *   modules of those capabilities (built as `capabilities` says) reach the registry only when
+ *   `ctx.manifest` has them on, as a provider's factory does (`withExperiments` applies them);
  * - `credentials`: a `credentials` sign-in instead of `browser-session` (R15), with
  *   `FAKE_CREDENTIAL_FIELDS` (a copyable member number and a password that is not) and one
  *   statement, `FAKE_CONFIRMATIONS`, unless given; `signIn` answers `signed-in` unless
@@ -63,6 +66,7 @@ import {
   type ProviderContext,
   type ProviderFactory,
   type ProviderLogger,
+  type ProviderModules,
   type RequestPriority,
 } from '@main/providers/sdk';
 import type {
@@ -72,10 +76,12 @@ import type {
   AccountFieldDescriptor,
   AccountRequirement,
   AccountStatus,
+  BooleanCapability,
   LocationAvailability,
   NightState,
   NightStatus,
   ProviderCapabilities,
+  ProviderExperiment,
   ProviderLimits,
   ProviderManifest,
   StayQuery,
@@ -167,6 +173,11 @@ export interface FakeProviderOptions {
   searchPageSize?: number;
   /** A search-mode catalogue also has `catalog.searchText`. */
   textSearch?: boolean;
+  /**
+   * Declared in the manifest, where the capabilities they turn on are off. Their modules are
+   * built as `capabilities` says, and given to the registry only when `ctx.manifest` has them on.
+   */
+  experiments?: ProviderExperiment[];
 }
 
 /** A `credentials` sign-in for the fake. Values here are made up; never a real number. */
@@ -236,6 +247,15 @@ const DEFAULT_LOCATIONS: FakeLocationSeed[] = [
   { externalId: 'area:3', name: 'Tingle Hut' },
 ];
 
+/** The module a capability an experiment turns on brings, when it has one of its own. */
+const EXPERIMENT_MODULES: Partial<Record<BooleanCapability, keyof ProviderModules>> = {
+  catalog: 'catalog',
+  accessGate: 'access',
+  snipes: 'release',
+  holds: 'holds',
+  bookingImport: 'bookings',
+};
+
 const ALL_ON: ProviderCapabilities = {
   catalog: true,
   catalogMode: 'full',
@@ -292,6 +312,8 @@ export function createFakeProvider(options: FakeProviderOptions = {}): FakeProvi
   let holdCount = 0;
   let holdSequence = 0;
   let disposed = false;
+  const experimental = [...new Set(options.experiments?.flatMap((e) => e.turnsOn) ?? [])];
+  const experimentalOff = Object.fromEntries(experimental.map((c) => [c, false]));
 
   const manifest: ProviderManifest = {
     id,
@@ -304,7 +326,8 @@ export function createFakeProvider(options: FakeProviderOptions = {}): FakeProvi
     locationKinds: ['campground', 'cabin'],
     timezone: 'Australia/Perth',
     currency: 'AUD',
-    capabilities,
+    capabilities: { ...capabilities, ...experimentalOff },
+    ...(options.experiments ? { experiments: options.experiments } : {}),
     limits: {
       minWatchIntervalMinutes: 5,
       maxConcurrentRequests: 2,
@@ -367,6 +390,29 @@ export function createFakeProvider(options: FakeProviderOptions = {}): FakeProvi
         return { state: accountState };
       },
     };
+  }
+
+  /** The fake's modules, without those of experimental capabilities `on` has off. */
+  function modulesFor(on: ProviderCapabilities): ProviderModules {
+    const { links, catalog, availability, access, release, holds, bookings, auth } = fake;
+    const modules: ProviderModules = {
+      links,
+      catalog,
+      availability,
+      access,
+      release,
+      holds,
+      bookings,
+      auth,
+      async dispose() {
+        await fake.dispose?.();
+      },
+    };
+    for (const capability of experimental) {
+      const module = EXPERIMENT_MODULES[capability];
+      if (module && !on[capability]) delete modules[module];
+    }
+    return modules;
   }
 
   /** Records the call, honours the signal and the delay, and fires a scripted failure. */
@@ -621,7 +667,7 @@ export function createFakeProvider(options: FakeProviderOptions = {}): FakeProvi
     delayMs: options.delayMs ?? 0,
     factory: defineProvider(manifest, (ctx) => {
       fake.ctx = ctx;
-      return fake;
+      return experimental.length ? modulesFor(ctx.manifest.capabilities) : fake;
     }),
     failNext(module, error) {
       failures.set(module, error);
