@@ -7,9 +7,10 @@
  *   searches them): `available_from` and `available_to` (`YYYY-MM-DD`), `adults`, `children`,
  *   `infants`, `pets=0` and `membership_type=non-member`.
  *
- * Never RAC's cart, or a tariff's cart address from an availability answer: opening one adds
- * the stay to a cart. There is no link to manage a booking: that needs the park's own NewBook
- * sign-in. A park the seed does not have (Ningaloo) has no links.
+ * Every link is on RAC's own site (the manifest's `website`), over https. Never RAC's cart, or a
+ * tariff's cart address from an availability answer: opening one adds the stay to a cart. There
+ * is no link to manage a booking: that needs the park's own NewBook sign-in. A park the seed
+ * does not have (Ningaloo) has no links.
  */
 
 import type { StayQuery } from '@shared/types/provider.types';
@@ -22,7 +23,11 @@ function parkPage(externalId: string, page = ''): string | null {
   return park ? `${RAC_SITE_URL}/${park.slug}/${page}` : null;
 }
 
-function bookNow(externalId: string, stay?: StayQuery): string | null {
+/**
+ * The park's book-now page, prefilled with the stay when there is one. A unit (a category) is
+ * accepted and left out: the page lists every category for the stay.
+ */
+function bookNow(externalId: string, stay?: StayQuery, _unitId?: string): string | null {
   const page = parkPage(externalId, 'book-now/');
   if (!page || !stay) return page;
   const search = new URLSearchParams({

@@ -115,14 +115,26 @@ describe('racLinks', () => {
     expect(racLinks.manageBooking).toBeUndefined();
   });
 
-  it("links every seeded park to RAC's own pages only (rule 6)", () => {
+  it('takes a unit and leaves it out: the book-now page lists every category for the stay', () => {
+    const booking = racLinks.booking as (
+      externalId: string,
+      stay?: StayQuery,
+      unitId?: string
+    ) => string | null;
+    expect(booking('busselton', STAY, 'cat:4')).toBe(racLinks.booking('busselton', STAY));
+  });
+
+  it("links every seeded park to RAC's own pages only, on the manifest's website (rule 6)", () => {
+    const website = new URL(racManifest.website).origin;
+    expect(website).toBe(RAC);
     for (const park of RAC_PARKS) {
       for (const url of [
         racLinks.location(park.slug),
         racLinks.booking(park.slug),
         racLinks.booking(park.slug, STAY),
       ]) {
-        expect(new URL(url!).origin).toBe(RAC);
+        expect(new URL(url!).origin).toBe(website);
+        expect(url).not.toMatch(/cart|rest_api_data_id/);
       }
     }
   });
