@@ -12,6 +12,10 @@
  *   cart RAC refused; a site's form and the member's tariff; blocks (403, 429, a challenge) and
  *   the cool-down; aborts before, between and after the cart address (cookies cleared after);
  *   the cart address and its token in no result, state, log line or error.
+ * - One at a time (R19 review): two creates together, or one during another's requests, place
+ *   one hold (three requests) and the other answers `in-progress` and sends nothing; a create
+ *   during a release does the same; a release during a create waits its turn, and one called
+ *   off while it waits sends nothing and passes its turn on.
  * - `paymentUrl`: every park's cart page, never a cart address.
  * - `release`: one GET and one POST of `remove_item_from_cart` (`item_offset`, `cart_type`) to
  *   the page's proxy while the cart holds the stay (`released`); the GET only for an emptied cart
@@ -121,6 +125,8 @@ class RecordingFixtureClient extends FixtureHttpClient {
   abortAfter?: { match: RegExp; controller: AbortController };
   /** Requests to a matching address fail as fixture mode fails one: naming the address. */
   refuse?: RegExp;
+  /** Called as each request is sent, before it is answered. */
+  onRequest?: (url: string) => void;
 
   override async request(
     method: HttpMethod,
@@ -132,6 +138,7 @@ class RecordingFixtureClient extends FixtureHttpClient {
       url,
       ...(options.body === undefined ? {} : { body: String(options.body) }),
     });
+    this.onRequest?.(url);
     if (this.refuse?.test(url)) {
       throw new UnexpectedNetworkRequestError({
         providerId: 'rac',
@@ -250,6 +257,7 @@ function setUp(answers: Answers = {}): void {
 }
 
 const paths = () => http.sent.map((r) => `${r.method} ${r.url.replace(RAC, '')}`);
+const cartAddresses = () => http.sent.filter((r) => /rest_api_data_id/.test(r.url));
 const logText = () => JSON.stringify(logger.lines);
 /** What `pending` rejected with. */
 async function rejection(pending: Promise<unknown>): Promise<unknown> {
@@ -485,6 +493,24 @@ describe('create: refusals', () => {
     expect(http.sent).toHaveLength(2);
   });
 
+  it('a cart showing other nights than the stay (3 nights, $150, for a 2-night stay): taken', async () => {
+    setUp({
+      cartAddress: {
+        file: fixture(
+          'cart-page-one-stay.html',
+          (page) => page.replace('"totalBookingNights":2', '"totalBookingNights":3'),
+          'three-nights.html'
+        ),
+      },
+    });
+    expect(await holds.create(POWERED)).toEqual({
+      ok: false,
+      reason: 'taken',
+      message: RAC_NOT_ADDED_MESSAGE,
+    });
+    expect(await state.get(RAC_CART_STATE_KEY)).toBeUndefined();
+  });
+
   it('a cart RAC refused (no nights in it): taken', async () => {
     setUp({ cartAddress: { file: fixture('cart-page-refused.html') } });
     expect(await holds.create(POWERED)).toEqual({
@@ -502,6 +528,13 @@ describe('create: refusals', () => {
     ['another park', (url: string) => url.replace('/busselton/', '/esperance/')],
     ['no token', (url: string) => url.replace(`rest_api_data_id=${ZERO_TOKEN}`, 'x=1')],
     ['a checkout step', (url: string) => url.replace('?cart&', '?cart=Booking&')],
+    ['a second cart value', (url: string) => url.replace('?cart&', '?cart&cart=Pay&')],
+    ['cart[]', (url: string) => url.replace('?cart&', '?cart[]&')],
+    ['rest.api.data.id', (url: string) => url.replace('rest_api_data_id', 'rest.api.data.id')],
+    [
+      'a second token',
+      (url: string) => url.replace('&rand=', `&rest_api_data_id=${ZERO_TOKEN}&rand=`),
+    ],
   ])('a cart address on %s: a parse error, and nothing is sent to it', async (_case, edit) => {
     setUp({
       availability: {
@@ -516,6 +549,79 @@ describe('create: refusals', () => {
     expect(error).toBeInstanceOf(ProviderParseError);
     expect(String((error as Error).message)).not.toMatch(/rest_api_data_id|0{32}|\?cart/);
     expect(http.sent).toHaveLength(2);
+  });
+});
+
+describe('one at a time (one cart)', () => {
+  const CABIN = { ...POWERED, unitId: 'cat:9' };
+  const IN_PROGRESS = { ok: false, reason: 'in-progress', message: RAC_ONE_CART_MESSAGE };
+
+  it('two creates at once: one hold, exactly three requests; the other is in-progress and sends nothing', async () => {
+    setUp();
+    const [first, second] = await Promise.all([holds.create(POWERED), holds.create(CABIN)]);
+    expect(first).toEqual(expect.objectContaining({ ok: true, unitId: 'cat:4' }));
+    expect(second).toEqual(IN_PROGRESS);
+    expect(paths()).toEqual([
+      'GET /busselton/booking/',
+      `POST ${RAC_AVAILABILITY_PATH}`,
+      `GET /busselton/booking/?cart&rest_api_data_id=${ZERO_TOKEN}&rand=1001`,
+    ]);
+  });
+
+  it("a create during another's availability POST is in-progress and sends nothing", async () => {
+    setUp();
+    let second: Promise<unknown> | undefined;
+    http.onRequest = (url) => {
+      if (!second && url.endsWith('availability-ajax.php')) second = holds.create(CABIN);
+    };
+    expect((await holds.create(POWERED)).ok).toBe(true);
+    expect(await second).toEqual(IN_PROGRESS);
+    expect(http.sent).toHaveLength(3);
+    expect(cartAddresses()).toHaveLength(1);
+  });
+
+  it('a create during a release is in-progress and sends nothing', async () => {
+    setUp({ cartPage: { file: fixture('cart-page-one-stay.html') } });
+    await state.set(RAC_CART_STATE_KEY, {
+      ...RECORD,
+      expiresAt: new Date(NOW.getTime() - MINUTE).toISOString(),
+    });
+    const releasing = holds.release(HOLD);
+    expect(await holds.create(POWERED)).toEqual(IN_PROGRESS);
+    expect(await releasing).toEqual({ outcome: 'released' });
+    expect(paths()).toEqual([
+      'GET /busselton/booking/',
+      `POST ${PROXY_PATH}?newbook_api_action=data&query=remove_item_from_cart`,
+    ]);
+  });
+
+  it('a release during a create waits its turn: its request comes after the hold is placed', async () => {
+    setUp();
+    const placing = holds.create(POWERED);
+    const releasing = holds.release(HOLD);
+    expect((await placing).ok).toBe(true);
+    // The cart page answers empty now: the hold it lets go is no longer in the cart
+    expect(await releasing).toEqual({ outcome: 'gone' });
+    expect(paths()).toEqual([
+      'GET /busselton/booking/',
+      `POST ${RAC_AVAILABILITY_PATH}`,
+      `GET /busselton/booking/?cart&rest_api_data_id=${ZERO_TOKEN}&rand=1001`,
+      'GET /busselton/booking/',
+    ]);
+  });
+
+  it('a release called off while it waits rejects at once, sends nothing, and passes its turn on', async () => {
+    setUp();
+    const controller = new AbortController();
+    const placing = holds.create(POWERED);
+    const releasing = holds.release(HOLD, controller.signal);
+    controller.abort();
+    expect(isAbortError(await rejection(releasing))).toBe(true);
+    expect((await placing).ok).toBe(true);
+    expect(http.sent).toHaveLength(3);
+    // The next one runs
+    expect(await holds.release(HOLD)).toEqual({ outcome: 'gone' });
+    expect(http.sent).toHaveLength(4);
   });
 });
 
@@ -723,6 +829,25 @@ describe('release', () => {
     expect(await holds.release(HOLD)).toEqual({ outcome: 'gone' });
     expect(paths()).toEqual(['GET /busselton/booking/']);
     expect(await state.get(RAC_CART_STATE_KEY)).toBeUndefined();
+  });
+
+  it("an item with this stay's dates in another category: can't tell, rejects, removes nothing, keeps the record and the cookies", async () => {
+    setUp({
+      cartPage: {
+        file: fixture(
+          'cart-page-one-stay.html',
+          (page) => page.replace('>Powered Site<', '>Ensuite Site<'),
+          'renamed.html'
+        ),
+      },
+    });
+    await held();
+    const error = await rejection(holds.release(HOLD));
+    expect(error).toBeInstanceOf(ProviderError);
+    expect((error as Error).message).toMatch(/can't tell which item in the cart is this stay/);
+    expect(http.sent).toHaveLength(1);
+    expect(await state.get(RAC_CART_STATE_KEY)).toEqual(RECORD);
+    expect(await http.cookies.getAll(RAC)).toHaveLength(1);
   });
 
   it("a cart holding someone else's stay only: left alone, gone", async () => {

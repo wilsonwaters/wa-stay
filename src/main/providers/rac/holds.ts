@@ -8,6 +8,14 @@
  * block cool-down, and the core's pacing, one at a time; the core sets the priority
  * (interactive, R18), nothing here does.
  *
+ * **One at a time** (one cart): `create` and `release` run one after the other inside the module,
+ * never together. `create` never waits: while another `create` or a `release` is in progress (or
+ * waiting), it answers `in-progress` ("Your RAC cart already holds a stay…") at once and sends
+ * nothing, decided before its first await, so two holds placed together (a watch's "Check now"
+ * and a snipe's release) cannot both see an empty cart. `release` waits its turn instead (the
+ * person asked to let a hold go): it starts once the operation before it has ended, and an
+ * abort while it waits rejects at once and sends nothing.
+ *
  * **`create`** (terms rules 8, 13, 15 and 16):
  * 1. One cart at a time: while the module's record (`ctx.state` `cart.current`) has not run out,
  *    `in-progress` ("Your RAC cart already holds a stay…"), with no request.
@@ -49,8 +57,9 @@
  * on RAC's host, under the park's `/wp-content/themes/parks-and-resorts/inc/newbook/api/`), and
  * `released`; a cart that no longer holds it (paid, run out, removed in the window) is left as it
  * is, `gone`, so a release never touches a booking (rule 10). Both clear the record. A cart whose
- * items cannot be told apart (two of this stay, one that cannot be read) is left alone, and the
- * release rejects: the hold stays until it runs out. So does a block, a failed request, an abort
+ * items cannot be told apart (two of this stay, one that cannot be read, or one with this stay's
+ * dates in another category, which may be this stay renamed) is left alone, and the release
+ * rejects: the hold stays until it runs out. So does a block, a failed request, an abort
  * or a proxy off RAC's path; the record and the cookies stay, so the hold stays payable. At most
  * two requests, which fit a paced release's deadline (R18: 30 s and two interactive gaps).
  */
@@ -61,6 +70,7 @@ import type { StayQuery } from '@shared/types/provider.types';
 import { eachNight, isCalendarDate } from '@shared/utils/calendar-date';
 import type { ProviderContext } from '../sdk/context';
 import {
+  createAbortError,
   isAbortError,
   ProviderError,
   ProviderHttpError,
@@ -83,7 +93,7 @@ import {
   stayRefusal,
   type CategoryKindOf,
 } from './availability';
-import { RAC_CART_REMOVAL_QUERY } from './cart-guard';
+import { phpKey, RAC_CART_REMOVAL_QUERY } from './cart-guard';
 import { cartExpiry, readCartPage, type RacCartItem } from './cart-page';
 import { RAC_SITE_URL, type RacClient } from './client';
 import { categoryIdOf } from './links';
@@ -180,6 +190,29 @@ export function slugOfReference(reference: string): string | undefined {
 /** The park's cart page: where the person pays, and what a release reads. */
 export function racCartPage(slug: string): string {
   return `${RAC_SITE_URL}/${slug}/booking/`;
+}
+
+/**
+ * Settles with `pending`, or rejects with an AbortError as soon as `signal` aborts (`pending`
+ * still settles, handled).
+ */
+function abortable<T>(pending: Promise<T>, signal?: AbortSignal): Promise<T> {
+  if (!signal) return pending;
+  return new Promise<T>((resolve, reject) => {
+    const onAbort = (): void => reject(createAbortError(signal));
+    if (signal.aborted) onAbort();
+    else signal.addEventListener('abort', onAbort, { once: true });
+    pending.then(
+      (value) => {
+        signal.removeEventListener('abort', onAbort);
+        resolve(value);
+      },
+      (error: unknown) => {
+        signal.removeEventListener('abort', onAbort);
+        reject(error);
+      }
+    );
+  });
 }
 
 /** `url` without its query and fragment. */
@@ -304,14 +337,21 @@ export function createRacHolds(deps: RacHoldsDeps): RacHolds {
       return undefined;
     }
     const query = url.searchParams;
+    // `cart` and `rest_api_data_id` once each, as written: no `cart[]`, `rest.api.data.id` or a
+    // second `cart`, which PHP would read as the same names
+    const names = [...query.keys()];
+    const cartNames = names.filter((n) => ['cart', 'rest_api_data_id'].includes(phpKey(n)));
     const onRac =
       url.protocol === 'https:' &&
       url.origin === RAC_ORIGIN &&
       !url.username &&
       !url.password &&
       url.pathname === `/${park.slug}/booking/` &&
-      query.has('cart') &&
-      (query.get('cart') ?? '') === '' &&
+      cartNames.length === 2 &&
+      cartNames.every((n) => n === 'cart' || n === 'rest_api_data_id') &&
+      query.getAll('cart').length === 1 &&
+      query.get('cart') === '' &&
+      query.getAll('rest_api_data_id').length === 1 &&
       CART_TOKEN.test(query.get('rest_api_data_id') ?? '');
     return onRac ? url.href : undefined;
   }
@@ -340,7 +380,64 @@ export function createRacHolds(deps: RacHoldsDeps): RacHolds {
     return url.href;
   }
 
+  // One at a time: the operations in progress or waiting, and the end of the last one's turn
+  let busy = 0;
+  let tail: Promise<void> = Promise.resolve();
+
+  /**
+   * Waits for the operation before this one to end (an abort while waiting rejects at once),
+   * and answers the function that ends this one's turn.
+   */
+  async function turn(signal?: AbortSignal): Promise<() => void> {
+    const before = tail;
+    let end!: () => void;
+    tail = new Promise<void>((resolve) => {
+      end = resolve;
+    });
+    try {
+      await abortable(before, signal);
+    } catch (error) {
+      // Given up while waiting: the turn passes on once the one before has ended
+      void before.then(end);
+      throw error;
+    }
+    return end;
+  }
+
   async function create(request: HoldRequest, signal?: AbortSignal): Promise<HoldResult> {
+    throwIfAborted(signal);
+    // Decided before any await: another create or a release in progress means one cart already
+    if (busy > 0) return fail('in-progress', RAC_ONE_CART_MESSAGE);
+    busy++;
+    try {
+      const end = await turn(signal);
+      try {
+        return await placeHold(request, signal);
+      } finally {
+        end();
+      }
+    } finally {
+      busy--;
+    }
+  }
+
+  async function release(hold: HoldToRelease, signal?: AbortSignal): Promise<HoldReleaseResult> {
+    throwIfAborted(signal);
+    // Counted at once, so a create meanwhile answers in-progress; it waits its own turn
+    busy++;
+    try {
+      const end = await turn(signal);
+      try {
+        return await letGo(hold, signal);
+      } finally {
+        end();
+      }
+    } finally {
+      busy--;
+    }
+  }
+
+  async function placeHold(request: HoldRequest, signal?: AbortSignal): Promise<HoldResult> {
     throwIfAborted(signal);
     const current = await readRecord();
     throwIfAborted(signal);
@@ -493,7 +590,7 @@ export function createRacHolds(deps: RacHoldsDeps): RacHolds {
     item.category !== undefined &&
     sameName(item.category, record.categoryName);
 
-  async function release(hold: HoldToRelease, signal?: AbortSignal): Promise<HoldReleaseResult> {
+  async function letGo(hold: HoldToRelease, signal?: AbortSignal): Promise<HoldReleaseResult> {
     throwIfAborted(signal);
     const stored = await readRecord();
     throwIfAborted(signal);
@@ -525,6 +622,13 @@ export function createRacHolds(deps: RacHoldsDeps): RacHolds {
         throw refuse("can't tell which item in the cart is this stay; it stays until it runs out");
       }
       const mine = cart.items.filter((item) => isThisStay(item, record));
+      // An item with this stay's dates in another category may be this stay, renamed: leave it
+      const sameDates = cart.items.some(
+        (item) => item.arrival === record.arrival && item.departure === record.departure
+      );
+      if (mine.length === 0 && sameDates) {
+        throw refuse("can't tell which item in the cart is this stay; it stays until it runs out");
+      }
       if (mine.length === 0) {
         await forget();
         return { outcome: 'gone' };
