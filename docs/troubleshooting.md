@@ -43,9 +43,21 @@ again by itself (after 1, 2 and 5 minutes) if that fails. Check the internet con
 downloaded, the catalogue works offline.
 
 **Cards say availability could not be checked, or show nothing for my dates.** Availability
-needs a connection, and ParkStay can be busy. If the DBCA queue is active, WA Stay says so and
-shows its place in the queue at the bottom right. Places that ParkStay does not book online show
-"Info only".
+needs a connection, and a provider can be busy. If the DBCA queue is active, WA Stay says so and
+shows its place in the queue at the bottom right. Places that are not booked online show "Info
+only".
+
+**"Still checking RAC…".** RAC is asked about one park at a time, so its counts take about 40 to
+60 seconds to arrive ([why](user-guide.md#why-do-racs-counts-take-a-minute)). ParkStay's arrive
+first.
+
+**RAC isn't answering ("RAC Parks & Resorts turned the request away").** RAC's site sometimes
+turns automated requests away (HTTP 403 or 429, or a security check). WA Stay then sends RAC
+nothing for 30 minutes, longer if it happens again (at most a day), and says until when:
+Explore's RAC parks read "Couldn't check RAC", and a watch or snipe shows the message ("WA Stay
+won't ask again until 3:45 pm."). A snipe stops there; start it again later if you want. Wait
+until the time given: restarting WA Stay doesn't shorten the pause, and WA Stay never tries to
+get around RAC's checks. RAC's own site still works in your browser.
 
 **"Too many checks in a short time".** ParkStay asked the app to slow down. Wait a minute before checking
 again; WA Stay never retries this straight away.
@@ -55,10 +67,12 @@ again; WA Stay never retries this straight away.
 **A watch never alerts.** WA Stay checks watches only while it is running and the computer is
 awake. Turn on **Start WA Stay when you sign in** (Settings → App). Check that the watch is
 active, not paused: a watch with **Stop watching after the first alert** pauses after alerting.
-A maximum price is applied only when ParkStay shows a price for every night.
+A maximum price is applied only when the provider shows a price for every night. A stay
+shorter than the place's minimum, or arriving on a day it takes no arrivals, never alerts: the
+watch's page shows why.
 
-**A watch shows an error.** Its page shows the last error. Network problems and a busy ParkStay
-fix themselves at the next check. "The arrival date has passed" means the stay has begun and the
+**A watch shows an error.** Its page shows the last error. Network problems and a busy
+provider fix themselves at the next check (for RAC, after its pause, above). "The arrival date has passed" means the stay has begun and the
 watch has stopped.
 
 ## Sign-in and payment

@@ -82,6 +82,23 @@ interval plus a little jitter, so watches do not all hit a provider at once. Aft
 wakes, due watches run. **WA Stay checks watches only while it is running**; turn on
 **Start WA Stay when you sign in** in Settings → App to keep them going.
 
+### A provider that asks for a pause
+
+A provider can ask for a pause between requests (`limits.minRequestIntervalMs`). RAC Parks &
+Resorts asks for 10 seconds, so its requests go one at a time:
+
+- a watch's check is background work: it waits its turn, at least 10 seconds after RAC's last
+  request ended;
+- what you start yourself goes first, a second after the request before it: a watch's **Check
+  now**, a place's **Check availability**, and your dates on Explore (RAC's eight parks then
+  take about 40 to 60 seconds together, with "Still checking RAC…" meanwhile);
+- if RAC turns a request away (HTTP 403 or 429, or a security check), WA Stay sends RAC nothing
+  for 30 minutes, longer for blocks in a row, and the watch shows "RAC Parks & Resorts turned
+  the request away (HTTP 429). WA Stay won't ask again until 3:45 pm." It checks again at its
+  next check after that.
+
+ParkStay asks for no pause. [How RAC is paced](providers/rac/README.md#pacing).
+
 ### Automatic holds
 
 For a provider with holds (ParkStay), **Hold a site automatically when found** places a hold
@@ -89,7 +106,11 @@ on the first fully matching site, by the same path and safety rules as Site Snip
 
 - one booking per night: a night already held by a snipe or another watch's hold blocks it;
 - the hold is recorded on the watch with its reference and expiry, and a notification says
-  "Site held at <place>";
+  "Site held at <place>" (or "Cabin held at …") and asks you to complete payment within the
+  time left ("within 30 minutes" on ParkStay). Its email says "This hold is in WA Stay on the
+  computer that placed it. Open WA Stay there to pay before it expires.", and gives the
+  provider's public booking page for when you are away from that computer, warning that what
+  WA Stay held may show as taken there until the hold ends;
 - the watch shows the same hold panel as a snipe: "<site> is held for you", the time it is held
   until and a countdown of the time left to pay (ParkStay: 30 minutes);
 - **Pay now** in that panel opens the provider's payment page in its own window, on the session
@@ -127,7 +148,7 @@ held, else the watch's or snipe's stay types, else the provider's usual kind of 
 | --- | --- |
 | **The bell** (top right) | Every notification, newest first, with an unread count. Click one to open what it is about (a watch, a snipe, a booking). Mark read, mark all read, delete, clear all. |
 | **The desktop** | An OS notification for each one, titled with the provider, e.g. "ParkStay · Sites available at Bungarra". Clicking it brings WA Stay forward on that page. Clicking an alert that a watch found something, or that a snipe found the dates free ("A site is free at …"), also opens the provider's booking page for those dates in your browser, for every provider; an alert that a site is held opens only the watch or snipe, where you pay. Settings → Notifications: **Desktop notifications** and **Play a sound**. |
-| **Email** | Each notification, sent through your own email account (below). An alert that a watch found something, or that a snipe found the dates free, has a **Book on {provider}** link to the provider's public booking page for those dates (the nights it found, for some nights), so you can book from your phone. An alert that a site is held says the hold is in WA Stay on the computer that placed it, and still gives the link. |
+| **Email** | Each notification, sent through your own email account (below). An alert that a watch found something, or that a snipe found the dates free, has a **Book on {provider}** link to the provider's public booking page for those dates (the nights it found, for some nights), so you can book from your phone. The link is never a cart or a checkout. An alert that a site is held says the hold is in WA Stay on the computer that placed it, and still gives the link. |
 
 What creates a notification: a watch finding sites (or some nights), a snipe finding the dates
 free (an alert, [Site Sniper](site-sniper.md#when-a-snipe-alerts)), a hold placed by a snipe or
@@ -160,12 +181,17 @@ When a watch finds a stay, the alert carries the provider's booking page for it
 (`core/booking-link.ts`): for a whole stay, the first matching unit's own page
 (`UnitAvailability.bookingUrl`) if the provider gives one, else `links.booking` with the stay's
 dates and the unit; for some nights, the longest run with its own dates. ParkStay's is its
-public search page with the campground and the dates. The core keeps a link only when it is
+public search page with the campground and the dates; RAC's is the category's own booking page
+with the stay filled in, which adds nothing to a cart until you press its book button. The
+core keeps a link only when it is
 https on the provider's own site (its website's host, or a subdomain of it); a link that adds to
 a cart is never one (the provider's rule). It is never stored: the watch's page works out the
 same link from the last check ("Book on {provider}" under the result, while the stay has not
 begun), and logs name only a link's origin. Moving a watch to another place forgets what its
-last check saw, so the page shows no link (and no result) until the new place is checked.
+last check saw, so the page shows no link (and no result) until the new place is checked. A
+check that was already running when the watch was moved, or its stay, units or stay types
+changed, keeps nothing of its answer and alerts on nothing: the change makes the watch due
+again, and the next check asks about what it is now.
 
 ### For developers
 

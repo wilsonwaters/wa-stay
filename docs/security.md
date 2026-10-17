@@ -1,8 +1,9 @@
 # Security
 
 This document describes how WA Stay protects data on the user's machine: [secret
-storage](#secret-storage), [provider windows](#provider-sign-in-and-payment-windows), [the main
-window's permissions](#the-main-windows-permissions) and [the packaged app's Electron
+storage](#secret-storage), [experiments](#experiments), [provider
+windows](#provider-sign-in-and-payment-windows), [the main window's
+permissions](#the-main-windows-permissions) and [the packaged app's Electron
 fuses](#the-packaged-app-electron-fuses). The overall baseline (sandboxing, CSP, IPC checks) is
 in the [architecture overview](architecture/overview.md#security).
 
@@ -18,9 +19,10 @@ The app keeps these secrets on disk:
 | Provider secrets (`ProviderContext.secrets`) | the provider's own state (`provider_state`), under `secret:<key>` |
 | Account details a provider asks for (a `credentials` sign-in, such as a member number) | the provider's secrets, as `account.<key>`: `secret:account.<key>` in `provider_state` |
 
-No built-in provider stores a secret yet. The email password is write-only over IPC: the
-window gets the notifier settings without it (`hasPassword` instead), and saving without a
-password keeps the stored one only for the same server, port and account.
+ParkStay stores no secret of its own; RAC's only one is the person's member number, an account
+detail (below). The email password is write-only over IPC: the window gets the notifier
+settings without it (`hasPassword` instead), and saving without a password keeps the stored one
+only for the same server, port and account.
 
 Account details are write-only over IPC too (`src/main/core/accounts/provider-account.service.ts`):
 
@@ -33,7 +35,13 @@ Account details are write-only over IPC too (`src/main/core/accounts/provider-ac
   save is not a React Query mutation, so its cache never holds the values).
 - "Copy" (`accounts.copyCredential`, only for fields the provider marks `copyable`) has main
   write the value to the system clipboard. The clipboard is not cleared afterwards: copying is
-  the person's own action.
+  the person's own action, and clearing it later could wipe something they copied since. The
+  value then lives where the operating system keeps clipboard contents: on Windows, with
+  clipboard history on (Windows key + V), it stays in that history until it is cleared there or
+  the computer restarts (unless pinned), and with clipboard sync across devices on, Windows sends
+  it to the person's other devices through their Microsoft account. WA Stay does not ask Windows
+  to leave it out of either. The [user guide](user-guide.md#settings) says how to clear the
+  history or turn these off, for a shared computer.
 - They are never logged, never quoted in an error message (a provider's own error is reduced to
   its name), and never sent by the core. Removing them (`accounts.signOut`) deletes them and
   touches no session.
@@ -253,6 +261,19 @@ and a warning is logged that secrets saved under the earlier key cannot be read.
   driven by `_electron.launch` uses the `local` backend on Linux. To exercise `os` on
   Linux, start Electron directly with `--password-store=gnome-libsecret` in a session that
   has an unlocked GNOME Keyring.
+
+## Experiments
+
+What a provider ships switched off (its manifest's `experiments`) is the person's choice, kept
+by main: the `provider_state` row `('<provider id>', 'core.experiments')`, under the app's own
+`core.*` keys, which a provider's `ctx.state` can neither read nor write
+(`src/main/providers/experiments.ts`). The window only asks main to change it
+(`providers.setExperiment`, after a confirmation); nothing a page or a provider sends turns one
+on. A choice takes effect when WA Stay next starts: the provider is registered with the
+capabilities the experiment turns on, so no code path of an experiment that is off can run.
+Turning off one that turns on holds is refused while one of the provider's snipes is running or
+one of its holds is unexpired, being placed or being let go (`ACCOUNT_BUSY`); once it is off, no
+new hold is placed for that provider until the restart.
 
 ## Provider sign-in and payment windows
 

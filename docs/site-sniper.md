@@ -46,9 +46,9 @@ at the fastest, for at most 30 minutes, and alerts you when the dates are free.
 | `scheduled`      | **At a time you set**     | For dates RAC releases on a day it announces, such as Cable Beach's dry-season dates (15 May to 15 October), which open on RAC's own monthly release days. Site Sniper checks from the time you set.                                                                                                                                                                                                                                                                                                                                                                |
 
 - **Members' pre-sale.** RAC members can book school holidays 48 hours before everyone else, at
-  the same hour (except Margaret River's dorms). Site Sniper will time a snipe to the pre-sale
-  once you can save your RAC member number in WA Stay, which is coming; until then it uses the
-  public release.
+  the same hour (except Margaret River's dorms). With your RAC member number saved (Settings →
+  Accounts), Site Sniper times a school-holiday snipe to the pre-sale; without one, to the
+  public release. Saving, replacing or removing the number re-times RAC's waiting snipes.
 - **When Site Sniper can't time it**, it says so and the snipe isn't created: school holidays
   RAC hasn't announced yet (from the last school day), dates beyond the release days WA Stay
   knows, or Cable Beach's dry season, whose release days WA Stay doesn't know. Set a watch, or
@@ -68,7 +68,7 @@ and dates). The flow has five steps:
 1. **Provider**: whose sites to snipe. Only providers with Site Sniper are listed; with one,
    it is chosen for you but still shown. A provider that places no holds says **Alerts
    only**.
-2. **Location**: the campground.
+2. **Location**: the place (a campground, a holiday park…).
 3. **Your stay**: dates and guests, plus the provider's own fields (ParkStay: Camping with,
    Vehicles, Postcode), the **Stay type** at a place whose units are of more than one kind, and
    the sites you want (any site, or a few). A snipe that holds needs one stay type or a site at
@@ -177,7 +177,9 @@ of this: its hold runs out on its own.
 
 ## Book responsibly
 
-Site Sniper works within DBCA's terms, and you must too:
+Site Sniper works within each provider's terms, and you must too.
+
+**ParkStay (DBCA):**
 
 - **One account per person.** Use only your own ParkStay account.
 - **One booking per night.** Never hold more than one booking for the same night.
@@ -190,6 +192,19 @@ DBCA may cancel bookings and bar people who break its terms. Site Sniper stops a
 your own session for your own stay and leaves payment to you: it is a fast, prepared person,
 not a fleet of bots.
 
+**RAC Parks & Resorts:**
+
+- **Your own member number only**, for a stay you will take, booked in the name on your RAC
+  card. RAC checks it at checkout, and on arrival.
+- **At most two bookings per period** with a member number: your own, and one for your guests
+  with the same arrival date and length.
+- **Gently.** An RAC snipe checks every 10 seconds at most, for at most 30 minutes; if RAC turns
+  a check away, the snipe stops and WA Stay asks RAC nothing more for a while.
+- **No booking for others, no transfer or resale.**
+
+RAC may cancel a booking it believes disrupts its parks or guests.
+[RAC's terms as WA Stay follows them](providers/rac/README.md#racs-terms).
+
 ## For developers
 
 - Generic orchestration: `src/main/core/snipes/snipe.service.ts`; timers:
@@ -199,8 +214,9 @@ not a fleet of bots.
 - ParkStay's release rules, holds and queue: `src/main/providers/parkstay/` (`release-policy.ts`,
   `holds.ts`, `queue/`), described in [ParkStay endpoints](providers/parkstay/endpoints.md).
 - RAC's release rules: `src/main/providers/rac/release-policy.ts`, and its school-holiday release
-  days in `release-calendar.ts`, whose header says how to update them when RAC announces a
-  release. The policy sends no request; `availability.check` uses it for `release.opensAt`.
+  days in `release-calendar.ts`, kept current by hand
+  ([RAC's release calendar](providers/rac/release-calendar.md)). The policy sends no request;
+  `availability.check` uses it for `release.opensAt`.
 - A new provider gets Site Sniper by declaring `snipes`, release modes and a release policy
   ([Adding a provider](providers/adding-a-provider.md#release-policy)); its snipes alert. With
   `holds` too, they can hold. A snipe's `action` (`alert` or `hold`), its `alert` and the
