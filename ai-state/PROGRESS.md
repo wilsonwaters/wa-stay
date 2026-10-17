@@ -10,7 +10,7 @@ Branch `ccr-573ddb1d-hir0sq` (from `main` at `4bd5d62`, the v2.0.0 release). The
 Phase 3–4 (task specs, then execution). The stakeholder approved the 20-task plan and decided R6–R8 (alert clicks for every provider, a phone booking link in alert emails, interactive pacing).
 
 ## Currently in flight
-- **R20 (#67)**: implementation agent in `/home/user/lanes/r20` (base `3cc29a2`), started alongside R19: everything not tied to the cart first, then the cart docs once R19 is merged. No Mapbox token in this environment, so screenshots cannot be retaken here.
+- **R20 (#67)**: done on `lane/r20` (`5d6a42c`, R19 merged in; gate 5943 tests, test:tz 8, e2e 29, RAC preview passed); part 1 approved, the cart part in review.
 - Next: system verification of the whole stream, final review against the brief, report to the stakeholder.
 
 ## Completed
