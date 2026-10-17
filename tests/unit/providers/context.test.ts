@@ -263,6 +263,36 @@ describe('createProviderContext', () => {
     expect(await b.state.get('k')).toBeUndefined();
   });
 
+  it("keeps the app's core.* keys out of the provider's state: refused, and never listed (R17)", async () => {
+    // The store underneath, as the core sees it (the repository, in the app)
+    const store = new InMemoryKeyValueStore();
+    await store.set('core.experiments', { autoCart: false });
+    await store.set('core.catalog.sync', { at: '2026-10-02T02:00:00Z' });
+    const ctx = createProviderContext(testManifest('fake'), deps({ createState: () => store }));
+    await ctx.state.set('release.cache', 'kept');
+
+    // A provider cannot turn its own experiment on, nor read or remove what the core keeps
+    const reserved = /state key "core\.experiments" is the app's/;
+    await expect(ctx.state.set('core.experiments', { autoCart: true })).rejects.toThrow(reserved);
+    await expect(ctx.state.get('core.experiments')).rejects.toThrow(reserved);
+    await expect(ctx.state.delete('core.experiments')).rejects.toThrow(reserved);
+    await expect(ctx.state.set('core.anything', 1)).rejects.toThrow(/core\.\* is reserved/);
+    expect(await store.get('core.experiments')).toEqual({ autoCart: false });
+
+    expect(await ctx.state.list()).toEqual([{ key: 'release.cache', value: 'kept' }]);
+    expect(await ctx.state.list('core.')).toEqual([]);
+    expect(await ctx.state.get('release.cache')).toBe('kept');
+    // Keys that only look alike are the provider's own
+    await ctx.state.set('corex', 1);
+    await ctx.state.set('Core.experiments', 2);
+    expect(await ctx.state.get('Core.experiments')).toBe(2);
+    await ctx.state.delete('corex');
+    expect((await ctx.state.list()).map((e) => e.key)).toEqual([
+      'Core.experiments',
+      'release.cache',
+    ]);
+  });
+
   it('rejects an invalid provider id or manifest', () => {
     expect(() => createProviderContext(testManifest('ParkStay'), deps())).toThrow();
     expect(() =>

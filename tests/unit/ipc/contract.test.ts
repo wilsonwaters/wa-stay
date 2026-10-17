@@ -212,6 +212,30 @@ describe('IPC contract', () => {
     );
   });
 
+  it('providers: experiments and setExperiment (R17) take a provider, an experiment id and a boolean', () => {
+    expect(Object.keys(contract.providers).sort()).toEqual(
+      ['accessStatus', 'experiments', 'list', 'setExperiment'].sort()
+    );
+    expect(contract.providers.experiments.channel).toBe('providers:experiments');
+    expect(contract.providers.setExperiment.channel).toBe('providers:set-experiment');
+    const set = contract.providers.setExperiment.request;
+    expect(
+      set.safeParse({ providerId: 'rac', experimentId: 'autoCart', enabled: true }).success
+    ).toBe(true);
+    for (const bad of [
+      { providerId: 'rac', experimentId: 'autoCart' },
+      { providerId: 'rac', experimentId: 'auto-cart', enabled: false },
+      { providerId: 'rac', experimentId: 'AutoCart', enabled: false },
+      { providerId: 'RAC', experimentId: 'autoCart', enabled: false },
+      { providerId: 'rac', experimentId: 'autoCart', enabled: 1 },
+    ]) {
+      expect(set.safeParse(bad).success).toBe(false);
+    }
+    expect(contract.providers.experiments.request.safeParse({ providerId: 'rac' }).success).toBe(
+      true
+    );
+  });
+
   it('pays for holds in the app: snipes.openPayment and watches.openPayment take an id (V6)', () => {
     expect(contract.snipes.openPayment.channel).toBe('snipes:open-payment');
     expect(contract.watches.openPayment.channel).toBe('watches:open-payment');

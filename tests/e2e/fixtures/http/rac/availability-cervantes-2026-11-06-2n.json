@@ -1,0 +1,296 @@
+{
+  "_fixture": "Trimmed from RAC Parks & Resorts' availability answer for RAC Cervantes Holiday Park (blog 5), 6-8 Nov 2026, 2 adults, fetched anonymously; only the fields WA Stay reads, 3 of its 9 categories, the NewBook key and cart addresses redacted. (Fetched 17 Oct 2026, 16:39 Perth.)",
+  "success": "true",
+  "message": "",
+  "timestamp": "2026-10-17 16:39:41",
+  "timezone": "Australia/Perth",
+  "api_key": "<redacted>",
+  "data": {
+    "1": {
+      "category_id": 1,
+      "category_type_id": "2",
+      "category_name": "Powered Firm Ground Site",
+      "sort": 3,
+      "sites_available": {
+        "2026-11-06": 49,
+        "2026-11-07": 37
+      },
+      "sites_code": {
+        "2026-11-06": 0,
+        "2026-11-07": 0
+      },
+      "sites_message": {
+        "2026-11-06": "",
+        "2026-11-07": ""
+      },
+      "stay_through_sites_available": 37,
+      "stay_through_sites_code": 0,
+      "stay_through_sites_message": "",
+      "online_booking_url": "https://parksandresorts.rac.com.au/cervantes/booking/?available_from=2026-11-06&available_to=2026-11-08&force_category_id=1&adults=2&children=0&infants=0&animals=0",
+      "tariffs_available": [
+        {
+          "tariff_label": "Standard Rate",
+          "tariff_success": "true",
+          "tariff_code": 0,
+          "tariff_message": "",
+          "tariff_total": 140,
+          "tariffs_quoted": {
+            "2026-11-06": {
+              "amount": 70,
+              "minimum_periods": "1",
+              "close_arrival": 0,
+              "close_departure": 0
+            },
+            "2026-11-07": {
+              "amount": 70,
+              "minimum_periods": "1",
+              "close_arrival": 0,
+              "close_departure": 0
+            }
+          },
+          "online_cart_url": "<redacted>"
+        },
+        {
+          "tariff_label": "RAC Member Rate",
+          "tariff_success": "true",
+          "tariff_code": 0,
+          "tariff_message": "",
+          "tariff_total": 122,
+          "tariffs_quoted": {
+            "2026-11-06": {
+              "amount": 61,
+              "minimum_periods": "1",
+              "close_arrival": 0,
+              "close_departure": 0
+            },
+            "2026-11-07": {
+              "amount": 61,
+              "minimum_periods": "1",
+              "close_arrival": 0,
+              "close_departure": 0
+            }
+          },
+          "online_cart_url": "<redacted>"
+        },
+        {
+          "tariff_label": "Stay & Save This Spring",
+          "tariff_success": "false",
+          "tariff_code": 6,
+          "tariff_message": "This Rate has a 3 Night Minimum",
+          "tariff_total": 140,
+          "tariffs_quoted": {
+            "2026-11-06": {
+              "amount": 70,
+              "minimum_periods": "3",
+              "close_arrival": 0,
+              "close_departure": 0
+            },
+            "2026-11-07": {
+              "amount": 70,
+              "minimum_periods": "3",
+              "close_arrival": 0,
+              "close_departure": 0
+            }
+          }
+        },
+        {
+          "tariff_label": "Stay & Save This Spring - RAC Member",
+          "tariff_success": "false",
+          "tariff_code": 6,
+          "tariff_message": "This Rate has a 3 Night Minimum",
+          "tariff_total": 122,
+          "tariffs_quoted": {
+            "2026-11-06": {
+              "amount": 61,
+              "minimum_periods": "3",
+              "close_arrival": 0,
+              "close_departure": 0
+            },
+            "2026-11-07": {
+              "amount": 61,
+              "minimum_periods": "3",
+              "close_arrival": 0,
+              "close_departure": 0
+            }
+          }
+        }
+      ]
+    },
+    "3": {
+      "category_id": 3,
+      "category_type_id": "2",
+      "category_name": "Powered Tent Site",
+      "sort": 4,
+      "sites_available": {
+        "2026-11-06": 21,
+        "2026-11-07": 22
+      },
+      "sites_code": {
+        "2026-11-06": 0,
+        "2026-11-07": 0
+      },
+      "sites_message": {
+        "2026-11-06": "",
+        "2026-11-07": ""
+      },
+      "stay_through_sites_available": 20,
+      "stay_through_sites_code": 0,
+      "stay_through_sites_message": "",
+      "online_booking_url": "https://parksandresorts.rac.com.au/cervantes/booking/?available_from=2026-11-06&available_to=2026-11-08&force_category_id=3&adults=2&children=0&infants=0&animals=0",
+      "tariffs_available": [
+        {
+          "tariff_label": "Standard Rate",
+          "tariff_success": "true",
+          "tariff_code": 0,
+          "tariff_message": "",
+          "tariff_total": 140,
+          "tariffs_quoted": {
+            "2026-11-06": {
+              "amount": 70,
+              "minimum_periods": "1",
+              "close_arrival": 0,
+              "close_departure": 0
+            },
+            "2026-11-07": {
+              "amount": 70,
+              "minimum_periods": "1",
+              "close_arrival": 0,
+              "close_departure": 0
+            }
+          },
+          "online_cart_url": "<redacted>"
+        },
+        {
+          "tariff_label": "RAC Member Rate",
+          "tariff_success": "true",
+          "tariff_code": 0,
+          "tariff_message": "",
+          "tariff_total": 122,
+          "tariffs_quoted": {
+            "2026-11-06": {
+              "amount": 61,
+              "minimum_periods": "1",
+              "close_arrival": 0,
+              "close_departure": 0
+            },
+            "2026-11-07": {
+              "amount": 61,
+              "minimum_periods": "1",
+              "close_arrival": 0,
+              "close_departure": 0
+            }
+          },
+          "online_cart_url": "<redacted>"
+        },
+        {
+          "tariff_label": "Stay & Save This Spring",
+          "tariff_success": "false",
+          "tariff_code": 6,
+          "tariff_message": "This Rate has a 3 Night Minimum",
+          "tariff_total": 140,
+          "tariffs_quoted": {
+            "2026-11-06": {
+              "amount": 70,
+              "minimum_periods": "3",
+              "close_arrival": 0,
+              "close_departure": 0
+            },
+            "2026-11-07": {
+              "amount": 70,
+              "minimum_periods": "3",
+              "close_arrival": 0,
+              "close_departure": 0
+            }
+          }
+        },
+        {
+          "tariff_label": "Stay & Save This Spring - RAC Member",
+          "tariff_success": "false",
+          "tariff_code": 6,
+          "tariff_message": "This Rate has a 3 Night Minimum",
+          "tariff_total": 122,
+          "tariffs_quoted": {
+            "2026-11-06": {
+              "amount": 61,
+              "minimum_periods": "3",
+              "close_arrival": 0,
+              "close_departure": 0
+            },
+            "2026-11-07": {
+              "amount": 61,
+              "minimum_periods": "3",
+              "close_arrival": 0,
+              "close_departure": 0
+            }
+          }
+        }
+      ]
+    },
+    "20": {
+      "category_id": 20,
+      "category_type_id": "1",
+      "category_name": "Two Bedroom Villa",
+      "sort": 6,
+      "sites_available": {
+        "2026-11-06": 0,
+        "2026-11-07": 0
+      },
+      "sites_code": {
+        "2026-11-06": 3,
+        "2026-11-07": 3
+      },
+      "sites_message": {
+        "2026-11-06": "There is no availability for this date",
+        "2026-11-07": "There is no availability for this date"
+      },
+      "stay_through_sites_available": 0,
+      "stay_through_sites_code": 3,
+      "stay_through_sites_message": "There is no longer availability for the dates given (<strong>6 Nov 2026 14:00</strong> to <strong>8 Nov 2026 10:00</strong>)",
+      "online_booking_url": "https://parksandresorts.rac.com.au/cervantes/booking/?available_from=2026-11-06&available_to=2026-11-08&force_category_id=20&adults=2&children=0&infants=0&animals=0",
+      "tariffs_available": [
+        {
+          "tariff_label": "Standard Rate",
+          "tariff_success": "true",
+          "tariff_code": 0,
+          "tariff_message": "",
+          "tariff_total": 874,
+          "tariffs_quoted": {
+            "2026-11-06": {
+              "amount": 437,
+              "minimum_periods": "2",
+              "close_arrival": 0,
+              "close_departure": 0
+            },
+            "2026-11-07": {
+              "amount": 437,
+              "minimum_periods": "2",
+              "close_arrival": 0,
+              "close_departure": 0
+            }
+          }
+        },
+        {
+          "tariff_label": "RAC Member Rate",
+          "tariff_success": "true",
+          "tariff_code": 0,
+          "tariff_message": "",
+          "tariff_total": 814,
+          "tariffs_quoted": {
+            "2026-11-06": {
+              "amount": 407,
+              "minimum_periods": "2",
+              "close_arrival": 0,
+              "close_departure": 0
+            },
+            "2026-11-07": {
+              "amount": 407,
+              "minimum_periods": "2",
+              "close_arrival": 0,
+              "close_departure": 0
+            }
+          }
+        }
+      ]
+    }
+  }
+}

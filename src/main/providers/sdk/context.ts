@@ -17,7 +17,7 @@ import {
 import type { BrowserAutomation } from './browser';
 import { PlaywrightBrowserAutomation } from './browser-automation';
 import type { HttpClient } from './http';
-import type { KeyValueStore } from './kv-store';
+import { withoutCoreKeys, type KeyValueStore } from './kv-store';
 import { freezeProviderManifest } from './manifest';
 import { createPacedHttpClient } from './pacing';
 import { createScopedSecretVault, type ScopedSecretVault, type SecretVaultLike } from './secrets';
@@ -49,7 +49,7 @@ export interface ProviderContext {
    * own profile at `<providersDir>/<id>/browser`. Costs nothing until first used.
    */
   readonly browser: BrowserAutomation;
-  /** The provider's own key-value state. */
+  /** The provider's own key-value state. `core.*` keys are the app's: refused and never listed. */
   readonly state: KeyValueStore;
   /** Encrypted secrets, stored in `state` and readable only by this provider. */
   readonly secrets: ScopedSecretVault;
@@ -88,7 +88,8 @@ export function createProviderContext(
 ): ProviderContext {
   const frozen = freezeProviderManifest(manifest);
   const id = frozen.id;
-  const state = deps.createState(id);
+  // The core's `core.*` keys are out of the provider's reach
+  const state = withoutCoreKeys(deps.createState(id), id);
   const logger = deps.logger.child({ provider: id });
   const limits = Object.freeze(providerLimits(frozen));
   const transport = deps.createHttp(id);

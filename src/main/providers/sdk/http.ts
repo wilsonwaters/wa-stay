@@ -65,6 +65,12 @@ export interface HttpRequestOptions {
    * (`withRequestPriority`, set by the core), which is `background` by default.
    */
   priority?: RequestPriority;
+  /**
+   * Called once, when the request is sent: at once, or on a paced client when its turn comes.
+   * Never for a request aborted before it was sent (one still waiting for its turn), so a
+   * caller can tell a request it may still call off from one the site is already answering.
+   */
+  onSend?: () => void;
 }
 
 export interface HttpResponse {
@@ -267,6 +273,7 @@ export abstract class BaseHttpClient implements HttpClient {
     const { signal, timeoutMs = DEFAULT_TIMEOUT_MS } = options;
     if (signal?.aborted) throw createAbortError(signal);
     const target = this.checkedUrl(url, options.query);
+    options.onSend?.();
 
     const controller = new AbortController();
     let timedOut = false;

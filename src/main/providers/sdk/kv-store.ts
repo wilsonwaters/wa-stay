@@ -48,3 +48,33 @@ export class InMemoryKeyValueStore implements KeyValueStore {
       .map(([key, json]) => ({ key, value: JSON.parse(json) as T }));
   }
 }
+
+/**
+ * The prefix of the keys the core keeps in a provider's `provider_state`, such as the person's
+ * experiment choices (`core.experiments`) and the catalogue's sync state. A provider's own store
+ * never reaches them (`withoutCoreKeys`).
+ */
+export const CORE_STATE_PREFIX = 'core.';
+
+const isCoreKey = (key: string): boolean => key.startsWith(CORE_STATE_PREFIX);
+
+/**
+ * `store` as a provider's `ctx.state`: getting, setting or deleting a `core.*` key rejects,
+ * and `list` leaves those keys out, so a provider cannot read or change what the core keeps
+ * there (it cannot turn its own experiment on). The core reads them through the repository.
+ */
+export function withoutCoreKeys(store: KeyValueStore, providerId: string): KeyValueStore {
+  const refuse = (key: string): Promise<never> =>
+    Promise.reject(
+      new Error(
+        `${providerId}: state key "${key}" is the app's (${CORE_STATE_PREFIX}* is reserved)`
+      )
+    );
+  return {
+    get: (key) => (isCoreKey(key) ? refuse(key) : store.get(key)),
+    set: (key, value) => (isCoreKey(key) ? refuse(key) : store.set(key, value)),
+    delete: (key) => (isCoreKey(key) ? refuse(key) : store.delete(key)),
+    list: async <T = unknown>(prefix?: string) =>
+      (await store.list<T>(prefix)).filter((entry) => !isCoreKey(entry.key)),
+  };
+}

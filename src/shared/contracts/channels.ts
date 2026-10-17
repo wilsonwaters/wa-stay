@@ -73,6 +73,8 @@ export const CHANNELS = {
   providers: {
     list: 'providers:list',
     accessStatus: 'providers:access-status',
+    experiments: 'providers:experiments',
+    setExperiment: 'providers:set-experiment',
   },
   catalog: {
     search: 'catalog:search',

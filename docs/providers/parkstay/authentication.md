@@ -80,8 +80,9 @@ person may have signed in while paying).
 **Sign out** (after a confirmation) calls `accounts.signOut('parkstay')`. It clears the
 partition's cookies, storage and HTTP auth cache and stores `signed-out`, keeping the email as
 a hint. It touches nothing else: watches, snipes, bookings and the local profile stay. It is
-refused with `ACCOUNT_BUSY` while a snipe is queueing, sniping or holding a site, or a watch's
-hold has not expired, because signing out would lose the queue place or the hold.
+refused with `ACCOUNT_BUSY` while a snipe is queueing, sniping or holding a site, a watch's
+hold has not expired, or a hold is being placed, because signing out would lose the queue place
+or the hold.
 
 ## Still to check by hand
 

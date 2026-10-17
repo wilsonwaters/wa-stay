@@ -23,7 +23,8 @@ http/
     ├── manifest.json
     ├── book-now-busselton.html       # RAC Busselton Holiday Park's categories, for its page
     ├── book-now-margaret-river.html  # RAC Margaret River Nature Park's categories (dorms, a safari tent)
-    └── availability-busselton-2026-11-06-2n.json  # Busselton's availability, 6–8 Nov 2026 (the RAC watch journey)
+    ├── availability-busselton-2026-11-06-2n.json  # Busselton's availability, 6–8 Nov 2026
+    └── availability-<park>-2026-11-06-2n.json     # the seven other parks', for the same stay
 ```
 
 A provider with no folder, or no routes, answers every request with an error.
@@ -141,9 +142,34 @@ to add.
   `blog_id` 6, 6–8 Nov 2026, 2 adults), fetched anonymously on 16 Oct 2026 and trimmed to the
   fields WA Stay reads (codes, counts, amounts, rates' labels, minimums and closed days, and
   `online_booking_url`), with the NewBook key and every cart address `<redacted>`. Its route
-  matches `blog_id` and `available_from` (`form`). `rac-watch.spec.ts` launches on a copy moved
+  matches `blog_id` (`form`), for any dates. `rac-watch.spec.ts` launches on a copy moved
   to its own dates (`support/dated-fixtures.ts`); the preview answers it with
   `PREVIEW_ARRIVAL=2026-11-06`.
+- **RAC, Explore's free counts** (R11): Explore asks every park once, so every park has an
+  answer, routed by its `blog_id` alone (`form`), for any dates. Busselton's is the recorded one
+  above. The seven others, `availability-<park>-2026-11-06-2n.json`, are RAC's answers for the
+  same stay (6–8 Nov 2026, 2 adults), recorded anonymously on 17 Oct 2026 between 16:39 and
+  16:41 Perth, one POST per park at least 12 s after the one before, with curl's default user
+  agent and the headers RAC's own page sends, and trimmed the same way: 3 or 4 of each park's
+  categories (the `_fixture` note says how many of how many), the NewBook key and cart addresses
+  `<redacted>`. They are the Jest fixtures in `tests/fixtures/providers/rac/`, copied unchanged.
+  Between them: spots free at every park, cabins free at Cable Beach and Esperance and booked out
+  elsewhere, a cabin closed for the stay (Exmouth, stop sold), minimum stays (the "Stay & Save"
+  rates) and every stay type. `rac-explore.spec.ts` launches on a copy moved to tomorrow
+  (`support/dated-fixtures.ts`, which moves a route by `blog_id` alone from its answer's first
+  night). The preview shows RAC's free counts for the recorded stay:
+
+  ```bash
+  npm run build:e2e
+  xvfb-run -a npx cross-env PREVIEW_PROVIDER=rac PREVIEW_ARRIVAL=2026-11-06 playwright test preview-provider
+  ```
+
+  Use it on or before 5 Nov 2026: on 6 Nov the stay has begun, and from 7 Nov the preview refuses
+  the date (no arrival before today in Perth). Later, the preview still passes on
+  its default dates, but RAC's answers cover none of their nights, so every park reads "No spot
+  free every night". To see counts again, record the eight answers for a later stay (anonymous,
+  read-only, one POST at least 10 s after another, trimmed as above, never a cart address), or
+  move their dates as `writeDatedFixtures` (`support/dated-fixtures.ts`) does for the journeys.
 
 ## Refreshing a fixture
 
