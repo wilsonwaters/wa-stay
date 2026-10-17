@@ -16,8 +16,8 @@ the release instant, and then does what the snipe is set to do:
 Site Sniper never pays for you. A snipe holds when its provider can place holds, and alerts
 otherwise; a provider that places no holds offers alerts only.
 
-ParkStay WA is the only provider with Site Sniper today. Its snipes hold, and its hold lasts
-**30 minutes**.
+Two providers have Site Sniper. ParkStay WA's snipes hold, and its hold lasts **30 minutes**.
+RAC Parks & Resorts' snipes alert: WA Stay places no holds on RAC.
 
 ## How ParkStay releases sites
 
@@ -33,6 +33,27 @@ Joining the DBCA queue early gives no advantage: for scheduled releases DBCA re-
 queue places at random at the release time. WA Stay joins genuinely at the start of its
 warm-up and keeps the session refreshed as ParkStay's own page does. It never fakes activity
 to get around the queue's inactivity rules.
+
+## How RAC releases dates
+
+RAC has two modes. Both are timed: an RAC snipe starts at the release, checks every 10 seconds
+at the fastest, for at most 30 minutes, and alerts you when the dates are free.
+
+| Mode             | In the app                | What happens                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| ---------------- | ------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `daily_rollover` | **When these dates open** | RAC takes bookings 364 days ahead, and one more night opens at midnight Perth time each day, so your stay opens at midnight on the day its last night comes 364 days ahead. WA school holidays are held back and open on RAC's own release days, at each park's hour, Perth time: 7 am at Esperance and Margaret River, 8 am at Busselton, Karri Valley and Monkey Mia, 9 am at Cervantes and Exmouth. Site Sniper works out the later of the two for your stay. Cable Beach has no school-holiday release: only the 364-day window applies there. |
+| `scheduled`      | **At a time you set**     | For dates RAC releases on a day it announces, such as Cable Beach's seasonal dates. Site Sniper checks from the time you set.                                                                                                                                                                                                                                                                                                                                                                                                                      |
+
+- **Members' pre-sale.** RAC members can book school holidays 48 hours before everyone else, at
+  the same hour (except Margaret River's dorms). Site Sniper will time a snipe to the pre-sale
+  once you can save your RAC member number in WA Stay, which is coming; until then it uses the
+  public release.
+- **When Site Sniper can't time it**, it says so and the snipe isn't created: school holidays
+  RAC hasn't announced yet, or dates beyond the release days WA Stay knows. Set a watch, or
+  choose **At a time you set** when you know the release. WA Stay learns new release days with
+  an app update, and a waiting snipe picks them up when it is next armed.
+- **Dates already open** can't be sniped: set a watch to hear about cancellations. RAC has no
+  "When someone cancels" mode, as a watch covers it, every 15 minutes at most.
 
 ## Creating a snipe
 
@@ -51,9 +72,10 @@ and dates). The flow has five steps:
 4. **Release**: **When are the sites released?** (or cabins, rooms…: the place's units as
    it calls them). For a scheduled release, the release date
    and time (in the provider's time zone), which must be before your check-in day. **Advanced timing**: Start early (seconds, default
-   120), Check every (seconds, default 1.5; never under 0.5), Keep trying for (minutes, default
-   15; a provider may set a limit for a release mode, `maxWindowMinutes`, and a longer choice is
-   cut to it), Most attempts (no limit by default).
+   120), Check every (seconds, default 1.5; never under 0.5, nor under the provider's own floor:
+   10 for RAC), Keep trying for (minutes, default 15; a provider may set a limit for a timed
+   release mode, `maxWindowMinutes`, and a longer choice is cut to it: 30 for RAC), Most
+   attempts (no limit by default).
 5. **Review**: the summary, the queue use, a name and notes, and **Book responsibly**. For an
    optional account (ParkStay) it suggests connecting before the release so checkout is
    quicker; for a provider whose holds need an account, the snipe is created paused until you
@@ -147,6 +169,9 @@ not a fleet of bots.
   `src/main/scheduler/snipe-runner.ts`; payment: `src/main/core/holds/hold-payment.service.ts`.
 - ParkStay's release rules, holds and queue: `src/main/providers/parkstay/` (`release-policy.ts`,
   `holds.ts`, `queue/`), described in [ParkStay endpoints](providers/parkstay/endpoints.md).
+- RAC's release rules: `src/main/providers/rac/release-policy.ts`, and its school-holiday release
+  days in `release-calendar.ts`, whose header says how to update them when RAC announces a
+  release. The policy sends no request; `availability.check` uses it for `release.opensAt`.
 - A new provider gets Site Sniper by declaring `snipes`, release modes and a release policy
   ([Adding a provider](providers/adding-a-provider.md#release-policy)); its snipes alert. With
   `holds` too, they can hold. A snipe's `action` (`alert` or `hold`), its `alert` and the
