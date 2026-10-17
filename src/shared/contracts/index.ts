@@ -68,5 +68,6 @@ export type { EventPayload, EventPayloads, EventsApi, EventSink, UpdateProgress 
 export type { AppInfo, LaunchAtLogin } from './app';
 export type { UpdateStatus } from './updater';
 export type { CatalogAvailabilityOptions } from './catalog';
+export type { ProviderExperimentState } from './providers';
 export { SETTING_KEYS, WRITABLE_SETTING_KEYS, settingDefault } from './settings';
 export type { SettingDefinition, SettingKey, SettingValue, WritableSettingKey } from './settings';

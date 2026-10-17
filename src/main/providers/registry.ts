@@ -24,6 +24,7 @@ import {
   type ProviderId,
   type ProviderManifest,
 } from '@shared/types/provider.types';
+import { applyExperiments } from './experiments';
 import type { ProviderContext, ProviderLogger } from './sdk/context';
 import {
   ProviderCapabilityError,
@@ -84,8 +85,8 @@ export interface ConsistencyRule {
 const fn = (value: unknown): boolean => typeof value === 'function';
 const hasCheck = (p: AccommodationProvider): boolean => fn(p.availability?.check);
 
-/** Manifest-flag rules (§12.30). Exported so tests and the contract suite can name them. */
-export const MANIFEST_RULES: readonly ManifestRule[] = [
+/** The manifest-flag rules on the manifest as it is. */
+const FLAG_RULES: readonly ManifestRule[] = [
   {
     // Holds are optional: a snipe without them alerts (§12.35, amends §12.30)
     rule: 'snipes needs availability',
@@ -115,6 +116,24 @@ export const MANIFEST_RULES: readonly ManifestRule[] = [
       limits?.minRequestIntervalMs && limits.maxConcurrentRequests !== 1
         ? `limits.minRequestIntervalMs needs limits.maxConcurrentRequests 1, not ${limits.maxConcurrentRequests}`
         : undefined,
+  },
+];
+
+/** Manifest-flag rules (§12.30). Exported so tests and the contract suite can name them. */
+export const MANIFEST_RULES: readonly ManifestRule[] = [
+  ...FLAG_RULES,
+  {
+    rule: 'experiments keep the flag rules',
+    // Turned on, every experiment together still leaves a manifest the flag rules accept.
+    violation: (m) => {
+      const ids = (m.experiments ?? []).map((e) => e.id);
+      if (!ids.length) return undefined;
+      const applied = applyExperiments(m, ids);
+      const problems = FLAG_RULES.map((r) => r.violation(applied)).filter((v) => v);
+      return problems.length
+        ? `with experiment ${ids.join(', ')} on: ${problems.join('; ')}`
+        : undefined;
+    },
   },
 ];
 

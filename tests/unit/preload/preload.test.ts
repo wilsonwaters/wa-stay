@@ -82,6 +82,8 @@ describe('preload window.api', () => {
 
     await api.providers.list();
     await api.providers.accessStatus('parkstay');
+    await api.providers.experiments('rac');
+    await api.providers.setExperiment('rac', 'autoCart', true);
     await api.catalog.search({ text: 'karri', limit: 50 });
     await api.catalog.get('parkstay:12:3');
     await api.catalog.availability(stay);
@@ -98,6 +100,8 @@ describe('preload window.api', () => {
     expect(ipcRenderer.invoke.mock.calls).toEqual([
       ['providers:list', undefined],
       ['providers:access-status', { providerId: 'parkstay' }],
+      ['providers:experiments', { providerId: 'rac' }],
+      ['providers:set-experiment', { providerId: 'rac', experimentId: 'autoCart', enabled: true }],
       ['catalog:search', { text: 'karri', limit: 50 }],
       ['catalog:get', { key: 'parkstay:12:3' }],
       ['catalog:availability', { stay }],

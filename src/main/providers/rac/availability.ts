@@ -115,14 +115,37 @@ export function availabilityForm(
   };
 }
 
+/**
+ * Why RAC's form cannot carry `stay` (nothing is sent then), or undefined when it can: the
+ * dates must be two calendar dates in order, and the pets 0 to 2.
+ */
+export function stayRefusal(stay: StayQuery): string | undefined {
+  const { arrival, departure } = stay;
+  if (!isCalendarDate(arrival) || !isCalendarDate(departure) || departure <= arrival) {
+    return 'a stay needs an arrival and a later departure (YYYY-MM-DD)';
+  }
+  if (petsOf(stay) === undefined) return 'a booking takes from 0 to 2 pets';
+  return undefined;
+}
+
 /** A category's unit id, `cat:<category id>`. */
 export function categoryUnitId(category: Pick<RawCategory, 'category_id'>): string {
   return `cat:${category.category_id}`;
 }
 
 export interface RacAvailability extends AvailabilityModule {
-  /** The categories RAC lists for the stay at the park, from one POST (a native park's units). */
-  categories(park: RacPark, stay: StayQuery, signal?: AbortSignal): Promise<RawCategory[]>;
+  /**
+   * The categories RAC lists for the stay at the park, from one POST (a native park's units).
+   * `onSend` is called once the POST is sent, not while it waits its turn.
+   */
+  categories(
+    park: RacPark,
+    stay: StayQuery,
+    signal?: AbortSignal,
+    onSend?: () => void
+  ): Promise<RawCategory[]>;
+  /** The categories as `check` gives them, one unit each, in their order (bulk counts them). */
+  unitsOf(park: RacPark, stay: StayQuery, categories: readonly RawCategory[]): UnitAvailability[];
 }
 
 export function createRacAvailability({
@@ -144,19 +167,17 @@ export function createRacAvailability({
   async function categories(
     park: RacPark,
     stay: StayQuery,
-    signal?: AbortSignal
+    signal?: AbortSignal,
+    onSend?: () => void
   ): Promise<RawCategory[]> {
     throwIfAborted(signal);
-    const { arrival, departure } = stay;
-    if (!isCalendarDate(arrival) || !isCalendarDate(departure) || departure <= arrival) {
-      throw refuse('a stay needs an arrival and a later departure (YYYY-MM-DD)');
-    }
-    const pets = petsOf(stay);
-    if (pets === undefined) throw refuse('a booking takes from 0 to 2 pets');
+    const refusal = stayRefusal(stay);
+    if (refusal) throw refuse(refusal);
+    const pets = petsOf(stay) ?? 0;
     const response = await client.postAjax(
       RAC_AVAILABILITY_PATH,
       availabilityForm(park, stay, pets),
-      { referer: `${ctx.manifest.website}/${park.slug}/book-now/`, signal }
+      { referer: `${ctx.manifest.website}/${park.slug}/book-now/`, signal, onSend }
     );
     throwIfAborted(signal);
     const reading = readAvailability(response.body);
@@ -194,6 +215,8 @@ export function createRacAvailability({
 
   return {
     categories,
+
+    unitsOf: (park, stay, answered) => answered.map((category) => toUnit(park, stay, category)),
 
     async check(
       externalId: string,

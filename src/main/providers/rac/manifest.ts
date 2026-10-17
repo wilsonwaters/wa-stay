@@ -3,12 +3,13 @@
  * manifest, and the renderer and the core services read everything about the provider from it:
  * no other code in the app names it.
  *
- * The parks are on Explore with their categories (the catalogue), each park's availability for
- * a stay is checked per category, watches run on it, and Site Sniper alerts when a stay's dates
- * open (snipes without holds). Free counts on Explore and the member number come later; until
- * then every other capability is off. RAC's terms (`index.ts`) set the limits: one request at a
- * time, 10 s apart in the background, watches every 15 minutes at most, a snipe's checks 10 s
- * apart for at most 30 minutes after the release, and at most two pets.
+ * The parks are on Explore with their categories (the catalogue) and their free units for the
+ * dates Explore is given, each park's availability for a stay is checked per category, watches
+ * run on it, and Site Sniper alerts when a stay's dates open (snipes without holds). The member
+ * number comes later; until then every other capability is off. RAC's terms (`index.ts`) set
+ * the limits: one request at a time, 10 s apart in the background, watches every 15 minutes at
+ * most, a snipe's checks 10 s apart for at most 30 minutes after the release, and at most two
+ * pets.
  */
 
 import { SnipeReleaseMode } from '@shared/types/common.types';
@@ -45,8 +46,8 @@ export const racManifest: ProviderManifest = {
     catalogMode: 'full',
     // One POST per park and stay, every category's nights and prices (`availability.ts`).
     availability: true,
-    // Explore's free counts come later.
-    bulkAvailability: false,
+    // Explore's free counts: one POST per park, free units only, no total (`bulk.ts`).
+    bulkAvailability: true,
     watches: true,
     // Release alerts: a snipe checks when the dates open and alerts with RAC's booking page.
     snipes: true,
@@ -79,6 +80,15 @@ export const racManifest: ProviderManifest = {
       default: 0,
       appliesTo: ['availability', 'watch', 'snipe'],
     },
+  ],
+  // What the POST sends: the dates, the party and the pets. A change to any asks again.
+  bulkAvailabilityStayFields: [
+    'arrival',
+    'departure',
+    'adults',
+    'children',
+    'infants',
+    'params.pets',
   ],
   // Both timed: a snipe checks every 10 s from the release for at most 30 minutes (terms rules
   // 2 and 3; `release-policy.ts`). No cancellation mode: watches cover cancellations, every 15

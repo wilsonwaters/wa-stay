@@ -1,15 +1,17 @@
 /**
  * RAC Parks & Resorts: RAC's holiday parks and resorts across Western Australia, WA Stay's
  * second provider. Its eight open parks are on Explore, each with its categories (powered site,
- * two-bedroom cabin, dorm…) on its page; a stay's availability is checked per category, with
- * prices and RAC's stay rules, and watches run on it. Site Sniper alerts when a stay's dates
- * open (RAC's holds are off, so a snipe never holds).
+ * two-bedroom cabin, dorm…) on its page and its free units for the dates Explore is given; a
+ * stay's availability is checked per category, with prices and RAC's stay rules, and watches
+ * run on it. Site Sniper alerts when a stay's dates open (RAC's holds are off, so a snipe never
+ * holds).
  *
  * - `manifest.ts`: who RAC is, what the module does, and its limits;
  * - `parks.ts`: the parks, as a seed of facts (no request per sync);
  * - `catalog.ts` and `book-now.ts`: the catalogue, and a park's categories from its book-now
  *   page (a native park's from one availability POST); `unit-kinds.ts`: what each category is;
  * - `availability.ts` and `mapping.ts`: a stay's availability, from RAC's availability answer;
+ * - `bulk.ts`: Explore's free counts, one POST per park;
  * - `release-policy.ts` and `release-calendar.ts`: when a stay opens (the rolling 364-day
  *   window, or a school-holiday release, 48 hours earlier for members), for snipes and for
  *   availability's `release.opensAt`;
@@ -20,7 +22,8 @@
  * addresses automated access, and robots.txt allows every path with a 10 s crawl delay; the
  * site's terms limit its use to "personal non-commercial home use". So the module:
  * 1. talks only to RAC's own host, for the person's own trip, from their own computer;
- * 2. sends at most one background request every 10 s, and none when the catalogue syncs;
+ * 2. sends at most one background request every 10 s, and none when the catalogue syncs (what
+ *    the person asks for, such as Explore's dates, goes 1 s after the request before it);
  * 3. lets watches run every 15 minutes at most, and a snipe check every 10 s for at most 30
  *    minutes after its release (no faster near a release);
  * 4. sends one request at a time, on one session;
@@ -38,6 +41,7 @@
 import { defineProvider, type ProviderModules } from '../sdk/provider';
 import type { ProviderContext } from '../sdk/context';
 import { createRacAvailability } from './availability';
+import { createRacBulkSearch } from './bulk';
 import { createRacCatalog } from './catalog';
 import { RacClient } from './client';
 import { racLinks } from './links';
@@ -82,7 +86,7 @@ export function createRacModules(
   return {
     links: racLinks,
     catalog: createRacCatalog({ ctx, client, links: racLinks, availability, kindOf }),
-    availability,
+    availability: { ...availability, search: createRacBulkSearch({ ctx, availability }) },
     release,
   };
 }

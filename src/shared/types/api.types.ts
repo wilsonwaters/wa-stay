@@ -33,7 +33,10 @@ export type ApiErrorCode =
   /** The provider answered "too many requests" (HTTP 429): try again later, not at once. */
   | 'RATE_LIMITED'
   | 'AUTH_REQUIRED'
-  /** Signing out would lose a queue place or a hold in progress on the provider. */
+  /**
+   * A queue place, a snipe or a hold needs the provider: signing out would lose it, and so
+   * would turning off an experiment that turns on its holds (`providers.setExperiment`).
+   */
   | 'ACCOUNT_BUSY'
   /** The hold has lapsed (or there is none to pay for): payment cannot open. */
   | 'HOLD_EXPIRED'

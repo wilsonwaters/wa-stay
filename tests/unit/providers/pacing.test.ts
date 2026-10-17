@@ -3,7 +3,8 @@
  * drive `performance.now()`, the monotonic clock it measures gaps with): one request in
  * flight, the gap from the end of one request to the start of the next (10 s background, 1 s
  * interactive), interactive requests first, one queue for every `withDefaults` view and every
- * kind of call, aborts and timeouts while waiting, failures and redirect chains as one turn,
+ * kind of call, aborts and timeouts while waiting, `onSend` at the turn (never for a request
+ * aborted while it waits), failures and redirect chains as one turn,
  * and the request priority: explicit, ambient, nested and inside a limiter task.
  */
 
@@ -223,6 +224,25 @@ describe('createPacedHttpClient', () => {
     expect(inner.requests.map((r) => new URL(r.url).pathname)).toEqual(['/sent', '/next']);
     // The aborted request ended its turn when it was aborted, 1 s in
     expect(starts()['/next']).toBe(SECOND + INTERVAL);
+  });
+
+  it('onSend is called when a request leaves the queue, never for one aborted while it waits', async () => {
+    setUp();
+    const sent: string[] = [];
+    const onSend = (path: string) => () => sent.push(`${path}@${performance.now() - start}`);
+    const start = performance.now();
+    const first = get('/a', { onSend: onSend('/a') });
+    const controller = new AbortController();
+    const aborted = get('/aborted', { signal: controller.signal, onSend: onSend('/aborted') });
+    const last = get('/last', { onSend: onSend('/last') });
+    expect(sent).toEqual(['/a@0']);
+    await jest.advanceTimersByTimeAsync(SECOND);
+    controller.abort();
+    await expect(aborted).rejects.toMatchObject({ name: 'AbortError' });
+    await jest.advanceTimersByTimeAsync(60 * SECOND);
+    await Promise.all([first, last]);
+    // /last when its turn came: 10 s after /a ended at 3 s
+    expect(sent).toEqual(['/a@0', '/last@13000']);
   });
 
   it('the timeout counts from the send', async () => {

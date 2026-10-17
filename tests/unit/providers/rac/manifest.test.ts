@@ -1,6 +1,7 @@
 /**
  * RAC's manifest (`src/main/providers/rac/manifest.ts`), links (`links.ts`) and seed
- * (`parks.ts`): who RAC is and its limits (terms rules 2–4), its pets stay field (rule 16), its
+ * (`parks.ts`): who RAC is and its limits (terms rules 2–4), its bulk cache key (the POST's stay
+ * fields), its pets stay field (rule 16), its
  * badge (a text monogram whose white text passes WCAG AA), what it does not do (no bookings
  * module, rule 10), links to RAC's own pages and never its cart (rule 6), and a seed of facts
  * with no photo or copy (rule 6).
@@ -43,12 +44,12 @@ describe('racManifest', () => {
     });
   });
 
-  it('has a catalogue, availability, watches and release alerts (snipes without holds), and no account', () => {
+  it('has a catalogue, availability (free counts on Explore too), watches and release alerts (snipes without holds), and no account', () => {
     expect(racManifest.capabilities).toEqual({
       catalog: true,
       catalogMode: 'full',
       availability: true,
-      bulkAvailability: false,
+      bulkAvailability: true,
       watches: true,
       snipes: true,
       holds: false,
@@ -65,6 +66,17 @@ describe('racManifest', () => {
       minRequestIntervalMs: 10_000,
       catalogTtlHours: 24,
     });
+  });
+
+  it('keys bulk answers by what the POST sends: both dates, the party and the pets', () => {
+    expect(racManifest.bulkAvailabilityStayFields).toEqual([
+      'arrival',
+      'departure',
+      'adults',
+      'children',
+      'infants',
+      'params.pets',
+    ]);
   });
 
   it('has a plain "RAC" monogram in a dark colour a white monogram passes WCAG AA on', () => {

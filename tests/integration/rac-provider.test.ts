@@ -4,9 +4,12 @@
  * book-now page in `tests/fixtures/providers/rac/` (a native park's from one availability
  * POST, cached by the core for 6 h), and the terms rules a request can break: RAC's host only
  * (rule 1), one request at a time 10 s apart (rules 2 and 4), the block cool-down on the
- * synthetic 403, 429 and challenge pages (rule 5). A FixtureHttpClient or a recording client
- * answers every request, so nothing is sent anywhere. Availability itself is
- * `rac-availability.test.ts`.
+ * synthetic 403, 429 and challenge pages (rule 5). RAC's bulk availability (Explore's free
+ * counts, `bulk.ts`): its counts agree with `check` on every recorded answer, its
+ * interactive pace through the core on Jest's fake timers, its deadlines with a place page or a
+ * date change in the middle, and its failures (a park that fails, a block, an abort, a newer
+ * search). A FixtureHttpClient or a recording client answers every request, so nothing is sent
+ * anywhere. Availability itself is `rac-availability.test.ts`.
  */
 
 import fs from 'fs';
@@ -16,11 +19,16 @@ import {
   createProviderContext,
   FakeSecretVault,
   InMemoryKeyValueStore,
+  isAbortError,
   ProviderError,
   ProviderHttpError,
   ProviderParseError,
+  type HopRequest,
   type ProviderContext,
 } from '@main/providers/sdk';
+import { INTERACTIVE_REQUEST_GAP_MS, currentRequestPriority } from '@main/providers/sdk/pacing';
+import { DEFAULT_CATALOG_TIMINGS } from '@main/core/catalog/location-catalog.service';
+import { pacedDeadlineMs } from '@main/core/catalog/catalog-helpers';
 import { ProviderRegistry } from '@main/providers/registry';
 import { LocationCatalogService } from '@main/core/catalog/location-catalog.service';
 import { openDatabase } from '@main/database/connection';
@@ -30,14 +38,24 @@ import { RAC_AVAILABILITY_PATH } from '@main/providers/rac/availability';
 import { RAC_RELEASE_INFO, RAC_ROLLING_RELEASE_INFO } from '@main/providers/rac/catalog';
 import { RAC_BLOCK_STATE_KEY, RacClient } from '@main/providers/rac/client';
 import { FixtureHttpClient } from '@main/testing/fixture-http-client';
-import type { StayQuery } from '@shared/types/provider.types';
+import type {
+  BulkAvailabilityEntry,
+  StayQuery,
+  UnitAvailability,
+  UnitKind,
+} from '@shared/types/provider.types';
 import { UNIT_KINDS } from '@shared/types/provider.types';
+import { addDays } from '@shared/utils/calendar-date';
 import {
   createMemoryLogger,
   createTestProviderContext,
   TEST_PROVIDERS_DIR,
 } from '@tests/utils/fake-provider';
-import { RecordingHttpClient } from '@tests/utils/fake-paced-provider';
+import {
+  pacedContext,
+  RecordingHttpClient,
+  type HopAnswer,
+} from '@tests/utils/fake-paced-provider';
 import { describeProviderContract } from '@tests/utils/provider-contract';
 import { fakeDateOnly } from '@tests/utils/core-harness';
 
@@ -49,6 +67,7 @@ const UNEXPECTED_LOG = path.join(os.tmpdir(), `rac-unexpected-${process.pid}.log
 const RAC = 'https://parksandresorts.rac.com.au';
 /** The day after the pages were recorded, 10 am in Perth. */
 const NOW = new Date('2026-10-17T02:00:00.000Z');
+const STAY: StayQuery = { arrival: '2026-11-06', departure: '2026-11-08', adults: 2 };
 const placeholder = (n: number) =>
   `https://driveau.newbook.cloud/crop_800_450/instances_00000000000000000000000000000000_${n}.jpg`;
 
@@ -540,6 +559,734 @@ describe('RAC terms rules', () => {
       await expect(client.getPage('/busselton/book-now/')).resolves.toMatchObject({
         status: 200,
       });
+    });
+  });
+});
+
+describe('RAC bulk availability', () => {
+  const SECOND = 1_000;
+  /** The park each availability POST is for, by its form's `blog_id`. */
+  const parkOf = (body: string | undefined) => {
+    const blogId = new URLSearchParams(body).get('blog_id');
+    return RAC_PARKS.find((park) => String(park.blogId) === blogId);
+  };
+  /** Each park's recorded answer for 6–8 Nov 2026. */
+  const ANSWER_FILES: Readonly<Record<string, string>> = Object.fromEntries(
+    RAC_PARKS.map((park) => [park.slug, `availability-${park.slug}-2026-11-06-2n.json`])
+  );
+  /** Answers a POST with its park's answer, and a book-now GET with Busselton's page. */
+  const byPark = (hop: HopRequest): HopAnswer => {
+    if (hop.method === 'GET') return { body: page('book-now-busselton.html') };
+    const park = parkOf(hop.body);
+    return park ? { body: page(ANSWER_FILES[park.slug]) } : { status: 404, body: '' };
+  };
+  /** The provider on an unpaced recording client, with a log to read. */
+  function recordingBulk(respond: (hop: HopRequest) => HopAnswer = byPark, delayMs = 0) {
+    const http = new RecordingHttpClient({ providerId: 'rac', respond, delayMs });
+    const logger = createMemoryLogger();
+    const provider = racFactory(
+      createTestProviderContext(racManifest, { http, logger, clock: () => NOW })
+    );
+    const search = (stay: StayQuery, signal?: AbortSignal) =>
+      provider.availability!.search!(stay, signal);
+    const posts = () => http.requests.filter((request) => request.method === 'POST');
+    return { http, logger, provider, search, posts };
+  }
+  const slugsOf = (requests: Array<{ body?: string }>) =>
+    requests.map((request) => parkOf(request.body)?.slug);
+  const SEED = RAC_PARKS.map((park) => park.slug);
+
+  afterEach(() => jest.useRealTimers());
+
+  describe('counts', () => {
+    it('counts every park for 6–8 Nov 2026 from the recorded answers, in the seed order, with no total', async () => {
+      const entries = await racFactory(fixtureContext()).availability!.search!(STAY);
+      const none = { availableUnits: 0, bookableUnits: 0 };
+      const free = (availableUnits: number) => ({ availableUnits });
+      expect(entries).toStrictEqual<BulkAvailabilityEntry[]>([
+        {
+          key: 'rac:busselton',
+          availableUnits: 51,
+          byKind: { campsite: free(51), cabin: none },
+        },
+        {
+          key: 'rac:cable-beach',
+          availableUnits: 35,
+          byKind: { campsite: free(31), cabin: free(4) },
+        },
+        {
+          // Its villas are booked out: none free, but bookable
+          key: 'rac:cervantes',
+          availableUnits: 57,
+          byKind: { campsite: free(57), cabin: free(0) },
+        },
+        {
+          // A studio free the first night only adds nothing
+          key: 'rac:esperance',
+          availableUnits: 75,
+          byKind: { campsite: free(69), cabin: free(6) },
+        },
+        {
+          key: 'rac:margaret-river',
+          availableUnits: 2,
+          byKind: { campsite: free(0), cabin: free(0), dorm: free(1), glamping: free(1) },
+        },
+        {
+          key: 'rac:exmouth',
+          availableUnits: 110,
+          byKind: { campsite: free(110), cabin: free(0), room: free(0) },
+        },
+        {
+          key: 'rac:karri-valley',
+          availableUnits: 5,
+          byKind: { campsite: free(5), cabin: free(0), room: free(0) },
+        },
+        {
+          key: 'rac:monkey-mia',
+          availableUnits: 75,
+          byKind: { campsite: free(57), cabin: free(0), room: free(14), dorm: free(4) },
+        },
+      ]);
+    });
+
+    it('Busselton 6–8 Nov 2026: the powered site adds its whole-stay 51, the sold-out ensuite site nothing, and there is no total', async () => {
+      const { search } = recordingBulk((hop) =>
+        parkOf(hop.body)?.slug === 'busselton' ? byPark(hop) : { status: 503, body: '' }
+      );
+      const [entry] = await search(STAY);
+      expect(entry).toStrictEqual({
+        key: 'rac:busselton',
+        availableUnits: 51,
+        byKind: {
+          campsite: { availableUnits: 51 },
+          cabin: { availableUnits: 0, bookableUnits: 0 },
+        },
+      });
+      // 53 and 55 free on the nights, 51 for the whole stay: the stay's count
+      const raw = JSON.parse(page(ANSWER_FILES.busselton)) as {
+        data: Record<string, { stay_through_sites_available: number; sites_available: object }>;
+      };
+      expect(raw.data['4'].sites_available).toEqual({ '2026-11-06': 53, '2026-11-07': 55 });
+      expect(raw.data['4'].stay_through_sites_available).toBe(51);
+      expect(entry).not.toHaveProperty('bookableUnits');
+    });
+
+    /** One park's answer, `body`, for `stay` (the other parks fail). */
+    async function entryFor(slug: string, body: string, stay: StayQuery) {
+      const { search } = recordingBulk((hop) =>
+        parkOf(hop.body)?.slug === slug ? { body } : { status: 503, body: '' }
+      );
+      const entries = await search(stay);
+      expect(entries).toHaveLength(1);
+      return entries[0];
+    }
+
+    it("Exmouth's closed category (stay-through code 2, stop sold) adds nothing and makes nothing bookable", async () => {
+      const entry = await entryFor(
+        'exmouth',
+        page('availability-exmouth-closed-2027-10-13-7n.json'),
+        {
+          arrival: '2027-10-13',
+          departure: '2027-10-20',
+          adults: 2,
+        }
+      );
+      const none = { availableUnits: 0, bookableUnits: 0 };
+      expect(entry).toStrictEqual({
+        key: 'rac:exmouth',
+        ...none,
+        byKind: { campsite: none, cabin: none, room: none },
+      });
+    });
+
+    it('a category closed for the stay (stop sold) adds nothing and makes nothing bookable, beside a free one', async () => {
+      // Exmouth's family cabin (stay-through code 2, every tariff stop sold) and its powered sites
+      const json = JSON.parse(page(ANSWER_FILES.exmouth)) as { data: Record<string, unknown> };
+      json.data = { '4': json.data['4'], '43': json.data['43'] };
+      const entry = await entryFor('exmouth', JSON.stringify(json), STAY);
+      expect(entry).toStrictEqual({
+        key: 'rac:exmouth',
+        availableUnits: 110,
+        byKind: {
+          campsite: { availableUnits: 110 },
+          cabin: { availableUnits: 0, bookableUnits: 0 },
+          room: { availableUnits: 0, bookableUnits: 0 },
+        },
+      });
+    });
+
+    it('a stay beyond the 364-day window (code 9, a special date) counts 0 of 0: "Not open"', async () => {
+      const leavers = await entryFor(
+        'busselton',
+        page('availability-busselton-leavers-2027-11-20-1n.json'),
+        { arrival: '2027-11-20', departure: '2027-11-21', adults: 2 }
+      );
+      expect(leavers).toMatchObject({ availableUnits: 0, bookableUnits: 0 });
+      // Partly inside the window: the nights inside it can be booked, but none is free all stay
+      const edge = await entryFor(
+        'busselton',
+        page('availability-busselton-window-edge-2027-10-13-6n.json'),
+        { arrival: '2027-10-13', departure: '2027-10-19', adults: 2 }
+      );
+      expect(edge.availableUnits).toBe(0);
+      expect(edge).not.toHaveProperty('bookableUnits');
+    });
+
+    it('a minimum stay on every tariff (code 6) is not free but bookable: "None free", never "Not open"', async () => {
+      const entry = await entryFor(
+        'busselton',
+        page('availability-busselton-school-holidays-2027-09-25-2n.json'),
+        { arrival: '2027-09-25', departure: '2027-09-27', adults: 2 }
+      );
+      expect(entry.availableUnits).toBe(0);
+      expect(entry).not.toHaveProperty('bookableUnits');
+      expect(entry.byKind?.campsite).toStrictEqual({ availableUnits: 0 });
+    });
+
+    it('too many guests on every tariff (code 3): check reads the nights closed, so bulk reads "Not open" too', async () => {
+      const json = JSON.parse(page(ANSWER_FILES.busselton)) as {
+        data: Record<string, { tariffs_available: Array<Record<string, unknown>> }>;
+      };
+      delete json.data['7'];
+      for (const tariff of json.data['4'].tariffs_available) {
+        Object.assign(tariff, {
+          tariff_success: 'false',
+          tariff_code: 3,
+          tariff_message: 'Maximum occupants exceeded',
+        });
+      }
+      const body = JSON.stringify(json);
+      const { provider } = recordingBulk(() => ({ body }));
+      const check = await provider.availability!.check('busselton', STAY);
+      expect(check.units[0].nights.map((night) => night.state)).toEqual(['closed', 'closed']);
+      // Explore agrees with the place page: nothing open
+      const entry = await entryFor('busselton', body, STAY);
+      const none = { availableUnits: 0, bookableUnits: 0 };
+      expect(entry).toStrictEqual({
+        key: 'rac:busselton',
+        ...none,
+        byKind: { campsite: none, cabin: none },
+      });
+    });
+
+    it('a night missing from the answer is not free, but the category stays bookable', async () => {
+      // A one-night answer for a two-night stay: 7 Nov is unknown
+      const entry = await entryFor(
+        'monkey-mia',
+        page('availability-monkey-mia-2026-10-31-1n.json'),
+        {
+          arrival: '2026-10-31',
+          departure: '2026-11-02',
+          adults: 2,
+        }
+      );
+      expect(entry.availableUnits).toBe(0);
+      expect(entry).not.toHaveProperty('bookableUnits');
+    });
+
+    /** Every recorded answer, with its park and its stay (from its nights). */
+    const ANSWERS = fs
+      .readdirSync(RAC_FIXTURES)
+      .filter((file) => /^availability-.+\.json$/.test(file))
+      .map((file) => {
+        const json = JSON.parse(page(file)) as { data: object };
+        const categories = Object.values(json.data) as Array<{
+          category_id: number;
+          sites_code: Record<string, number>;
+          stay_through_sites_available: number;
+        }>;
+        const nights = [...new Set(categories.flatMap((c) => Object.keys(c.sites_code)))].sort();
+        const park = RAC_PARKS.find((p) => file.startsWith(`availability-${p.slug}-`))!;
+        const stay: StayQuery = {
+          arrival: nights[0],
+          departure: addDays(nights[nights.length - 1], 1),
+          adults: 2,
+        };
+        return { file, park, stay, categories };
+      });
+
+    it('has a recorded answer for every park', () => {
+      expect(new Set(ANSWERS.map((answer) => answer.park.slug))).toEqual(new Set(SEED));
+      expect(ANSWERS.length).toBeGreaterThanOrEqual(16);
+    });
+
+    it.each(ANSWERS.map((answer) => [answer.file, answer] as const))(
+      'bulk agrees with check: %s',
+      async (file, { park, stay, categories }) => {
+        const body = page(file);
+        const entry = await entryFor(park.slug, body, stay);
+        const { provider } = recordingBulk(() => ({ body }));
+        const { units } = await provider.availability!.check(park.slug, stay);
+        const whole = new Map(
+          categories.map((c) => [`cat:${c.category_id}`, c.stay_through_sites_available])
+        );
+        // The units `check` marks free for the whole stay, by their whole-stay count
+        const free = (list: UnitAvailability[]) =>
+          list.filter((u) => u.fullyAvailable).reduce((sum, u) => sum + whole.get(u.unitId)!, 0);
+        // A category can be booked when one of its nights is neither closed nor not released
+        const counts = (list: UnitAvailability[]) =>
+          list.some((u) => u.nights.some((n) => n.state !== 'closed' && n.state !== 'not-released'))
+            ? { availableUnits: free(list) }
+            : { availableUnits: free(list), bookableUnits: 0 };
+
+        expect(entry).toStrictEqual({
+          key: `rac:${park.slug}`,
+          ...counts(units),
+          byKind: expect.any(Object),
+        });
+        const kinds = UNIT_KINDS.filter(
+          (kind) => park.unitKinds.includes(kind) || units.some((u) => u.unitKind === kind)
+        );
+        expect(Object.keys(entry.byKind!)).toEqual(kinds);
+        for (const kind of kinds) {
+          expect([kind, entry.byKind![kind]]).toStrictEqual([
+            kind,
+            counts(units.filter((u) => u.unitKind === (kind as UnitKind))),
+          ]);
+        }
+      }
+    );
+  });
+
+  describe('failures', () => {
+    it('one park that fails (a 503) gets no entry: seven entries, and one warning naming the park and the status', async () => {
+      const { search, logger, posts } = recordingBulk((hop) =>
+        parkOf(hop.body)?.slug === 'cervantes' ? { status: 503, body: 'down' } : byPark(hop)
+      );
+      const entries = await search(STAY);
+      expect(entries.map((entry) => entry.key)).toEqual(
+        SEED.filter((slug) => slug !== 'cervantes').map((slug) => `rac:${slug}`)
+      );
+      expect(slugsOf(posts())).toEqual(SEED);
+      const warnings = logger.lines.filter((line) => line.level === 'warn');
+      expect(warnings.map((line) => line.message)).toEqual([
+        'Bulk availability: no answer for cervantes (HTTP 503); it reads as unknown',
+      ]);
+    });
+
+    it.each<[string, HopAnswer, string]>([
+      ['a 520', { status: 520, body: '' }, 'HTTP 520'],
+      [
+        "RAC's guard text",
+        { body: page('availability-no-direct-file-access.txt') },
+        'an answer it could not read',
+      ],
+      [
+        'success "false"',
+        { body: '{"success":"false","message":"<b>Error</b>","data":[]}' },
+        'an answer it could not read',
+      ],
+      [
+        'no response',
+        { fail: new ProviderHttpError({ providerId: 'rac', status: 0, url: `${RAC}/x` }) },
+        'no response',
+      ],
+    ])(
+      'a park whose request fails with %s reads as unknown, and the next is asked',
+      async (_, answer, why) => {
+        const { search, logger, posts } = recordingBulk((hop) =>
+          parkOf(hop.body)?.slug === 'esperance' ? answer : byPark(hop)
+        );
+        const entries = await search(STAY);
+        expect(entries).toHaveLength(7);
+        expect(entries.find((entry) => entry.key === 'rac:esperance')).toBeUndefined();
+        expect(posts()).toHaveLength(8);
+        expect(logger.lines.filter((line) => line.level === 'warn').map((l) => l.message)).toEqual([
+          `Bulk availability: no answer for esperance (${why}); it reads as unknown`,
+        ]);
+      }
+    );
+
+    it('a 503 for every park rejects with the last error, after asking each once', async () => {
+      const { search, posts } = recordingBulk(() => ({ status: 503, body: '' }));
+      const error = await search(STAY).catch((e: unknown) => e);
+      expect(error).toBeInstanceOf(ProviderHttpError);
+      expect(error).toMatchObject({ status: 503, retryable: true });
+      expect(slugsOf(posts())).toEqual(SEED);
+    });
+
+    it('block stops the search: a 403 on the third park rejects with the typed error after exactly three POSTs, and a second search within the cool-down sends nothing', async () => {
+      const { search, posts, provider } = recordingBulk((hop) =>
+        parkOf(hop.body)?.slug === 'cervantes'
+          ? { status: 403, body: page('blocked-403.html') }
+          : byPark(hop)
+      );
+      const error = await search(STAY).catch((e: unknown) => e);
+      expect(error).toBeInstanceOf(ProviderHttpError);
+      expect(error).toMatchObject({ status: 403, retryable: false });
+      expect((error as Error).message).toMatch(
+        /turned the request away \(HTTP 403\)\. WA Stay won't ask again until/
+      );
+      expect(slugsOf(posts())).toEqual(['busselton', 'cable-beach', 'cervantes']);
+
+      // Retry during the cool-down fails at once and sends nothing (terms rule 5)
+      await expect(search({ ...STAY, adults: 3 })).rejects.toMatchObject({ status: 403 });
+      expect(posts()).toHaveLength(3);
+      // Nor does a place page's check
+      await expect(provider.availability!.check('busselton', STAY)).rejects.toMatchObject({
+        status: 403,
+      });
+      expect(posts()).toHaveLength(3);
+    });
+
+    it.each<[string, HopAnswer]>([
+      ['a 429', { status: 429, body: page('blocked-429.html') }],
+      ['a challenge', { body: page('challenge.html') }],
+    ])('%s stops the search too', async (_, answer) => {
+      const { search, posts } = recordingBulk((hop) =>
+        parkOf(hop.body)?.slug === 'busselton' ? answer : byPark(hop)
+      );
+      await expect(search(STAY)).rejects.toBeInstanceOf(ProviderHttpError);
+      expect(posts()).toHaveLength(1);
+    });
+
+    it('an abort after two POSTs sends no third one, and rejects with an AbortError', async () => {
+      const controller = new AbortController();
+      const { search, posts } = recordingBulk((hop) => {
+        if (parkOf(hop.body)?.slug === 'cable-beach') controller.abort();
+        return byPark(hop);
+      });
+      const error = await search(STAY, controller.signal).catch((e: unknown) => e);
+      expect(isAbortError(error)).toBe(true);
+      expect(slugsOf(posts())).toEqual(['busselton', 'cable-beach']);
+    });
+
+    it('an aborted signal sends nothing', async () => {
+      const controller = new AbortController();
+      controller.abort();
+      const { search, posts } = recordingBulk();
+      const error = await search(STAY, controller.signal).catch((e: unknown) => e);
+      expect(isAbortError(error)).toBe(true);
+      expect(posts()).toHaveLength(0);
+    });
+
+    it('refuses a stay RAC cannot take with a ProviderError, sending nothing', async () => {
+      const { search, posts } = recordingBulk();
+      for (const stay of [
+        { ...STAY, params: { pets: 3 } },
+        { ...STAY, departure: STAY.arrival },
+        { ...STAY, arrival: '6 Nov 2026' },
+      ]) {
+        await expect(search(stay)).rejects.toBeInstanceOf(ProviderError);
+      }
+      expect(posts()).toHaveLength(0);
+    });
+
+    const NEXT_WEEK: StayQuery = { arrival: '2026-11-13', departure: '2026-11-15', adults: 2 };
+    const stayOf = (body?: string) => new URLSearchParams(body).get('available_from');
+
+    it('a superseded search sends nothing more and resolves with what it has; its POST already sent finishes first', async () => {
+      jest.useFakeTimers({ now: NOW });
+      const { search, http, posts } = recordingBulk(byPark, 5 * SECOND);
+      let older: BulkAvailabilityEntry[] | undefined;
+      void search(STAY).then((entries) => (older = entries));
+      // Busselton answered; Cable Beach is on the wire when the dates change
+      await jest.advanceTimersByTimeAsync(7 * SECOND);
+      expect(posts()).toHaveLength(2);
+      let newer: BulkAvailabilityEntry[] | undefined;
+      void search(NEXT_WEEK).then((entries) => (newer = entries));
+      await jest.advanceTimersByTimeAsync(SECOND);
+      // Cable Beach is still RAC's to answer: nothing else is sent meanwhile
+      expect(posts()).toHaveLength(2);
+      expect(older).toBeUndefined();
+      await jest.advanceTimersByTimeAsync(2 * SECOND);
+      expect(older?.map((entry) => entry.key)).toEqual(['rac:busselton', 'rac:cable-beach']);
+      await jest.advanceTimersByTimeAsync(60 * SECOND);
+      expect(newer).toHaveLength(8);
+
+      const [, cableBeach, firstNewer] = posts();
+      // Not called off: it took its whole 5 s, and the newer search's first POST went after it
+      expect(cableBeach.endedAt! - cableBeach.sentAt).toBe(5 * SECOND);
+      expect(firstNewer.sentAt).toBeGreaterThanOrEqual(cableBeach.endedAt!);
+      expect(posts().filter((r) => stayOf(r.body) === '6 Nov 2026')).toHaveLength(2);
+      expect(slugsOf(posts().filter((r) => stayOf(r.body) === '13 Nov 2026'))).toEqual(SEED);
+      expect(http.peakInFlight).toBe(1);
+    });
+
+    it('a superseded search calls off its POST still waiting for its turn: it is never sent', async () => {
+      jest.useFakeTimers({ now: NOW });
+      const { search, http, posts, provider } = recordingBulk(byPark, 5 * SECOND);
+      // A place page's check is on the wire; the search's first POST waits behind it
+      void provider.availability!.check('exmouth', STAY);
+      await jest.advanceTimersByTimeAsync(SECOND);
+      let older: BulkAvailabilityEntry[] | undefined;
+      void search(STAY).then((entries) => (older = entries));
+      await jest.advanceTimersByTimeAsync(SECOND);
+      expect(http.requests).toHaveLength(1);
+      let newer: BulkAvailabilityEntry[] | undefined;
+      void search(NEXT_WEEK).then((entries) => (newer = entries));
+      await jest.advanceTimersByTimeAsync(SECOND);
+      expect(older).toEqual([]);
+      await jest.advanceTimersByTimeAsync(60 * SECOND);
+      expect(newer).toHaveLength(8);
+      // The check, then only the newer search's POSTs: the older one's Busselton never went
+      const searches = posts().slice(1);
+      expect(searches.every((r) => stayOf(r.body) === '13 Nov 2026')).toBe(true);
+      expect(slugsOf(searches)).toEqual(SEED);
+      expect(http.peakInFlight).toBe(1);
+    });
+  });
+
+  it('logs no request body, cart address or NewBook key', async () => {
+    const logger = createMemoryLogger();
+    const answers = new Map<string, HopAnswer>([
+      ['cable-beach', { status: 503, body: page(ANSWER_FILES.busselton) }],
+      ['cervantes', { body: page('availability-no-direct-file-access.txt') }],
+      ['esperance', { body: '{"success":"false","message":"api_key instances_x","data":[]}' }],
+    ]);
+    const http = new RecordingHttpClient({
+      providerId: 'rac',
+      respond: (hop) => answers.get(parkOf(hop.body)?.slug ?? '') ?? byPark(hop),
+    });
+    const provider = racFactory(
+      createTestProviderContext(racManifest, { http, logger, clock: () => NOW })
+    );
+    await provider.availability!.search!({ ...STAY, children: 1, params: { pets: 1 } });
+    // Then a block, which logs its status only
+    const blocked = new RecordingHttpClient({
+      providerId: 'rac',
+      respond: () => ({ status: 429, body: page('blocked-429.html') }),
+    });
+    await racFactory(
+      createTestProviderContext(racManifest, { http: blocked, logger, clock: () => NOW })
+    ).availability!.search!(STAY).catch(() => undefined);
+
+    const logged = JSON.stringify(logger.lines);
+    expect(logger.lines.length).toBeGreaterThanOrEqual(4);
+    for (const leak of [
+      'blog_id',
+      'available_from',
+      '6 Nov 2026',
+      'animals',
+      'api_key',
+      'instances_',
+      '<redacted>',
+      'cart',
+      'online_booking_url',
+      '/booking/',
+      'availability-ajax',
+      'Powered Site',
+    ]) {
+      expect([leak, logged.includes(leak)]).toEqual([leak, false]);
+    }
+  });
+
+  describe('pace and deadlines, through the core (R2, brief R8)', () => {
+    let db: ReturnType<typeof openDatabase> | undefined;
+    let catalog: LocationCatalogService | undefined;
+    let registry: ProviderRegistry | undefined;
+
+    afterEach(async () => {
+      catalog?.stop();
+      await registry?.disposeAll();
+      db?.close();
+      db = undefined;
+      catalog = undefined;
+      registry = undefined;
+    });
+
+    /** RAC through the core, paced as in the app, on a recording client whose hops take `delayMs`. */
+    async function pacedRac(delayMs: number) {
+      jest.useFakeTimers({ now: NOW });
+      const priorities: string[] = [];
+      const inner = new RecordingHttpClient({ providerId: 'rac', delayMs, respond: byPark });
+      registry = new ProviderRegistry();
+      registry.register(racFactory, (manifest) => {
+        const ctx = pacedContext(manifest, inner);
+        // The ambient priority when the RAC module asks its (paced) client to send
+        const request = ctx.http.request.bind(ctx.http);
+        ctx.http.request = (...args) => {
+          priorities.push(currentRequestPriority());
+          return request(...args);
+        };
+        return ctx;
+      });
+      db = openDatabase(':memory:');
+      catalog = new LocationCatalogService({
+        registry,
+        locations: new LocationRepository(db),
+        providerState: new ProviderStateRepository(db),
+        events: { emit: () => undefined },
+        logger: createMemoryLogger(),
+      });
+      await catalog.sync('rac');
+      // The seed: nothing sent
+      expect(inner.requests).toHaveLength(0);
+      return { inner, catalog, priorities };
+    }
+
+    interface Tracked<T> {
+      value?: T;
+      error?: unknown;
+      /** How long it took, once settled. */
+      ms?: number;
+    }
+
+    /** Follows `promise`: what it gave, and how long it took on the fake clock. */
+    function track<T>(promise: Promise<T>): Tracked<T> {
+      const start = performance.now();
+      const tracked: Tracked<T> = {};
+      promise.then(
+        (value) => Object.assign(tracked, { value, ms: performance.now() - start }),
+        (error: unknown) => Object.assign(tracked, { error, ms: performance.now() - start })
+      );
+      return tracked;
+    }
+
+    /** Runs fake time, 100 ms at a time, until every one has settled (5 minutes at most). */
+    async function settle(...all: Tracked<unknown>[]): Promise<void> {
+      for (let waited = 0; waited < 5 * 60 * SECOND; waited += 100) {
+        if (all.every((t) => t.ms !== undefined)) return;
+        await jest.advanceTimersByTimeAsync(100);
+      }
+    }
+
+    /** Runs fake time until `promise` settles; how long it took, and what it gave. */
+    async function timed<T>(promise: Promise<T>): Promise<Tracked<T> & { ms: number }> {
+      const tracked = track(promise);
+      await settle(tracked);
+      return tracked as Tracked<T> & { ms: number };
+    }
+
+    const limits = racManifest.limits!;
+    const BULK_DEADLINE_MS = pacedDeadlineMs(
+      DEFAULT_CATALOG_TIMINGS.availabilityTimeoutMs,
+      limits,
+      {
+        requests: RAC_PARKS.length,
+        priority: 'interactive',
+      }
+    );
+    const CHECK_DEADLINE_MS = pacedDeadlineMs(
+      DEFAULT_CATALOG_TIMINGS.availabilityTimeoutMs,
+      limits,
+      {
+        requests: 2,
+        priority: 'interactive',
+      }
+    );
+    const DETAIL_DEADLINE_MS = pacedDeadlineMs(DEFAULT_CATALOG_TIMINGS.detailTimeoutMs, limits, {
+      requests: 2,
+      priority: 'interactive',
+    });
+
+    it('interactive pacing: eight POSTs, never two in flight, each 1 s after the last ended, all interactive, done within 60 s', async () => {
+      const { inner, catalog, priorities } = await pacedRac(5 * SECOND);
+      const { value, ms } = await timed(catalog.availability(STAY));
+
+      expect(value?.errors).toEqual([]);
+      expect(value?.entries.map((entry) => entry.key)).toEqual(SEED.map((slug) => `rac:${slug}`));
+      expect(slugsOf(inner.requests)).toEqual(SEED);
+      expect(inner.peakInFlight).toBe(1);
+      for (let i = 1; i < inner.requests.length; i++) {
+        const gap = inner.requests[i].sentAt - inner.requests[i - 1].endedAt!;
+        expect(gap).toBeGreaterThanOrEqual(INTERACTIVE_REQUEST_GAP_MS);
+      }
+      expect(inner.requests.map((request) => request.priority)).toEqual(
+        Array(8).fill('interactive')
+      );
+      expect(priorities).toEqual(Array(8).fill('interactive'));
+      // 8 × 5 s and 7 gaps of 1 s
+      expect(Math.round(ms)).toBe(47 * SECOND);
+      expect(ms).toBeLessThanOrEqual(60 * SECOND);
+    });
+
+    it("the core's deadline covers eight POSTs at the slowest latency seen live (8 s)", async () => {
+      const { catalog } = await pacedRac(8 * SECOND);
+      const { value, ms } = await timed(catalog.availability(STAY));
+      expect(value?.errors).toEqual([]);
+      expect(value?.entries).toHaveLength(8);
+      // 8 × 8 s and 7 gaps of 1 s, inside 20 s + 8 × 11 s
+      expect(Math.round(ms)).toBe(71 * SECOND);
+      expect(BULK_DEADLINE_MS).toBe(108 * SECOND);
+    });
+
+    it("a place page opened during Explore's search waits for one POST, not the search: its detail and check meet their deadlines, and so does the search", async () => {
+      const { inner, catalog } = await pacedRac(8 * SECOND);
+      const explored = track(catalog.availability(STAY));
+      // Busselton and Cable Beach answered; Cervantes is on the wire
+      await jest.advanceTimersByTimeAsync(20 * SECOND);
+      expect(inner.requests).toHaveLength(3);
+      const opened = track(catalog.get('rac:busselton'));
+      const checked = track(catalog.checkLocation('rac:busselton', STAY));
+      await settle(explored, opened, checked);
+
+      // Cervantes ends at 26 s; the detail goes 1 s later (35 s), then the check (44 s)
+      expect(opened.error).toBeUndefined();
+      expect(opened.value?.units.length).toBeGreaterThan(0);
+      expect(Math.round(opened.ms!)).toBe(15 * SECOND);
+      expect(opened.ms).toBeLessThan(DETAIL_DEADLINE_MS);
+      expect(checked.error).toBeUndefined();
+      expect(checked.value?.units.length).toBeGreaterThan(0);
+      expect(Math.round(checked.ms!)).toBe(24 * SECOND);
+      expect(checked.ms).toBeLessThan(CHECK_DEADLINE_MS);
+      // The search's own POSTs resume after them: 10 requests of 8 s and 9 gaps
+      expect(explored.value?.errors).toEqual([]);
+      expect(explored.value?.entries).toHaveLength(8);
+      expect(Math.round(explored.ms!)).toBe(89 * SECOND);
+      expect(explored.ms).toBeLessThan(BULK_DEADLINE_MS);
+      expect(inner.requests.map((r) => r.method)).toEqual([
+        'POST',
+        'POST',
+        'POST',
+        'GET',
+        'POST',
+        'POST',
+        'POST',
+        'POST',
+        'POST',
+        'POST',
+      ]);
+      expect(inner.peakInFlight).toBe(1);
+    });
+
+    it('a date change during a search stops the older one, so the newer one meets its deadline', async () => {
+      const { inner, catalog } = await pacedRac(8 * SECOND);
+      const NEXT_WEEK: StayQuery = { arrival: '2026-11-13', departure: '2026-11-15', adults: 2 };
+      const older = track(catalog.availability(STAY));
+      await jest.advanceTimersByTimeAsync(20 * SECOND);
+      const newer = track(catalog.availability(NEXT_WEEK));
+      await settle(older, newer);
+
+      // The older one lets Cervantes, already sent, finish, keeps the parks it had, with no
+      // error, and sends nothing after it
+      expect(older.value?.errors).toEqual([]);
+      expect(older.value?.entries.map((entry) => entry.key)).toEqual([
+        'rac:busselton',
+        'rac:cable-beach',
+        'rac:cervantes',
+      ]);
+      const olderPosts = inner.requests.filter(
+        (r) => new URLSearchParams(r.body).get('available_from') === '6 Nov 2026'
+      );
+      expect(olderPosts).toHaveLength(3);
+      expect(olderPosts[2].endedAt! - olderPosts[2].sentAt).toBe(8 * SECOND);
+      // The newer one waits for Cervantes (6 s more) and its gap: 6 s + 8 × 8 s + 8 gaps
+      expect(newer.value?.errors).toEqual([]);
+      expect(newer.value?.entries).toHaveLength(8);
+      expect(Math.round(newer.ms!)).toBe(78 * SECOND);
+      expect(newer.ms).toBeLessThan(BULK_DEADLINE_MS);
+      expect(inner.peakInFlight).toBe(1);
+    });
+
+    it('a date change while a POST waits for its 1 s gap calls that POST off: it is never sent', async () => {
+      const { inner, catalog } = await pacedRac(8 * SECOND);
+      const NEXT_WEEK: StayQuery = { arrival: '2026-11-13', departure: '2026-11-15', adults: 2 };
+      const older = track(catalog.availability(STAY));
+      // Busselton ended at 8 s; Cable Beach waits for its turn at 9 s
+      await jest.advanceTimersByTimeAsync(8.5 * SECOND);
+      expect(inner.requests).toHaveLength(1);
+      const newer = track(catalog.availability(NEXT_WEEK));
+      await settle(older, newer);
+
+      expect(older.value?.entries.map((entry) => entry.key)).toEqual(['rac:busselton']);
+      const stays = inner.requests.map((r) => new URLSearchParams(r.body).get('available_from'));
+      expect(stays).toEqual(['6 Nov 2026', ...Array(8).fill('13 Nov 2026')]);
+      // The newer one's first POST takes Cable Beach's turn, at 9 s
+      expect(inner.requests[1].sentAt - inner.requests[0].endedAt!).toBe(SECOND);
+      expect(newer.value?.entries).toHaveLength(8);
+      expect(newer.ms).toBeLessThan(BULK_DEADLINE_MS);
+      expect(inner.peakInFlight).toBe(1);
     });
   });
 });

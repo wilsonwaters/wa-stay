@@ -36,10 +36,13 @@ export { useSetSetting, useSetting } from './settings';
 export {
   useAccessStatus,
   useProvider,
+  useProviderExperiments,
   useProviders,
   useProvidersWith,
+  useSetExperiment,
   type ProviderCapabilities,
   type ProviderCapability,
+  type ProviderExperimentState,
   type ProviderManifest,
 } from './providers';
 export {

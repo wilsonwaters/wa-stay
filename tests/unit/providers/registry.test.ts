@@ -231,6 +231,11 @@ describe('ProviderRegistry.register', () => {
           {},
           /limits\.minRequestIntervalMs needs limits\.maxConcurrentRequests 1, not 4/,
         ],
+        [
+          'experiments keep the flag rules',
+          { capabilities: { snipes: false } },
+          /with experiment sniping on: capability snipes needs at least one release mode/,
+        ],
       ];
 
     it('covers every manifest rule', () => {
@@ -255,6 +260,12 @@ describe('ProviderRegistry.register', () => {
           minRequestIntervalMs: 10_000,
           maxConcurrentRequests: 4,
         };
+      }
+      if (rule === 'experiments keep the flag rules') {
+        // Off, the manifest is fine; on, Site Sniper would have no release mode
+        fake.manifest.experiments = [
+          { id: 'sniping', label: 'Site Sniper', description: 'Snipes.', turnsOn: ['snipes'] },
+        ];
       }
       expectRegistrationError(fake, message);
     });

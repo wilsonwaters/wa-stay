@@ -9,6 +9,7 @@ import { bulkAvailabilityFor } from '../../../../tests/fixtures/catalog/bulk-ava
 import { catalogApi, placeNamed } from '../../../../tests/utils/renderer/catalog';
 import { ok, PARKSTAY_MANIFEST } from '../../../../tests/utils/renderer/createMockApi';
 import { installFakeMap, type FakeMaps } from '../../../../tests/utils/renderer/fakeMapController';
+import { RAC_MANIFEST } from '../../../../tests/utils/renderer/manifests';
 import { currentRoute, renderWithApp } from '../../../../tests/utils/renderer/renderWithApp';
 import type { LocationSummary } from '../../../shared/types/catalog.types';
 import type { BulkAvailabilityEntry, StayQuery } from '../../../shared/types/provider.types';
@@ -559,6 +560,105 @@ describe('Explore with dates: providers that fail or are slow', () => {
     } finally {
       onLine.mockRestore();
     }
+  });
+});
+
+describe("Explore with dates: RAC's free counts, with no total (RS12)", () => {
+  /** An RAC park: sites and cabins, its free units counted with no total. */
+  const BUSSELTON: LocationSummary = {
+    ...KINGSTOWN,
+    key: 'rac:busselton',
+    providerId: 'rac',
+    externalId: 'busselton',
+    name: 'RAC Busselton Holiday Park',
+    kind: 'holiday-park',
+    unitKinds: ['campsite', 'cabin'],
+    lng: 115.25,
+  };
+  const ENTRIES: BulkAvailabilityEntry[] = [
+    ...bulkAvailabilityFor([BUNGARRA]),
+    {
+      key: BUSSELTON.key,
+      availableUnits: 27,
+      byKind: { campsite: { availableUnits: 26 }, cabin: { availableUnits: 1 } },
+    },
+  ];
+  const stubs = (availability?: AvailabilityStub) =>
+    api(
+      availability ?? jest.fn(async (stay, options) => answering(ENTRIES)(stay, options)),
+      [PARKSTAY_MANIFEST, RAC_MANIFEST],
+      [BUNGARRA, BUSSELTON]
+    ).stubs;
+
+  it("reads RAC's free units with their noun and no total, beside ParkStay's N of M", async () => {
+    await renderExplore(`/?${STAY}`, stubs(), '2 places · 2 available for 6–8 Nov');
+    const rac = card(BUSSELTON.name);
+    expect(within(rac).getByText('27 spots free')).toBeInTheDocument();
+    expect(rac).toHaveAccessibleDescription(expect.stringContaining('27 spots free'));
+    expect(within(rac).queryByText(/\bof\b/)).toBeNull();
+    expect(within(card('Bungarra')).getByText('3 of 5 sites available')).toBeInTheDocument();
+  });
+
+  it('counts only the cabins with Cabins & villas chosen: "1 cabin free"', async () => {
+    await renderExplore(`/?stay=cabin&${STAY}`, stubs(), '1 place · 1 available for 6–8 Nov');
+    expect(within(card(BUSSELTON.name)).getByText('1 cabin free')).toBeInTheDocument();
+  });
+
+  it('says "Still checking RAC…" in the notices after 10 seconds while its counts arrive', async () => {
+    jest.useFakeTimers();
+    try {
+      const availability: AvailabilityStub = jest.fn((stay, options) =>
+        options?.providerIds?.[0] === 'rac'
+          ? new Promise(() => undefined)
+          : answering(ENTRIES)(stay, options)
+      );
+      renderWithApp({ route: `/?${STAY}`, api: stubs(availability) });
+      await screen.findByRole('heading', { name: '2 places · checking availability…' });
+      expect(screen.queryByText(/Still checking/)).toBeNull();
+      await act(async () => {
+        jest.advanceTimersByTime(SLOW_AVAILABILITY_MS);
+      });
+      // A status notice in the results' notices; RAC has no waiting queue: no word of one
+      const notices = within(results())
+        .getAllByRole('status')
+        .map((status) => status.textContent);
+      expect(notices).toContain('Still checking RAC…');
+      expect(screen.queryByText(/Still checking ParkStay/)).toBeNull();
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it('says it could not check RAC, with "Retry RAC availability", when RAC turned the request away', async () => {
+    let blocked = true;
+    const availability: AvailabilityStub = jest.fn(async (stay, options) =>
+      options?.providerIds?.[0] === 'rac' && blocked
+        ? ok({
+            entries: [],
+            errors: [
+              {
+                providerId: 'rac',
+                code: 'http',
+                message:
+                  "RAC Parks & Resorts turned the request away (HTTP 403). WA Stay won't ask again until 3:45 pm.",
+              },
+            ],
+          })
+        : answering(ENTRIES)(stay, options)
+    );
+    const { user } = await renderExplore(
+      `/?${STAY}`,
+      stubs(availability),
+      '2 places · 1 available for 6–8 Nov'
+    );
+    const alert = within(results()).getByRole('alert');
+    expect(alert).toHaveTextContent("Couldn't check availability on RAC.");
+    expect(within(card(BUSSELTON.name)).getByText("Couldn't check RAC")).toBeInTheDocument();
+
+    blocked = false;
+    await user.click(within(alert).getByRole('button', { name: 'Retry RAC availability' }));
+    expect(await within(card(BUSSELTON.name)).findByText('27 spots free')).toBeInTheDocument();
+    expect(availability).toHaveBeenLastCalledWith(expect.anything(), { providerIds: ['rac'] });
   });
 });
 

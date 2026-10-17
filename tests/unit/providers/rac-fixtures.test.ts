@@ -45,6 +45,16 @@ const DROPPED_KEYS = [
 /** A notice's text is a booking rule, kept as a fact; every other description is RAC's copy. */
 const KEPT_DESCRIPTION_CLASS = 'booking-notification__description';
 const RAC_HOST = 'parksandresorts.rac.com.au';
+/** The parks besides Busselton whose answers for 6–8 Nov 2026 Explore's free counts use. */
+const BULK_PARKS = [
+  'cable-beach',
+  'cervantes',
+  'esperance',
+  'margaret-river',
+  'exmouth',
+  'karri-valley',
+  'monkey-mia',
+];
 
 function filesIn(dir: string): string[] {
   const absolute = path.join(ROOT, dir);
@@ -171,6 +181,10 @@ describe('RAC fixtures (terms rule 7)', () => {
         'tests/e2e/fixtures/http/rac/book-now-busselton.html',
         'tests/e2e/fixtures/http/rac/book-now-margaret-river.html',
         'tests/e2e/fixtures/http/rac/availability-busselton-2026-11-06-2n.json',
+        ...BULK_PARKS.flatMap((slug) => [
+          `tests/fixtures/providers/rac/availability-${slug}-2026-11-06-2n.json`,
+          `tests/e2e/fixtures/http/rac/availability-${slug}-2026-11-06-2n.json`,
+        ]),
       ])
     );
   });

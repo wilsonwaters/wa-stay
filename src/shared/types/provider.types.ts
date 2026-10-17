@@ -115,6 +115,46 @@ export interface ProviderCapabilities {
 /** The capability flags that are booleans: what `registry.require` and `withCapability` take. */
 export type BooleanCapability = Exclude<keyof ProviderCapabilities, 'account' | 'catalogMode'>;
 
+/** Every `BooleanCapability`. */
+export const BOOLEAN_CAPABILITIES = [
+  'catalog',
+  'availability',
+  'bulkAvailability',
+  'watches',
+  'snipes',
+  'holds',
+  'bookingImport',
+  'accessGate',
+] as const satisfies readonly BooleanCapability[];
+assertTypeEquals<(typeof BOOLEAN_CAPABILITIES)[number], BooleanCapability>(true);
+
+/** An experiment's id: a lower-case letter, then 1–31 letters or digits, e.g. `autoCart`. */
+export const EXPERIMENT_ID_PATTERN = /^[a-z][A-Za-z0-9]{1,31}$/;
+
+/**
+ * Something a provider can do but ships switched off: the person turns it on in Settings →
+ * Accounts, on the provider's row, and it takes effect when WA Stay restarts. WA Stay then
+ * registers the provider with `turnsOn` on, so its factory sees them on in `ctx.manifest`
+ * and builds their modules.
+ */
+export interface ProviderExperiment {
+  /** Stored with the person's choice, so it never changes once shipped. */
+  id: string;
+  /** The switch's label, e.g. "Hold a stay in the cart". */
+  label: string;
+  /** One or two sentences under the switch. */
+  description: string;
+  /** Shown in the confirm dialog before the person turns it on. */
+  warning?: string;
+  /** Boolean capabilities, each off in the manifest, that the experiment turns on. */
+  turnsOn: BooleanCapability[];
+  /**
+   * Set by WA Stay on the manifest it registers with the experiment on (`withExperiments`),
+   * whose `turnsOn` capabilities are then on. A provider never sets it.
+   */
+  applied?: boolean;
+}
+
 /**
  * How hard the app may use a provider (§12.30). Core services read them from the provider
  * context or the manifest; a manifest without `limits` gets `DEFAULT_PROVIDER_LIMITS`.
@@ -286,6 +326,8 @@ export interface ProviderManifest {
    * absent.
    */
   bulkAvailabilityStayFields?: StayKeyField[];
+  /** What the provider ships switched off, for the person to turn on (`ProviderExperiment`). */
+  experiments?: ProviderExperiment[];
 }
 
 /** Values for a provider's `stayFields`, keyed by `StayFieldDescriptor.key`. */
@@ -393,9 +435,10 @@ export interface LocationAvailability {
 
 /**
  * One place's availability for a stay, from a provider's bulk `availability.search`: counts of
- * units, not nights. Explore shows "2 of 5 sites available" (`availableUnits` above 0), "No site
- * free every night" (none free, some bookable) or "No sites open for these dates" (none
- * bookable). A place the provider has no answer for gets no entry, and reads as unknown.
+ * units, not nights. Explore shows "2 of 5 sites available" (`availableUnits` above 0), "27
+ * spots free" (above 0, with no total), "No site free every night" (none free, some bookable)
+ * or "No sites open for these dates" (none bookable). A place the provider has no answer for
+ * gets no entry, and reads as unknown.
  */
 export interface BulkAvailabilityEntry {
   /** The place's location key, `makeLocationKey(providerId, externalId)`. */
@@ -407,15 +450,18 @@ export interface BulkAvailabilityEntry {
   availableUnits: number;
   /**
    * How many units can be booked online for the stay's dates at all, free or not: the place's
-   * total, or 0 when none can be (not released yet, closed, or past the booking window).
+   * total, or 0 when none can be (not released yet, closed, or past the booking window). Left
+   * out when the provider has no unit total (RAC counts free units only); 0 still means none
+   * can be booked.
    */
-  bookableUnits: number;
+  bookableUnits?: number;
   /**
    * The same two counts for each kind of unit the place has, so a filter on what people sleep
    * in can count only those units. Set it at a place with more than one kind; a kind left out
-   * has no count. Passed through as the provider gives it.
+   * has no count. Its `bookableUnits` is left out, as above, when the provider has no total.
+   * Passed through as the provider gives it.
    */
-  byKind?: Partial<Record<UnitKind, { availableUnits: number; bookableUnits: number }>>;
+  byKind?: Partial<Record<UnitKind, { availableUnits: number; bookableUnits?: number }>>;
 }
 
 /** The state of a provider's waiting room or queue. */
@@ -568,6 +614,24 @@ export const ReleaseModeDescriptorSchema = z.object({
 assertTypeEquals<z.input<typeof ReleaseModeDescriptorSchema>, ReleaseModeDescriptor>(true);
 assertTypeEquals<z.output<typeof ReleaseModeDescriptorSchema>, ReleaseModeDescriptor>(true);
 
+export const ExperimentIdSchema = z
+  .string()
+  .regex(
+    EXPERIMENT_ID_PATTERN,
+    'Experiment ids are a lower-case letter, then 1–31 letters or digits'
+  );
+
+export const ProviderExperimentSchema = z.object({
+  id: ExperimentIdSchema,
+  label: nonEmpty,
+  description: nonEmpty,
+  warning: nonEmpty.optional(),
+  turnsOn: z.array(z.enum(BOOLEAN_CAPABILITIES)).min(1),
+  applied: z.boolean().optional(),
+});
+assertTypeEquals<z.input<typeof ProviderExperimentSchema>, ProviderExperiment>(true);
+assertTypeEquals<z.output<typeof ProviderExperimentSchema>, ProviderExperiment>(true);
+
 /** A `credentials` field's or confirmation's key: a letter, then letters and digits. */
 export const AccountKeySchema = z
   .string()
@@ -637,43 +701,70 @@ const StayKeyFieldSchema = z.union([
   ),
 ]);
 
-export const ProviderManifestSchema = z.object({
-  id: ProviderIdSchema,
-  name: nonEmpty,
-  shortName: nonEmpty.max(24),
-  description: nonEmpty,
-  website: z.url().refine((url) => url.startsWith('https://'), 'The website must be https'),
-  integration: z.enum(['api', 'browser', 'hybrid']),
-  brand: z.object({
-    color: z.string().regex(/^#[0-9a-fA-F]{6}$/, 'Brand colour is #RRGGBB'),
-    monogram: z.string().regex(/^[A-Z0-9]{1,3}$/, 'Monogram is 1–3 capitals or digits'),
-  }),
-  locationKinds: z.array(LocationKindSchema).min(1),
-  timezone: z.string().refine(isTimeZone, 'Not an IANA time zone'),
-  currency: z.string().regex(/^[A-Z]{3}$/, 'Currency is an ISO 4217 code such as AUD'),
-  capabilities: ProviderCapabilitiesSchema,
-  limits: ProviderLimitsSchema.optional(),
-  stayFields: z
-    .array(StayFieldDescriptorSchema)
-    .refine(
-      uniqueBy((f: StayFieldDescriptor) => f.key),
-      'Stay field keys must be unique'
-    )
-    .optional(),
-  releaseModes: z
-    .array(ReleaseModeDescriptorSchema)
-    .refine(
-      uniqueBy((m: ReleaseModeDescriptor) => m.id),
-      'Release mode ids must be unique'
-    )
-    .optional(),
-  bulkAvailabilityStayFields: z
-    .array(StayKeyFieldSchema)
-    .refine(
-      (fields) => fields.includes('arrival') && fields.includes('departure'),
-      'Bulk availability always depends on both dates'
-    )
-    .optional(),
-});
+export const ProviderManifestSchema = z
+  .object({
+    id: ProviderIdSchema,
+    name: nonEmpty,
+    shortName: nonEmpty.max(24),
+    description: nonEmpty,
+    website: z.url().refine((url) => url.startsWith('https://'), 'The website must be https'),
+    integration: z.enum(['api', 'browser', 'hybrid']),
+    brand: z.object({
+      color: z.string().regex(/^#[0-9a-fA-F]{6}$/, 'Brand colour is #RRGGBB'),
+      monogram: z.string().regex(/^[A-Z0-9]{1,3}$/, 'Monogram is 1–3 capitals or digits'),
+    }),
+    locationKinds: z.array(LocationKindSchema).min(1),
+    timezone: z.string().refine(isTimeZone, 'Not an IANA time zone'),
+    currency: z.string().regex(/^[A-Z]{3}$/, 'Currency is an ISO 4217 code such as AUD'),
+    capabilities: ProviderCapabilitiesSchema,
+    limits: ProviderLimitsSchema.optional(),
+    stayFields: z
+      .array(StayFieldDescriptorSchema)
+      .refine(
+        uniqueBy((f: StayFieldDescriptor) => f.key),
+        'Stay field keys must be unique'
+      )
+      .optional(),
+    releaseModes: z
+      .array(ReleaseModeDescriptorSchema)
+      .refine(
+        uniqueBy((m: ReleaseModeDescriptor) => m.id),
+        'Release mode ids must be unique'
+      )
+      .optional(),
+    bulkAvailabilityStayFields: z
+      .array(StayKeyFieldSchema)
+      .refine(
+        (fields) => fields.includes('arrival') && fields.includes('departure'),
+        'Bulk availability always depends on both dates'
+      )
+      .optional(),
+    experiments: z
+      .array(ProviderExperimentSchema)
+      .refine(
+        uniqueBy((e: ProviderExperiment) => e.id),
+        'Experiment ids must be unique'
+      )
+      .optional(),
+  })
+  // An experiment turns on capabilities that are off, and they are on only once it is applied
+  // (`withExperiments`), by itself or by another applied experiment.
+  .superRefine((manifest, ctx) => {
+    const experiments = manifest.experiments ?? [];
+    const applied = new Set(experiments.filter((e) => e.applied).flatMap((e) => e.turnsOn));
+    experiments.forEach((experiment, index) => {
+      experiment.turnsOn.forEach((capability, at) => {
+        const on = manifest.capabilities[capability] === true;
+        if (on === applied.has(capability)) return;
+        ctx.addIssue({
+          code: 'custom',
+          path: ['experiments', index, 'turnsOn', at],
+          message: on
+            ? `Capability ${capability} is already on, so experiment ${experiment.id} cannot turn it on`
+            : `Experiment ${experiment.id} is applied but capability ${capability} is off`,
+        });
+      });
+    });
+  });
 assertTypeEquals<z.input<typeof ProviderManifestSchema>, ProviderManifest>(true);
 assertTypeEquals<z.output<typeof ProviderManifestSchema>, ProviderManifest>(true);
