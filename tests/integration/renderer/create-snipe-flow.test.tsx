@@ -9,6 +9,7 @@ import { SnipeStatus } from '../../../src/shared/types/common.types';
 import type { SiteSnipe, SiteSnipeInput } from '../../../src/shared/types/site-sniper.types';
 import { nightsBetween } from '../../../src/shared/utils/calendar-date';
 import { makeSnipe, snipeFlowApi } from '../../fixtures/renderer/snipes';
+import { catalogGet, makeMixedDetail } from '../../fixtures/renderer/watches';
 import { createMockApi, ok } from '../../utils/renderer/createMockApi';
 import { currentRoute, renderWithApp } from '../../utils/renderer/renderWithApp';
 
@@ -98,5 +99,56 @@ describe('create a snipe, end to end', () => {
     );
     await user.click(within(hold).getByRole('button', { name: 'Pay now' }));
     expect(openPayment).toHaveBeenCalledWith(9);
+  });
+});
+
+describe('create a snipe at a place with sites and cabins, end to end', () => {
+  it('needs a stay type there, and sends "Camping" as unitKinds', async () => {
+    const create = jest.fn((input: SiteSnipeInput) =>
+      Promise.resolve(ok(makeSnipe({ id: 9, name: input.name })))
+    );
+    const mock = createMockApi(
+      snipeFlowApi({
+        catalog: { get: catalogGet(makeMixedDetail()) },
+        snipes: { create, get: jest.fn(() => Promise.resolve(ok(makeSnipe({ id: 9 })))) },
+      })
+    );
+    const { user } = renderWithApp({ route: '/site-sniper/new', api: mock });
+
+    await waitFor(() => expect(screen.getByRole('radio', { name: 'ParkStay WA' })).toBeChecked());
+    await user.click(screen.getByRole('button', { name: 'Continue' }));
+    await user.type(await screen.findByRole('combobox', { name: 'Location' }), 'Osp');
+    await user.click(await screen.findByRole('option', { name: /Osprey Bay/ }));
+    await user.click(screen.getByRole('button', { name: 'Continue' }));
+
+    // Your stay: dates, then Continue without a stay type or a site is refused.
+    await screen.findByRole('heading', { level: 2, name: /Your stay$/ });
+    await user.click(screen.getByRole('button', { name: /^Dates/ }));
+    await user.keyboard('{ArrowRight}{Enter}{ArrowRight}{ArrowRight}{Enter}');
+    await user.click(
+      within(screen.getByRole('dialog', { name: 'Choose dates' })).getByRole('button', {
+        name: 'Done',
+      })
+    );
+    const stayTypes = await screen.findByRole('group', { name: 'Stay type' });
+    await user.click(screen.getByRole('button', { name: 'Continue' }));
+    await waitFor(() => expect(stayTypes).toHaveFocus());
+    await user.click(within(stayTypes).getByRole('button', { name: 'Camping' }));
+    await user.click(screen.getByRole('button', { name: 'Continue' }));
+
+    await screen.findByRole('heading', { level: 2, name: /Release and timing$/ });
+    await user.click(screen.getByRole('button', { name: 'Continue' }));
+    await screen.findByRole('heading', { level: 2, name: /Review$/ });
+    expect(
+      within(screen.getByRole('region', { name: 'Stay' })).getByText('Camping')
+    ).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Create snipe' }));
+    await waitFor(() => expect(create).toHaveBeenCalledTimes(1));
+    expect(create.mock.calls[0][0]).toMatchObject({
+      providerId: 'parkstay',
+      location: { externalId: '20', name: 'Osprey Bay' },
+      unitKinds: ['campsite'],
+    });
+    expect(create.mock.calls[0][0]).not.toHaveProperty('unitIds');
   });
 });

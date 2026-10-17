@@ -1,6 +1,7 @@
 import {
   clampStayParams,
   hasDates,
+  hasUnusableStayType,
   isStayType,
   parseStayParams,
   parseStayTypes,
@@ -121,5 +122,13 @@ describe('stay types', () => {
     expect(parseStayTypes('glamping, cabin,,other,cabin,castle')).toEqual(['glamping', 'cabin']);
     expect(parseStayTypes('')).toEqual([]);
     expect(parseStayTypes(null)).toEqual([]);
+  });
+
+  it('tells when a `stay` value names something that is not a stay type, ignoring blanks and repeats', () => {
+    expect(hasUnusableStayType('cabin,castle')).toBe(true);
+    expect(hasUnusableStayType('other')).toBe(true);
+    expect(hasUnusableStayType('cabin,cabin, room,')).toBe(false);
+    expect(hasUnusableStayType('')).toBe(false);
+    expect(hasUnusableStayType(null)).toBe(false);
   });
 });

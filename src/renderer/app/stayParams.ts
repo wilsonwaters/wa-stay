@@ -131,3 +131,14 @@ export function parseStayTypes(raw: string | null | undefined): StayTypeKind[] {
   if (!raw) return [];
   return [...new Set(raw.split(',').map((item) => item.trim()))].filter(isStayType);
 }
+
+/**
+ * Whether a `stay` query value names something that is not a stay type (`castle`, `other`),
+ * which `parseStayTypes` leaves out: a create flow says so. Repeats and empty items do not count.
+ */
+export function hasUnusableStayType(raw: string | null | undefined): boolean {
+  return (raw ?? '')
+    .split(',')
+    .map((item) => item.trim())
+    .some((item) => item !== '' && !isStayType(item));
+}

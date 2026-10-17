@@ -14,14 +14,18 @@ import {
 import { SnipeReleaseMode } from '../../../../shared/types/common.types';
 import {
   LOCATION_KINDS,
+  UNIT_KINDS,
   type ProviderManifest,
   type StayFieldDescriptor,
+  type UnitKind,
 } from '../../../../shared/types/provider.types';
+import { DEFAULT_UNIT_NOUN, type UnitNoun } from '../../../components/nightGridModel';
 import {
   stayFieldDefaults,
   stayFieldIssue,
   stayFieldsFor,
 } from '../../../components/stay/stayFields';
+import { holdNeedsChoice } from '../../../components/stay/stayTypes';
 import { zonedInstant } from './zonedTime';
 
 const shape = z.object({
@@ -43,6 +47,8 @@ const shape = z.object({
   infants: z.number(),
   stayParams: z.record(z.string(), z.union([z.string(), z.number(), z.boolean()]).optional()),
   unitIds: z.array(z.string()),
+  /** The stay types wanted, in stay-type order; none means any. */
+  unitKinds: z.array(z.enum(UNIT_KINDS)),
   /** A `releaseModes` id of the provider. */
   releaseMode: z.string(),
   /** A scheduled release, in the provider's zone: `YYYY-MM-DD` and `HH:MM`. */
@@ -81,6 +87,7 @@ export function emptySnipeForm(manifest: ProviderManifest | undefined): SnipeFor
     infants: 0,
     stayParams: stayFieldDefaults(snipeStayFields(manifest)),
     unitIds: [],
+    unitKinds: [],
     releaseMode: manifest?.releaseModes?.[0]?.id ?? '',
     releaseDate: '',
     releaseTime: '',
@@ -109,6 +116,19 @@ export interface SnipeFormContext {
   /** Today in the provider's time zone, `YYYY-MM-DD`. */
   today: string;
   now: Date;
+  /**
+   * The kinds of the place's units (`placeUnitKinds`), once its detail has loaded. A snipe holds,
+   * so at a mixed place it needs a stay type or a unit; without them nothing is enforced here
+   * (main then ends the snipe without holding).
+   */
+  placeKinds?: readonly UnitKind[];
+  /** What a unit is called here, for the hold rule's message. */
+  noun?: UnitNoun;
+}
+
+/** Why a snipe at a mixed place needs a stay type or a unit chosen. */
+export function snipeHoldChoiceMessage(noun: UnitNoun): string {
+  return `Choose a stay type or a ${noun.one}. At a place with more than one stay type, Site Sniper holds only what you choose.`;
 }
 
 /** Midnight of check-in day where the provider is (epoch ms), or never when there is no date. */
@@ -117,7 +137,13 @@ function checkInAt(arrival: string, timeZone: string): number {
 }
 
 /** The form's rules for one provider. */
-export function snipeFormSchema({ manifest, today, now }: SnipeFormContext) {
+export function snipeFormSchema({
+  manifest,
+  today,
+  now,
+  placeKinds,
+  noun = DEFAULT_UNIT_NOUN,
+}: SnipeFormContext) {
   const fields = snipeStayFields(manifest);
   const modes = manifest?.releaseModes ?? [];
   return shape.superRefine((v, ctx) => {
@@ -134,6 +160,9 @@ export function snipeFormSchema({ manifest, today, now }: SnipeFormContext) {
     for (const field of fields) {
       const message = stayFieldIssue(field, v.stayParams[field.key]);
       if (message) issue(['stayParams', field.key], message);
+    }
+    if (placeKinds && holdNeedsChoice(placeKinds, v.unitKinds, v.unitIds)) {
+      issue(['unitKinds'], snipeHoldChoiceMessage(noun));
     }
 
     if (!modes.some((mode) => mode.id === v.releaseMode)) {
@@ -194,6 +223,7 @@ export function stepFields(
         'departure',
         'adults',
         ...snipeStayFields(manifest).map((field) => `stayParams.${field.key}` as const),
+        'unitKinds',
       ];
     case 'release':
       return [

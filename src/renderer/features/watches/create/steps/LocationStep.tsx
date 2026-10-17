@@ -27,6 +27,9 @@ export function LocationStep({ manifest, place, placeLoading }: LocationStepProp
         providerName={manifest.shortName}
         value={location}
         onChange={(next) => {
+          // Another place has other units and stay types. A link's stay types are kept for
+          // the first place chosen, which checks them once its units load.
+          if (location && next?.externalId !== location.externalId) set('unitKinds', []);
           set('location', next);
           set('unitIds', []);
         }}

@@ -36,7 +36,10 @@ and dates). The flow has five steps:
    it is chosen for you but still shown.
 2. **Location**: the campground.
 3. **Your stay**: dates and guests, plus the provider's own fields (ParkStay: Camping with,
-   Vehicles, Postcode), and the sites you want (any site, or a few).
+   Vehicles, Postcode), the **Stay type** at a place whose units are of more than one kind, and
+   the sites you want (any site, or a few). A snipe holds, so at such a place it needs one stay
+   type or a site before it goes on (the same chips and rules as a watch:
+   [Stay types](watches-and-notifications.md#stay-types)).
 4. **Release**: **When are the sites released?** For a scheduled release, the release date
    and time (in the provider's time zone), which must be before your check-in day. **Advanced timing**: Start early (seconds, default
    120), Check every (seconds, default 1.5; never under 0.5), Keep trying for (minutes, default
@@ -69,8 +72,9 @@ and dates). The flow has five steps:
   across stay types: with no units chosen, once one of its candidates comes free and they,
   booked or free, are of more than one kind, it holds nothing, reserves no night and ends **Failed** with "Free units of
   more than one stay type: choose a stay type or units for this snipe", and you get a
-  warning notification. Choose units (the snipe flow does not offer stay types yet) and start
-  it again.
+  warning notification. The flow asks for one stay type or units at a place it knows is mixed,
+  so this happens only when the flow could not load the place's units, or they changed after the
+  snipe was made: choose a stay type or units and start it again.
 - **Run now** runs one attempt immediately (only while the snipe is running).
 - **WA Stay must be running**, and the computer awake, at the release.
 

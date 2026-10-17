@@ -1,7 +1,10 @@
+import { useMemo } from 'react';
 import { useFormContext } from 'react-hook-form';
 import type { UnitSummary } from '../../../../../shared/types/catalog.types';
 import type { ProviderManifest } from '../../../../../shared/types/provider.types';
 import { ProviderStayFields } from '../../../../components/stay/ProviderStayFields';
+import { StayTypeChips } from '../../../../components/stay/StayTypeChips';
+import { placeUnitKinds, stayTypeOptions } from '../../../../components/stay/stayTypes';
 import { choosesUnit, UnitPicker, type UnitNoun } from '../../../../components/stay/UnitPicker';
 import { DateRangeField, GuestsField, Notice } from '../../../../components/ui';
 import { snipeStayFields, type SnipeFormValues } from '../snipeForm';
@@ -31,14 +34,16 @@ export interface StayStepProps {
 
 /**
  * Step 3: the dates, who is coming, the provider's own snipe and hold fields (vehicles,
- * postcode…), and the preferred units: none chosen means any unit.
+ * postcode…), the stay types at a place whose units are of more than one kind, and the
+ * preferred units: none chosen means any unit. A snipe holds, so at such a place it needs a
+ * stay type or a unit.
  */
 export function StayStep({ manifest, today, units, noun }: StayStepProps) {
-  const { watch, formState } = useFormContext<SnipeFormValues>();
+  const { watch, formState, getFieldState, trigger } = useFormContext<SnipeFormValues>();
   const set = useSetSnipeField();
   const setFields = useSetSnipeFields();
   const { errors } = formState;
-  const [arrival, departure, adults, children, infants, stayParams, unitIds] = watch([
+  const [arrival, departure, adults, children, infants, stayParams, unitIds, unitKinds] = watch([
     'arrival',
     'departure',
     'adults',
@@ -46,8 +51,11 @@ export function StayStep({ manifest, today, units, noun }: StayStepProps) {
     'infants',
     'stayParams',
     'unitIds',
+    'unitKinds',
   ]);
   const fields = snipeStayFields(manifest);
+  const placeKinds = useMemo(() => (units ? placeUnitKinds(units) : undefined), [units]);
+  const stayTypes = placeKinds ? stayTypeOptions(placeKinds, unitKinds) : [];
   const capacity = units ? chosenCapacity(units, unitIds) : undefined;
   const party = adults + children + infants;
 
@@ -83,13 +91,26 @@ export function StayStep({ manifest, today, units, noun }: StayStepProps) {
           fields.map((field) => [field.key, errors.stayParams?.[field.key]?.message])
         )}
       />
+      {stayTypes.length > 0 && (
+        <StayTypeChips
+          options={stayTypes}
+          value={unitKinds}
+          onChange={(kinds) => set('unitKinds', kinds)}
+          error={errors.unitKinds?.message}
+        />
+      )}
       {units && units.length > 0 && (
         <UnitPicker
           units={units}
           value={unitIds}
-          onChange={(ids) => set('unitIds', ids)}
+          onChange={(ids) => {
+            set('unitIds', ids);
+            // A unit also meets the stay-type rule: check it again once its error shows.
+            if (getFieldState('unitKinds').error) void trigger('unitKinds');
+          }}
           noun={noun}
           hint={`Leave all unticked and Site Sniper holds the first ${noun.one} that comes free.`}
+          kinds={stayTypes.length > 0 ? unitKinds : undefined}
         />
       )}
       {capacity !== undefined && party > capacity && (

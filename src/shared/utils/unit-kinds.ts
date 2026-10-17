@@ -1,8 +1,9 @@
 /**
  * Unit kinds (`UnitKind`): what a person sleeps in, the same words for every provider. The
  * groups people choose from (`STAY_TYPES`), what a place offers when its provider does not say
- * (`deriveUnitKinds`, from its `LocationKind`), and the cleaning every stored or returned list
- * goes through (`unitKindsOf`), so a location's `unitKinds` is never empty.
+ * (`deriveUnitKinds`, from its `LocationKind`), the cleaning every stored or returned list
+ * goes through (`unitKindsOf`), so a location's `unitKinds` is never empty, and what one unit
+ * is (`unitKindOfUnit`), the same in main's matching and the renderer's flows.
  *
  * No node or electron imports: the renderer compiles this file too.
  */
@@ -71,4 +72,12 @@ export function cleanUnitKinds(value: unknown): UnitKind[] {
 export function unitKindsOf(location: { kind: LocationKind; unitKinds?: unknown }): UnitKind[] {
   const own = cleanUnitKinds(location.unitKinds);
   return own.length > 0 ? own : deriveUnitKinds(location.kind);
+}
+
+/**
+ * What `unit` is: its `unitKind`, or `other` when it has none (or one this app does not know).
+ * Watch and snipe matching, and the flows' "mixed place" rule, count units by it.
+ */
+export function unitKindOfUnit(unit: { unitKind?: unknown }): UnitKind {
+  return isUnitKind(unit.unitKind) ? unit.unitKind : 'other';
 }

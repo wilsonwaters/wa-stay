@@ -33,6 +33,7 @@ export function makeWatch(overrides: Partial<Watch> = {}): Watch {
       concessions: 0,
     },
     unitIds: [],
+    unitKinds: [],
     stayParams: {},
     checkIntervalMinutes: 60,
     isActive: true,
@@ -90,6 +91,30 @@ export function makeLocationDetail(overrides: Partial<LocationDetail> = {}): Loc
     unitType: n <= 4 ? 'Powered' : 'Unpowered',
   }));
   return { ...makeLocation(), units, ...overrides };
+}
+
+/**
+ * A place with more than one stay type (R6): its detail with four powered sites and two cabins
+ * (`unitKind` campsite and cabin), at Osprey Bay's key. `cabinKind` gives the two other units
+ * another kind (`dorm`), or none.
+ */
+export function makeMixedDetail(
+  overrides: Partial<LocationDetail> = {},
+  cabinKind: UnitSummary['unitKind'] = 'cabin'
+): LocationDetail {
+  const sites: UnitSummary[] = [1, 2, 3, 4].map((n) => ({
+    unitId: String(n),
+    unitName: `Site ${n}`,
+    unitType: 'Powered',
+    unitKind: 'campsite',
+  }));
+  const cabins: UnitSummary[] = [1, 2].map((n) => ({
+    unitId: `c${n}`,
+    unitName: `Cabin ${n}`,
+    unitType: 'Two bedroom',
+    unitKind: cabinKind,
+  }));
+  return { ...makeLocation(), units: [...sites, ...cabins], ...overrides };
 }
 
 /** `catalog.get` answering `detail` for its key and NOT_FOUND for any other. */

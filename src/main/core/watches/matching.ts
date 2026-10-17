@@ -16,7 +16,7 @@
 
 import type { NightStatus, UnitAvailability, UnitKind, WatchMatch } from '@shared/types';
 import { addDays } from '@shared/utils/calendar-date';
-import { isUnitKind } from '@shared/utils/unit-kinds';
+import { unitKindOfUnit } from '@shared/utils/unit-kinds';
 
 /** What matching needs from a watch (or a snipe). */
 export interface MatchCriteria {
@@ -24,11 +24,6 @@ export interface MatchCriteria {
   /** The stay types wanted; none or empty means any kind. */
   unitKinds?: readonly UnitKind[];
   maxPrice?: number;
-}
-
-/** What `unit` is: its `unitKind`, or `other` when it has none (or one this app does not know). */
-function unitKindOfUnit(unit: Pick<UnitAvailability, 'unitKind'>): UnitKind {
-  return isUnitKind(unit.unitKind) ? unit.unitKind : 'other';
 }
 
 /**

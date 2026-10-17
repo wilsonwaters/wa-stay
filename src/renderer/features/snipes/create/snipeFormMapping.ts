@@ -76,6 +76,7 @@ export function toSnipeInput(
       ...(values.infants > 0 ? { infants: values.infants } : {}),
     },
     ...(values.unitIds.length ? { unitIds: values.unitIds } : {}),
+    ...(values.unitKinds.length ? { unitKinds: values.unitKinds } : {}),
     ...(Object.keys(stayParams).length ? { stayParams } : {}),
     releaseMode: values.releaseMode as SnipeReleaseMode,
     ...(releaseAt ? { releaseAt } : {}),

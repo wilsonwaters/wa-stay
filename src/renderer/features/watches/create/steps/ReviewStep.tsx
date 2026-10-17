@@ -3,6 +3,7 @@ import { useFormContext } from 'react-hook-form';
 import type {
   ProviderManifest,
   StayFieldDescriptor as StayField,
+  UnitKind,
 } from '../../../../../shared/types/provider.types';
 import { formatPrice } from '../../../../components/nightGridModel';
 import {
@@ -10,6 +11,7 @@ import {
   partyLabel,
   stayDatesLabel,
 } from '../../../../components/stay/stayFormat';
+import { isMixedPlace, stayTypesText } from '../../../../components/stay/stayTypes';
 import type { UnitNoun } from '../../../../components/stay/UnitPicker';
 import {
   Button,
@@ -35,6 +37,8 @@ export interface ReviewStepProps {
   noun: UnitNoun;
   /** The chosen place as the catalogue has it, for its photo. */
   place?: PhotoPlace;
+  /** The kinds of the place's units, once known: a mixed place shows the stay type. */
+  placeKinds?: readonly UnitKind[];
   placeLoading?: boolean;
   onChangeStep: (step: FlowStepId) => void;
   /** Why the last attempt to create the watch failed. */
@@ -103,6 +107,7 @@ export function ReviewStep({
   today,
   noun,
   place,
+  placeKinds,
   placeLoading,
   onChangeStep,
   submitError,
@@ -155,6 +160,9 @@ export function ReviewStep({
           <Items>
             <Item label="Guests">{partyLabel(v)}</Item>
             {fieldItems(fields.watch)}
+            {(isMixedPlace(placeKinds) || v.unitKinds.length > 0) && (
+              <Item label="Stay type">{stayTypesText(v.unitKinds)}</Item>
+            )}
             <Item label={`Preferred ${noun.many}`}>
               {v.unitIds.length ? `${v.unitIds.length} chosen` : `Any ${noun.one}`}
             </Item>

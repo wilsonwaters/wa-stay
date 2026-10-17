@@ -121,9 +121,60 @@ describe('watch form options', () => {
     ]);
     expect(stepFields('alerts', PARKSTAY_MANIFEST, true)).toEqual([
       'checkIntervalMinutes',
+      'autoHold',
       'stayParams.numVehicles',
       'stayParams.postcode',
     ]);
-    expect(stepFields('alerts', FAKE_MANIFEST, true)).toEqual(['checkIntervalMinutes']);
+    expect(stepFields('alerts', FAKE_MANIFEST, true)).toEqual(['checkIntervalMinutes', 'autoHold']);
+  });
+});
+
+describe('the hold rule at a place with more than one stay type', () => {
+  const MIXED = ['campsite', 'cabin'] as const;
+  const holdIssues = (
+    values: WatchFormValues,
+    placeKinds?: readonly ('campsite' | 'cabin' | 'other')[],
+    manifest = PARKSTAY_MANIFEST
+  ) => {
+    const result = watchFormSchema({
+      manifest,
+      today: TODAY,
+      placeKinds,
+      noun: { one: 'site', many: 'sites' },
+    }).safeParse(values);
+    return result.success
+      ? {}
+      : Object.fromEntries(result.error.issues.map((i) => [i.path.join('.'), i.message]));
+  };
+  const held = (overrides: Partial<WatchFormValues> = {}) =>
+    valid({
+      autoHold: true,
+      stayParams: { ...valid().stayParams, postcode: '6000' },
+      ...overrides,
+    });
+
+  it('refuses an automatic hold with no stay type and no unit chosen, saying what to choose', () => {
+    expect(holdIssues(held(), MIXED)).toEqual({
+      autoHold:
+        'Osprey Bay has more than one stay type. Choose a stay type or a site on the Stay step to hold one automatically.',
+    });
+    expect(holdIssues(held(), ['campsite', 'other'])).toHaveProperty('autoHold');
+  });
+
+  it('accepts it with a stay type or a unit chosen', () => {
+    expect(holdIssues(held({ unitKinds: ['cabin'] }), MIXED)).toEqual({});
+    expect(holdIssues(held({ unitIds: ['12'] }), MIXED)).toEqual({});
+  });
+
+  it('asks nothing without auto-hold, at a place of one kind, or before the place’s units are known', () => {
+    expect(holdIssues(valid(), MIXED)).toEqual({});
+    expect(holdIssues(held(), ['campsite'])).toEqual({});
+    expect(holdIssues(held(), undefined)).toEqual({});
+  });
+
+  it('asks nothing of a provider without holds', () => {
+    expect(
+      holdIssues({ ...held(), providerId: 'fakestay', stayParams: {} }, MIXED, FAKE_MANIFEST)
+    ).toEqual({});
   });
 });

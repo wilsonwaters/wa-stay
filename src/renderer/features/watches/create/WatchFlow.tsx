@@ -1,12 +1,14 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { FormProvider, useForm, type Resolver } from 'react-hook-form';
 import { useNavigate } from 'react-router';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { toApiError, useCreateWatch, useLocationDetail } from '../../../api';
-import type { ProviderManifest } from '../../../../shared/types/provider.types';
+import type { ProviderManifest, UnitKind } from '../../../../shared/types/provider.types';
+import type { UnitNoun } from '../../../components/nightGridModel';
 import { ROUTES } from '../../../app/routes';
 import { StepFlow, type FlowStep } from '../../../components/StepFlow';
 import { stayFieldDefaults } from '../../../components/stay/stayFields';
+import { placeUnitKinds, reconcileStayTypes } from '../../../components/stay/stayTypes';
 import { unitNoun } from '../../../components/locationFormat';
 import { Notice, useToast } from '../../../components/ui';
 import { useNow } from '../../../hooks/useNow';
@@ -52,13 +54,18 @@ export function WatchFlow({ manifests, initialValues, initialStep, notices = [] 
   const now = useNow();
   const [step, setStep] = useState<FlowStepId>(initialStep);
   const [submitError, setSubmitError] = useState<string>();
+  /** Notices about the link found once the place's units are known. */
+  const [placeNotices, setPlaceNotices] = useState<string[]>([]);
+  // What the hold rule needs from the place (below), for the resolver.
+  const hold = useRef<{ placeKinds?: UnitKind[]; noun?: UnitNoun }>({});
 
   const manifestOf = useCallback((id: string) => manifests.find((m) => m.id === id), [manifests]);
   const resolver = useCallback<Resolver<WatchFormValues>>(
     (values, context, options) => {
       const manifest = manifestOf(values.providerId);
       const today = providerToday(manifest, new Date());
-      return zodResolver(watchFormSchema({ manifest, today }))(values, context, options);
+      const schema = watchFormSchema({ manifest, today, ...hold.current });
+      return zodResolver(schema)(values, context, options);
     },
     [manifestOf]
   );
@@ -82,6 +89,21 @@ export function WatchFlow({ manifests, initialValues, initialStep, notices = [] 
   // The place's units, for the unit choice (a search result has none until the detail loads).
   const detail = useLocationDetail(location ? `${providerId}:${location.externalId}` : null);
   const units = detail.isPlaceholderData ? undefined : detail.data?.units;
+  const placeKinds = useMemo(() => (units ? placeUnitKinds(units) : undefined), [units]);
+  hold.current = { placeKinds, noun };
+
+  // The link's stay types, once the place's units are known: those it has are kept; at a mixed
+  // place with none of them they are cleared with a notice, at any other place silently. Before
+  // the page paints, so a stay type the place lacks never shows.
+  const reconciledFor = useRef<string | null>(null);
+  useLayoutEffect(() => {
+    if (!location || !placeKinds || reconciledFor.current === location.externalId) return;
+    reconciledFor.current = location.externalId;
+    const chosen = getValues('unitKinds');
+    const { unitKinds, notice } = reconcileStayTypes(chosen, placeKinds, location.name);
+    if (unitKinds.length !== chosen.length) setValue('unitKinds', unitKinds);
+    if (notice) setPlaceNotices((shown) => [...shown, notice]);
+  }, [location, placeKinds, getValues, setValue]);
 
   // Suggest a name from the place and dates until the person writes their own: any name but
   // the last suggestion, or none. Not `dirtyFields.name`: react-hook-form counts any value that
@@ -101,6 +123,7 @@ export function WatchFlow({ manifests, initialValues, initialStep, notices = [] 
     setValue('providerId', id, { shouldDirty: true, shouldValidate: true });
     setValue('location', null);
     setValue('unitIds', []);
+    setValue('unitKinds', []);
     setValue('stayParams', stayFieldDefaults([...fields.watch, ...fields.hold]));
     setValue('autoHold', false);
     setValue('checkIntervalMinutes', defaultInterval(next));
@@ -142,14 +165,15 @@ export function WatchFlow({ manifests, initialValues, initialStep, notices = [] 
 
   const onContinue = async () =>
     step === 'review' ? submit() : trigger(stepFields(step, manifest, autoHold));
+  const linkNotices = [...notices, ...placeNotices];
 
   return (
     <FormProvider {...form}>
       <form noValidate onSubmit={(event) => event.preventDefault()} className="flex flex-col gap-6">
-        {notices.length > 0 && (
+        {linkNotices.length > 0 && (
           <Notice tone="info" title="Some of the link couldn't be used">
             <ul className="list-disc pl-5">
-              {notices.map((notice) => (
+              {linkNotices.map((notice) => (
                 <li key={notice}>{notice}</li>
               ))}
             </ul>
@@ -181,6 +205,7 @@ export function WatchFlow({ manifests, initialValues, initialStep, notices = [] 
               today={today}
               noun={noun}
               place={detail.data}
+              placeKinds={placeKinds}
               placeLoading={detail.isLoading}
               onChangeStep={setStep}
               submitError={submitError}

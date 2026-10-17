@@ -18,7 +18,7 @@ export interface ResolvedPrefill {
 
 /**
  * The create-watch form as the URL's prefill query (§12.10) sets it up: provider, location,
- * dates and guests, and the step to open on (the first the link did not settle, else Your
+ * dates, guests and stay types, and the step to open on (the first the link did not settle, else Your
  * stay). The place comes from `catalog.get`, the same detail the place page shows (and caches).
  */
 export function usePrefill(manifests: readonly ProviderManifest[]): ResolvedPrefill {
@@ -53,6 +53,7 @@ export function usePrefill(manifests: readonly ProviderManifest[]): ResolvedPref
     }
     if (prefill.adults) values.adults = prefill.adults;
     if (prefill.children !== undefined) values.children = prefill.children;
+    if (prefill.unitKinds) values.unitKinds = [...prefill.unitKinds];
     const step: FlowStepId = !prefill.providerId ? 'provider' : place ? 'stay' : 'location';
     return { ready, values, step, notices };
   }, [manifest, prefill, ready, key, place, detail.isError, detail.error]);

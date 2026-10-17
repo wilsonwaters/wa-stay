@@ -46,6 +46,7 @@ export function emptyWatchForm(manifest: ProviderManifest | undefined): WatchFor
     infants: 0,
     stayParams: stayFieldDefaults([...fields.watch, ...fields.hold]),
     unitIds: [],
+    unitKinds: [],
     maxPrice: '',
     checkIntervalMinutes: defaultInterval(manifest),
     allowPartialMatch: false,
@@ -96,6 +97,7 @@ export function toWatchInput(
     location: locationOf(values.location),
     stay: stayOf(values),
     ...(values.unitIds.length ? { unitIds: values.unitIds } : {}),
+    ...(values.unitKinds.length ? { unitKinds: values.unitKinds } : {}),
     ...(Object.keys(stayParams).length ? { stayParams } : {}),
     checkIntervalMinutes: values.checkIntervalMinutes,
     ...(manifest?.capabilities.holds && values.autoHold ? { autoHold: true } : {}),
@@ -130,6 +132,7 @@ export function fromWatch(
       infants: watch.stay.infants,
       stayParams,
       unitIds: [...watch.unitIds],
+      unitKinds: [...watch.unitKinds],
       maxPrice: watch.maxPrice ? String(watch.maxPrice) : '',
       checkIntervalMinutes: watch.checkIntervalMinutes,
       allowPartialMatch: watch.allowPartialMatch,
@@ -143,6 +146,9 @@ export function fromWatch(
 }
 
 const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
+/** The same members, in any order. */
+const sameSet = (a: readonly string[], b: readonly string[]) =>
+  a.length === b.length && a.every((item) => b.includes(item));
 
 /**
  * What `watches.update` gets: only what changed from `initial` (so an untouched stay that has
@@ -166,6 +172,7 @@ export function toWatchUpdate(
     update.stay = stayOf(values, watch.stay.concessions);
   }
   if (!same(values.unitIds, initial.unitIds)) update.unitIds = values.unitIds;
+  if (!sameSet(values.unitKinds, initial.unitKinds)) update.unitKinds = values.unitKinds;
   if (!same(values.stayParams, initial.stayParams) || values.autoHold !== initial.autoHold) {
     const declared = new Set((manifest?.stayFields ?? []).map((field) => field.key));
     const kept: StayParams = Object.fromEntries(

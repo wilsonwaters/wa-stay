@@ -77,8 +77,9 @@ Click a place to open its page:
 A watch checks a place for your dates on a schedule and tells you when sites free up.
 
 1. **New watch** (or **Watch for availability** on a place's page).
-2. Choose the provider, the place and your stay: dates, guests, **Camping with**, the sites you
-   prefer (or any) and an optional maximum price per night.
+2. Choose the provider, the place and your stay: dates, guests, **Camping with**, the stay
+   type at a place with more than one (camping, cabins…), the sites you prefer (or any) and an
+   optional maximum price per night.
 3. Choose the alerts: how often to check (every 15 minutes to daily; 1 hour by default),
    whether to tell you about partial availability (only some nights free), whether to stop
    after the first alert, and, for ParkStay, **Hold a site automatically when found**.
@@ -99,7 +100,8 @@ someone cancels. It joins the DBCA queue when the release uses it, checks rapidl
 release, and places a 30-minute hold that you then pay for.
 
 **New snipe** walks through the provider, the place, your stay (with ParkStay's vehicles and
-postcode), when the sites are released, and a review. Hold only what you will use. Full guide:
+postcode, and the stay type at a place with more than one), when the sites are released, and a
+review. Hold only what you will use. Full guide:
 [Site Sniper](site-sniper.md).
 
 ### When a site is held

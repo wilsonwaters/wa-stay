@@ -4,6 +4,7 @@ import type { UnitSummary } from '../../../../shared/types/catalog.types';
 import type { ProviderManifest } from '../../../../shared/types/provider.types';
 import type { SiteSnipe } from '../../../../shared/types/site-sniper.types';
 import { partyLabel, stayDatesLabel, stayNightsLabel } from '../../../components/stay/stayFormat';
+import { isMixedPlace, placeUnitKinds, stayTypesText } from '../../../components/stay/stayTypes';
 import { relativeTime } from '../../../components/timeFormat';
 import { msToMinutes, msToSeconds } from '../create/snipeFormMapping';
 import { releaseText, stayFieldText } from '../shared/snipeFormat';
@@ -35,7 +36,10 @@ export interface SnipeSummaryProps {
   manifest: ProviderManifest | undefined;
   today: string;
   now: Date;
-  /** The place's units (its catalogue detail), for the chosen units' names. */
+  /**
+   * The place's units (its catalogue detail), for the chosen units' names and, at a place
+   * whose units are of more than one kind, the stay type.
+   */
   units?: readonly UnitSummary[];
 }
 
@@ -47,6 +51,7 @@ export function SnipeSummary({ snipe, manifest, today, now, units }: SnipeSummar
   const fields = (manifest?.stayFields ?? []).filter((f) => snipe.stayParams[f.key] !== undefined);
   const continuous = snipe.releaseMode === SnipeReleaseMode.CANCELLATION;
   const releaseAt = snipe.releaseAt ? new Date(snipe.releaseAt) : undefined;
+  const showStayType = snipe.unitKinds.length > 0 || isMixedPlace(units && placeUnitKinds(units));
 
   return (
     <div className="grid gap-8 sm:grid-cols-2">
@@ -61,6 +66,7 @@ export function SnipeSummary({ snipe, manifest, today, now, units }: SnipeSummar
             {stayFieldText(field, snipe.stayParams[field.key])}
           </Item>
         ))}
+        {showStayType && <Item label="Stay type">{stayTypesText(snipe.unitKinds)}</Item>}
         <Item label={`Preferred ${noun.many}`}>
           {snipe.unitIds.length
             ? snipe.unitIds.map((id) => unitLabel(id, noun, names)).join(', ')
