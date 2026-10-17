@@ -9,10 +9,13 @@
  *   deposits, fees or membership copy in an availability answer, `<redacted>` for every
  *   `api_key`, `rest_api_data_id` and `online_cart_url`, and no email address, phone number,
  *   IP address, Cloudflare cookie or `cf-ray` value, or script. Each availability answer says
- *   where it was trimmed from and when (`_fixture`).
+ *   where it was trimmed from and when (`_fixture`). The auto-cart's fixtures (`cart/`, R19)
+ *   are synthetic and say so: their cart addresses are RAC's booking page with the made-up
+ *   token of 32 zeros (`rest_api_data_id` is that token or `<redacted>` everywhere).
  * - **Rule 1, the source.** Every URL in `src/main/providers/rac/` is on RAC's host; NewBook's
  *   image host is named only where photos are checked; and nothing names a cart address
- *   (`online_cart_url`, `/booking/?cart`).
+ *   (`online_cart_url`, `/booking/?cart`), except that the auto-cart (`holds.ts`) reads a
+ *   tariff's `online_cart_url`.
  *
  * Each check is a function, run over the files and over a bad sample, so a check that can no
  * longer fail is caught too.
@@ -32,6 +35,20 @@ const PLACEHOLDER_IMAGE =
 const LAZY_GIF = 'data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==';
 const PLACEHOLDER_DESCRIPTION = 'Placeholder description.';
 const SECRET_KEYS = ['api_key', 'rest_api_data_id', 'online_cart_url'];
+/** The made-up cart token of the synthetic cart fixtures (R19): never a real one. */
+const ZERO_TOKEN = '0'.repeat(32);
+/** A token as a live one looks, built here so that no such token is written out in the tests. */
+const LIVE_LOOKING_TOKEN = '0123456789abcdef'.repeat(2);
+/** A synthetic cart address: RAC's booking page, `cart`, the zero token and a `rand`. */
+const SYNTHETIC_CART_ADDRESS = new RegExp(
+  `^https://parksandresorts\\.rac\\.com\\.au/[a-z-]+/booking/\\?cart&rest_api_data_id=${ZERO_TOKEN}&rand=\\d+$`
+);
+/** The auto-cart's synthetic fixtures, and the label each starts with. */
+const CART_DIR = 'tests/fixtures/providers/rac/cart/';
+const SYNTHETIC_LABEL =
+  /^(?:<!-- |\{\s*"_fixture"\s*:\s*")Synthetic: written from RAC's NewBook scripts, not recorded\./;
+/** The one RAC source file that may read a tariff's cart address. */
+const CART_SOURCE = 'holds.ts';
 /** Keys an availability answer's fixture drops: RAC's copy, an image, money terms. */
 const DROPPED_KEYS = [
   'tariff_inclusions',
@@ -69,14 +86,26 @@ function filesIn(dir: string): string[] {
 
 const read = (file: string): string => fs.readFileSync(path.join(ROOT, file), 'utf8');
 
-/** What in `text` breaks rule 7, as messages ([] when nothing). */
-function fixtureViolations(raw: string): string[] {
+/**
+ * What in `text` breaks rule 7, as messages ([] when nothing). `synthetic`: a cart fixture
+ * (R19), whose cart addresses may be synthetic ones.
+ */
+function fixtureViolations(raw: string, { synthetic = false } = {}): string[] {
   // JSON may escape its slashes (`https:\/\/…`): read it as written out.
   const text = raw.replace(/\\\//g, '/');
   const found: string[] = [];
   // Images: every address of a photo, and every img source
   for (const [url] of text.matchAll(/https?:\/\/[^\s"'<>)\\]+/g)) {
-    const photo = /\.(?:jpe?g|png|gif|webp|avif)(?:[?#]|$)/i.test(url) || /newbook/i.test(url);
+    // Anything naming NewBook (its image host among them), except RAC's own NewBook proxy
+    let racProxy = false;
+    try {
+      const parsed = new URL(url);
+      racProxy = parsed.host === RAC_HOST && /\/inc\/newbook\/api\//.test(parsed.pathname);
+    } catch {
+      // Not a URL: judged by its whole text
+    }
+    const photo =
+      /\.(?:jpe?g|png|gif|webp|avif)(?:[?#]|$)/i.test(url) || (/newbook/i.test(url) && !racProxy);
     if (photo && !PLACEHOLDER_IMAGE.test(url)) found.push(`image URL ${url}`);
   }
   for (const [, src] of text.matchAll(/\b(?:data-)?src(?:set)?\s*=\s*"([^"]*)"/gi)) {
@@ -116,9 +145,14 @@ function fixtureViolations(raw: string): string[] {
     found.push(`a cf-ray value ${ray}`);
   }
   for (const key of SECRET_KEYS) {
-    const values = text.matchAll(new RegExp(`${key}["']?\\s*[:=]\\s*["']?([^"'&\\s,}]*)`, 'g'));
-    for (const [, value] of values) {
-      if (value !== '<redacted>') found.push(`${key} is not <redacted>`);
+    const values = text.matchAll(new RegExp(`${key}["']?\\s*[:=]\\s*["']?([^"'\\s,}]*)`, 'g'));
+    for (const [, whole] of values) {
+      const value = key === 'online_cart_url' ? whole : whole.split('&')[0];
+      const allowed =
+        value === '<redacted>' ||
+        (key === 'rest_api_data_id' && value === ZERO_TOKEN) ||
+        (key === 'online_cart_url' && synthetic && SYNTHETIC_CART_ADDRESS.test(value));
+      if (!allowed) found.push(`${key} is not <redacted>`);
     }
   }
   for (const [email] of text.matchAll(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi)) {
@@ -136,8 +170,11 @@ function fixtureViolations(raw: string): string[] {
   return found;
 }
 
-/** What in a source file breaks rule 1, as messages ([] when nothing). */
-function sourceViolations(text: string): string[] {
+/**
+ * What in a source file breaks rule 1, as messages ([] when nothing). `cartSource`: the
+ * auto-cart (`holds.ts`), which may read a tariff's `online_cart_url`.
+ */
+function sourceViolations(text: string, { cartSource = false } = {}): string[] {
   const found: string[] = [];
   for (const [url] of text.matchAll(/[a-z][a-z0-9+.-]*:\/\/[^\s"'`<>)\\]*/gi)) {
     let host: string | undefined;
@@ -153,7 +190,9 @@ function sourceViolations(text: string): string[] {
       found.push(`another host named: ${line.trim()}`);
     }
   }
-  if (/online_cart_url|\/booking\/\?cart/.test(text)) found.push('a cart address');
+  if (/\/booking\/\?cart/.test(text) || (!cartSource && /online_cart_url/.test(text))) {
+    found.push('a cart address');
+  }
   return found;
 }
 
@@ -190,7 +229,26 @@ describe('RAC fixtures (terms rule 7)', () => {
   });
 
   it.each(files.map((file) => [file]))('%s is trimmed to facts', (file) => {
-    expect(fixtureViolations(read(file))).toEqual([]);
+    expect(fixtureViolations(read(file), { synthetic: file.startsWith(CART_DIR) })).toEqual([]);
+  });
+
+  it('labels every auto-cart fixture as synthetic, and finds them (R19)', () => {
+    const cart = files.filter((file) => file.startsWith(CART_DIR));
+    expect(cart).toEqual(
+      expect.arrayContaining([
+        `${CART_DIR}cart-page-empty.html`,
+        `${CART_DIR}cart-page-one-stay.html`,
+        `${CART_DIR}cart-page-no-hold-fields.html`,
+        `${CART_DIR}cart-page-refused.html`,
+        `${CART_DIR}availability-busselton-2026-11-06-2n.json`,
+        `${CART_DIR}remove-item-from-cart.json`,
+      ])
+    );
+    for (const file of cart) expect([file, SYNTHETIC_LABEL.test(read(file))]).toEqual([file, true]);
+    // No synthetic cart fixture outside the cart folder, and none in the e2e fixtures
+    for (const file of files.filter((f) => !f.startsWith(CART_DIR))) {
+      expect([file, SYNTHETIC_CART_ADDRESS.test(read(file))]).toEqual([file, false]);
+    }
   });
 
   it('labels the recorded pages with their page and date, and the block pages as synthetic', () => {
@@ -204,7 +262,8 @@ describe('RAC fixtures (terms rule 7)', () => {
         /^<!-- Synthetic, written by hand/
       );
     }
-    for (const file of files.filter((f) => /\/availability-[^/]+\.json$/.test(f))) {
+    const recorded = files.filter((f) => !f.startsWith(CART_DIR));
+    for (const file of recorded.filter((f) => /\/availability-[^/]+\.json$/.test(f))) {
       const note = (JSON.parse(read(file)) as { _fixture?: string })._fixture;
       expect([file, note]).toEqual([
         file,
@@ -218,12 +277,18 @@ describe('RAC fixtures (terms rule 7)', () => {
   it('catches what it guards against', () => {
     const bad = [
       '<img src="https://driveau.newbook.cloud/crop_800_450/instances_d895bd707965db25abb932aba767878f_6.jpg">',
+      // A NewBook host's address, even with no image extension
+      '{"photo":"https://driveau.newbook.cloud/crop_800_450/a-photo"}',
+      // An address on RAC's host naming NewBook anywhere but RAC's own proxy
+      '{"photo":"https://parksandresorts.rac.com.au/newbook/crop_800_450/a-photo"}',
       '<img data-src="https://example.com/photo.png">',
       '{"photo":"https:\\/\\/driveau.newbook.cloud\\/crop_800_450\\/instances_d895bd70_6.jpg"}',
       '<div class="accommodation-item__description">Wake up to birdsong.</div>',
       '{"api_key":"instances_d895bd707965db25abb932aba767878f"}',
       '{"online_cart_url":"https://parksandresorts.rac.com.au/busselton/booking/?cart"}',
-      'rest_api_data_id=0123456789abcdef',
+      `rest_api_data_id=${LIVE_LOOKING_TOKEN.slice(0, 16)}`,
+      `rest_api_data_id=${'0'.repeat(31)}1`,
+      `"online_cart_url":"https://parksandresorts.rac.com.au/busselton/booking/?cart&rest_api_data_id=${ZERO_TOKEN}&rand=1"`,
       'Email: reservations@example.com.au',
       'Telephone: 08 9755 4241',
       'Free call: 1800 871 570',
@@ -254,9 +319,27 @@ describe('RAC fixtures (terms rule 7)', () => {
           '{"api_key":"<redacted>","online_cart_url":"<redacted>"} data-date-from="20270924"' +
           '<div class="booking-notification__description"><p>Arrivals on Fridays only.</p></div>' +
           '<p class="accommodation-item__description">Placeholder description.</p>' +
-          '{"timestamp":"2026-10-16 23:35:15","newbook_version":"2025.03.12-6acd5eef54202"}'
+          '{"timestamp":"2026-10-16 23:35:15","newbook_version":"2025.03.12-6acd5eef54202"}' +
+          `rest_api_data_id=${ZERO_TOKEN}&rand=1 ` +
+          // RAC's own NewBook proxy, on RAC's host, is no photo
+          "newbook_api_path='https://parksandresorts.rac.com.au/busselton/wp-content/themes/parks-and-resorts/inc/newbook/api/rac-busselton-holiday-park.php?'"
       )
     ).toEqual([]);
+    // A synthetic cart fixture: its cart address, with the zero token only, on RAC's booking page
+    const synthetic = (address: string) =>
+      fixtureViolations(`{"online_cart_url":"${address}"}`, { synthetic: true });
+    expect(
+      synthetic(
+        `https://parksandresorts.rac.com.au/busselton/booking/?cart&rest_api_data_id=${ZERO_TOKEN}&rand=1001`
+      )
+    ).toEqual([]);
+    for (const address of [
+      `https://parksandresorts.rac.com.au/busselton/booking/?cart&rest_api_data_id=${LIVE_LOOKING_TOKEN}&rand=1`,
+      `https://example.com/busselton/booking/?cart&rest_api_data_id=${ZERO_TOKEN}&rand=1`,
+      `https://parksandresorts.rac.com.au/busselton/booking/?cart=Booking&rest_api_data_id=${ZERO_TOKEN}`,
+    ]) {
+      expect([address, synthetic(address).length]).not.toEqual([address, 0]);
+    }
   });
 });
 
@@ -270,7 +353,9 @@ describe('RAC source (terms rule 1)', () => {
   it.each(files.map((file) => [file]))(
     "%s names no URL but RAC's, the image host only where photos are checked, and no cart address",
     (file) => {
-      expect(sourceViolations(read(file))).toEqual([]);
+      expect(
+        sourceViolations(read(file), { cartSource: path.basename(file) === CART_SOURCE })
+      ).toEqual([]);
     }
   );
 
@@ -285,6 +370,13 @@ describe('RAC source (terms rule 1)', () => {
     ]) {
       expect([sample, sourceViolations(sample).length]).not.toEqual([sample, 0]);
     }
+    // The auto-cart may read a tariff's cart address, but never names one itself
+    expect(sourceViolations('const cart = tariff.online_cart_url;', { cartSource: true })).toEqual(
+      []
+    );
+    expect(
+      sourceViolations('const url = `${base}/booking/?cart&rand=1`;', { cartSource: true })
+    ).not.toEqual([]);
     expect(
       sourceViolations(
         "export const RAC_SITE_URL = 'https://parksandresorts.rac.com.au';\n" +

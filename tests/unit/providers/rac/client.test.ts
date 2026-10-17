@@ -22,10 +22,13 @@ import {
   RacClient,
   retryAfterMs,
 } from '@main/providers/rac/client';
+import { RAC_AVAILABILITY_PATH } from '@main/providers/rac/cart-guard';
 import { createMemoryLogger, type MemoryLogger } from '@tests/utils/fake-provider';
 import { RecordingHttpClient, type HopAnswer } from '@tests/utils/fake-paced-provider';
 
 const RAC = 'https://parksandresorts.rac.com.au';
+/** The one form the client may post outside the cart (`cart-guard.ts`): RAC's availability. */
+const AJAX = RAC_AVAILABILITY_PATH;
 const BOOK_NOW = `${RAC}/busselton/book-now/`;
 const PAGE = '<html><body><div class="accommodation-item" data-cat-id="4"></div></body></html>';
 /** 3:15 pm in Perth (UTC+8). */
@@ -156,9 +159,9 @@ describe('RacClient: host and headers', () => {
     const client = makeClient((hop) =>
       hop.method === 'POST' ? { status: 302, headers: { location: '/done/' } } : { body: '{}' }
     );
-    await client.postAjax('/ajax.php', { a: 1 }, { referer: BOOK_NOW });
+    await client.postAjax(AJAX, { a: 1 }, { referer: BOOK_NOW });
     expect(http.hops.map((hop) => [hop.method, hop.url, hop.body])).toEqual([
-      ['POST', `${RAC}/ajax.php`, 'a=1'],
+      ['POST', `${RAC}${AJAX}`, 'a=1'],
       ['GET', `${RAC}/done/`, undefined],
     ]);
     expect(http.hops[1].headers.get('content-type')).toBeNull();
@@ -171,11 +174,11 @@ describe('RacClient: host and headers', () => {
         : { body: '{}' }
     );
     const onSend = jest.fn();
-    const first = client.postAjax('/ajax.php', { a: 1 }, { referer: BOOK_NOW, onSend });
+    const first = client.postAjax(AJAX, { a: 1 }, { referer: BOOK_NOW, onSend });
     const controller = new AbortController();
     const waiting = jest.fn();
     const second = client.postAjax(
-      '/ajax.php',
+      AJAX,
       { a: 2 },
       { referer: BOOK_NOW, signal: controller.signal, onSend: waiting }
     );
@@ -279,7 +282,7 @@ describe('RacClient: a block', () => {
     expect(second.retryable).toBe(false);
     expect(second.message).toBe(first.message);
     // An AJAX call too
-    await failure(client.postAjax('/ajax.php', { a: 1 }, { referer: BOOK_NOW }));
+    await failure(client.postAjax(AJAX, { a: 1 }, { referer: BOOK_NOW }));
     expect(http.requests).toHaveLength(1);
 
     now = new Date(START.getTime() + RAC_BLOCK_COOLDOWN_MS);

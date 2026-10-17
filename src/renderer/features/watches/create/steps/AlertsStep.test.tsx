@@ -3,6 +3,8 @@ import { screen, waitFor, within } from '@testing-library/react';
 import type { ProviderManifest } from '../../../../../shared/types/provider.types';
 import { FAKE_MANIFEST, PARKSTAY_MANIFEST, ok } from '@tests/utils/renderer/createMockApi';
 import { renderWithProviders } from '@tests/utils/renderer/renderWithProviders';
+import { RAC_AUTO_CART_MANIFEST, RAC_MANIFEST } from '@tests/utils/renderer/manifests';
+import { racAccount } from '@tests/fixtures/renderer/settings';
 import { emptyWatchForm } from '../../form/watchFormMapping';
 import type { WatchFormValues } from '../../form/watchFormSchema';
 import { stayNoun } from '../../../../components/stay/stayTypes';
@@ -71,6 +73,38 @@ describe('AlertsStep', () => {
     await waitFor(() =>
       expect(screen.queryByRole('link', { name: /connect ParkStay/i })).toBeNull()
     );
+  });
+
+  it('RAC with auto-cart off: no automatic hold, and no equipment', () => {
+    renderWithProviders(<Harness manifest={RAC_MANIFEST} />, { api: accounts([racAccount()]) });
+    expect(toggle()).toBeNull();
+    expect(screen.queryByRole('combobox', { name: /Equipment/ })).toBeNull();
+  });
+
+  it('RAC with auto-cart on: the automatic hold asks for the equipment, and suggests adding the member number, never connecting (R19)', async () => {
+    const { user } = renderWithProviders(<Harness manifest={RAC_AUTO_CART_MANIFEST} />, {
+      api: accounts([racAccount()]),
+    });
+    const hold = toggle();
+    expect(hold).not.toBeNull();
+    const link = await screen.findByRole('link', {
+      name: 'add your RAC member number in Settings',
+    });
+    expect(link).toHaveAttribute('href', '#/settings/accounts?provider=rac');
+    expect(link.closest('p')).toHaveTextContent(
+      'Optional: add your RAC member number in Settings.'
+    );
+    expect(screen.queryByRole('link', { name: /connect RAC/i })).toBeNull();
+
+    expect(screen.queryByRole('combobox', { name: /Equipment/ })).toBeNull();
+    await user.click(hold!);
+    const equipment = screen.getByRole('combobox', { name: /^Equipment/ });
+    expect(within(equipment).getAllByRole('option')).toHaveLength(16);
+    expect(equipment).toHaveValue('');
+    expect(
+      screen.getByRole('textbox', { name: /Equipment length \(metres\)/ })
+    ).toBeInTheDocument();
+    expect(screen.getByRole('textbox', { name: /Equipment width \(metres\)/ })).toBeInTheDocument();
   });
 
   it('warns when the provider needs an account to hold', async () => {

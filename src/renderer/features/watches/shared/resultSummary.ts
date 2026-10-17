@@ -72,7 +72,11 @@ export function runResultMessage(
   if (!result.success) return result.error ?? `The check of ${place} failed. Try again soon.`;
   if (result.expired) return `The stay at ${place} has started, so the watch has stopped.`;
   if (result.hold) {
-    const unit = unitNameOf(watch, result.hold.unitId, noun);
+    // This check's own units name it (the watch is from before the check, with no units yet)
+    const held = result.hold.unitId;
+    const unit =
+      result.matches.find((match) => match.unitId === held)?.unitName ??
+      unitNameOf(watch, held, noun);
     // A guessed expiry is "about" (R18)
     const about = result.hold.expiresEstimated ? 'about ' : '';
     const by = manifest

@@ -70,6 +70,9 @@ describe('watch state helpers', () => {
     });
     expect(unitNameOf(watch, '7', SITES)).toBe('Site 07');
     expect(unitNameOf(watch, '9', SITES)).toBe('Site 9');
+    // An id that is not a number is never shown (RAC's categories): the noun, as unitLabel does
+    expect(unitNameOf(watch, 'cat:4', SITES)).toBe('A site');
+    expect(unitNameOf(watch, undefined, SITES)).toBe('A site');
   });
 
   it('names a watch’s units by its last check, its stay types, the place or the provider (R9)', () => {

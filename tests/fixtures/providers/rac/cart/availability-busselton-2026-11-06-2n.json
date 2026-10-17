@@ -1,0 +1,190 @@
+{
+  "_fixture": "Synthetic: written from RAC's NewBook scripts, not recorded. An availability answer for RAC Busselton Holiday Park (blog 6), 6-8 Nov 2026, 2 adults, in the shape of the trimmed answers, whose bookable tariffs carry cart addresses (availability-filters.js reads them as each tariff's online_cart_url) with the made-up token of 32 zeros; each tariff's rand tells them apart. No cart was ever opened.",
+  "success": "true",
+  "message": "",
+  "timestamp": "2026-10-17 10:00:00",
+  "timezone": "Australia/West",
+  "api_key": "<redacted>",
+  "data": {
+    "4": {
+      "category_id": 4,
+      "category_type_id": "2",
+      "category_name": "Powered Site",
+      "sort": 5,
+      "sites_available": {
+        "2026-11-06": 20,
+        "2026-11-07": 20
+      },
+      "sites_code": {
+        "2026-11-06": 0,
+        "2026-11-07": 0
+      },
+      "sites_message": {
+        "2026-11-06": "",
+        "2026-11-07": ""
+      },
+      "stay_through_sites_available": 20,
+      "stay_through_sites_code": 0,
+      "stay_through_sites_message": "",
+      "online_booking_url": "https://parksandresorts.rac.com.au/busselton/booking/?available_from=2026-11-06&available_to=2026-11-08&force_category_id=4&adults=2&children=0&infants=0&animals=0",
+      "tariffs_available": [
+        {
+          "tariff_label": "Standard Rate",
+          "tariff_success": "true",
+          "tariff_code": 0,
+          "tariff_message": "",
+          "tariff_total": 150,
+          "tariffs_quoted": {
+            "2026-11-06": {
+              "amount": 75,
+              "minimum_periods": "1",
+              "close_arrival": "0",
+              "close_departure": "0"
+            },
+            "2026-11-07": {
+              "amount": 75,
+              "minimum_periods": "1",
+              "close_arrival": "0",
+              "close_departure": "0"
+            }
+          },
+          "online_cart_url": "https://parksandresorts.rac.com.au/busselton/booking/?cart&rest_api_data_id=00000000000000000000000000000000&rand=1001"
+        },
+        {
+          "tariff_label": "RAC Member Rate",
+          "tariff_success": "true",
+          "tariff_code": 0,
+          "tariff_message": "",
+          "tariff_total": 136,
+          "tariffs_quoted": {
+            "2026-11-06": {
+              "amount": 68,
+              "minimum_periods": "1",
+              "close_arrival": "0",
+              "close_departure": "0"
+            },
+            "2026-11-07": {
+              "amount": 68,
+              "minimum_periods": "1",
+              "close_arrival": "0",
+              "close_departure": "0"
+            }
+          },
+          "online_cart_url": "https://parksandresorts.rac.com.au/busselton/booking/?cart&rest_api_data_id=00000000000000000000000000000000&rand=1002"
+        },
+        {
+          "tariff_label": "Stay & Save This Spring",
+          "tariff_success": "false",
+          "tariff_code": 6,
+          "tariff_message": "This Rate has a 3 Night Minimum",
+          "tariff_total": 150,
+          "tariffs_quoted": {
+            "2026-11-06": {
+              "amount": 75,
+              "minimum_periods": "3",
+              "close_arrival": "0",
+              "close_departure": "0"
+            },
+            "2026-11-07": {
+              "amount": 75,
+              "minimum_periods": "3",
+              "close_arrival": "0",
+              "close_departure": "0"
+            }
+          }
+        }
+      ]
+    },
+    "7": {
+      "category_id": 7,
+      "category_type_id": "2",
+      "category_name": "Ensuite Site",
+      "sort": 0,
+      "sites_available": {
+        "2026-11-06": 0,
+        "2026-11-07": 0
+      },
+      "sites_code": {
+        "2026-11-06": 3,
+        "2026-11-07": 3
+      },
+      "sites_message": {
+        "2026-11-06": "There is no availability for this date",
+        "2026-11-07": "There is no availability for this date"
+      },
+      "stay_through_sites_available": 0,
+      "stay_through_sites_code": 3,
+      "stay_through_sites_message": "There is no longer availability for the dates given",
+      "online_booking_url": "https://parksandresorts.rac.com.au/busselton/booking/?available_from=2026-11-06&available_to=2026-11-08&force_category_id=7&adults=2&children=0&infants=0&animals=0",
+      "tariffs_available": [
+        {
+          "tariff_label": "Standard Rate",
+          "tariff_success": "true",
+          "tariff_code": 0,
+          "tariff_message": "",
+          "tariff_total": 260,
+          "tariffs_quoted": {
+            "2026-11-06": {
+              "amount": 130,
+              "minimum_periods": "1",
+              "close_arrival": "0",
+              "close_departure": "0"
+            },
+            "2026-11-07": {
+              "amount": 130,
+              "minimum_periods": "1",
+              "close_arrival": "0",
+              "close_departure": "0"
+            }
+          }
+        }
+      ]
+    },
+    "9": {
+      "category_id": 9,
+      "category_type_id": "5",
+      "category_name": "Two Bedroom Cabin (Sleeps 4)",
+      "sort": 10,
+      "sites_available": {
+        "2026-11-06": 3,
+        "2026-11-07": 3
+      },
+      "sites_code": {
+        "2026-11-06": 0,
+        "2026-11-07": 0
+      },
+      "sites_message": {
+        "2026-11-06": "",
+        "2026-11-07": ""
+      },
+      "stay_through_sites_available": 3,
+      "stay_through_sites_code": 0,
+      "stay_through_sites_message": "",
+      "online_booking_url": "https://parksandresorts.rac.com.au/busselton/booking/?available_from=2026-11-06&available_to=2026-11-08&force_category_id=9&adults=2&children=0&infants=0&animals=0",
+      "tariffs_available": [
+        {
+          "tariff_label": "Standard Rate",
+          "tariff_success": "true",
+          "tariff_code": 0,
+          "tariff_message": "",
+          "tariff_total": 260,
+          "tariffs_quoted": {
+            "2026-11-06": {
+              "amount": 130,
+              "minimum_periods": "1",
+              "close_arrival": "0",
+              "close_departure": "0"
+            },
+            "2026-11-07": {
+              "amount": 130,
+              "minimum_periods": "1",
+              "close_arrival": "0",
+              "close_departure": "0"
+            }
+          },
+          "online_cart_url": "https://parksandresorts.rac.com.au/busselton/booking/?cart&rest_api_data_id=00000000000000000000000000000000&rand=1003"
+        }
+      ]
+    }
+  }
+}

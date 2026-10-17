@@ -889,9 +889,9 @@ describe('RAC availability: never a cart address', () => {
   );
 
   it.each([
-    `${RAC}/busselton/booking/?cart&rest_api_data_id=x`,
+    `${RAC}/busselton/booking/?cart&rest_api_data_id=<redacted>`,
     `${RAC}/busselton/booking/?available_from=2026-11-06&cart=Booking&force_category_id=4`,
-    `${RAC}/busselton/booking/?available_from=2026-11-06&rest_api_data_id=x`,
+    `${RAC}/busselton/booking/?available_from=2026-11-06&rest_api_data_id=<redacted>`,
     'http://parksandresorts.rac.com.au/busselton/booking/?force_category_id=4',
     'https://evil.example/busselton/booking/?force_category_id=4',
     `${RAC}/cable-beach/booking/?force_category_id=4`,

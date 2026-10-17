@@ -5,6 +5,7 @@ import { CircleAlert } from 'lucide-react';
 import { useAccountStatus } from '../../../api';
 import type { ProviderManifest } from '../../../../shared/types/provider.types';
 import { ROUTES } from '../../../app/routes';
+import { inSentence } from '../../../components/accounts/credentialText';
 import { ProviderStayFields } from '../../../components/stay/ProviderStayFields';
 import type { UnitNoun } from '../../../components/stay/UnitPicker';
 import { Checkbox, Notice } from '../../../components/ui';
@@ -19,7 +20,8 @@ export interface AutoHoldFieldProps {
 /**
  * "Hold a site automatically when found" (architecture-notes §12.4), only for providers with
  * holds. Ticking it asks for the provider's hold fields. Signing in is a suggestion for
- * providers whose account is optional, and a warning for those that need one (§12.32). At a
+ * providers whose account is optional ("add your {label}" for details saved in the app, such as
+ * RAC's member number, which has no sign-in), and a warning for those that need one (§12.32). At a
  * place with more than one stay type it needs a stay type or a unit chosen: the schema's
  * error shows under the box, which it describes.
  */
@@ -36,6 +38,14 @@ export function AutoHoldField({ manifest, noun }: AutoHoldFieldProps) {
   const signedIn = account.data?.status === 'signed-in';
   const requirement = manifest.capabilities.account;
   const settings = ROUTES.settings('accounts', { provider: manifest.id });
+  // Details saved in the app (a member number) are added, never connected
+  const detailFields = account.data?.fields ?? [];
+  const savedDetails =
+    account.data?.authKind !== 'credentials'
+      ? undefined
+      : detailFields.length === 1
+        ? inSentence(detailFields[0].label)
+        : 'details';
 
   return (
     <div className="flex flex-col gap-4">
@@ -70,7 +80,16 @@ export function AutoHoldField({ manifest, noun }: AutoHoldFieldProps) {
           />
         </div>
       )}
-      {!signedIn && requirement === 'optional' && (
+      {!signedIn && requirement === 'optional' && savedDetails !== undefined && (
+        <p className="text-sm text-fg-muted">
+          Optional:{' '}
+          <Link to={settings} className="font-semibold text-brand-strong hover:underline">
+            add your {savedDetails} in Settings
+          </Link>
+          .
+        </p>
+      )}
+      {!signedIn && requirement === 'optional' && savedDetails === undefined && (
         <p className="text-sm text-fg-muted">
           Optional:{' '}
           <Link to={settings} className="font-semibold text-brand-strong hover:underline">

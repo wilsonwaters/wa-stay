@@ -1,9 +1,19 @@
 import { ALERT_ONLY_MANIFEST } from '@tests/fixtures/renderer/snipes';
-import { PARKSTAY_MANIFEST } from '@tests/utils/renderer/manifests';
+import {
+  PARKSTAY_MANIFEST,
+  RAC_AUTO_CART_MANIFEST,
+  RAC_MANIFEST,
+} from '@tests/utils/renderer/manifests';
 import { SnipeReleaseMode } from '../../../../shared/types/common.types';
 import type { ProviderManifest, UnitKind } from '../../../../shared/types/provider.types';
 import { defaultSnipeAction, windowCapMinutes } from './snipeAction';
-import { emptySnipeForm, snipeFormSchema, stepFields, type SnipeFormValues } from './snipeForm';
+import {
+  emptySnipeForm,
+  snipeFormSchema,
+  snipeStayFields,
+  stepFields,
+  type SnipeFormValues,
+} from './snipeForm';
 
 const NOW = new Date('2099-12-01T02:00:00Z');
 const valid = (overrides: Partial<SnipeFormValues> = {}): SnipeFormValues => ({
@@ -117,5 +127,21 @@ describe('snipeFormSchema: the release mode’s limit on the window', () => {
     expect(
       issues(valid({ windowMinutes: '1440', releaseMode: SnipeReleaseMode.CANCELLATION }))
     ).toEqual({});
+  });
+});
+
+describe('snipeStayFields', () => {
+  const keys = (manifest: ProviderManifest) => snipeStayFields(manifest).map((field) => field.key);
+
+  it("asks for a hold's fields only from a provider that holds (R19: RAC's equipment)", () => {
+    expect(keys(PARKSTAY_MANIFEST)).toEqual(['gearType', 'numVehicles', 'postcode']);
+    expect(keys(RAC_MANIFEST)).toEqual(['pets']);
+    expect(keys(RAC_AUTO_CART_MANIFEST)).toEqual([
+      'pets',
+      'equipmentType',
+      'equipmentLength',
+      'equipmentWidth',
+    ]);
+    expect(emptySnipeForm(RAC_MANIFEST).stayParams).toEqual({ pets: 0 });
   });
 });

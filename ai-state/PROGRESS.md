@@ -10,8 +10,9 @@ Branch `ccr-573ddb1d-hir0sq` (from `main` at `4bd5d62`, the v2.0.0 release). The
 Phase 3–4 (task specs, then execution). The stakeholder approved the 20-task plan and decided R6–R8 (alert clicks for every provider, a phone booking link in alert emails, interactive pacing).
 
 ## Currently in flight
-- **R19 (#66)**: implementation agent in `/home/user/lanes/r19`, started early from `lane/r16` (`5750238`) to overlap with R16's review; it merges the integration branch once R16 is merged. No live request of any kind (synthetic cart fixtures only).
-- Next: R20 (docs, website, CHANGELOG, final gate), then system verification.
+- **R19 (#66)**: implemented on `lane/r19` (`1f4f607`, R16 merged in; 5832 tests, e2e 29); in independent review (guard bypasses first). No live request (synthetic fixtures, fixture mode, network guard).
+- **R20 (#67)**: implementation agent in `/home/user/lanes/r20` (base `3cc29a2`), started alongside R19: everything not tied to the cart first, then the cart docs once R19 is merged. No Mapbox token in this environment, so screenshots cannot be retaken here.
+- Next: system verification of the whole stream, final review against the brief, report to the stakeholder.
 
 ## Completed
 - **R16 (#63) merged** (`8ff8151`): RAC's optional member number (`credentials`, digits only, checked locally, never sent, logged, returned or put in an alert); members-only tariffs and member prices with a note only with a saved number; the member pre-sale 48 h earlier at the park's hour; RAC availability asked again and RAC snipes re-armed when the number changes (`rearmSnipes(providerId)`, ParkStay untouched); Copy member number beside Book and Pay now; `ConnectAccountPrompt` links to Settings for credentials providers; the release preview shows the policy's refusal (`release.refused`); number stay fields take whole numbers; the core drops a provider refusal that quotes any 4-character run of a typed value. Review REQUEST-CHANGES (refusal filter) → fixes `0840153`, `054ad3c`, `362fce2` → APPROVE. Gate on the lane (code identical to the merge): 5595 tests, test:tz 8, e2e 27. Test member numbers are placeholders only (`1234567890123`, `012345678`, `5550199`…).

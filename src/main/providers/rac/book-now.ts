@@ -20,7 +20,8 @@
  * no category at all (a redesign) reads as `undefined`.
  *
  * The page is parsed with sanitize-html's parser (htmlparser2), through its open, close and
- * text hooks: no other HTML library.
+ * text hooks: no other HTML library. The small element tree (`parseHtml`, `findAll`,
+ * `hasClass`, `textOf`) is shared with the cart page's reader (`cart-page.ts`).
  */
 
 import sanitizeHtml from 'sanitize-html';
@@ -72,14 +73,14 @@ export interface BookNowPage {
 // A small element tree
 // ---------------------------------------------------------------------------------------
 
-interface HtmlElement {
+export interface HtmlElement {
   tag: string;
   attribs: Record<string, string>;
   children: HtmlNode[];
 }
 
 /** A text node holds its text escaped as HTML (`&amp;`, `&lt;`, `&gt;`). */
-type HtmlNode = HtmlElement | { text: string };
+export type HtmlNode = HtmlElement | { text: string };
 
 const isElement = (node: HtmlNode): node is HtmlElement => 'tag' in node;
 
@@ -88,7 +89,7 @@ const isElement = (node: HtmlNode): node is HtmlElement => 'tag' in node;
  * allowed: its hooks report each element as it opens and closes (implied closes included) and
  * each text, escaped. Script and style text never reaches the text hook.
  */
-function parseHtml(html: string): HtmlElement {
+export function parseHtml(html: string): HtmlElement {
   const root: HtmlElement = { tag: '#root', attribs: {}, children: [] };
   const stack: HtmlElement[] = [root];
   const top = (): HtmlElement => stack[stack.length - 1];
@@ -114,7 +115,7 @@ function parseHtml(html: string): HtmlElement {
   return root;
 }
 
-function findAll(
+export function findAll(
   from: HtmlElement,
   test: (element: HtmlElement) => boolean,
   found: HtmlElement[] = []
@@ -127,14 +128,14 @@ function findAll(
   return found;
 }
 
-const hasClass = (name: string) => (element: HtmlElement) =>
+export const hasClass = (name: string) => (element: HtmlElement) =>
   (element.attribs.class ?? '').split(/\s+/).includes(name);
 
 const unescapeText = (text: string): string =>
   text.replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&');
 
 /** The element's text, unescaped, with runs of white space as one space. */
-function textOf(node: HtmlNode): string {
+export function textOf(node: HtmlNode): string {
   const raw = (n: HtmlNode): string =>
     isElement(n) ? n.children.map(raw).join('') : unescapeText(n.text);
   return raw(node).replace(/\s+/g, ' ').trim();
