@@ -277,6 +277,14 @@ describe('ProviderManifestSchema', () => {
     ['a select without options', (m) => (m.stayFields![0].options = []), 'stayFields.0.options'],
     ['a bad pattern', (m) => (m.stayFields![1].pattern = '(['), 'stayFields.1.pattern'],
     ['min above max', (m) => (m.stayFields![2].min = 9), 'stayFields.2.min'],
+    // A number stay field is a count: whole numbers bound and start it (R16)
+    ['a fractional number min', (m) => (m.stayFields![2].min = 0.5), 'stayFields.2.min'],
+    ['a fractional number max', (m) => (m.stayFields![2].max = 2.5), 'stayFields.2.max'],
+    [
+      'a fractional number default',
+      (m) => (m.stayFields![2].default = 1.5),
+      'stayFields.2.default',
+    ],
     [
       'a default of the wrong type',
       (m) => (m.stayFields![2].default = 'one'),

@@ -895,6 +895,41 @@ describe('ProviderAccountService', () => {
       expect(credentialsChanged).not.toHaveBeenCalled();
     });
 
+    it("a signed-out answer's own words are the refusal, unless they quote what was typed (R16)", async () => {
+      registry = new ProviderRegistry();
+      const scripted: Array<{ state: 'signed-out'; message?: unknown }> = [
+        { state: 'signed-out', message: "  That doesn't look like a Key Stay member number " },
+        // Quoting the number as typed, trimmed, or with its spaces left out: never shown
+        { state: 'signed-out', message: `${NUMBER} is not a member number` },
+        { state: 'signed-out', message: `Member 1234 5678 90123 not found` },
+        { state: 'signed-out', message: `Your password ${PASSWORD.toUpperCase()} is wrong` },
+        // Not text, empty, or too long: the core's own words
+        { state: 'signed-out', message: 42 },
+        { state: 'signed-out', message: '   ' },
+        { state: 'signed-out', message: 'x'.repeat(201) },
+      ];
+      keystay = registerKeyStay({
+        signIn: () => scripted.shift() as { state: 'signed-out'; message?: string },
+      });
+      build();
+
+      const messages: string[] = [];
+      for (let i = 0; i < 7; i++) {
+        const refused = await refusal(service.saveCredentials('keystay', VALUES, ['own']));
+        expect(refused).toMatchObject({
+          code: 'VALIDATION',
+          issues: ['values.memberNumber', 'values.password'],
+        });
+        messages.push(refused.message);
+      }
+      expect(messages).toEqual([
+        "That doesn't look like a Key Stay member number",
+        ...Array<string>(6).fill("KeyStay didn't accept these details"),
+      ]);
+      expect(secretRows()).toEqual([]);
+      expect(everything()).not.toContain(NUMBER);
+    });
+
     it('a signIn that throws is PROVIDER_ERROR, and its message (which quotes the value) is never logged', async () => {
       registry = new ProviderRegistry();
       keystay = registerKeyStay({

@@ -78,4 +78,28 @@ describe('a release the provider refused', () => {
       screen.getByRole('radio', { name: 'When these dates open' })
     ).toHaveAccessibleDescription(new RegExp(RELEASE_UNKNOWN));
   });
+
+  it("shows the provider's reason from its check before anything is created (R16)", async () => {
+    const create = jest.fn();
+    const mock = api(
+      {
+        snipes: { create },
+        catalog: { checkLocation: checkLocationWith({ open: false, refused: REFUSAL }) },
+      },
+      [ALERT_ONLY_MANIFEST],
+      PLACE
+    );
+    const { user } = renderWithApp({ route: ROUTE, api: mock });
+    await step(/Your stay$/);
+    await user.click(button('Continue'));
+    await step(/Release and timing$/);
+    const rolling = screen.getByRole('radio', { name: 'When these dates open' });
+    await waitFor(() =>
+      expect(rolling).toHaveAccessibleDescription(
+        `Dates open a year ahead, at midnight. ${REFUSAL}`
+      )
+    );
+    expect(screen.queryByText(RELEASE_UNKNOWN)).toBeNull();
+    expect(create).not.toHaveBeenCalled();
+  });
 });

@@ -1,8 +1,9 @@
 import { act, screen, waitFor } from '@testing-library/react';
-import type { ProviderAccount } from '../../../shared/types/provider.types';
+import type { ProviderAccount, ProviderManifest } from '../../../shared/types/provider.types';
 import { ACCOUNT_REQUIRED_MANIFEST } from '@tests/fixtures/renderer/snipes';
 import { createMockApi, fail, ok, PARKSTAY_MANIFEST } from '@tests/utils/renderer/createMockApi';
 import { FAKE_MANIFEST } from '@tests/utils/renderer/manifests';
+import { KEYSTAY, KEY_SAVED, keyAccount } from '@tests/fixtures/renderer/settings';
 import { politeAnnouncement, renderWithProviders } from '@tests/utils/renderer/renderWithProviders';
 import { ConnectAccountPrompt, NOT_CONNECTED } from './ConnectAccountPrompt';
 
@@ -145,5 +146,51 @@ describe('ConnectAccountPrompt', () => {
     renderWithProviders(<ConnectAccountPrompt manifest={FAKE_MANIFEST} />);
     expect(screen.queryByRole('button')).toBeNull();
     expect(screen.queryByText(/Connect/)).toBeNull();
+  });
+
+  describe('a provider whose account is details saved in the app (credentials, R16)', () => {
+    const withAccount = (account: ProviderManifest['capabilities']['account']) =>
+      ({
+        ...KEYSTAY,
+        capabilities: { ...KEYSTAY.capabilities, account, holds: true },
+      }) as ProviderManifest;
+
+    it('links to Settings → Accounts instead of a sign-in window it does not have', async () => {
+      const signIn = jest.fn();
+      renderWithProviders(
+        <ConnectAccountPrompt manifest={withAccount('optional')} message="Connect KeyStay." />,
+        { api: { accounts: { list: jest.fn().mockResolvedValue(ok([keyAccount()])), signIn } } }
+      );
+      const settings = await screen.findByRole('link', { name: 'Settings → Accounts' });
+      expect(settings.closest('p')).toHaveTextContent(
+        'You can add your member number in Settings → Accounts.'
+      );
+      expect(settings).toHaveAttribute('href', '#/settings/accounts?provider=keystay');
+      expect(screen.queryByRole('button', { name: /Connect/ })).toBeNull();
+      expect(screen.queryByText('Connect KeyStay.')).toBeNull();
+      expect(signIn).not.toHaveBeenCalled();
+    });
+
+    it('needed for holds: says so, and "Add member number" goes to Settings → Accounts', async () => {
+      renderWithProviders(<ConnectAccountPrompt manifest={withAccount('required-for-holds')} />, {
+        api: { accounts: { list: jest.fn().mockResolvedValue(ok([keyAccount()])) } },
+      });
+      const add = await screen.findByRole('link', { name: 'Add member number' });
+      expect(add).toHaveAttribute('href', '#/settings/accounts?provider=keystay');
+      expect(
+        screen.getByText('KeyStay needs your member number before it can hold anything for you.')
+      ).toBeInTheDocument();
+    });
+
+    it('shows nothing once the details are saved', async () => {
+      renderWithProviders(<ConnectAccountPrompt manifest={withAccount('required-for-holds')} />, {
+        api: { accounts: { list: jest.fn().mockResolvedValue(ok([KEY_SAVED])) } },
+      });
+      await act(async () => {
+        await new Promise((r) => setTimeout(r, 50));
+      });
+      expect(screen.queryByRole('link')).toBeNull();
+      expect(screen.queryByRole('button')).toBeNull();
+    });
   });
 });

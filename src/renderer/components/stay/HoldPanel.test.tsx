@@ -1,10 +1,7 @@
 import { act, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { FAKE_MANIFEST, PARKSTAY_MANIFEST } from '@tests/utils/renderer/manifests';
-import {
-  politeAnnouncement,
-  renderWithProviders,
-} from '@tests/utils/renderer/renderWithProviders';
+import { politeAnnouncement, renderWithProviders } from '@tests/utils/renderer/renderWithProviders';
 import { AppProviders } from '../../app/AppProviders';
 import { ToastViewport } from '../ui';
 import { HoldPanel, type HoldPanelProps } from './HoldPanel';

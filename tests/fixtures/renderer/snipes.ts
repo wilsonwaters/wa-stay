@@ -151,7 +151,7 @@ export function makeAlertedSnipe(overrides: Partial<SiteSnipe> = {}): SiteSnipe 
 }
 
 /** The answer of `catalog.checkLocation` with this release, for the Release step's preview. */
-export function checkLocationWith(release: { open: boolean; opensAt?: string }) {
+export function checkLocationWith(release: { open: boolean; opensAt?: string; refused?: string }) {
   return jest.fn().mockResolvedValue({
     success: true,
     data: { key: 'parkstay:20', checkedAt: new Date().toISOString(), units: [], release },

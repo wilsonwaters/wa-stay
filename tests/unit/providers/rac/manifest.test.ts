@@ -118,16 +118,19 @@ describe('racManifest', () => {
     expect(resolveStayParams(racManifest, ['watch'], { pets: 2 })).toEqual({ pets: 2 });
   });
 
-  it.each([3, -1, '1'])('refuses pets %p with VALIDATION on stayParams.pets (rule 16)', (pets) => {
-    let error: unknown;
-    try {
-      resolveStayParams(racManifest, ['watch'], { pets });
-    } catch (e) {
-      error = e;
+  it.each([3, -1, '1', 1.5])(
+    'refuses pets %p with VALIDATION on stayParams.pets (rule 16)',
+    (pets) => {
+      let error: unknown;
+      try {
+        resolveStayParams(racManifest, ['watch'], { pets });
+      } catch (e) {
+        error = e;
+      }
+      expect(error).toBeInstanceOf(AppError);
+      expect(error).toMatchObject({ code: 'VALIDATION', issues: ['stayParams.pets'] });
     }
-    expect(error).toBeInstanceOf(AppError);
-    expect(error).toMatchObject({ code: 'VALIDATION', issues: ['stayParams.pets'] });
-  });
+  );
 
   it('declares two timed release modes, each checked for at most 30 minutes, and no cancellation mode', () => {
     expect(racManifest.releaseModes).toEqual([

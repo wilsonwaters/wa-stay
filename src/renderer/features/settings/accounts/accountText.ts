@@ -114,7 +114,8 @@ export function accountPurpose(
       if (!holds || (signedIn && account?.authKind === 'credentials')) purpose = 'Optional.';
       else if (account?.authKind === 'credentials') {
         const detail = inSentence(credentialsName(account));
-        purpose = `Optional. Add your ${detail}${when} if you have one. Holds work without it.`;
+        const have = (account.fields ?? []).length > 1 ? 'them' : 'one';
+        purpose = `Optional. Add your ${detail}${when} if you have ${have}. Holds work without it.`;
       } else if (signedIn) purpose = "Optional. Checkout is quicker while you're signed in.";
       else {
         purpose = `Optional. Connect ${name}${when} so checkout is quicker. Holds work without it.`;
