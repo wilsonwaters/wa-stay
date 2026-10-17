@@ -10,7 +10,8 @@ Branch `ccr-573ddb1d-hir0sq` (from `main` at `4bd5d62`, the v2.0.0 release). The
 Phase 3–4 (task specs, then execution). The stakeholder approved the 20-task plan and decided R6–R8 (alert clicks for every provider, a phone booking link in alert emails, interactive pacing).
 
 ## Currently in flight
-- **R8 (#55)**: implementation agent in `/home/user/lanes/r8` (at `7f4c2b4` = branch tip + `lane/r7`; I resolved an import conflict in `matching.ts` between R6 and R7).
+- **R8 (#55)** done on `lane/r8` (`f42b16e`, `d89bf36`; merged the tip at `c2060e8`; 4596 tests, e2e 22, axe 0 violations). Review running.
+- **R9 (#56)** and **R10 (#57)**: implementation agents in `/home/user/lanes/r9` and `/home/user/lanes/r10`, cut from `lane/r8` (`c2060e8`). R9 also carries the copy notes routed from the R3, R5 and R6 reviews; R10 the RAC notes from the R5 review (block cool-down with `Retry-After`, fixture guard, wheelchair test).
 
 ## Completed
 - **R7 (#54) merged** (`01971e3`): a found or partial alert's click opens the watch then the provider's booking page (every provider); a held alert opens the watch only; emails carry a public "Book on {shortName}" link (HTML and text, never a cart URL; a held email says the hold is in the app); link checks (https, the provider's own site) in core and again in `notify`; `links.booking(…, unitId?)`. Review REQUEST_CHANGES → fix `b619fd1` (a location edit forgets the last check; quiet read path; scaffold site check; malformed rows) → APPROVE. Follow-ups (nits): a check already running when the location changes can write the old result back (fix: cancel the watch's in-flight check on a location change); `last_error`/`found_count` survive a location change. A separate pre-existing issue was suggested to the stakeholder as a task: a held watch can still be edited.
