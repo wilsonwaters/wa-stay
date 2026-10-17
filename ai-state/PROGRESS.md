@@ -10,7 +10,8 @@ Branch `ccr-573ddb1d-hir0sq` (from `main` at `4bd5d62`, the v2.0.0 release). The
 Phase 3–4 (task specs, then execution). The stakeholder approved the 20-task plan and decided R6–R8 (alert clicks for every provider, a phone booking link in alert emails, interactive pacing).
 
 ## Currently in flight
-- **R9 (#56)** and **R10 (#57)**: implementation agents in `/home/user/lanes/r9` and `/home/user/lanes/r10`, cut from `lane/r8` (`c2060e8`). R9 also carries the copy notes routed from the R3, R5 and R6 reviews; R10 the RAC notes from the R5 review (block cool-down with `Retry-After`, fixture guard, wheelchair test).
+- **R9 (#56)** and **R10 (#57)**: implementation agents in `/home/user/lanes/r9` and `/home/user/lanes/r10`, cut from `lane/r8` (`c2060e8`). R9 also carries the copy notes routed from the R3, R5 and R6 reviews; R10 the RAC notes from the R5 review (block cool-down with `Retry-After`, fixture guard, wheelchair test). Both need R8's review fixes (`82a98f1`, `a6ecf76`) merged in before their review.
+- **R15 (#62)**: implementation agent in `/home/user/lanes/r15` (at `f063929`), started beside R9/R10 because its R12 dependency is lane order only.
 
 ## Completed
 - **R8 (#55) merged**: stay rules (`min-stay` night reason; `minNights` per night and per unit; `noArrival`/`noDeparture`; `priceNote`), matching that trims or drops runs a provider would refuse, night-grid notes and key, stay-step warnings, a contract check that a refused stay has no free night. Review APPROVE (38 matching probes across time zones); fixes `82a98f1`, `a6ecf76` (contract uses core's effective minimum; found card counts as the grid does). Gate: 4762 tests, e2e 23.
