@@ -1,14 +1,17 @@
 /**
- * Dated fixtures: a temp copy of `tests/e2e/fixtures/http/` whose RAC availability answers are
- * moved to a journey's own stay, so a journey that checks availability never goes stale as the
- * recorded dates pass.
+ * Dated fixtures: a temp copy of `tests/e2e/fixtures/http/` whose RAC and ParkStay availability
+ * answers are moved to a journey's own stay, so a journey that checks availability never goes
+ * stale as the recorded dates pass.
  *
  * Every RAC route that answers an availability POST (`form.available_from`, RAC's `D MMM YYYY`)
  * is moved so its stay arrives `arrivalInDays` days after today in Perth: its answer's dates
  * (the night keys, the dates in `online_booking_url`, and the dates in RAC's messages, as
  * `YYYY-MM-DD` or `D MMM YYYY`) and the route's own `available_from` shift by the same number of
- * days. Every other file is copied as it is. The launch then passes the copy as
- * `env: { WA_STAY_E2E_FIXTURES_DIR: fixtures.dir }` (`support/wa-stay.ts`).
+ * days. Each ParkStay campground's availability view (`campsite_availablity_view_<id>.json`,
+ * whose route matches any stay) moves the same way, from its own `arrival` (`YYYY/MM/DD`): its
+ * nights, its release date and every other date in it. Every other file is copied as it is.
+ * The launch then passes the copy as `env: { WA_STAY_E2E_FIXTURES_DIR: fixtures.dir }`
+ * (`support/wa-stay.ts`).
  *
  *   const fixtures = writeDatedFixtures(tempDir('dated'));
  *   const wa = await launchWaStay({ env: { WA_STAY_E2E_FIXTURES_DIR: fixtures.dir }, … });
@@ -38,10 +41,13 @@ function fromRacDate(text: string): string | undefined {
   return `${match[3]}-${String(month).padStart(2, '0')}-${match[1].padStart(2, '0')}`;
 }
 
-/** `text` with every date in it (`YYYY-MM-DD` or `D MMM YYYY`) moved by `days`. */
+/** `text` with every date in it (`YYYY-MM-DD`, `YYYY/MM/DD` or `D MMM YYYY`) moved by `days`. */
 function shiftDates(text: string, days: number): string {
   return text
     .replace(/\b\d{4}-\d{2}-\d{2}\b/g, (date) => addDays(date, days))
+    .replace(/\b\d{4}\/\d{2}\/\d{2}\b/g, (date) =>
+      addDays(date.replaceAll('/', '-'), days).replaceAll('-', '/')
+    )
     .replace(/\b\d{1,2} [A-Z][a-z]{2} \d{4}\b/g, (date) => {
       const calendar = fromRacDate(date);
       return calendar ? toRacDate(addDays(calendar, days)) : date;
@@ -51,7 +57,7 @@ function shiftDates(text: string, days: number): string {
 export interface DatedFixtures {
   /** The copy, for `WA_STAY_E2E_FIXTURES_DIR`. */
   dir: string;
-  /** The stay every RAC availability answer now arrives on (`YYYY-MM-DD`). */
+  /** The stay every RAC and ParkStay availability answer now arrives on (`YYYY-MM-DD`). */
   arrival: string;
 }
 
@@ -63,8 +69,8 @@ interface Route {
 }
 
 /**
- * Copies the e2e HTTP fixtures into `dir` (an empty temp folder) with RAC's availability
- * answers moved to arrive `arrivalInDays` days after `today` (Perth by default).
+ * Copies the e2e HTTP fixtures into `dir` (an empty temp folder) with RAC's and ParkStay's
+ * availability answers moved to arrive `arrivalInDays` days after `today` (Perth by default).
  */
 export function writeDatedFixtures(
   dir: string,
@@ -87,5 +93,18 @@ export function writeDatedFixtures(
     fs.writeFileSync(file, shiftDates(fs.readFileSync(file, 'utf8'), days));
   }
   fs.writeFileSync(manifestFile, `${JSON.stringify(manifest, null, 2)}\n`);
+  moveParkStayViews(path.join(dir, 'parkstay'), arrival);
   return { dir, arrival };
+}
+
+/** Each ParkStay campground availability view in `parkstayDir`, moved to arrive on `arrival`. */
+function moveParkStayViews(parkstayDir: string, arrival: string): void {
+  for (const name of fs.readdirSync(parkstayDir)) {
+    if (!/^campsite_availablity_view_\d+\.json$/.test(name)) continue;
+    const file = path.join(parkstayDir, name);
+    const text = fs.readFileSync(file, 'utf8');
+    const recorded = (JSON.parse(text) as { arrival?: string }).arrival?.replaceAll('/', '-');
+    if (!recorded) continue;
+    fs.writeFileSync(file, shiftDates(text, nightsBetween(recorded, arrival)));
+  }
 }

@@ -233,7 +233,7 @@ npm run test:electron -- http-transport
 
 ## Electron smoke tests (E2E)
 
-`tests/e2e/` holds the Electron smoke suite: 24 journeys in 13 specs through the **built** app
+`tests/e2e/` holds the Electron smoke suite: 25 journeys in 14 specs through the **built** app
 (main, preload and renderer together), driven by Playwright's `_electron` launcher. It
 catches what Jest cannot: startup crashes, preload or sandbox breakage, CSP violations,
 broken routing and focus, and a quit that hangs.
@@ -336,6 +336,9 @@ better-sqlite3's Electron build loads and `dist/main` opens and migrates the dat
 
 - `seedHeldSnipe(userDataDir, …)`, from `launchWaStay({ prepare })`: a HELD snipe with its hold
   and its `snipe_held` notification. No hold is ever placed (architecture-notes §12.33).
+- `seedAlertSnipe(userDataDir, …)`: an armed ParkStay snipe that alerts, watching for
+  cancellations, and nothing else: the app's scheduler checks the place at once and records the
+  alert and its `snipe_alert` notification itself (`alert-snipe.spec.ts`, with dated fixtures).
 - `writeLegacyV1Data(dir)`: a v1.2.0 data folder from `tests/fixtures/db/v5-release-1.2.0.sql`,
   for `WA_STAY_LEGACY_DATA_DIR` (the upgrade journey).
 
@@ -352,8 +355,10 @@ Recorded provider responses live in `tests/e2e/fixtures/http/<providerId>/`, wit
 instead, so it never goes stale: `writeDatedFixtures(tempDir('dated'))`
 (`tests/e2e/support/dated-fixtures.ts`) copies `fixtures/http/` and moves every RAC
 availability answer (its night keys, the dates in `online_booking_url`, and its route's
-`available_from`) to a stay arriving 7 days after today in Perth; the launch passes
-`env: { WA_STAY_E2E_FIXTURES_DIR: fixtures.dir }`. `rac-watch.spec.ts` uses it.
+`available_from`) and each ParkStay campground availability view (its nights and release date,
+from its own `arrival`) to a stay arriving 7 days after today in Perth; the launch passes
+`env: { WA_STAY_E2E_FIXTURES_DIR: fixtures.dir }`. `rac-watch.spec.ts` and
+`alert-snipe.spec.ts` use it.
 
 ### Adding a journey
 

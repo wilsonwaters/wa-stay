@@ -94,10 +94,13 @@ detail: [Watches and notifications](watches-and-notifications.md).
 
 ## Site Sniper (coming soon)
 
-Site Sniper holds a hard-to-get site the moment it is released: when ParkStay opens a new
+Site Sniper catches a hard-to-get site the moment it is released: when ParkStay opens a new
 date (180 days ahead, at the campground's release time), at a scheduled block release, or when
 someone cancels. It joins the DBCA queue when the release uses it, checks rapidly across the
-release, and places a 30-minute hold that you then pay for.
+release, and then does what you chose under **When the dates are free**: **Hold it for me**
+places a 30-minute hold that you then pay for (ParkStay's default), and **Alert me** sends a
+desktop alert and email with a link to book on ParkStay, holding nothing. A provider that places
+no holds offers alerts only.
 
 **New snipe** walks through the provider, the place, your stay (with ParkStay's vehicles and
 postcode, and the stay type at a place with more than one), when the sites are released, and a
