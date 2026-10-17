@@ -1,7 +1,10 @@
+import { useMemo } from 'react';
 import { useFormContext } from 'react-hook-form';
 import type { UnitSummary } from '../../../../shared/types/catalog.types';
 import type { ProviderManifest } from '../../../../shared/types/provider.types';
 import { ProviderStayFields } from '../../../components/stay/ProviderStayFields';
+import { StayTypeChips } from '../../../components/stay/StayTypeChips';
+import { placeUnitKinds, stayTypeOptions } from '../../../components/stay/stayTypes';
 import { UnitPicker, type UnitNoun } from '../../../components/stay/UnitPicker';
 import { DateRangeField, Field, GuestsField, TextField } from '../../../components/ui';
 import { useSetWatchField, useSetWatchFields } from './useSetWatchField';
@@ -18,7 +21,10 @@ export interface WatchStayFieldsProps {
   fieldNotes?: Partial<Record<string, string>>;
 }
 
-/** Dates, guests, the provider's own stay fields, units and price: the Stay step, and Edit. */
+/**
+ * Dates, guests, the provider's own stay fields, stay types (at a place whose units are of more
+ * than one kind), units and price: the Stay step, and Edit.
+ */
 export function WatchStayFields({
   manifest,
   today,
@@ -26,11 +32,11 @@ export function WatchStayFields({
   noun,
   fieldNotes,
 }: WatchStayFieldsProps) {
-  const { register, watch, formState } = useFormContext<WatchFormValues>();
+  const { register, watch, formState, getFieldState, trigger } = useFormContext<WatchFormValues>();
   const set = useSetWatchField();
   const setFields = useSetWatchFields();
   const { errors } = formState;
-  const [arrival, departure, adults, children, infants, stayParams, unitIds] = watch([
+  const [arrival, departure, adults, children, infants, stayParams, unitIds, unitKinds] = watch([
     'arrival',
     'departure',
     'adults',
@@ -38,9 +44,17 @@ export function WatchStayFields({
     'infants',
     'stayParams',
     'unitIds',
+    'unitKinds',
   ]);
   const fields = watchStayFields(manifest).watch;
   const provider = manifest?.shortName ?? 'the provider';
+  const placeKinds = useMemo(() => (units ? placeUnitKinds(units) : undefined), [units]);
+  const stayTypes = placeKinds ? stayTypeOptions(placeKinds, unitKinds) : [];
+  // An automatic hold needs a stay type or a unit at a mixed place (Alerts): once that error
+  // shows, a new choice here checks it again.
+  const recheckHold = () => {
+    if (getFieldState('autoHold').error) void trigger('autoHold');
+  };
 
   return (
     <>
@@ -74,13 +88,27 @@ export function WatchStayFields({
         )}
         notes={fieldNotes}
       />
+      {stayTypes.length > 0 && (
+        <StayTypeChips
+          options={stayTypes}
+          value={unitKinds}
+          onChange={(kinds) => {
+            set('unitKinds', kinds);
+            recheckHold();
+          }}
+        />
+      )}
       {units && units.length > 0 && (
         <UnitPicker
           units={units}
           value={unitIds}
-          onChange={(ids) => set('unitIds', ids)}
+          onChange={(ids) => {
+            set('unitIds', ids);
+            recheckHold();
+          }}
           noun={noun}
           hint={`Leave all unticked to be told about any ${noun.one}.`}
+          kinds={stayTypes.length > 0 ? unitKinds : undefined}
         />
       )}
       <Field

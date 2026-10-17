@@ -53,6 +53,13 @@ describe('toSnipeInput', () => {
     expect(input.accessGateEnabled).toBe(false);
     expect(input.pollIntervalMs).toBe(1500);
   });
+
+  it('sends the chosen stay types, and nothing for any', () => {
+    expect(
+      toSnipeInput({ ...filled(), unitKinds: ['cabin', 'room'] }, PARKSTAY_MANIFEST)
+    ).toMatchObject({ unitKinds: ['cabin', 'room'] });
+    expect(toSnipeInput(filled(), PARKSTAY_MANIFEST)).not.toHaveProperty('unitKinds');
+  });
 });
 
 describe('issueField', () => {
@@ -107,5 +114,19 @@ describe('parseSnipePrefill', () => {
       "The link's place couldn't be used, so choose a location.",
       "The link's dates couldn't be used (they have passed or are out of order), so choose your dates.",
     ]);
+  });
+
+  it('reads the link’s stay types, and says when it named one it cannot use', () => {
+    const parse = (query: string) => parseSnipePrefill(query, [PARKSTAY_MANIFEST], now);
+    expect(parse('?provider=parkstay&location=20&stay=cabin,cabin')).toEqual({
+      providerId: 'parkstay',
+      locationId: '20',
+      unitKinds: ['cabin'],
+      notices: [],
+    });
+    expect(parse('?stay=bogus')).toEqual({
+      notices: ["The link's stay type couldn't be used, so choose one."],
+    });
+    expect(parse('?stay=')).toEqual({ notices: [] });
   });
 });

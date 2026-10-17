@@ -1,6 +1,6 @@
 import { useId, type ReactNode } from 'react';
 import { useFormContext } from 'react-hook-form';
-import type { ProviderManifest } from '../../../../../shared/types/provider.types';
+import type { ProviderManifest, UnitKind } from '../../../../../shared/types/provider.types';
 import { ConnectAccountPrompt } from '../../../../components/accounts/ConnectAccountPrompt';
 import { PlacePhoto, type PhotoPlace } from '../../../../components/PlacePhoto';
 import {
@@ -8,6 +8,7 @@ import {
   stayDatesLabel,
   stayNightsLabel,
 } from '../../../../components/stay/stayFormat';
+import { isMixedPlace, stayTypesText } from '../../../../components/stay/stayTypes';
 import type { UnitNoun } from '../../../../components/stay/UnitPicker';
 import {
   Button,
@@ -27,6 +28,8 @@ export interface ReviewStepProps {
   noun: UnitNoun;
   /** The chosen place as the catalogue has it, for its photo and unit names. */
   place?: PhotoPlace & { units?: { unitId: string; unitName: string }[] };
+  /** The kinds of the place's units, once known: a mixed place shows the stay type. */
+  placeKinds?: readonly UnitKind[];
   placeLoading?: boolean;
   /** "At a scheduled time, Tue 3 Nov, 10:00 am AWST" or the mode's name and preview. */
   releaseSummary: string;
@@ -79,7 +82,8 @@ function Item({ label, children }: { label: string; children: ReactNode }) {
  * a gentle hint where it is optional (§12.32).
  */
 export function ReviewStep(props: ReviewStepProps) {
-  const { manifest, today, noun, place, placeLoading, releaseSummary, onChangeStep } = props;
+  const { manifest, today, noun, place, placeKinds, placeLoading, releaseSummary, onChangeStep } =
+    props;
   const { register, getValues, formState } = useFormContext<SnipeFormValues>();
   const v = getValues();
   const unitNames = v.unitIds.map(
@@ -120,6 +124,9 @@ export function ReviewStep(props: ReviewStepProps) {
                 {stayFieldText(field, v.stayParams[field.key])}
               </Item>
             ))}
+            {(isMixedPlace(placeKinds) || v.unitKinds.length > 0) && (
+              <Item label="Stay type">{stayTypesText(v.unitKinds)}</Item>
+            )}
             <Item label={`Preferred ${noun.many}`}>
               {unitNames.length ? unitNames.join(', ') : `Any ${noun.one}`}
             </Item>

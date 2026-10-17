@@ -15,7 +15,8 @@ provider, the place and your dates, and opens on "Your stay"). Five steps:
    chosen for you but still shown.
 2. **Location.** Search the provider's synced catalogue.
 3. **Your stay.** Dates and guests, the provider's own fields (ParkStay: **Camping with**:
-   Any, Tent, Campervan or Caravan), **Preferred sites** (leave all unticked to hear about any
+   Any, Tent, Campervan or Caravan), **Stay type** at a place whose units are of more than one
+   kind ([below](#stay-types)), **Preferred sites** (leave all unticked to hear about any
    site) and **Max price per night** (optional; in dollars, applied only when the provider
    shows a price for every night).
 4. **Alerts.**
@@ -52,8 +53,18 @@ A watch can ask for stay types: campsites, cabins and villas, rooms, dorms or gl
 kinds match: the alert counts only those, and the watch's page shows only those. A unit the
 provider gives no kind counts as "other", so at a provider that sets no kinds a watch for cabins
 finds nothing. Units you chose by name win: the stay types do not filter them. With no stay
-type, every unit counts. The watch flow does not offer stay types yet, so a watch made there
-wants any kind.
+type, every unit counts.
+
+The flow offers them as **Stay type** chips on "Your stay" (and on Edit) only at a place whose
+units are of more than one kind, counting a unit with no kind as "other": a campground of sites
+alone shows none, and a place with sites and units of no kind shows just **Camping**. The chips
+come from the place's units, not from the catalogue's summary. Leave them all off for any stay
+type. **Preferred sites** groups such a place's units by stay type; choosing stay types narrows
+it to units of those kinds and unticks any chosen site of a kind turned off (it says how many),
+so the two never disagree.
+A link from Explore with stay types (`stay=cabin`) chooses them once the place's units load: the
+ones the place has are kept; at a mixed place with none of them they are cleared, with a notice;
+at any other place they are dropped without one.
 
 ### Scheduling
 
@@ -80,8 +91,9 @@ on the first fully matching site, by the same path and safety rules as Site Snip
 - **never "any unit" across stay types**: a watch with no units chosen whose wanted units are of
   more than one kind (campsites and a hut, or the two stay types it asks for), booked or free,
   places no hold. It alerts as usual, with "Not held automatically: this place has more than one
-  stay type. Choose a stay type or units to let WA Stay hold one." Choose units to let it hold
-  (the watch flow does not offer stay types yet).
+  stay type. Choose a stay type or units to let WA Stay hold one." So at a place the flow knows
+  is mixed, **Hold a site automatically when found** needs one stay type or a site chosen on
+  "Your stay" before the Alerts step (or Edit) goes on.
 
 Hold only what you will use ([Book responsibly](site-sniper.md#book-responsibly)).
 

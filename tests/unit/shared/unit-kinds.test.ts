@@ -17,6 +17,7 @@ import {
   deriveUnitKinds,
   isUnitKind,
   STAY_TYPES,
+  unitKindOfUnit,
   unitKindsOf,
 } from '@shared/utils/unit-kinds';
 
@@ -111,6 +112,15 @@ describe('cleanUnitKinds and unitKindsOf', () => {
   ])('derives them from the kind when they are %s', (_label, unitKinds) => {
     expect(unitKindsOf({ kind: 'holiday-park', unitKinds })).toEqual(['campsite', 'cabin']);
     expect(unitKindsOf({ kind: 'farm-stay', unitKinds })).toEqual(['other']);
+  });
+});
+
+describe('unitKindOfUnit', () => {
+  it('is the unit’s own kind, or other when it has none or one this app does not know', () => {
+    expect(unitKindOfUnit({ unitKind: 'cabin' })).toBe('cabin');
+    expect(unitKindOfUnit({ unitKind: 'other' })).toBe('other');
+    expect(unitKindOfUnit({})).toBe('other');
+    expect(unitKindOfUnit({ unitKind: 'castle' })).toBe('other');
   });
 });
 

@@ -132,6 +132,38 @@ describe('fromWatch and toWatchUpdate', () => {
   });
 });
 
+describe('stay types', () => {
+  it('sends the chosen stay types on create, and nothing for any', () => {
+    expect(toWatchInput(form({ unitKinds: ['cabin'] }), PARKSTAY_MANIFEST)).toMatchObject({
+      unitKinds: ['cabin'],
+    });
+    expect(toWatchInput(form(), PARKSTAY_MANIFEST)).not.toHaveProperty('unitKinds');
+    const input = toWatchInput(form({ unitKinds: ['cabin', 'room'] }), PARKSTAY_MANIFEST);
+    expect(contract.watches.create.request.parse(input)).toEqual(input);
+  });
+
+  it('pre-fills stored stay types, and an edit of them sends only unitKinds', () => {
+    const watch = makeWatch({ unitKinds: ['campsite', 'cabin'] });
+    const { values } = fromWatch(watch, PARKSTAY_MANIFEST);
+    expect(values.unitKinds).toEqual(['campsite', 'cabin']);
+    expect(
+      toWatchUpdate({ ...values, unitKinds: ['cabin'] }, values, watch, PARKSTAY_MANIFEST)
+    ).toEqual({ unitKinds: ['cabin'] });
+    expect(toWatchUpdate({ ...values, unitKinds: [] }, values, watch, PARKSTAY_MANIFEST)).toEqual({
+      unitKinds: [],
+    });
+    // The same stay types in another order are no change.
+    expect(
+      toWatchUpdate(
+        { ...values, unitKinds: ['cabin', 'campsite'] },
+        values,
+        watch,
+        PARKSTAY_MANIFEST
+      )
+    ).toEqual({});
+  });
+});
+
 describe('suggestedName', () => {
   it('names a watch after the place and dates', () => {
     expect(suggestedName({ name: 'Osprey Bay' }, '2099-12-11', '2099-12-13', '2099-01-01')).toBe(
