@@ -350,6 +350,8 @@ describe('SiteSniperRepository', () => {
         lastResult: SnipeResult.ALERTED,
         isActive: false,
         attemptsCount: 1,
+        lastCheckedAt: at,
+        nextCheckAt: undefined,
         alert: {
           at,
           unitId: '136',

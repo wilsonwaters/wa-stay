@@ -443,18 +443,24 @@ export class SiteSniperRepository extends BaseRepository<SiteSnipe> {
 
   /**
    * The dates were free and the person is alerted: ALERTED with what it found, the attempt
-   * counted, inactive, in one statement (a restart never sees an active snipe that alerted).
-   * Nothing is held.
+   * counted and checked at the alert's time, nothing due, inactive, in one statement (a restart
+   * never sees an active snipe that alerted). Nothing is held.
    */
   markAlerted(id: number, alert: SnipeAlert): void {
     this.db
       .prepare(
         `UPDATE site_snipes
          SET status = ?, last_result = ?, alert = ?, last_error = NULL, is_active = 0,
-             attempts_count = attempts_count + 1
+             attempts_count = attempts_count + 1, last_checked_at = ?, next_check_at = NULL
          WHERE id = ?`
       )
-      .run(SnipeStatus.ALERTED, SnipeResult.ALERTED, alertToWrite(alert), id);
+      .run(
+        SnipeStatus.ALERTED,
+        SnipeResult.ALERTED,
+        alertToWrite(alert),
+        alert.at.toISOString(),
+        id
+      );
   }
 
   /** Ends the snipe: a terminal status (EXPIRED, FAILED), its result and message, inactive. */
