@@ -10,7 +10,7 @@ do from its manifest.
 | Provider | Status | Explore | Availability | Watches | Site Sniper | Holds and payment | Booking import | Account |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | [ParkStay WA](parkstay/README.md) (DBCA national-park campgrounds) | Built in | Yes, 169 campgrounds | Yes, per night with prices, and bulk for map pins | Yes | Coming soon | Yes, 30-minute holds paid on ParkStay | No | Optional |
-| RAC Parks & Resorts | Planned (the next project) | | | | | | | |
+| RAC Parks & Resorts (holiday parks and resorts) | In progress: Explore | Yes, 8 parks; 5 list their categories | Not yet | Not yet | Not yet | No | No | None |
 
 Other providers (Hipcamp, holiday-park chains, Airbnb) are possible with the SDK, including
 ones with no API, but none is planned in this release.

@@ -134,7 +134,7 @@ tests/
 ├── unit/                    # Unit tests (main project)
 │   ├── core/                # Provider-agnostic services (watches, snipes, accounts, holds)
 │   ├── database/
-│   ├── providers/           # The provider SDK, registry and ParkStay module
+│   ├── providers/           # The provider SDK, registry, and the ParkStay and RAC modules
 │   ├── docs/                # The docs: links, the provider guide's examples, ParkStay endpoints
 │   └── …                    # app, ipc, security, scheduler, renderer guards, brand, design
 ├── integration/             # Integration tests (main project)
@@ -233,7 +233,7 @@ npm run test:electron -- http-transport
 
 ## Electron smoke tests (E2E)
 
-`tests/e2e/` holds the Electron smoke suite: a handful of journeys through the **built** app
+`tests/e2e/` holds the Electron smoke suite: 23 journeys in 12 specs through the **built** app
 (main, preload and renderer together), driven by Playwright's `_electron` launcher. It
 catches what Jest cannot: startup crashes, preload or sandbox breakage, CSP violations,
 broken routing and focus, and a quit that hangs.
@@ -302,8 +302,10 @@ The `launchWaStay()` fixture starts the app with:
   provider ids): `parkstay` (`DEFAULT_PROVIDERS`) unless the launch passes `{ providers }`. The
   other built-in providers are not registered, so the journeys' counts and pre-selections
   (ParkStay's 11 places, ParkStay chosen for you) hold however many providers are built in. A
-  journey that counts or expects a pre-selection passes its list explicitly. An id that is not
-  a built-in provider stops the app at start-up, with the reason in the main process's output.
+  journey that counts or expects a pre-selection passes its list explicitly
+  (`rac-catalogue.spec.ts` passes `['parkstay', 'rac']`: RAC's eight parks beside ParkStay's 11
+  campgrounds). An id that is not a built-in provider stops the app at start-up, with the reason
+  in the main process's output.
 - **A production renderer**: `NODE_ENV=production`, no `ELECTRON_RENDERER_URL`, no Mapbox
   token, `TZ=Australia/Perth`, `LANG=en_AU.UTF-8`.
 - **An online window, whatever the host.** Chromium reads `navigator.onLine` from the host's

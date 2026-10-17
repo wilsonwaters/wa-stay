@@ -11,14 +11,18 @@ One folder per provider id, each with a `manifest.json` and the response files i
 
 ```
 http/
-└── parkstay/
+├── parkstay/
+│   ├── manifest.json
+│   ├── campground_map.json      # the catalogue the app syncs 5 s after launch (V5), Explore's places (E1)
+│   ├── campground_availabilty_view.json   # every campground's free sites for any stay, Explore's dates (E3)
+│   ├── campsite_availablity_view_20.json  # Bungarra's sites and description, for its detail page (E2) and a new watch's first check (U1)
+│   ├── campground_page_20.html  # Bungarra's campground page: its About's notices and sections (E2, PD2)
+│   ├── profile-signed-out.json  # /api/profile signed out (403), the account check at launch (V6)
+│   └── queue-active.json        # the DBCA queue letting the session through, before a payment window (V6)
+└── rac/
     ├── manifest.json
-    ├── campground_map.json      # the catalogue the app syncs 5 s after launch (V5), Explore's places (E1)
-    ├── campground_availabilty_view.json   # every campground's free sites for any stay, Explore's dates (E3)
-    ├── campsite_availablity_view_20.json  # Bungarra's sites and description, for its detail page (E2) and a new watch's first check (U1)
-    ├── campground_page_20.html  # Bungarra's campground page: its About's notices and sections (E2, PD2)
-    ├── profile-signed-out.json  # /api/profile signed out (403), the account check at launch (V6)
-    └── queue-active.json        # the DBCA queue letting the session through, before a payment window (V6)
+    ├── book-now-busselton.html       # RAC Busselton Holiday Park's categories, for its page
+    └── book-now-margaret-river.html  # RAC Margaret River Nature Park's categories (dorms, a safari tent)
 ```
 
 A provider with no folder, or no routes, answers every request with an error.
@@ -117,6 +121,18 @@ to add.
   `queue.dbca.wa.gov.au`'s `GET /api/check-create-session/` (`queue_group=parkstayv2`; the host
   is not compared). "Pay now" passes the queue before it opens the payment window, so the
   held-snipe journey needs it; its session key is made up.
+
+- **RAC Parks & Resorts** (`rac/`): RAC's parks are a seed in the module, so the catalogue
+  sync sends nothing; a park's page reads its book-now page. `book-now-busselton.html` and
+  `book-now-margaret-river.html` are the Jest fixtures in `tests/fixtures/providers/rac/`,
+  copied unchanged: the public `/<park>/book-now/` pages, fetched anonymously on 16 Oct 2026
+  and trimmed to the type filter, the equipment list, a few dated notices (booking rules, no
+  phone numbers) and some categories' facts. RAC's photos are replaced by placeholder addresses
+  on NewBook's image host and its descriptions by "Placeholder description.", with no script,
+  menu, footer, price or marketing copy (RAC's terms, rule 7;
+  `tests/unit/providers/rac-fixtures.test.ts` checks every file here). The other parks' pages
+  have no route: the Explore journey (`rac-catalogue.spec.ts`) opens Margaret River, and the
+  preview opens the first park, Busselton.
 
 ## Refreshing a fixture
 

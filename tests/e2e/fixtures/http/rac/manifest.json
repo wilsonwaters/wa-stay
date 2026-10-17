@@ -1,0 +1,10 @@
+{
+  "routes": [
+    { "method": "GET", "path": "/busselton/book-now/", "file": "book-now-busselton.html" },
+    {
+      "method": "GET",
+      "path": "/margaret-river/book-now/",
+      "file": "book-now-margaret-river.html"
+    }
+  ]
+}
