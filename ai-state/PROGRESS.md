@@ -10,7 +10,7 @@ Branch `ccr-573ddb1d-hir0sq` (from `main` at `4bd5d62`, the v2.0.0 release). The
 Phase 3–4 (task specs, then execution). The stakeholder approved the 20-task plan and decided R6–R8 (alert clicks for every provider, a phone booking link in alert emails, interactive pacing).
 
 ## Currently in flight
-- **R19 (#66)**: implementation agent in `/home/user/lanes/r19`, started early from `lane/r16` (`5750238`) to overlap with R16's review; it merges the integration branch once R16 is merged. No live request of any kind (synthetic cart fixtures only).
+- **R19 (#66)**: implemented on `lane/r19` (`1f4f607`, R16 merged in; 5832 tests, e2e 29); in independent review (guard bypasses first). No live request (synthetic fixtures, fixture mode, network guard).
 - **R20 (#67)**: implementation agent in `/home/user/lanes/r20` (base `3cc29a2`), started alongside R19: everything not tied to the cart first, then the cart docs once R19 is merged. No Mapbox token in this environment, so screenshots cannot be retaken here.
 - Next: system verification of the whole stream, final review against the brief, report to the stakeholder.
 
