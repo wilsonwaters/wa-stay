@@ -10,11 +10,13 @@ Branch `ccr-573ddb1d-hir0sq` (from `main` at `4bd5d62`, the v2.0.0 release). The
 Phase 3–4 (task specs, then execution). The stakeholder approved the 20-task plan and decided R6–R8 (alert clicks for every provider, a phone booking link in alert emails, interactive pacing).
 
 ## Currently in flight
-- **R5 (#52)** done on `lane/r5` (`84fe618`, `cdd44ee`, `810c514`; 4496 tests, e2e 23, RAC preview passed; 0 live requests). Review running.
-- **R7 (#54)** done on `lane/r7` (`223587d`; 4442 tests, e2e 22; rendered emails in the scratchpad). Review running.
+- **R7 (#54)**: review REQUEST_CHANGES (a location edit kept the old place's booking link; paused watches are never re-checked) plus minors; the implementer is fixing on `lane/r7`.
+- Integration gate running on the merged tip (R1–R6).
 - **R8 (#55)**: implementation agent in `/home/user/lanes/r8` (at `7f4c2b4` = branch tip + `lane/r7`; I resolved an import conflict in `matching.ts` between R6 and R7).
 
 ## Completed
+- 2026-10-17 ~02:00–03:10 UTC: an account usage limit stopped the R7 fix and R8 agents; both resumed from their saved worktrees after the reset.
+- **R5 (#52) merged** (`71db261`): the RAC module (`src/main/providers/rac/`): eight-park seed, book-now page parser, categories as units with stay types, place detail, links (no cart), a host-locked client with Cloudflare/403/429 block handling (a 30-minute stop, no retry loop), trimmed fixtures with a guard, one e2e journey (23). 0 live requests. Review APPROVE; minors forwarded to R10 and R9.
 - **R6 (#53) merged** (`9328ab9`): stay-type chips on the watch and snipe stay steps at mixed places, UnitPicker grouped by kind, `stay=` prefill checked against the place, a stay type or unit needed to hold at a mixed place; `unitKindOfUnit` moved to `src/shared/utils/unit-kinds.ts`. Review APPROVE; fix `0940ce3` (Edit keeps stored stay types as chips so focus isn't lost). Copy notes forwarded to R9. Gate: 4350 tests.
 - **R2 (#49) merged** (`3a28271`): `limits.minRequestIntervalMs`, a paced client (one in flight; interactive 1 s gap, background at the provider's interval), core-set priority (place page, Explore, "Check now" interactive; due loop and sync background), deadlines grown with pacing, unpaced fixture mode, form-field fixture routes. Review REQUEST_CHANGES (a FIFO module limiter put interactive requests last) → fix `443629f` (limiters start interactive tasks first; sync-deadline tests; field names only in fixture errors) → APPROVE. Side effect accepted: ParkStay's limiter also lets person-triggered requests go first.
 - Cluster check after R1+R3+R4: full suite 4277 passed + 6 skipped.
