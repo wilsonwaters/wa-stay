@@ -35,13 +35,16 @@ export function isMinStayNight(night: NightStatus): boolean {
   return night.reason === 'min-stay';
 }
 
-/** Free on every night of the stay, none of them refused under the stay rules. */
+/**
+ * Free on every night of the stay: each `available`, with no reason it is not (`split`, or
+ * `min-stay`: refused under the stay rules), as matching counts it.
+ */
 export function isFullyAvailable(unit: UnitAvailability, nights: readonly string[]): boolean {
   return (
     nights.length > 0 &&
     nights.every((date) => {
       const night = nightOf(unit, date);
-      return night.state === 'available' && !isMinStayNight(night);
+      return night.state === 'available' && night.reason === undefined;
     })
   );
 }

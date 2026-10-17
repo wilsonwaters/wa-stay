@@ -296,8 +296,9 @@ export interface NightStatus {
   label?: string;
   reason?: NightReason;
   /**
-   * The fewest nights a stay arriving this night may have, when the provider has a minimum. A
-   * whole number; 0, 1, a negative or a fraction is no rule.
+   * The fewest nights a stay arriving this night may have, when the provider has a minimum: a
+   * whole number, which comes before the unit's (1 is no minimum). 0, a negative or a fraction
+   * is ignored.
    */
   minNights?: number;
   /** No arrivals on this date: a stay may not start this night. */

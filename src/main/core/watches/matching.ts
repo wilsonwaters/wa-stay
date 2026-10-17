@@ -10,7 +10,8 @@
  * - Price rule: `maxPrice` applies per night, and only when every night of the stay (or of
  *   the run) has a price. Otherwise the unit passes with `priceKnown: false`.
  * - Stay rules (`meetsStayRules`): the provider's minimum nights, and the days it takes no
- *   arrivals or departures. A night it refuses under them (`reason: 'min-stay'`) is never free.
+ *   arrivals or departures. A night it refuses under them (`reason: 'min-stay'`), like any
+ *   night with a reason, is never free, whatever its state.
  * - Full match: a unit with every night available that passes the price rule and the stay
  *   rules, so a provider's `fullyAvailable` alone never alerts on a stay it would refuse.
  * - Partial matches: per unit, each run of consecutive available nights that passes the
@@ -98,9 +99,12 @@ export function meetsStayRules(
   return departureNight?.noDeparture !== true;
 }
 
-/** A night matching counts as free: available, and not refused under the stay rules. */
+/**
+ * A night matching counts as free: available, with no reason it is not (`split`, or `min-stay`:
+ * refused under the stay rules). The reason wins over the state.
+ */
 function isFreeNight(night: NightStatus): boolean {
-  return night.state === 'available' && night.reason !== 'min-stay';
+  return night.state === 'available' && night.reason === undefined;
 }
 
 /** The unit's night starting on the morning after `last`, when the provider reported it. */
@@ -111,12 +115,12 @@ function nightAfter(unit: UnitAvailability, last: NightStatus): NightStatus | un
 
 /**
  * A unit free for the whole stay it was checked for: the provider says so (`fullyAvailable`),
- * no night is refused under its stay rules, and the stay meets them.
+ * no night has a reason it is not (`split`, `min-stay`), and the stay meets the stay rules.
  */
 export function freeForStay(unit: UnitAvailability): boolean {
   const { nights } = unit;
   if (!unit.fullyAvailable || nights.length === 0) return false;
-  if (nights.some((night) => night.reason === 'min-stay')) return false;
+  if (nights.some((night) => night.reason !== undefined)) return false;
   return meetsStayRules(unit, nights, nightAfter(unit, nights[nights.length - 1]));
 }
 

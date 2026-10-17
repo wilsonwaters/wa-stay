@@ -417,6 +417,12 @@ describe('watch matching', () => {
         ['1', D3, D4],
         ['1', D5, D6],
       ]);
+      // As a split night does, whatever its state
+      const split = [free(D1), { ...free(D2), reason: 'split' as const }, free(D3)];
+      expect(runs([unit('2', split, { fullyAvailable: false })])).toEqual([
+        ['2', D1, D2],
+        ['2', D3, D4],
+      ]);
     });
 
     it('is no full match for a fullyAvailable unit whose minimum is above the stay', () => {
