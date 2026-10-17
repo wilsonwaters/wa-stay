@@ -41,9 +41,10 @@ export function windowCapMinutes(
 }
 
 /**
- * Why a snipe that holds, at a mixed place, needs one stay type or a unit chosen: none, or more
- * than one, is chosen. Shown on the Release step, where "Hold it for me" is chosen.
+ * Why a snipe that holds, at a mixed place, needs one stay type or a unit chosen (none, or more
+ * than one, is chosen), and where to fix it: shown on the Release step, where "Hold it for me"
+ * is chosen, while the stay types and units are under "Your stay".
  */
-export function snipeHoldChoiceMessage(noun: UnitNoun): string {
-  return `Choose one stay type or a ${noun.one}. At a place with more than one stay type, Site Sniper holds only what you choose.`;
+export function snipeHoldChoiceMessage(noun: UnitNoun, place = 'This place'): string {
+  return `${place} has more than one stay type. To hold one, choose a stay type or a ${noun.one} under "Your stay", or choose Alert me.`;
 }

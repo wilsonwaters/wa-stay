@@ -528,22 +528,29 @@ export class SiteSniperRepository extends BaseRepository<SiteSnipe> {
 
   /**
    * How many of the provider's snipes are in one of `statuses`, active or not (a HELD snipe
-   * is inactive), and, with `action`, do that when the dates are free. The account service asks
-   * it before a sign-out.
+   * is inactive), and, with `filter`, do `action` when the dates are free or use the provider's
+   * access gate. The account service asks it before a sign-out.
    */
   countByStatus(
     providerId: string,
     statuses: readonly SnipeStatus[],
-    action?: SnipeAction
+    filter: { action?: SnipeAction; accessGateEnabled?: boolean } = {}
   ): number {
     if (statuses.length === 0) return 0;
     const placeholders = statuses.map(() => '?').join(', ');
-    const byAction = action === undefined ? '' : ' AND action = ?';
+    const where = [`provider_id = ?`, `status IN (${placeholders})`];
+    const values: unknown[] = [providerId, ...statuses];
+    if (filter.action !== undefined) {
+      where.push('action = ?');
+      values.push(filter.action);
+    }
+    if (filter.accessGateEnabled !== undefined) {
+      where.push('access_gate_enabled = ?');
+      values.push(filter.accessGateEnabled ? 1 : 0);
+    }
     const row = this.db
-      .prepare(
-        `SELECT COUNT(*) AS n FROM site_snipes WHERE provider_id = ? AND status IN (${placeholders})${byAction}`
-      )
-      .get(providerId, ...statuses, ...(action === undefined ? [] : [action])) as { n: number };
+      .prepare(`SELECT COUNT(*) AS n FROM site_snipes WHERE ${where.join(' AND ')}`)
+      .get(...values) as { n: number };
     return row.n;
   }
 

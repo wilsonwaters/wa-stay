@@ -163,7 +163,7 @@ export function snipeFormSchema({
       if (message) issue(['stayParams', field.key], message);
     }
     if (v.action === 'hold' && placeKinds && holdNeedsChoice(placeKinds, v.unitKinds, v.unitIds)) {
-      issue(['action'], snipeHoldChoiceMessage(noun));
+      issue(['action'], snipeHoldChoiceMessage(noun, v.location?.name));
     }
 
     if (!modes.some((mode) => mode.id === v.releaseMode)) {

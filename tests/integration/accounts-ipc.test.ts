@@ -332,6 +332,32 @@ describe('accounts over IPC', () => {
       expect(partition().clearStorageData).toHaveBeenCalledTimes(1);
     });
 
+    it('an alert snipe sniping through the queue keeps sign-out busy: its checks carry the queue session', async () => {
+      const userId = container.profile.requireUserId();
+      const snipes = container.repositories.snipes;
+      const queued = snipes.create(
+        userId,
+        createMockSiteSnipeInput({
+          providerId: 'parkstay',
+          action: 'alert',
+          accessGateEnabled: true,
+        })
+      );
+      snipes.updateStatus(queued.id, SnipeStatus.SNIPING);
+
+      await expect(call('accounts:sign-out', { providerId: 'parkstay' })).resolves.toMatchObject({
+        success: false,
+        code: 'ACCOUNT_BUSY',
+      });
+      expect(partition().clearStorageData).not.toHaveBeenCalled();
+
+      // Through with the queue: its alert sent
+      snipes.updateStatus(queued.id, SnipeStatus.ALERTED);
+      await expect(call('accounts:sign-out', { providerId: 'parkstay' })).resolves.toMatchObject({
+        success: true,
+      });
+    });
+
     it('sign-out keeps the profile row and its data', async () => {
       container.repositories.providerAccounts.upsert({
         providerId: 'parkstay',

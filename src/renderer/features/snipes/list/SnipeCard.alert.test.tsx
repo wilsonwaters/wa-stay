@@ -14,6 +14,7 @@ import {
 } from '@tests/fixtures/renderer/snipes';
 import { createMockApi, ok, PARKSTAY_MANIFEST } from '@tests/utils/renderer/createMockApi';
 import { renderWithProviders } from '@tests/utils/renderer/renderWithProviders';
+import { SnipesPage } from '../SnipesPage';
 import { SnipeCard } from './SnipeCard';
 
 function renderCard(snipe: SiteSnipe, stubs = {}, manifest = PARKSTAY_MANIFEST) {
@@ -105,7 +106,7 @@ describe('SnipeCard: alerts', () => {
     expect(within(card).queryByRole('button', { name: 'Connect Fake Stay' })).toBeNull();
   });
 
-  it('Run now that finds the dates free says what is free and where to book it', async () => {
+  it('Run now that finds the dates free says what is free and where to book it (by id, before the alert arrives)', async () => {
     const runNow = jest.fn().mockResolvedValue(
       ok({
         snipeId: 7,
@@ -124,5 +125,36 @@ describe('SnipeCard: alerts', () => {
       await screen.findByText('Site 3 is free at Osprey Bay. Book on ParkStay.')
     ).toBeInTheDocument();
     expect(screen.queryByText(/^Tried /)).toBeNull();
+  });
+
+  it('Run now names the unit as the alert main sent back does, as the card and panel do', async () => {
+    const sniping = makeSnipe({ action: 'alert', status: SnipeStatus.SNIPING });
+    const alerted = makeAlertedSnipe();
+    const list = jest.fn().mockResolvedValue(ok([sniping]));
+    const runNow = jest.fn().mockImplementation(async () => {
+      // Main pushes the changed snipe before it answers
+      list.mockResolvedValue(ok([alerted]));
+      mock.emit('snipe:updated', alerted);
+      return ok({
+        snipeId: 7,
+        success: true,
+        result: 'alerted',
+        held: false,
+        matchedSiteId: '3',
+        checkedAt: new Date(),
+      });
+    });
+    const mock = createMockApi({ snipes: { list, runNow } });
+    const { user } = renderWithProviders(<SnipesPage />, { api: mock });
+    const card = await screen.findByRole('article', { name: sniping.name });
+    await user.click(
+      within(card).getByRole('button', { name: `More actions for ${sniping.name}` })
+    );
+    await user.click(screen.getByRole('menuitem', { name: 'Run now' }));
+    const toasts = screen.getByRole('region', { name: 'Notifications' });
+    expect(
+      await within(toasts).findByText('CAMPSITE 03 is free at Osprey Bay. Book on ParkStay.')
+    ).toBeInTheDocument();
+    expect(within(card).getByText(/CAMPSITE 03 was free$/)).toBeInTheDocument();
   });
 });

@@ -2,6 +2,7 @@ import { useRef, useState } from 'react';
 import {
   toApiError,
   useAccountStatus,
+  useCachedSnipe,
   useDeleteSnipe,
   useOpenSnipePayment,
   useRunSnipeNow,
@@ -13,10 +14,15 @@ import type { SiteSnipe, SnipeExecutionResult } from '../../../../shared/types/s
 import { HOLD_EXPIRED_MESSAGE } from '../../../components/stay/HoldPanel';
 import { useToast } from '../../../components/ui';
 import type { PlaceUnits } from './usePlaceUnits';
+import { alertedUnitLabel } from './snipeAlert';
 import { heldUnitNoun } from './snipeNouns';
 import { unitLabel } from './snipeState';
 
-/** What one attempt found, for the toast that announces it. */
+/**
+ * What one attempt found, for the toast that announces it. An alert names the unit as the
+ * snipe's alert does (`alertedUnitLabel`, as its card and panel do) once `snipe` is the one
+ * main sent back with it.
+ */
 export function runResultMessage(
   result: SnipeExecutionResult,
   snipe: SiteSnipe,
@@ -34,7 +40,10 @@ export function runResultMessage(
   switch (result.result) {
     case SnipeResult.ALERTED: {
       const noun = heldUnitNoun(snipe, manifest, units?.units, result.matchedSiteId);
-      const unit = unitLabel(result.matchedSiteId, noun, units?.names);
+      const unit =
+        (snipe.alert?.unitId === result.matchedSiteId &&
+          alertedUnitLabel(snipe, manifest, units)) ||
+        unitLabel(result.matchedSiteId, noun, units?.names);
       return `${unit} is free at ${place}. Book on ${provider}.`;
     }
     case SnipeResult.TOO_EARLY:
@@ -77,6 +86,8 @@ export function useSnipeActions(
   const account = useAccountStatus(manifest?.id);
   const [connectOpen, setConnectOpen] = useState(false);
   const running = useRef(false);
+  // The snipe as main last pushed it: by the time Run now answers, the one it changed
+  const cachedSnipe = useCachedSnipe();
   const requirement = manifest?.capabilities.account;
   const needsAccount =
     snipe.action === 'hold' &&
@@ -109,7 +120,8 @@ export function useSnipeActions(
     running.current = true;
     run.mutate(snipe.id, {
       onSuccess: (result) => {
-        const message = runResultMessage(result, snipe, manifest, units);
+        const current = cachedSnipe(snipe.id) ?? snipe;
+        const message = runResultMessage(result, current, manifest, units);
         if (result.success) toast.success(message);
         else toast.error(message);
       },

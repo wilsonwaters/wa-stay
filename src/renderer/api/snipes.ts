@@ -1,3 +1,4 @@
+import { useCallback } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type {
   SiteSnipe,
@@ -80,6 +81,20 @@ export function useSetSnipeActive() {
     mutationFn: ({ id, active }: { id: number; active: boolean }) =>
       unwrap((api) => (active ? api.snipes.activate(id) : api.snipes.deactivate(id))),
   });
+}
+
+/**
+ * The snipe as the cache holds it now: its detail, else its entry in the list. A pushed
+ * `snipe:updated` lands there at once, before the screen re-renders.
+ */
+export function useCachedSnipe(): (id: number) => SiteSnipe | undefined {
+  const queryClient = useQueryClient();
+  return useCallback(
+    (id: number) =>
+      queryClient.getQueryData<SiteSnipe | null>(queryKeys.snipes.detail(id)) ??
+      queryClient.getQueryData<SiteSnipe[]>(queryKeys.snipes.list())?.find((s) => s.id === id),
+    [queryClient]
+  );
 }
 
 /** One attempt now. The snipe itself refreshes from the `snipe:updated` main sends after it. */

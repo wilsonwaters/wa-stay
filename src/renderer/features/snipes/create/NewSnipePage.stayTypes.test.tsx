@@ -11,9 +11,9 @@ const button = (name: string) => screen.getByRole('button', { name });
 const step = (name: RegExp) => screen.findByRole('heading', { level: 2, name });
 const sent = (mock: jest.Mock): SiteSnipeInput => mock.mock.calls[0][0];
 const stayTypes = () => screen.findByRole('group', { name: 'Stay type' });
-// R9: "one stay type", and the mixed place's noun
+// Where to fix it (R13 review), with the mixed place's noun (R9)
 const MESSAGE =
-  'Choose one stay type or a spot. At a place with more than one stay type, Site Sniper holds only what you choose.';
+  'Osprey Bay has more than one stay type. To hold one, choose a stay type or a spot under "Your stay", or choose Alert me.';
 
 describe('NewSnipePage at a place with sites and cabins', () => {
   it('offers its stay types; "Cabins & villas" narrows the units and is sent as unitKinds', async () => {

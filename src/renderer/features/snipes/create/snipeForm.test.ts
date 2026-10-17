@@ -38,7 +38,7 @@ describe('snipeFormSchema: a stay type or a unit at a mixed place, to hold', () 
   it('refuses a snipe that holds with neither, on its action (the Release step)', () => {
     expect(issues(valid(), ['campsite', 'cabin'])).toEqual({
       action:
-        'Choose one stay type or a site. At a place with more than one stay type, Site Sniper holds only what you choose.',
+        'Lucky Bay has more than one stay type. To hold one, choose a stay type or a site under "Your stay", or choose Alert me.',
     });
     expect(issues(valid(), ['campsite', 'other'])).toHaveProperty('action');
   });

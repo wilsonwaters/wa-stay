@@ -243,16 +243,25 @@ export function createContainer({
   };
   // One booking per night across snipes and auto-hold watches; it also knows the holds in flight
   const nightGuard = new NightGuard(repositories.snipes, repositories.watches);
-  // Turning off a provider's holds, or signing out, would lose a queue place (any snipe's: the
-  // queue session is on the partition), a hold being placed (a hold snipe sniping, or any hold
-  // whose `holds.create` is still running), or a hold awaiting payment. An alert snipe's check
-  // needs no session and places no hold.
-  const isBusy = (providerId: string, now: Date): boolean =>
-    nightGuard.reserving(providerId) ||
-    repositories.snipes.countByStatus(providerId, [SnipeStatus.QUEUEING]) > 0 ||
-    repositories.snipes.countByStatus(providerId, [SnipeStatus.SNIPING, SnipeStatus.HELD], 'hold') >
-      0 ||
-    repositories.watches.countUnexpiredHolds(providerId, now) > 0;
+  // Turning off a provider's holds, or signing out, would lose:
+  // - a queue place: any snipe in the queue, and any snipe sniping through it (its checks carry
+  //   the queue session on the provider's partition), alert snipes included;
+  // - a hold being placed: a hold snipe sniping, or any hold whose `holds.create` still runs;
+  // - a hold awaiting payment.
+  // An alert snipe that uses no queue needs no session while it checks. A snipe through the
+  // queue and waiting for its release (WAITING_RELEASE) is not counted, as before R13.
+  const isBusy = (providerId: string, now: Date): boolean => {
+    const snipes = repositories.snipes;
+    return (
+      nightGuard.reserving(providerId) ||
+      snipes.countByStatus(providerId, [SnipeStatus.QUEUEING]) > 0 ||
+      snipes.countByStatus(providerId, [SnipeStatus.SNIPING], { accessGateEnabled: true }) > 0 ||
+      snipes.countByStatus(providerId, [SnipeStatus.SNIPING, SnipeStatus.HELD], {
+        action: 'hold',
+      }) > 0 ||
+      repositories.watches.countUnexpiredHolds(providerId, now) > 0
+    );
+  };
   const providers = new ProviderRegistry({ logger });
   // The person's experiment choices apply here, as each provider registers: after a restart
   const experiments = new ProviderExperiments({ state: providerState, providers, isBusy, logger });
