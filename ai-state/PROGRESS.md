@@ -10,7 +10,7 @@ Branch `ccr-573ddb1d-hir0sq` (from `main` at `4bd5d62`, the v2.0.0 release). The
 Phase 6 (completion). All 20 tasks and the system-verification fix are merged on `ccr-573ddb1d-hir0sq` and pushed. System verification: success criteria 1–9 met; full gate green. Waiting on the stakeholder: the PR (RO1), the stakeholder actions below, and RQ1, RQ4, RQ6–RQ8.
 
 ## Currently in flight
-- Nothing. Report sent to the stakeholder; asked whether to open the PR from `ccr-573ddb1d-hir0sq` to `main`.
+- PR #68 (`ccr-573ddb1d-hir0sq` → `main`) opened at the stakeholder's request; it closes #48–#67 on merge.
 
 ## Stakeholder actions before recommending RAC features
 - Retake screenshots with a `pk.` Mapbox token: `npm run docs:screenshots`, `npm run site:screenshots` (`docs/images/explore.png` and the site hero still show the old "Type" chip; alt text still true).
