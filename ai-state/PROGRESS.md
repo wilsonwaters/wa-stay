@@ -11,7 +11,8 @@ Phase 3–4 (task specs, then execution). The stakeholder approved the 20-task p
 
 ## Currently in flight
 - **R18 (#65)**: implementation agent in `/home/user/lanes/r18`.
-- **R13 (#60)** and **R14 (#61)**: implementation agents in `/home/user/lanes/r13` and `r14` (at `348d6d2`).
+- **R13 (#60)**: implementation agent in `/home/user/lanes/r13` (at `348d6d2`).
+- **R14 (#61)** done on `lane/r14` (`e3bc75c`, `04716dd`, `a548063`; 5158 tests, e2e 24; one anonymous GET of the WA Department of Education's term dates). Review running (instants verified independently).
 - Next: R16 (after R11, R13, R14, R15), R18 (after R12, R17), R19, R20.
 
 ## Completed
