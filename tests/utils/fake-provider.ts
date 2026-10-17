@@ -26,7 +26,11 @@
  *   nights with room answered `min-stay` and never `fullyAvailable`;
  * - `scriptHold(...results)`: the next `holds.create` calls answer these;
  * - `account` / `setAccount(state)`: what `auth.isSignedIn` answers; `auth` replaces its
- *   sign-in URL, origins or completion pages.
+ *   sign-in URL, origins or completion pages;
+ * - `credentials`: a `credentials` sign-in instead of `browser-session` (R15), with
+ *   `FAKE_CREDENTIAL_FIELDS` (a copyable member number and a password that is not) and one
+ *   statement, `FAKE_CONFIRMATIONS`, unless given; `signIn` answers `signed-in` unless
+ *   scripted. Its calls are recorded with the keys only, never a value.
  *
  * Every async method honours its `AbortSignal` and rejects with an `AbortError`.
  */
@@ -49,7 +53,10 @@ import {
   type BrowserAutomation,
   type BrowserSessionAuth,
   type CatalogModule,
+  type CredentialsAuth,
+  type CredentialsSignInResult,
   type ExternalBooking,
+  type HttpClient,
   type HoldResult,
   type HoldSuccess,
   type PaymentPage,
@@ -61,6 +68,8 @@ import {
 import type {
   AccessState,
   AccessStatus,
+  AccountConfirmation,
+  AccountFieldDescriptor,
   AccountRequirement,
   AccountStatus,
   LocationAvailability,
@@ -143,6 +152,8 @@ export interface FakeProviderOptions {
   auth?: Partial<
     Pick<BrowserSessionAuth, 'signInUrl' | 'allowedOrigins' | 'completionUrlPatterns'>
   >;
+  /** A `credentials` sign-in instead of `browser-session` (see `FakeCredentialsOptions`). */
+  credentials?: FakeCredentialsOptions;
   accessStates?: AccessState[];
   bookings?: ExternalBooking[];
   delayMs?: number;
@@ -157,6 +168,41 @@ export interface FakeProviderOptions {
   /** A search-mode catalogue also has `catalog.searchText`. */
   textSearch?: boolean;
 }
+
+/** A `credentials` sign-in for the fake. Values here are made up; never a real number. */
+export interface FakeCredentialsOptions {
+  /** Default `FAKE_CREDENTIAL_FIELDS`. */
+  fields?: AccountFieldDescriptor[];
+  /** Default `FAKE_CONFIRMATIONS`; `[]` for none. */
+  confirmations?: AccountConfirmation[];
+  /**
+   * What `signIn` answers: a state, or a function of the trimmed values and the HTTP client
+   * the core passes (it may reject, or return normalised `values`). Default `signed-in`.
+   */
+  signIn?:
+    | AccountStatus['state']
+    | ((
+        values: Readonly<Record<string, string>>,
+        http: HttpClient,
+        signal?: AbortSignal
+      ) => CredentialsSignInResult | Promise<CredentialsSignInResult>);
+}
+
+/** The fake's default `credentials` fields: a copyable member number, and a password that is not. */
+export const FAKE_CREDENTIAL_FIELDS: AccountFieldDescriptor[] = [
+  {
+    key: 'memberNumber',
+    label: 'Member number',
+    help: 'The 13 digits on your card.',
+    secret: true,
+    copyable: true,
+  },
+  { key: 'password', label: 'Password', secret: true },
+];
+
+export const FAKE_CONFIRMATIONS: AccountConfirmation[] = [
+  { key: 'own', label: 'This is my own membership.' },
+];
 
 export interface FakeProvider extends AccommodationProvider {
   readonly factory: ProviderFactory;
@@ -304,6 +350,24 @@ export function createFakeProvider(options: FakeProviderOptions = {}): FakeProvi
         ]
       : undefined,
   };
+
+  function credentialsAuth(credentials: FakeCredentialsOptions): CredentialsAuth {
+    const answer = credentials.signIn ?? 'signed-in';
+    return {
+      kind: 'credentials',
+      fields: credentials.fields ?? FAKE_CREDENTIAL_FIELDS,
+      confirmations: credentials.confirmations ?? FAKE_CONFIRMATIONS,
+      async signIn(values, http, signal) {
+        // The keys only: a test may print its calls
+        await enter('auth', 'signIn', [Object.keys(values)], signal);
+        return typeof answer === 'function' ? answer(values, http, signal) : { state: answer };
+      },
+      async isSignedIn(_http, signal) {
+        await enter('auth', 'isSignedIn', [], signal);
+        return { state: accountState };
+      },
+    };
+  }
 
   /** Records the call, honours the signal and the delay, and fires a scripted failure. */
   async function enter(
@@ -700,21 +764,23 @@ export function createFakeProvider(options: FakeProviderOptions = {}): FakeProvi
       : undefined,
 
     auth:
-      capabilities.account !== 'none'
-        ? {
-            kind: 'browser-session',
-            signInUrl: `https://${id}.example/sign-in`,
-            allowedOrigins: [`https://${id}.example`],
-            completionUrlPatterns: [`https://${id}.example/signed-in*`],
-            ...options.auth,
-            async isSignedIn(_http, signal) {
-              await enter('auth', 'isSignedIn', [], signal);
-              return accountState === 'signed-in'
-                ? { state: 'signed-in', email: `person@${id}.example`, displayName: 'Pat Person' }
-                : { state: accountState };
-            },
-          }
-        : undefined,
+      capabilities.account !== 'none' && options.credentials
+        ? credentialsAuth(options.credentials)
+        : capabilities.account !== 'none'
+          ? {
+              kind: 'browser-session',
+              signInUrl: `https://${id}.example/sign-in`,
+              allowedOrigins: [`https://${id}.example`],
+              completionUrlPatterns: [`https://${id}.example/signed-in*`],
+              ...options.auth,
+              async isSignedIn(_http, signal) {
+                await enter('auth', 'isSignedIn', [], signal);
+                return accountState === 'signed-in'
+                  ? { state: 'signed-in', email: `person@${id}.example`, displayName: 'Pat Person' }
+                  : { state: accountState };
+              },
+            }
+          : undefined,
 
     async dispose() {
       disposed = true;

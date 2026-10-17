@@ -148,23 +148,48 @@ export function providerLimits(manifest: Pick<ProviderManifest, 'limits'>): Prov
 /**
  * How a person signs in to a provider (§12.30):
  * - `browser-session`: on the provider's own pages, in an app window on its partition;
- * - `credentials`: the app asks for the fields in `AccountFieldDescriptor`s and keeps the
- *   secret ones in the provider's scoped secret vault;
+ * - `credentials`: the app asks for the fields in `AccountFieldDescriptor`s and keeps every
+ *   value in the provider's scoped secret vault (`account.<key>`);
  * - `automation`: browser automation signs in for the person.
  *
- * Only `browser-session` is implemented (V6); the others are declared and validated.
+ * `browser-session` (V6) and `credentials` (R15) are implemented; `automation` is declared and
+ * validated only.
  */
 export type ProviderAuthKind = 'browser-session' | 'credentials' | 'automation';
 
-/** One input of a `credentials` sign-in, rendered generically by the renderer. */
+/**
+ * One input of a `credentials` sign-in, rendered generically by the renderer. Every value is
+ * kept in the provider's scoped secret vault (`account.<key>`) and never sent back to the
+ * renderer, whether it is `secret` or not.
+ */
 export interface AccountFieldDescriptor {
   /** e.g. `email`, `password`. */
   key: string;
   label: string;
   help?: string;
-  /** Stored only in the scoped secret vault and never sent back to the renderer. */
+  /** Masked as it is typed. */
   secret: boolean;
+  /**
+   * The person can copy the saved value, to paste at the provider's checkout: main writes it
+   * to the clipboard, so it never reaches the renderer. Default false, so a password is never
+   * put on the clipboard.
+   */
+  copyable?: boolean;
 }
+
+/**
+ * A statement the person ticks before a `credentials` sign-in can be saved, such as "This is
+ * my own member number". The account service refuses a save without every one.
+ */
+export interface AccountConfirmation {
+  /** Alphanumeric, unique within the sign-in. */
+  key: string;
+  /** The statement, shown as its checkbox's label. */
+  label: string;
+}
+
+/** The most characters a `credentials` value may have, once trimmed. */
+export const ACCOUNT_VALUE_MAX_LENGTH = 256;
 
 /** Where a stay field is used. §12.1, §12.18 (`appliesTo` is canonical). */
 export type StayFieldUse = 'availability' | 'watch' | 'snipe' | 'hold';
@@ -414,6 +439,8 @@ export interface AccountStatus {
 export interface ProviderAccount {
   providerId: ProviderId;
   requirement: AccountRequirement;
+  /** How the person signs in: on the provider's pages, or with details saved in the app. */
+  authKind: ProviderAuthKind;
   status: AccountStatus['state'];
   displayName?: string;
   email?: string;
@@ -421,6 +448,12 @@ export interface ProviderAccount {
   lastSignedInAt?: string;
   /** ISO timestamp. */
   lastCheckedAt?: string;
+  /** `credentials` only: the details the app asks for. */
+  fields?: AccountFieldDescriptor[];
+  /** `credentials` only: the statements the person ticks to save them. */
+  confirmations?: AccountConfirmation[];
+  /** `credentials` only: the keys of the fields that have a stored value. Never a value. */
+  savedFields?: string[];
 }
 
 // ---------------------------------------------------------------------------------------
@@ -527,11 +560,17 @@ export const ReleaseModeDescriptorSchema = z.object({
 assertTypeEquals<z.input<typeof ReleaseModeDescriptorSchema>, ReleaseModeDescriptor>(true);
 assertTypeEquals<z.output<typeof ReleaseModeDescriptorSchema>, ReleaseModeDescriptor>(true);
 
+/** A `credentials` field's or confirmation's key: a letter, then letters and digits. */
+export const AccountKeySchema = z
+  .string()
+  .regex(/^[A-Za-z][A-Za-z0-9]*$/, 'Account field keys are alphanumeric');
+
 export const AccountFieldDescriptorSchema = z.object({
-  key: z.string().regex(/^[A-Za-z][A-Za-z0-9]*$/, 'Account field keys are alphanumeric'),
+  key: AccountKeySchema,
   label: nonEmpty,
   help: z.string().optional(),
   secret: z.boolean(),
+  copyable: z.boolean().optional(),
 });
 assertTypeEquals<z.input<typeof AccountFieldDescriptorSchema>, AccountFieldDescriptor>(true);
 assertTypeEquals<z.output<typeof AccountFieldDescriptorSchema>, AccountFieldDescriptor>(true);
@@ -544,6 +583,16 @@ export const AccountFieldsSchema = z
     uniqueBy((f: AccountFieldDescriptor) => f.key),
     'Account field keys must be unique'
   );
+
+export const AccountConfirmationSchema = z.object({ key: AccountKeySchema, label: nonEmpty });
+assertTypeEquals<z.input<typeof AccountConfirmationSchema>, AccountConfirmation>(true);
+assertTypeEquals<z.output<typeof AccountConfirmationSchema>, AccountConfirmation>(true);
+
+/** A `credentials` sign-in's confirmations: any number, with unique keys. */
+export const AccountConfirmationsSchema = z.array(AccountConfirmationSchema).refine(
+  uniqueBy((c: AccountConfirmation) => c.key),
+  'Account confirmation keys must be unique'
+);
 
 export const ProviderLimitsSchema = z.object({
   minWatchIntervalMinutes: z.number().int().min(1).max(1440),

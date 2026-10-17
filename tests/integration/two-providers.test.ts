@@ -181,6 +181,7 @@ describe('a container with ParkStay and a second provider', () => {
     expect(accounts.find((account) => account.providerId === 'parkstay')).toEqual({
       providerId: 'parkstay',
       requirement: 'optional',
+      authKind: 'browser-session',
       status: 'unknown',
     });
   });

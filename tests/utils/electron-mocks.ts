@@ -153,6 +153,8 @@ export function electron(): Record<string, unknown> {
     BrowserWindow: FakeBrowserWindow,
     Notification: jest.fn().mockImplementation(() => ({ on: jest.fn(), show: jest.fn() })),
     shell: { openExternal: jest.fn(() => Promise.resolve()), openPath: jest.fn() },
+    // `accounts.copyCredential` writes here (main); no test touches a real clipboard.
+    clipboard: { writeText: jest.fn() },
     // The scheduler re-arms its timers on `resume` and `unlock-screen`; a test emits them.
     powerMonitor: new EventEmitter(),
     ipcMain: { handle: jest.fn() },

@@ -7,9 +7,11 @@ import {
   ACTION_LABELS,
   accountPurpose,
   accountRowText,
+  credentialsRowText,
   missingAccountWarning,
   type AccountAction,
 } from './accountText';
+import { CredentialsActions } from './CredentialsActions';
 import { SignInLinkField } from './SignInLinkField';
 
 /** How the row's last sign-in ended, when it needs saying. */
@@ -66,7 +68,11 @@ function ButtonLabel({ label, waiting }: { label: string; waiting: boolean }) {
   );
 }
 
-/** One provider on Settings → Accounts (§12.9: shown even when there is only one). */
+/**
+ * One provider on Settings → Accounts (§12.9: shown even when there is only one). A
+ * `browser-session` account connects in the provider's sign-in window; a `credentials` one
+ * saves its details in a form instead (`CredentialsActions`).
+ */
 export function AccountRow({
   manifest,
   account,
@@ -80,7 +86,10 @@ export function AccountRow({
   // Is the stored status still true? One read-only check per visit (main caches it 60 s)
   useAccountCheck(manifest.id, { enabled: hasAccount });
 
-  const text = accountRowText(manifest, account);
+  const credentials = account?.authKind === 'credentials' ? account : undefined;
+  const text = credentials
+    ? { ...credentialsRowText(manifest, credentials), action: null }
+    : accountRowText(manifest, account);
   const purpose = accountPurpose(manifest, account);
   const warning = missingAccountWarning(manifest, account);
   const StatusIcon = STATUS_ICON[text.tone];
@@ -90,8 +99,8 @@ export function AccountRow({
     <li id={`account-${manifest.id}`} className="flex flex-col gap-4 py-6 sm:flex-row sm:gap-8">
       <div className="flex min-w-0 flex-1 flex-col gap-1.5">
         <h3
-          ref={text.action ? undefined : focusRef}
-          tabIndex={text.action ? undefined : -1}
+          ref={text.action || credentials ? undefined : focusRef}
+          tabIndex={text.action || credentials ? undefined : -1}
           className="text-base"
         >
           <ProviderBadge providerId={manifest.id} />
@@ -127,7 +136,7 @@ export function AccountRow({
             {outcome.message}
           </Notice>
         )}
-        {hasAccount && account?.status !== 'signed-in' && (
+        {hasAccount && !credentials && account?.status !== 'signed-in' && (
           <Disclosure summary="Have a sign-in link?" className="mt-2">
             <div className="pt-3">
               <SignInLinkField manifest={manifest} />
@@ -135,6 +144,16 @@ export function AccountRow({
           </Disclosure>
         )}
       </div>
+      {credentials && (
+        <div className="shrink-0">
+          <CredentialsActions
+            manifest={manifest}
+            account={credentials}
+            focusRef={focusRef}
+            statusId={statusId}
+          />
+        </div>
+      )}
       {text.action && (
         <div className="shrink-0">
           <Button

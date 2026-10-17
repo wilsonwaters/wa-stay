@@ -80,11 +80,65 @@ export const OPENSTAY = {
   },
 } as unknown as ProviderManifest;
 
+/** A provider whose account is details saved in the app (`credentials`, R15), optional. */
+export const KEYSTAY = {
+  ...PARKSTAY_MANIFEST,
+  id: 'keystay',
+  name: 'Key Stay',
+  shortName: 'KeyStay',
+  brand: { color: '#7A4B1F', monogram: 'KS' }, // token-guard-ignore: provider brand data
+  capabilities: {
+    ...PARKSTAY_MANIFEST.capabilities,
+    holds: false,
+    snipes: false,
+    bookingImport: false,
+    accessGate: false,
+    account: 'optional',
+  },
+  releaseModes: [],
+} as unknown as ProviderManifest;
+
+/** KeyStay's one detail: a copyable member number (made-up values only in tests). */
+export const MEMBER_NUMBER_FIELD = {
+  key: 'memberNumber',
+  label: 'Member number',
+  help: 'The 13 digits on your card.',
+  secret: true,
+  copyable: true,
+};
+
+export const KEYSTAY_CONFIRMATIONS = [
+  { key: 'own', label: 'This is my own member number.' },
+  { key: 'stay', label: "I'll be staying, in the name on the card." },
+];
+
+/** KeyStay's account (`credentials`): nothing saved unless overridden. */
+export function keyAccount(overrides: Partial<ProviderAccount> = {}): ProviderAccount {
+  return {
+    providerId: 'keystay',
+    requirement: 'optional',
+    authKind: 'credentials',
+    status: 'signed-out',
+    fields: [MEMBER_NUMBER_FIELD],
+    confirmations: KEYSTAY_CONFIRMATIONS,
+    savedFields: [],
+    ...overrides,
+  };
+}
+
+export const KEY_SAVED = keyAccount({ status: 'signed-in', savedFields: ['memberNumber'] });
+
 /** Noon on Sat 3 Oct 2026 in the computer's time zone, so it reads "Sat 3 Oct 2026" anywhere. */
 export const LAST_SIGN_IN = new Date(2026, 9, 3, 12).toISOString();
 
 export function account(overrides: Partial<ProviderAccount> = {}): ProviderAccount {
-  return { providerId: 'parkstay', requirement: 'optional', status: 'unknown', ...overrides };
+  return {
+    providerId: 'parkstay',
+    requirement: 'optional',
+    authKind: 'browser-session',
+    status: 'unknown',
+    ...overrides,
+  };
 }
 
 export const SIGNED_IN = account({

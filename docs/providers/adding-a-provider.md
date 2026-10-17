@@ -845,7 +845,7 @@ closes after 5 minutes without a call, and on quit. [Browser providers](browser-
 has the details.
 
 Sign-in by browser automation (`auth.kind: 'automation'`) is declared and validated but **not
-implemented**: the account service supports only `browser-session` ([sign-in](#7-sign-in)).
+implemented**: the account service supports `browser-session` and `credentials` ([sign-in](#7-sign-in)).
 
 ### The example
 
@@ -1237,10 +1237,12 @@ export function createExampleHolds(options: ExampleHoldsOptions): HoldsModule {
 
 ## 7. Sign-in
 
-Required unless `capabilities.account` is `none`. The only sign-in the app implements is
-**`browser-session`**: the person signs in on the provider's own pages, in an app window on
+Required unless `capabilities.account` is `none`. The app implements two kinds. With
+**`browser-session`** the person signs in on the provider's own pages, in an app window on
 your session partition, so the cookies they get are the ones `ctx.http`, holds and the payment
-window use. Example Parks' account is `optional`:
+window use. With **`credentials`** the person saves a detail the provider asks for, such as a
+member number, in Settings → Accounts ([saved details](#saved-details-credentials)). Example
+Parks' account is `optional`, with `browser-session`:
 
 <!-- region: tests/fixtures/providers/example-api/auth.ts#auth -->
 
@@ -1326,10 +1328,47 @@ export function createExampleAuth(options: {
 - Settings → Accounts shows the provider's row with "Connect" and "Sign out". Sign-out clears
   only your partition, and is refused (`ACCOUNT_BUSY`) while a snipe or hold needs it.
 
+### Saved details (`credentials`)
+
+For a provider whose checkout asks for a detail rather than a sign-in (a member number), the
+person saves it once, and WA Stay keeps it encrypted on the computer. A `credentials` auth has:
+
+- **`fields`** (`AccountFieldDescriptor[]`, at least one, unique alphanumeric keys): a `label`,
+  an optional `help` line, `secret` (masked as it is typed) and `copyable` (default false). A
+  copyable field gets a "Copy {label}" button: main puts the saved value on the clipboard, for
+  the person to paste at your checkout, and the window never sees it. Leave `copyable` off for a
+  password.
+- **`confirmations`** (optional, unique alphanumeric keys): statements the person ticks before
+  Save works, such as "This is my own member number". The core refuses a save without every one
+  (`VALIDATION`, issue `confirmed`), so the rule holds whatever the window does.
+- **`signIn(values, http, signal)`**: your check, before anything is stored. It gets every
+  declared field, trimmed at both ends, none empty and none over 256 characters (the core refuses
+  the rest with `VALIDATION`, issue `values.<key>`); reformatting, such as removing spaces or
+  dashes inside a number, is yours. It runs within 15 s, at interactive priority. Answer
+  `signed-in` to store the values, `signed-out` to refuse them ("{shortName} didn't accept these
+  details"), or `unknown` when you cannot tell; a rejection counts as `unknown`, and nothing is
+  stored. A local check (the format) needs no request at all. Never put a value in an error
+  message, a log line, or a request that does not need it.
+- **Your own form of a value:** a `signed-in` answer may carry `values`
+  (`CredentialsSignInResult`), and the core stores those instead of what was typed, so the saved
+  value, the one `ctx.secrets` reads and the one "Copy" puts on the clipboard are yours: a
+  member number typed "1234 5678 9012" can be kept as "123456789012". Declared keys only, each a
+  string that is not empty and at most 256 characters once trimmed; a key you leave out keeps
+  what was typed. Anything else is ignored (the core logs a warning that names no value) and
+  the typed values are stored.
+- **`isSignedIn`** must exist but is never called: the account counts as signed in when every
+  field has a stored value, worked out on the computer with no request. Return `unknown`.
+
+The core keeps each value as `account.<key>` in your scoped secret vault, so your modules read
+it with `ctx.secrets.get('account.<key>')` (undefined when nothing is saved). Saving again
+replaces every value, all or nothing. Settings → Accounts shows "Add {label}", then "{label}
+saved" with Replace, Remove and Copy; Remove (`accounts.signOut`) deletes the values, clears no
+session and is never refused. No value is ever sent back to the window or written to a log.
+
 | `kind` | How the person signs in | Status |
 | --- | --- | --- |
 | `browser-session` | On the provider's own pages, in an app window on your partition, as above. | Implemented. ParkStay uses it ([sign-in](parkstay/authentication.md)). |
-| `credentials` | The app asks for `fields` (`AccountFieldDescriptor`, secret ones kept in `ctx.secrets`) and calls `signIn(values, http)`. | Declared and validated; the account service does not implement it yet. |
+| `credentials` | The app asks for `fields`, with `confirmations` ticked, and calls `signIn(values, http)`; the values are kept in `ctx.secrets` as `account.<key>`. | Implemented ([saved details](#saved-details-credentials)). No built-in provider uses it yet. |
 | `automation` | `signIn(browser)` signs in through browser automation. | Declared and validated; the account service does not implement it yet. |
 
 ## 8. Other optional modules
@@ -1410,7 +1449,7 @@ in `src/main/core/catalog/location-catalog.service.ts` (a paced provider's from
 | One page of a `search` catalogue's area or text search, `searchTimeoutMs` | 20 s | That search fails (earlier pages are kept), and is not asked again for 60 s (`searchErrorTtlMs`). |
 | One `ctx.http` request | 30 s (`timeoutMs`) | `ProviderTimeoutError`. |
 | One `ctx.browser.withPage` call | 60 s (`timeoutMs`) | Playwright's `TimeoutError`. |
-| A sign-in check (`isSignedIn`), `probeTimeoutMs` | 15 s | The account shows as unknown, never signed out. |
+| A sign-in check (`isSignedIn`), or a `credentials` save's `signIn`, `probeTimeoutMs` | 15 s | The account shows as unknown, never signed out; a save stores nothing. |
 | A watch check, a hold | none from the core | Only your own request and page timeouts apply. |
 
 A paced provider's catalogue bounds (`minRequestIntervalMs` above 0) grow with the gaps a call
@@ -1740,7 +1779,8 @@ Once registered, with no other change:
 - **Watches and Site Sniper** list the provider in their first step when it has the
   capability, with its stay fields and release modes. A watch's location step searches the
   stored catalogue (and, for a `search` catalogue with `searchText`, the provider).
-- **Settings → Accounts** shows its row and, with `browser-session`, its sign-in.
+- **Settings → Accounts** shows its row and, with `browser-session`, its sign-in; with
+  `credentials`, its saved details (add, replace, remove, copy).
 - **Notifications** name the provider; desktop titles start with its `shortName`. A watch's
   alert opens your booking page for the stay it found (a click on the desktop notification,
   and "Book on {shortName}" in its email and on the watch's page).

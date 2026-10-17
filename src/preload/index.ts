@@ -136,6 +136,8 @@ const api: WindowApi = {
     signIn: (providerId) => ({ providerId }),
     signOut: (providerId) => ({ providerId }),
     openSignInLink: (providerId, url) => ({ providerId, url }),
+    saveCredentials: (providerId, values, confirmed) => ({ providerId, values, confirmed }),
+    copyCredential: (providerId, key) => ({ providerId, key }),
   }),
 
   events: {

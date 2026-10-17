@@ -276,10 +276,16 @@ describe('secrets never reach the renderer', () => {
       success: true,
       data: [
         // FakeProvider's account is optional too, never checked
-        { providerId: 'fake', requirement: 'optional', status: 'unknown' },
+        {
+          providerId: 'fake',
+          requirement: 'optional',
+          authKind: 'browser-session',
+          status: 'unknown',
+        },
         {
           providerId: 'parkstay',
           requirement: 'optional',
+          authKind: 'browser-session',
           status: 'signed-in',
           email: 'me@example.com',
           displayName: 'Sweep Person',
