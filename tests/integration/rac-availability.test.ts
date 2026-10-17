@@ -280,7 +280,7 @@ describe('RAC availability: Busselton, 6–8 Nov 2026', () => {
     ]);
   });
 
-  it('the powered site is fully available at 75 and 75, 150 in all, on the Standard Rate', () => {
+  it('the powered site is fully available at 75 and 75, 150 in all, on the Standard Rate, with 51 sites free for the whole stay', () => {
     expect(unit(result, 'cat:4')).toEqual({
       unitId: 'cat:4',
       unitName: 'Powered Site',
@@ -291,6 +291,8 @@ describe('RAC availability: Busselton, 6–8 Nov 2026', () => {
         { date: '2026-11-07', state: 'available', price: 75, minNights: 1 },
       ],
       fullyAvailable: true,
+      // 53 and 55 free on the nights, 51 for the whole stay: Explore's count
+      freeCount: 51,
       total: 150,
       bookingUrl: POWERED_SITE_LINK,
     });
@@ -304,7 +306,7 @@ describe('RAC availability: Busselton, 6–8 Nov 2026', () => {
     expect(powered.nights.every((night) => night.minNights === 1)).toBe(true);
   });
 
-  it('the ensuite site is booked both nights, not fully available, with no price', () => {
+  it('the ensuite site is booked both nights, not fully available, with no price and none free', () => {
     const ensuite = unit(result, 'cat:7');
     expect(ensuite.nights).toEqual([
       { date: '2026-11-06', state: 'booked' },
@@ -312,6 +314,7 @@ describe('RAC availability: Busselton, 6–8 Nov 2026', () => {
     ]);
     expect(ensuite.fullyAvailable).toBe(false);
     expect(ensuite.total).toBeUndefined();
+    expect(ensuite.freeCount).toBe(0);
   });
 
   it("links each category to RAC's booking page for it, and the place to its book-now page", () => {
