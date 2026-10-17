@@ -59,6 +59,24 @@ import { effectiveIntervalMinutes, nextCheckAt } from './next-check';
 
 const log = logger.child({ module: 'watches' });
 
+/** A check's answer that was about the watch before an edit: nothing of it is kept. */
+export const WATCH_EDITED_DURING_CHECK =
+  'The watch was changed while it was being checked. It checks again now.';
+
+/**
+ * What a check asks about: the place, the stay, the units, the stay types and the stay
+ * fields. An edit to any of them makes the watch due at once (`update`).
+ */
+function checkedKey(watch: Watch): string {
+  return JSON.stringify([
+    watch.location.externalId,
+    watch.stay,
+    watch.unitIds,
+    watch.unitKinds,
+    watch.stayParams,
+  ]);
+}
+
 /** Why an automatic hold was not placed at a place with more than one stay type. */
 const MIXED_KINDS_NOTE =
   'Not held automatically: this place has more than one stay type. Choose one stay type or units to let WA Stay hold one.';
@@ -330,6 +348,10 @@ export class WatchService {
         { signal, ...(watch.unitIds.length > 0 ? { knownUnitIds: [...watch.unitIds] } : {}) }
       );
       if (signal?.aborted) return result({ error: 'The check was stopped' });
+      // Edited while the provider answered (another place, stay, units, stay types or stay
+      // fields): the answer is about what the watch was, so nothing of it is kept or sent.
+      // The edit made the watch due at once, so the next check asks about what it is now.
+      if (this.editedSince(watch)) return result({ error: WATCH_EDITED_DURING_CHECK });
 
       const units = wantedUnits(watch, availability.units);
       const full = fullMatches(watch, units);
@@ -405,6 +427,15 @@ export class WatchService {
   }
 
   // ---- internal helpers -------------------------------------------------------
+
+  /**
+   * Whether what a check asks about (`checkedKey`) has changed since `before` was read, or the
+   * watch is gone.
+   */
+  private editedSince(before: Watch): boolean {
+    const now = this.repo.findById(before.id);
+    return !now || checkedKey(now) !== checkedKey(before);
+  }
 
   private require(id: number): Watch {
     const watch = this.repo.findById(id);
