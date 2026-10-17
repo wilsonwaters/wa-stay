@@ -7,6 +7,10 @@
  *   for its provider) is not started again, and "check now" joins the run in flight.
  * - **Per provider.** At most `min(2, limits.maxConcurrentRequests)` checks run at once for a
  *   provider; the rest wait their turn in its limiter.
+ * - **Priority.** "Check now" asks at interactive priority, the due loop at background
+ *   (`withRequestPriority`). The limiter is called in that scope, so "Check now" goes ahead of
+ *   due checks waiting for the provider; the task sets it again, so a check keeps its own
+ *   priority whichever check's end starts it.
  * - **Startup.** Watches that fell due while the app was closed are spread over two minutes.
  * - **Unknown provider.** A watch whose provider is not registered is marked in error once
  *   and never selected, so the loop does not spin on it.
@@ -18,6 +22,7 @@ import type { WatchService } from '../core/watches/watch.service';
 import { staggerOffsets } from '../core/watches/next-check';
 import type { ProviderRegistry } from '../providers/registry';
 import { createLimiter, type Limiter } from '../providers/sdk/concurrency';
+import { withRequestPriority } from '../providers/sdk/pacing';
 import { AppError } from '../utils/app-error';
 import { logger } from '../utils/logger';
 
@@ -125,10 +130,15 @@ export class WatchLoop {
 
   private launch(id: number, providerId: string, manual: boolean): Promise<WatchExecutionResult> {
     const controller = new AbortController();
-    const promise = this.limiterFor(providerId)(() => {
-      log.info(`Executing watch ${id}${manual ? ' (now)' : ''}`);
-      return this.watches.execute(id, { signal: controller.signal, manual });
-    });
+    const priority = manual ? 'interactive' : 'background';
+    const promise = withRequestPriority(priority, () =>
+      this.limiterFor(providerId)(() =>
+        withRequestPriority(priority, () => {
+          log.info(`Executing watch ${id}${manual ? ' (now)' : ''}`);
+          return this.watches.execute(id, { signal: controller.signal, manual });
+        })
+      )
+    );
     const run: WatchRun = { promise, controller };
     this.inFlight.set(id, run);
     promise

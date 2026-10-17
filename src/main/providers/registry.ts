@@ -106,6 +106,14 @@ export const MANIFEST_RULES: readonly ManifestRule[] = [
         : undefined;
     },
   },
+  {
+    rule: 'minRequestIntervalMs needs maxConcurrentRequests 1',
+    // A paced provider's requests go one at a time (`sdk/pacing.ts`).
+    violation: ({ limits }) =>
+      limits?.minRequestIntervalMs && limits.maxConcurrentRequests !== 1
+        ? `limits.minRequestIntervalMs needs limits.maxConcurrentRequests 1, not ${limits.maxConcurrentRequests}`
+        : undefined,
+  },
 ];
 
 function isHttpsUrl(value: unknown): boolean {
@@ -374,7 +382,8 @@ export class ProviderRegistry {
 
   /**
    * The provider's HTTP client (its context's `http`): bound to the provider's session
-   * partition, the one its sign-in and payment windows share. The account service asks a
+   * partition, the one its sign-in and payment windows share, and paced when the provider is,
+   * so a check through it waits in the provider's queue. The account service asks a
    * provider's `auth.isSignedIn` with it. Throws `UnknownProviderError`.
    */
   httpOf(id: ProviderId): HttpClient {

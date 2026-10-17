@@ -24,6 +24,11 @@
  *   locations at all (a first launch offline), a failed automatic sync is retried after
  *   1, 2 and 5 minutes before the hourly schedule takes over. Manual refresh always runs.
  * - **Freshness.** A timestamp in the future (the clock was set back) counts as stale.
+ * - **Pacing.** A detail, a location's check and bulk availability are asked at interactive
+ *   priority (`withRequestPriority`: the person is waiting); syncs and searches stay
+ *   background. A paced provider's deadline grows with the requests a call may wait for
+ *   (`pacedDeadlineMs`): 2 for a detail or a check (its own and one in flight ahead of it),
+ *   one per stored place for bulk availability and for a sync.
  *
  * - **Search-mode catalogues** (`catalogMode: 'search'`, §12.30) cannot list every location,
  *   so they are never synced. A `search` with a map area (`bbox`) asks each of them in scope
@@ -90,6 +95,7 @@ import type { ProviderRegistry } from '../../providers/registry';
 import type { ProviderLogger } from '../../providers/sdk/context';
 import { createLimiter, type Limiter } from '../../providers/sdk/concurrency';
 import { sanitizeProviderHtml } from '../../providers/sdk/html';
+import { withRequestPriority } from '../../providers/sdk/pacing';
 import type {
   AccommodationProvider,
   FullCatalogModule,
@@ -101,6 +107,7 @@ import { AppError } from '../../utils/app-error';
 import {
   catalogErrorCode,
   errorMessage,
+  pacedDeadlineMs,
   stayCacheKey,
   summaryFromHtml,
   withDeadline,
@@ -470,7 +477,12 @@ export class LocationCatalogService {
   }
 
   private hasRows(id: ProviderId): boolean {
-    return (this.locations.countByProvider()[id] ?? 0) > 0;
+    return this.storedCount(id) > 0;
+  }
+
+  /** How many of the provider's locations are stored. */
+  private storedCount(id: ProviderId): number {
+    return this.locations.countByProvider()[id] ?? 0;
   }
 
   private syncProvider(provider: AccommodationProvider, force: boolean): Promise<void> {
@@ -480,22 +492,37 @@ export class LocationCatalogService {
     if (this.stopped || !this.syncableMode(provider)) return Promise.resolve();
     if (!force && this.isFresh(provider, this.syncState(id))) return Promise.resolve();
 
-    const run = this.runSync(id, provider.catalog as FullCatalogModule).finally(() => {
+    const run = this.runSync(provider, provider.catalog as FullCatalogModule).finally(() => {
       this.syncs.delete(id);
     });
     this.syncs.set(id, run);
     return run;
   }
 
-  /** One sync. Resolves either way; a failure is recorded, never thrown. */
-  private async runSync(id: ProviderId, catalog: FullCatalogModule): Promise<void> {
+  /**
+   * One sync, in the background. Resolves either way; a failure is recorded, never thrown. A
+   * paced provider's deadline allows a request per stored place.
+   */
+  private async runSync(
+    provider: AccommodationProvider,
+    catalog: FullCatalogModule
+  ): Promise<void> {
+    const id = provider.manifest.id;
     try {
-      const listed = await withDeadline(id, this.timings.syncTimeoutMs, this.lifetime.signal, (s) =>
+      const deadlineMs = pacedDeadlineMs(
+        this.timings.syncTimeoutMs,
+        providerLimits(provider.manifest),
+        {
+          requests: this.storedCount(id),
+          priority: 'background',
+        }
+      );
+      const listed = await withDeadline(id, deadlineMs, this.lifetime.signal, (s) =>
         catalog.listLocations(s)
       );
       if (this.stopped) return;
       if (!Array.isArray(listed)) throw new Error(`${id} did not list its locations`);
-      const cached = this.locations.countByProvider()[id] ?? 0;
+      const cached = this.storedCount(id);
       if (listed.length === 0 && cached > 0) {
         throw new Error(`${id} listed no locations; the ${cached} cached ones are kept`);
       }
@@ -922,15 +949,23 @@ export class LocationCatalogService {
     previous: ProviderLocationDetail | undefined
   ): Promise<ProviderLocationDetail> {
     const { providerId, externalId } = summary;
-    const fetched = await withDeadline(
-      providerId,
+    // The person is waiting (the place page): interactive, and a paced provider's deadline
+    // allows for its own request and one already in flight.
+    const deadlineMs = pacedDeadlineMs(
       this.timings.detailTimeoutMs,
-      this.lifetime.signal,
-      (signal) =>
+      providerLimits(provider.manifest),
+      {
+        requests: 2,
+        priority: 'interactive',
+      }
+    );
+    const fetched = await withDeadline(providerId, deadlineMs, this.lifetime.signal, (signal) =>
+      withRequestPriority('interactive', () =>
         provider.catalog!.getLocation(externalId, signal, {
           summary,
           ...(previous ? { previous } : {}),
         })
+      )
     );
     const at = this.clock();
     // Defence in depth: whatever the provider did, main sanitises before IPC.
@@ -999,7 +1034,7 @@ export class LocationCatalogService {
     const settled = await Promise.allSettled(
       providers.map((p) =>
         this.bulkFor(
-          p.manifest.id,
+          p,
           (signal) => p.availability.search(stay, signal),
           stayKeyFor(stay, p.manifest.bulkAvailabilityStayFields)
         )
@@ -1029,15 +1064,17 @@ export class LocationCatalogService {
   }
 
   /**
-   * One provider's bulk availability for a stay: cached, single-flight, with a deadline. An
+   * One provider's bulk availability for a stay: cached, single-flight, interactive (Explore
+   * is waiting), with a deadline that allows a paced provider a request per stored place. An
    * `access-gate` or `timeout` failure is cached too (for `bulkErrorTtlMs`), so while a
    * queue is up the provider is not asked again for every map pan.
    */
   private bulkFor(
-    providerId: ProviderId,
+    provider: AccommodationProvider,
     search: (signal: AbortSignal) => Promise<BulkAvailabilityEntry[]>,
     stayKey: string
   ): Promise<BulkAvailabilityEntry[]> {
+    const providerId = provider.manifest.id;
     const key = `${providerId}|${stayKey}`;
     const hit = this.bulkCache.get(key);
     if (hit && this.within(hit.at, this.timings.bulkTtlMs)) return Promise.resolve(hit.value);
@@ -1048,11 +1085,13 @@ export class LocationCatalogService {
     const running = this.bulk.get(key);
     if (running) return running;
 
-    const run = withDeadline(
-      providerId,
+    const deadlineMs = pacedDeadlineMs(
       this.timings.availabilityTimeoutMs,
-      this.lifetime.signal,
-      search
+      providerLimits(provider.manifest),
+      { requests: this.storedCount(providerId), priority: 'interactive' }
+    );
+    const run = withDeadline(providerId, deadlineMs, this.lifetime.signal, (signal) =>
+      withRequestPriority('interactive', () => search(signal))
     )
       .then(
         (entries) => {
@@ -1075,9 +1114,9 @@ export class LocationCatalogService {
   }
 
   /**
-   * One location's availability for `stay`, unit by unit and night by night. Reused for
-   * 60 s per location and stay. Throws `UnknownProviderError`, `ProviderCapabilityError` or
-   * the provider's error.
+   * One location's availability for `stay`, unit by unit and night by night (interactive: the
+   * place page is waiting). Reused for 60 s per location and stay. Throws
+   * `UnknownProviderError`, `ProviderCapabilityError` or the provider's error.
    */
   checkLocation(key: string, stay: StayQuery): Promise<LocationAvailability> {
     const { providerId, externalId } = parseLocationKey(key);
@@ -1088,11 +1127,15 @@ export class LocationCatalogService {
     const running = this.checks.get(cacheKey);
     if (running) return running;
 
-    const run = withDeadline(
-      providerId,
+    const deadlineMs = pacedDeadlineMs(
       this.timings.availabilityTimeoutMs,
-      this.lifetime.signal,
-      (signal) => provider.availability.check(externalId, stay, { signal })
+      providerLimits(provider.manifest),
+      { requests: 2, priority: 'interactive' }
+    );
+    const run = withDeadline(providerId, deadlineMs, this.lifetime.signal, (signal) =>
+      withRequestPriority('interactive', () =>
+        provider.availability.check(externalId, stay, { signal })
+      )
     )
       .then((availability) => {
         this.remember(this.checkCache, cacheKey, availability, this.timings.checkTtlMs);

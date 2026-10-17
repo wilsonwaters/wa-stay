@@ -126,6 +126,12 @@ export interface ProviderLimits {
   maxConcurrentRequests: number;
   /** How long a synced catalogue stays fresh. */
   catalogTtlHours: number;
+  /**
+   * Polite pacing: the core sends the provider's requests one at a time, starting each at
+   * least this long (ms, 0–60 000) after the previous one ended; a request the person
+   * triggered waits a shorter gap. 0 or absent: unpaced. Needs `maxConcurrentRequests: 1`.
+   */
+  minRequestIntervalMs?: number;
 }
 
 export const DEFAULT_PROVIDER_LIMITS: Readonly<ProviderLimits> = Object.freeze({
@@ -508,6 +514,7 @@ export const ProviderLimitsSchema = z.object({
     .number()
     .positive()
     .max(24 * 30),
+  minRequestIntervalMs: z.number().int().min(0).max(60_000).optional(),
 });
 assertTypeEquals<z.input<typeof ProviderLimitsSchema>, ProviderLimits>(true);
 assertTypeEquals<z.output<typeof ProviderLimitsSchema>, ProviderLimits>(true);

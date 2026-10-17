@@ -1,6 +1,7 @@
 /**
  * The per-provider context: KV store, scoped secrets (ciphertext only, per provider),
- * child logger, browser automation with a per-provider profile, id validation.
+ * child logger, browser automation with a per-provider profile, id validation, and an http
+ * paced by the core when the manifest sets `limits.minRequestIntervalMs`.
  */
 
 import path from 'path';
@@ -14,8 +15,10 @@ import {
   type ProviderContextDeps,
   type ScopedSecretVault,
 } from '@main/providers/sdk';
+import { parkstayManifest } from '@main/providers/parkstay';
 import { DEFAULT_PROVIDER_LIMITS } from '@shared/types/provider.types';
 import { createMemoryLogger, TEST_PROVIDERS_DIR, testManifest } from '@tests/utils/fake-provider';
+import { RecordingHttpClient } from '@tests/utils/fake-paced-provider';
 import { removeUserData, testVault, type TestVault } from '@tests/utils/fake-safe-storage';
 
 function deps(overrides: Partial<ProviderContextDeps> = {}): ProviderContextDeps {
@@ -289,5 +292,66 @@ describe('createProviderContext', () => {
     const ctx = createProviderContext(testManifest('fake'), deps());
     expect(ctx.limits).toEqual(DEFAULT_PROVIDER_LIMITS);
     expect(Object.isFrozen(ctx.limits)).toBe(true);
+  });
+});
+
+describe('createProviderContext: request pacing', () => {
+  const pacedManifest = (minRequestIntervalMs?: number) =>
+    testManifest('paced', {
+      limits: {
+        minWatchIntervalMinutes: 15,
+        maxConcurrentRequests: 1,
+        catalogTtlHours: 24,
+        ...(minRequestIntervalMs === undefined ? {} : { minRequestIntervalMs }),
+      },
+    });
+
+  afterEach(() => jest.useRealTimers());
+
+  /** Sends two background requests through `ctx.http`; returns the gap between them (ms). */
+  async function gapBetweenTwo(
+    http: { getJson(url: string): Promise<unknown> },
+    inner: RecordingHttpClient
+  ) {
+    void http.getJson('https://paced.example/a');
+    void http.getJson('https://paced.example/b');
+    await jest.advanceTimersByTimeAsync(60_000);
+    expect(inner.requests).toHaveLength(2);
+    return inner.requests[1].sentAt - inner.requests[0].endedAt!;
+  }
+
+  it('paces the http with the limit: one request at a time, 10 s apart', async () => {
+    jest.useFakeTimers();
+    const inner = new RecordingHttpClient({ providerId: 'paced', delayMs: 2_000 });
+    const ctx = createProviderContext(pacedManifest(10_000), deps({ createHttp: () => inner }));
+
+    expect(ctx.http).not.toBe(inner);
+    expect(ctx.http.providerId).toBe('paced');
+    expect(ctx.http.cookies).toBe(inner.cookies);
+    expect(ctx.limits.minRequestIntervalMs).toBe(10_000);
+    expect(await gapBetweenTwo(ctx.http, inner)).toBe(10_000);
+    expect(inner.peakInFlight).toBe(1);
+  });
+
+  it('does not pace with unpaced (fixture mode), without the limit, or with a limit of 0', async () => {
+    jest.useFakeTimers();
+    for (const [manifest, unpaced] of [
+      [pacedManifest(10_000), true],
+      [pacedManifest(), false],
+      [pacedManifest(0), false],
+    ] as const) {
+      const inner = new RecordingHttpClient({ providerId: 'paced', delayMs: 2_000 });
+      const ctx = createProviderContext(manifest, deps({ createHttp: () => inner, unpaced }));
+      expect(ctx.http).toBe(inner);
+      // Both go at once
+      expect(await gapBetweenTwo(ctx.http, inner)).toBe(-2_000);
+    }
+  });
+
+  it("ParkStay's context http is the inner client, unwrapped", () => {
+    const inner = new NodeHttpClient({ providerId: 'parkstay' });
+    const ctx = createProviderContext(parkstayManifest, deps({ createHttp: () => inner }));
+    expect(parkstayManifest.limits?.minRequestIntervalMs).toBeUndefined();
+    expect(ctx.http).toBe(inner);
   });
 });

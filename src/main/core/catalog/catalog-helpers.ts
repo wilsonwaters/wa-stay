@@ -1,15 +1,37 @@
 /**
- * Pure helpers for the location catalogue service: deadlines on provider calls, error codes
- * for per-provider failures, cache keys for stays, and summaries derived from descriptions.
+ * Pure helpers for the location catalogue service: deadlines on provider calls (grown for a
+ * paced provider), error codes for per-provider failures, cache keys for stays, and
+ * summaries derived from descriptions.
  */
 
 import sanitizeHtml from 'sanitize-html';
 import type { CatalogErrorCode } from '@shared/types/catalog.types';
-import type { ProviderId, StayQuery } from '@shared/types/provider.types';
+import type { ProviderId, ProviderLimits, StayQuery } from '@shared/types/provider.types';
 import { createAbortError, ProviderError } from '../../providers/sdk/errors';
+import type { RequestPriority } from '../../providers/sdk/http';
+import { pacedGapMs } from '../../providers/sdk/pacing';
 
 /** How long a derived summary may be (architecture-notes §5: FTS indexes it). */
 export const DERIVED_SUMMARY_LENGTH = 200;
+
+/** What a paced provider's deadline allows for each request, beyond its gap. */
+export const PACED_REQUEST_ALLOWANCE_MS = 10_000;
+
+/**
+ * A provider call's deadline. `baseMs` for an unpaced provider; for a paced one (its
+ * `minRequestIntervalMs` above 0), `baseMs` plus, for each of the call's `requests` (at least
+ * 1), the gap before it at `priority` (`pacedGapMs`) and `PACED_REQUEST_ALLOWANCE_MS`.
+ */
+export function pacedDeadlineMs(
+  baseMs: number,
+  limits: Pick<ProviderLimits, 'minRequestIntervalMs'>,
+  { requests, priority }: { requests: number; priority: RequestPriority }
+): number {
+  const intervalMs = limits.minRequestIntervalMs ?? 0;
+  if (intervalMs <= 0) return baseMs;
+  const perRequest = pacedGapMs(intervalMs, priority) + PACED_REQUEST_ALLOWANCE_MS;
+  return baseMs + Math.max(1, requests) * perRequest;
+}
 
 /** The error a provider call rejects with when it misses its deadline. */
 export function deadlineError(providerId: ProviderId, ms: number): ProviderError {

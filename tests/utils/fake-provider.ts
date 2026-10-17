@@ -14,7 +14,9 @@
  * Knobs:
  * - `failNext(module, error)`: the next call into that module rejects with `error`;
  * - `delayMs`: every async call waits this long first (abortable); `delays` per module;
- * - `calls`: every call, in order, with its `signal`;
+ * - `limits`: replaces parts of the manifest's limits;
+ * - `calls`: every call, in order, with its `signal` and the ambient request priority it was
+ *   made at (`currentRequestPriority()`, what a paced `ctx.http` would send it with);
  * - `peakInFlight(module)`: the most calls into the module at once;
  * - `accessStates`: the states the access gate steps through on `ensure()`;
  * - `availability`: a state per unit for every night, or a list of nights (state and price);
@@ -31,6 +33,7 @@ import path from 'path';
 import {
   AccessGateError,
   createAbortError,
+  currentRequestPriority,
   defineProvider,
   FakeSecretVault,
   InMemoryKeyValueStore,
@@ -50,6 +53,7 @@ import {
   type ProviderContext,
   type ProviderFactory,
   type ProviderLogger,
+  type RequestPriority,
 } from '@main/providers/sdk';
 import type {
   AccessState,
@@ -60,6 +64,7 @@ import type {
   NightState,
   NightStatus,
   ProviderCapabilities,
+  ProviderLimits,
   ProviderManifest,
   StayQuery,
   UnitKind,
@@ -76,6 +81,8 @@ export interface FakeCall {
   method: string;
   args: unknown[];
   signal?: AbortSignal;
+  /** The ambient request priority when it was called (the fake's own modules record it). */
+  priority?: RequestPriority;
 }
 
 /**
@@ -123,6 +130,8 @@ export interface FakeProviderOptions {
   delayMs?: number;
   /** Per-module delays, instead of `delayMs`. */
   delays?: Partial<Record<FakeModule, number>>;
+  /** Replaces parts of the manifest's limits (5 min watches, 2 at once, a 1 h catalogue). */
+  limits?: Partial<ProviderLimits>;
   /** The manifest's `bulkAvailabilityStayFields` (every stay field when absent). */
   bulkAvailabilityStayFields?: ProviderManifest['bulkAvailabilityStayFields'];
   /** A search-mode catalogue's `searchArea` page size (default 2). */
@@ -232,7 +241,12 @@ export function createFakeProvider(options: FakeProviderOptions = {}): FakeProvi
     timezone: 'Australia/Perth',
     currency: 'AUD',
     capabilities,
-    limits: { minWatchIntervalMinutes: 5, maxConcurrentRequests: 2, catalogTtlHours: 1 },
+    limits: {
+      minWatchIntervalMinutes: 5,
+      maxConcurrentRequests: 2,
+      catalogTtlHours: 1,
+      ...options.limits,
+    },
     ...(options.bulkAvailabilityStayFields
       ? { bulkAvailabilityStayFields: options.bulkAvailabilityStayFields }
       : {}),
@@ -280,7 +294,7 @@ export function createFakeProvider(options: FakeProviderOptions = {}): FakeProvi
     args: unknown[],
     signal?: AbortSignal
   ): Promise<void> {
-    calls.push({ module, method, args, signal });
+    calls.push({ module, method, args, signal, priority: currentRequestPriority() });
     const now = (active.get(module) ?? 0) + 1;
     active.set(module, now);
     peaks.set(module, Math.max(peaks.get(module) ?? 0, now));

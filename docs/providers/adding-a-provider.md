@@ -322,10 +322,29 @@ context gives the effective values as `ctx.limits`.
 | Limit | What reads it |
 | --- | --- |
 | `minWatchIntervalMinutes` | The watch form offers no shorter interval, and the scheduler runs a shorter stored one at this interval (`core/watches/next-check.ts`). |
-| `maxConcurrentRequests` | The watch loop runs at most `min(2, maxConcurrentRequests)` checks at once for the provider, and a `search` catalogue's area searches stay within it. **Your module enforces it for every request it sends**, with `createLimiter` from the SDK: Example Parks sends its catalogue, availability, hold and sign-in check requests through one limiter, reading each answer inside it, and the scaffold's API provider limits its requests the same way. A browser provider's `withPage` calls already run one at a time. |
+| `maxConcurrentRequests` | The watch loop runs at most `min(2, maxConcurrentRequests)` checks at once for the provider, and a `search` catalogue's area searches stay within it. **Your module enforces it for every request it sends**, with `createLimiter` from the SDK: Example Parks sends its catalogue, availability, hold and sign-in check requests through one limiter, reading each answer inside it, and the scaffold's API provider limits its requests the same way. A limiter starts the tasks the person is waiting on before background ones ([pacing](#limits)). A browser provider's `withPage` calls already run one at a time. |
 | `catalogTtlHours` | How long a synced catalogue stays fresh before the catalogue service syncs it again; for a `search` catalogue, how long an area or text search is not repeated. |
+| `minRequestIntervalMs` | Optional, 0 to 60 000 ms; 0 or absent leaves the provider unpaced. For a site that asks for a gap between automated requests (a `Crawl-delay`, or its terms), the core paces `ctx.http` itself: one request in flight, each starting only this long after the previous one ended. It needs `maxConcurrentRequests: 1`, or the provider does not register. |
 
 A browser provider should use `maxConcurrentRequests: 1` and generous intervals.
+
+**Pacing.** With `minRequestIntervalMs`, the core keeps the provider to one request in flight
+through one queue: the clients `ctx.http.withDefaults` returns and the sign-in check's client
+share it, and a redirect chain counts as one request. Requests the person is waiting on (a
+place's page and its check, Explore's availability for their dates, "Check now" on a watch) are
+`interactive`: they go ahead of waiting background requests, after a 1 s gap. Everything else
+(the catalogue sync, scheduled watch checks, snipes, the sign-in check) is `background` and
+waits the full gap. The core labels each call's requests itself, so your module needs no
+change; `HttpRequestOptions.priority` (`'interactive'` or `'background'`) overrides the label
+for one request. Long-lived work your module starts during an interactive call (a timer, a
+keep-alive) inherits the interactive priority, so pass `priority: 'background'` for its
+requests. A request's `timeoutMs` counts from when it is sent, not while it waits, and an
+aborted `signal` takes a waiting request out of the queue at once. A module's own
+`createLimiter` honours priorities as well: it starts a waiting interactive task before waiting
+background ones (first in, first out within each), and the task keeps its caller's priority,
+so the person's request still goes next. Pacing covers `ctx.http` only, not `ctx.browser`'s
+pages, and fixture mode is never paced. Each call's deadline grows with the gaps it may wait
+([timeouts](#timeouts)), so ask for as few requests per call as you can.
 
 ### Stay fields
 
@@ -1350,10 +1369,12 @@ after the access gate's; the registry also closes your browser.
 ### Timeouts
 
 The core bounds every call it makes to a provider. These are fixed, the same for every
-provider: the manifest's `limits` set how often and how many, not how long. Keep each call well
-inside its bound; a call that runs over is aborted through its `signal`. The catalogue's bounds
-are `DEFAULT_CATALOG_TIMINGS` in `src/main/core/catalog/location-catalog.service.ts`, and the
-sign-in check's is `DEFAULT_ACCOUNT_TIMINGS` in `src/main/core/accounts/provider-account.service.ts`.
+provider, except that a paced provider's grow with its gaps (below): the manifest's `limits`
+set how often and how many, not how long. Keep each call well inside its bound; a call that
+runs over is aborted through its `signal`. The catalogue's bounds are `DEFAULT_CATALOG_TIMINGS`
+in `src/main/core/catalog/location-catalog.service.ts` (a paced provider's from
+`pacedDeadlineMs` in `catalog-helpers.ts` beside it), and the sign-in check's is
+`DEFAULT_ACCOUNT_TIMINGS` in `src/main/core/accounts/provider-account.service.ts`.
 
 | Call | Bound | What happens then |
 | --- | --- | --- |
@@ -1366,6 +1387,15 @@ sign-in check's is `DEFAULT_ACCOUNT_TIMINGS` in `src/main/core/accounts/provider
 | One `ctx.browser.withPage` call | 60 s (`timeoutMs`) | Playwright's `TimeoutError`. |
 | A sign-in check (`isSignedIn`), `probeTimeoutMs` | 15 s | The account shows as unknown, never signed out. |
 | A watch check, a hold | none from the core | Only your own request and page timeouts apply. |
+
+A paced provider's catalogue bounds (`minRequestIntervalMs` above 0) grow with the gaps a call
+may wait: for each request the call counts, the bound adds the gap before it (1 s for the
+person's requests, the provider's own interval for background ones) and a 10 s allowance. A
+place's detail and its check count 2 requests (their own and one already in flight ahead of
+them); Explore's availability (bulk `availability.search`) and a `full` catalogue sync count one
+per stored place, and at least 1. With a 10 s interval and 8 places, Explore's availability gets
+20 s + 8 × 11 s = 108 s, and a sync 60 s + 8 × 20 s = 220 s. A `search` catalogue's pages and
+the sign-in check keep their bounds.
 
 Other timings from the same table: the first sync starts once the window has been open for
 5 s (`startDelayMs`), stale catalogues are looked at every 60 minutes (`recheckMs`), a detail is
@@ -1386,6 +1416,9 @@ never for a time.
 - **HTTP 429** reaches the person as `RATE_LIMITED`, and is never retried at once. The core does
   not read `Retry-After` (`ProviderHttpError` does not keep headers). If the provider asks you
   to slow down, raise `minWatchIntervalMinutes`, lower `maxConcurrentRequests`, and fetch less.
+  If it asks for a gap between requests, set `minRequestIntervalMs` with
+  `maxConcurrentRequests: 1`: the core then sends one request at a time, the person's first
+  after a 1 s gap, and background work after the full gap ([pacing](#limits)).
 - **Do not retry in a loop inside a module**, and never sleep and try again. Throw a
   `ProviderError` with a message the person can act on, and let the next scheduled run try.
 
@@ -1444,10 +1477,10 @@ personal detail.
 
 `FixtureHttpClient` (`src/main/testing/fixture-http-client.ts`) answers requests from recorded
 responses: a folder per provider with a `manifest.json` of routes (`method`, `path`, and
-optionally `query`, `status`, `contentType`) and the files they name. The host is not compared,
-so any https address does, and a request that no route answers fails without being sent
-([the route format](../../tests/e2e/fixtures/http/README.md#manifest)). It is the client the app
-uses in fixture mode, so the same format serves Jest and the Electron smoke tests:
+optionally `query`, `form`, `status`, `contentType`) and the files they name. The host is not
+compared, so any https address does, and a request that no route answers fails without being
+sent ([the route format](../../tests/e2e/fixtures/http/README.md#manifest)). It is the client
+the app uses in fixture mode, so the same format serves Jest and the Electron smoke tests:
 
 <!-- region: tests/unit/docs/example-providers.test.ts#test-fixtures -->
 
@@ -1470,9 +1503,11 @@ function fixtureContext(manifest: ProviderManifest) {
 
 A route with `query` answers only a request with those values, so a fixture can prove the
 provider sent the right parameters (Example Parks' availability route answers only
-`siteType=powered` for the stay). When a test needs answers that differ for the same request
-(a refusal, a slow server, a wrong shape), serve them from a loopback server with
-`NodeHttpClient`, as the example's tests do.
+`siteType=powered` for the stay). A route with `form` answers only a request whose body, read
+as a form (`postForm`), has those fields, so POSTs to one address are told apart by what they
+send. When a test needs answers that differ for the same request (a refusal, a slow server, a
+wrong shape), serve them from a loopback server with `NodeHttpClient`, as the example's tests
+do.
 
 ### The contract suite
 

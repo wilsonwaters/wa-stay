@@ -17,6 +17,7 @@ export * from './errors';
 export * from './net-errors';
 export * from './manifest';
 export * from './concurrency';
+export * from './pacing';
 export * from './user-agent';
 export * from './html';
 export * from './url-patterns';
