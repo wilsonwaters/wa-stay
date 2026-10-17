@@ -96,6 +96,7 @@ describe('desktop notifications', () => {
     openExternal = jest.fn(() => Promise.resolve());
     service = new NotificationService(repo, undefined, events, {
       providerName: (id) => registry.tryGet(id)?.manifest.shortName,
+      providerManifest: (id) => registry.tryGet(id)?.manifest,
       showMainWindow,
       openExternal,
     });
@@ -268,6 +269,25 @@ describe('desktop notifications', () => {
         ['info', 'warn', 'error', 'debug'].map((level) => mockLog[level].mock.calls)
       );
       expect(logged).not.toMatch(/search-availability|campground_id|arrival=/);
+    });
+
+    it("never opens a link off the provider's site, checked again against its manifest", async () => {
+      await service.notifyWatchFound(ospreyBay, [match], undefined, 'https://evil.test/cart?add=7');
+      click();
+      // A provider the registry does not know cannot vouch for any link
+      await service.notifyWatchFound(
+        { ...ospreyBay, providerId: 'gone' },
+        [match],
+        undefined,
+        BOOKING_URL
+      );
+      click();
+      await settle();
+
+      expect(navigations()).toHaveLength(2);
+      expect(openExternal).not.toHaveBeenCalled();
+      expect(mockLog.warn).toHaveBeenCalledWith(expect.stringContaining('https://evil.test'));
+      expect(JSON.stringify(mockLog.warn.mock.calls)).not.toContain('cart?add');
     });
 
     it('never opens a link that is not https, or one without a booking page', async () => {

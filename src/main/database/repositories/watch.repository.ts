@@ -327,6 +327,20 @@ export class WatchRepository extends BaseRepository<Watch> {
     this.db.prepare('UPDATE watches SET last_error = ? WHERE id = ?').run(error ?? null, id);
   }
 
+  /**
+   * Forgets what the last check saw (its result, units and time), as for a watch moved to
+   * another place: those units were the old place's. A held or booked watch keeps all of it:
+   * its hold, and the held unit's name, are the old place's.
+   */
+  forgetLastCheck(id: number): void {
+    this.db
+      .prepare(
+        `UPDATE watches SET last_result = NULL, last_availability = NULL, last_checked_at = NULL
+         WHERE id = ? AND (last_result IS NULL OR last_result NOT IN (?, ?))`
+      )
+      .run(id, WatchResult.HELD, WatchResult.BOOKED);
+  }
+
   /** The last result alone (an unknown provider, found when the scheduler starts). */
   setLastResult(id: number, result: WatchResult): void {
     this.db.prepare('UPDATE watches SET last_result = ? WHERE id = ?').run(result, id);

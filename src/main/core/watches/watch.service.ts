@@ -180,6 +180,11 @@ export class WatchService {
       );
     }
     this.repo.update(id, prepared);
+    // Another place: the stored check (result, units) was the old place's, and would give the
+    // new one the old place's booking link, even while the watch is paused and not checked
+    if (updates.location && updates.location.externalId !== watch.location.externalId) {
+      this.repo.forgetLastCheck(id);
+    }
     const reschedule =
       updates.location !== undefined ||
       updates.stay !== undefined ||
@@ -410,9 +415,19 @@ export class WatchService {
     return watch;
   }
 
-  /** The watch as the renderer gets it: with its booking link, when it has one. */
+  /**
+   * The watch as the renderer gets it: with its booking link, when it has one. A stored check
+   * that cannot be read (a malformed row) gives no link, never a failed read.
+   */
   private present(watch: Watch): Watch {
-    const bookingLink = this.bookingLinkOf(watch);
+    let bookingLink: WatchBookingLink | undefined;
+    try {
+      bookingLink = this.bookingLinkOf(watch);
+    } catch (error) {
+      log.debug(
+        `Watch ${watch.id}: no booking link, its last check could not be read (${error instanceof Error ? error.name : 'error'})`
+      );
+    }
     return bookingLink ? { ...watch, bookingLink } : watch;
   }
 
@@ -435,7 +450,8 @@ export class WatchService {
       lastResult === WatchResult.FOUND
         ? fullMatches(watch, units)[0]
         : longestRun(partialMatches(watch, units));
-    return match ? matchedStayLink(provider, watch, match, units) : undefined;
+    // Quiet: this runs on every read; the alert already logged what it refused
+    return match ? matchedStayLink(provider, watch, match, units, { quiet: true }) : undefined;
   }
 
   private assertAutoHold(provider: WatchProvider, autoHold: boolean | undefined): void {

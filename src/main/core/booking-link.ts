@@ -26,6 +26,14 @@ const log = logger.child({ module: 'booking-link' });
 /** What a booking link is checked against: the provider's id (for logs) and website. */
 export type BookingLinkManifest = Pick<ProviderManifest, 'id' | 'website'>;
 
+/**
+ * `quiet`: log nothing. For the watch reads (`get`, `list`, `watch:updated`), which derive the
+ * link again on every refresh; only the alert path logs what it refused.
+ */
+export interface BookingLinkOptions {
+  quiet?: boolean;
+}
+
 /** What `matchedStayLink` needs from a provider. */
 export type BookingLinkProvider = { manifest: BookingLinkManifest } & Pick<
   AccommodationProvider,
@@ -69,11 +77,13 @@ export function isProviderBookingLink(
 
 /**
  * The first candidate that is a booking link of the provider (normalised), or undefined. Empty
- * candidates are passed over; refused ones are logged once per call, by origin only.
+ * candidates are passed over; refused ones are logged once per call, by origin only (unless
+ * `quiet`).
  */
 export function firstBookingLink(
   manifest: BookingLinkManifest,
-  candidates: ReadonlyArray<string | null | undefined>
+  candidates: ReadonlyArray<string | null | undefined>,
+  { quiet = false }: BookingLinkOptions = {}
 ): string | undefined {
   const refused: string[] = [];
   let found: string | undefined;
@@ -85,7 +95,7 @@ export function firstBookingLink(
     }
     refused.push(describeUrl(candidate));
   }
-  if (refused.length > 0) {
+  if (refused.length > 0 && !quiet) {
     log.warn(`${manifest.id}: skipped booking links off its site: ${refused.join(', ')}`);
   }
   return found;
@@ -95,13 +105,14 @@ export function firstBookingLink(
  * The booking link for a stay a watch found, and the stay it is for. Candidates, in order:
  * for a full match, the matched unit's own `bookingUrl` (from `units`, the check's units);
  * then `links.booking` for the match's stay (a partial match's run, with its dates) and unit.
- * Undefined when neither is a booking link of the provider.
+ * Undefined when neither is a booking link of the provider. `quiet` logs nothing (the reads).
  */
 export function matchedStayLink(
   provider: BookingLinkProvider,
   watch: Pick<Watch, 'location' | 'stay' | 'stayParams'>,
   match: WatchMatch,
-  units: readonly UnitAvailability[]
+  units: readonly UnitAvailability[],
+  options: BookingLinkOptions = {}
 ): WatchBookingLink | undefined {
   const { manifest } = provider;
   const unitUrl = match.partial
@@ -115,10 +126,12 @@ export function matchedStayLink(
   try {
     stayUrl = provider.links.booking(watch.location.externalId, stay, match.unitId);
   } catch (error) {
-    log.warn(
-      `${manifest.id}: links.booking failed: ${error instanceof Error ? error.name : 'error'}`
-    );
+    if (!options.quiet) {
+      log.warn(
+        `${manifest.id}: links.booking failed: ${error instanceof Error ? error.name : 'error'}`
+      );
+    }
   }
-  const url = firstBookingLink(manifest, [unitUrl, stayUrl]);
+  const url = firstBookingLink(manifest, [unitUrl, stayUrl], options);
   return url ? { url, arrival: match.arrival, departure: match.departure } : undefined;
 }

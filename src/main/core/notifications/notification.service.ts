@@ -18,7 +18,7 @@ import { Notification as ElectronNotification } from 'electron';
 import { getBrandIconPath } from '../../app/paths';
 import { describeUrl } from '../../providers/sdk/url-patterns';
 import { logger } from '../../utils/logger';
-import { httpsLink } from '../booking-link';
+import { firstBookingLink, type BookingLinkManifest } from '../booking-link';
 import { longestRun } from '../watches/matching';
 
 const log = logger.child({ module: 'notifications' });
@@ -37,8 +37,10 @@ interface DispatchMeta {
   locationName?: string;
   /**
    * The provider's public booking page for what the alert found (`booking-link.ts`): the
-   * email's "Book on {shortName}" link, and a desktop click opens it in the browser. Never
-   * stored, in `notifications` or in the delivery log.
+   * email's "Book on {shortName}" link, and a desktop click opens it in the browser. It must
+   * be a booking link of the notification's provider (`isProviderBookingLink`: https on its
+   * own site); `notify` checks it against the provider's manifest again and drops it
+   * otherwise. Never stored, in `notifications` or in the delivery log.
    */
   bookingUrl?: string;
   /**
@@ -60,6 +62,9 @@ export interface NotificationSubject {
 /** A provider's short name (`ParkStay`), or undefined for an unknown provider. */
 export type ProviderNameResolver = (providerId: string) => string | undefined;
 
+/** A provider's manifest (its id and website), or undefined for an unknown provider. */
+export type ProviderManifestResolver = (providerId: string) => BookingLinkManifest | undefined;
+
 /** The person's notification preferences (Settings → Notifications). */
 export interface NotificationPreferences {
   /** Show an OS (desktop) notification. The in-app list, events and email are not affected. */
@@ -77,6 +82,11 @@ export const DEFAULT_NOTIFICATION_PREFERENCES: Readonly<NotificationPreferences>
 export interface NotificationServiceOptions {
   /** Resolves a provider's short name through the registry, for desktop titles. */
   providerName?: ProviderNameResolver;
+  /**
+   * Resolves a provider's manifest through the registry, to check an alert's booking link
+   * against its website. Without it (or for an unknown provider) alerts carry no link.
+   */
+  providerManifest?: ProviderManifestResolver;
   /**
    * The current preferences, read on every notification, so a change in Settings applies to
    * the next one with nothing to push. The container reads the stored settings.
@@ -124,6 +134,7 @@ export class NotificationService {
   private dispatcher: NotificationDispatcher | null = null;
   private events: EventSink | null = null;
   private readonly providerName: ProviderNameResolver;
+  private readonly providerManifest: ProviderManifestResolver;
   private readonly clock: () => Date;
   private readonly showMainWindow: () => boolean;
   private readonly openExternal: (url: string) => Promise<void>;
@@ -141,6 +152,7 @@ export class NotificationService {
     this.dispatcher = dispatcher || null;
     this.events = events || null;
     this.providerName = options.providerName ?? (() => undefined);
+    this.providerManifest = options.providerManifest ?? (() => undefined);
     this.clock = options.clock ?? (() => new Date());
     this.showMainWindow = options.showMainWindow ?? (() => false);
     this.openExternal = options.openExternal ?? (() => Promise.resolve());
@@ -156,7 +168,7 @@ export class NotificationService {
   async notify(input: NotificationInput, dispatchMeta?: DispatchMeta): Promise<Notification> {
     // Store notification in database
     const notification = this.notificationRepo.create(input);
-    const bookingUrl = httpsLink(dispatchMeta?.bookingUrl);
+    const bookingUrl = this.checkedBookingLink(input, dispatchMeta?.bookingUrl);
     const heldInApp = dispatchMeta?.heldInApp === true;
 
     // The OS notification, if the person wants them; its sound is the OS's own (`silent`). A
@@ -192,6 +204,20 @@ export class NotificationService {
     }
 
     return notification;
+  }
+
+  /**
+   * An alert's booking link, when it is one of the notification's provider (https on its own
+   * site, checked against its manifest), normalised; otherwise none (a refused one is logged by
+   * origin only).
+   */
+  private checkedBookingLink(
+    input: NotificationInput,
+    bookingUrl: string | undefined
+  ): string | undefined {
+    if (!bookingUrl || !input.providerId) return undefined;
+    const manifest = this.providerManifest(input.providerId);
+    return manifest ? firstBookingLink(manifest, [bookingUrl]) : undefined;
   }
 
   /**

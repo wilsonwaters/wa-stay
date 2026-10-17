@@ -8,6 +8,7 @@
  * made-up site (and the expectations below) with the real site's markup.
  */
 
+import { isProviderBookingLink } from '@main/core/booking-link';
 import { ProviderHttpError } from '@main/providers/sdk';
 import { ProviderRegistry } from '@main/providers/registry';
 // @if search
@@ -185,6 +186,8 @@ describe('{{NAME_JS}}', () => {
   it('has an https address, or fails loudly and opens no page while it is a placeholder', async () => {
     if ({{CONST}}_SITE_URL) {
       expect({{CONST}}_SITE_URL).toMatch(/^https:\/\//);
+      // The links are built on it, so it must be on the manifest's website, as booking links are
+      expect(isProviderBookingLink({{CAMEL}}Manifest, {{CONST}}_SITE_URL)).toBe(true);
       return;
     }
     const unsetBrowser = createFakeBrowser(render{{PASCAL}}Site, { providerId: '{{ID}}' });

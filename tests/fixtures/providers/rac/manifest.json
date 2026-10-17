@@ -1,0 +1,14 @@
+{
+  "routes": [
+    { "method": "GET", "path": "/busselton/book-now/", "file": "book-now-busselton.html" },
+    {
+      "method": "GET",
+      "path": "/margaret-river/book-now/",
+      "file": "book-now-margaret-river.html"
+    },
+    { "method": "GET", "path": "/blocked/403/", "status": 403, "file": "blocked-403.html" },
+    { "method": "GET", "path": "/blocked/429/", "status": 429, "file": "blocked-429.html" },
+    { "method": "GET", "path": "/blocked/challenge-503/", "status": 503, "file": "challenge.html" },
+    { "method": "GET", "path": "/blocked/challenge-200/", "file": "challenge.html" }
+  ]
+}

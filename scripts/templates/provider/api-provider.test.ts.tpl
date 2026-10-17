@@ -10,6 +10,7 @@
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
+import { isProviderBookingLink } from '@main/core/booking-link';
 import { ProviderHttpError } from '@main/providers/sdk';
 import { ProviderRegistry } from '@main/providers/registry';
 import { FixtureHttpClient } from '@main/testing/fixture-http-client';
@@ -199,6 +200,8 @@ describe('{{NAME_JS}}', () => {
     if ({{CONST}}_API_URL || {{CONST}}_SITE_URL) {
       expect({{CONST}}_API_URL).toMatch(/^https:\/\//);
       expect({{CONST}}_SITE_URL).toMatch(/^https:\/\//);
+      // The links are built on it, so it must be on the manifest's website, as booking links are
+      expect(isProviderBookingLink({{CAMEL}}Manifest, {{CONST}}_SITE_URL)).toBe(true);
       return;
     }
     const log = path.join(os.tmpdir(), `{{ID}}-placeholders-${process.pid}.log`);
