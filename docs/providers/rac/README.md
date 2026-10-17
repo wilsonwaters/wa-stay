@@ -19,6 +19,7 @@ answer an availability request with JSON, so no browser is driven.
 - [Pacing](#pacing)
 - [Releases](#releases)
 - [The member number](#the-member-number)
+- [The auto-cart experiment](#the-auto-cart-experiment)
 - [RAC's terms](#racs-terms)
 - [Data and images](#data-and-images)
 - [Tests](#tests)
@@ -35,9 +36,11 @@ answer an availability request with JSON, so no browser is driven.
 | `locationKinds` | holiday-park |
 | `timezone`, `currency` | `Australia/Perth`, `AUD` |
 | `limits` | watches every 15 min at most, 1 request in flight, 10 s between background requests (`minRequestIntervalMs`), catalogue fresh for 24 h |
-| `stayFields` | `pets` "Pets", 0–2, default 0 ("Up to 2, where pets are allowed."; availability, watches and snipes), sent to RAC as `animals` |
+| `stayFields` | `pets` "Pets", 0–2, default 0 ("Up to 2, where pets are allowed."; availability, watches and snipes), sent to RAC as `animals`; and for a hold only (the auto-cart, [below](#the-auto-cart-experiment)), a site's `equipmentType` "Equipment" (none, or one of NewBook's 15 types), `equipmentLength` and `equipmentWidth` in metres ("6.5") |
 | `bulkAvailabilityStayFields` | `arrival`, `departure`, `adults`, `children`, `infants`, `params.pets`: RAC's request carries the party and the pets, so a change to any asks again |
 | `releaseModes` | `daily_rollover` "When these dates open" and `scheduled` "At a time you set", each `maxWindowMinutes: 30` |
+| `experiments` | `autoCart` "Put stays in my RAC cart automatically", off by default; it turns on `holds` ([below](#the-auto-cart-experiment)) |
+| `holdRelease` | `true`: with the experiment on, "Let it go" takes the stay out of the cart |
 
 | Capability | | Module |
 | --- | --- | --- |
@@ -45,15 +48,16 @@ answer an availability request with JSON, so no browser is driven.
 | `availability` | yes | `availability.ts` and `mapping.ts`: one request per park and stay, every category night by night, with prices and RAC's stay rules |
 | `bulkAvailability` | yes | `bulk.ts`: Explore's free counts, one request per park |
 | `watches` | yes | uses `availability` |
-| `snipes` | yes (Site Sniper is marked "coming soon") | `release-policy.ts` and `release-calendar.ts`; every RAC snipe alerts |
-| `holds` | no | |
+| `snipes` | yes (Site Sniper is marked "coming soon") | `release-policy.ts` and `release-calendar.ts`; RAC snipes alert (with the auto-cart experiment on, they can hold) |
+| `holds` | off by default: the `autoCart` experiment turns it on | `holds.ts` (the cart), `cart-page.ts` (reading the cart page), and `cart-guard.ts` (what any request may be) |
 | `accessGate` | no | RAC has no queue |
 | `bookingImport` | no | WA Stay never cancels or changes an RAC booking |
 | `account` | `optional` | `auth.ts` and `membership.ts`: the person's own RAC member number ([below](#the-member-number)) |
 
 `links.ts` gives every link: a park's home page ("View on RAC"), and its booking pages ("Book on
 RAC", [below](#availability)). There is no link to manage a booking: that needs the park's own
-sign-in on RAC's site.
+sign-in on RAC's site. `client.ts` sends every request, and asks the cart guard
+(`cart-guard.ts`) about each one first ([endpoints](endpoints.md#rules-every-request-follows)).
 
 ## The parks
 
@@ -145,8 +149,9 @@ RAC's site asks for 10 seconds between automated requests, so the core paces the
 
 - **in the background** (a watch's check, a snipe's checks), each request starts at least 10 s
   after the one before ended;
-- **what the person starts** (a place page, Explore's dates, "Check now") goes first, 1 s after
-  the request before. Explore's eight requests then take about 40 to 60 seconds together, and
+- **what the person starts** (a place page, Explore's dates, "Check now", and with the
+  auto-cart on, putting a stay in the cart or letting it go) goes first, 1 s after the request
+  before. Explore's eight requests then take about 40 to 60 seconds together, and
   Explore says "Still checking RAC…" meanwhile. A place page opened during them waits for one
   request at most.
 
@@ -206,8 +211,97 @@ public release times.
   again, and only `membership.ts` reads it, as a yes or no.
 - **WA Stay never sends it.** Not to RAC, not anywhere: RAC offers no way to check a number
   without a booking, and WA Stay never tries one. The person types or pastes it at RAC's own
-  checkout; **Copy RAC member number** (in Settings, and beside "Book on RAC" on a place page, a
-  watch and an alerted snipe) puts it on the clipboard for that.
+  checkout; **Copy RAC member number** (in Settings, beside "Book on RAC" on a place page, a
+  watch and an alerted snipe, and beside "Pay now" for a stay in the cart) puts it on the
+  clipboard for that. WA Stay never fills it in on RAC's pages, the cart's included.
+
+## The auto-cart experiment
+
+RAC's only hold is its cart: opening a rate's cart address adds the stay to a NewBook cart on the
+session that opened it. WA Stay can do that for the person, and it ships **off**: the
+`autoCart` experiment, which no one has yet checked with a real booking. Until then everything
+above holds, and every RAC snipe alerts.
+
+**Turning it on.** Settings → Accounts → RAC → **Experimental**: "Put stays in my RAC cart
+automatically", confirmed first ("Experimental: not yet checked with a real booking. A cart is
+not a booking: only a paid booking secures your stay."). It takes effect when WA Stay restarts,
+and so does turning it off. Only then is `holds` on in RAC's manifest, and only then does the
+factory build the holds module and let the client send a cart request: with the experiment off,
+no code path can reach a cart.
+
+**What it does** (`holds.ts`), when a watch set to hold, or a snipe set to "Hold it for me",
+finds the stay free:
+
+1. **One cart at a time.** While the stay it put in the cart last has not run out, or while
+   another hold or a release is under way, it adds nothing ("Your RAC cart already holds a stay.
+   Pay for it or let it go first."), and sends nothing.
+2. **A site needs your equipment.** A site's cart needs the equipment type, its length and its
+   width: the hold-only stay fields, asked for under "Hold a site automatically when found" on a
+   watch and on a snipe's stay step. Without them it adds nothing and says so. A cabin or a room
+   needs none.
+3. It reads the park's cart page: a cart that already holds nights is left alone.
+4. It asks RAC's availability once more for the one category, with the equipment, and takes the
+   cart address of the rate the check prices the stay with (a members' rate only with a member
+   number saved).
+5. **One GET of that cart address**, and nothing else, only when it is RAC's own booking page for
+   the park. The page it ends on must show the stay's nights and an amount, else the stay is
+   reported taken.
+6. The hold runs until the cart's own countdown ends, when the page gives one; otherwise WA Stay
+   guesses 10 minutes, and says "about" ("Held until about 10:42 am", "within about 10
+   minutes").
+
+The cart address and its token are never stored, logged or shown: an abort after it was sent
+clears RAC's cookies in the app, so a half-made cart is no longer this session's.
+
+**Paying.** "Pay now" opens the park's cart page in a payment window on RAC's session, never the
+cart address (that would add the stay twice). The window shows RAC's own pages only. The person
+checks out, agrees to RAC's terms and pays there; "Copy RAC member number" sits beside "Pay now"
+for RAC's membership prompt. WA Stay never marks an RAC stay booked: it has not seen RAC's
+confirmation page yet, so the person looks for RAC's confirmation email.
+
+**Letting it go.** "Let it go" on the watch's or snipe's page, closing the payment window without
+paying, and deleting the watch or snipe all ask RAC to take the stay out of the cart. WA Stay reads
+the cart page first, and removes the stay (RAC's own "Remove booking" request) only while the
+cart still holds it, by its dates and category. A cart that no longer holds it (paid, run out,
+removed in the window) is left as it is: "RAC no longer holds it. If you paid, look for RAC's
+confirmation email." A cart it cannot read for certain is left alone too, and the hold runs out
+on its own.
+
+**What it never does**: open checkout, tick RAC's terms, type or send card details, extend a
+hold, check or fill in a member number, hold two stays at once, or hold two for the same nights
+(the night guard). The cart guard (`cart-guard.ts`) refuses all of these on every request and
+redirect, whatever is on, and refuses the cart address and the removal while the experiment is
+off.
+
+### Verifying it
+
+For the maintainer, with a genuine booking of their own that they mean to pay for, the
+experiment turned on, and the log open (Settings → About → Open logs folder). It checks what
+the module was written from RAC's page code to expect:
+
+- **The cart timer.** The page the cart address ends on, and the cart page, carry NewBook's hold
+  fields as hidden inputs: `hold_ids[]` (one per held item), `earliest_hold_expires_when`
+  (seconds left) and `default_hold_duration` (minutes). Note their values against the countdown
+  RAC shows and WA Stay's "Held until": no "about" means WA Stay read them.
+- **The cart page.** `cart_breakdown` is a script variable assigned on its own line, as JSON, its
+  entries carrying `totalBookingNights` and `amount`. The sidebar's item names
+  (`.sidebar_category_name`) match the availability answer's `category_name` for the category,
+  and its arrival and departure read as dates.
+- **The removal.** `newbook_api_path` is an absolute https address on RAC's host,
+  `https://parksandresorts.rac.com.au/<slug>/wp-content/themes/parks-and-resorts/inc/newbook/api/<file>.php`,
+  with nothing after `.php` but a `?`. Let a stay go once ("Let it go") and see it leave RAC's
+  cart.
+- **Checkout's top-level origins.** Pay in the payment window. The window shows RAC's origin
+  only, so a step that moves the whole page elsewhere (a card check, a payment provider) is
+  refused, and the log says "The payment window blocked … to <origin>". Note any such origin:
+  it would need adding to the module's payment origins before the experiment can ship on.
+- **After paying.** The cart page is empty, so closing the payment window answers `gone` (the
+  log says "hold gone", not "hold let go"), and nothing is removed. Note the
+  confirmation page's address and how it shows the booking number, which a booked check
+  (`bookedReference`) would need.
+
+Nothing here is ever done by a test or an agent: every cart in the tests is synthetic, written
+from RAC's scripts, and no live cart has been opened.
 
 ## RAC's terms
 
@@ -222,7 +316,10 @@ Stay:
   minutes;
 - never answers or works around a bot check: a block stops every request for a while;
 - shows facts (park names, categories, availability, prices) and links to RAC's own pages;
-- never cancels or changes a booking;
+- never cancels or changes a booking, and a release takes out only a stay the cart still holds;
+- with the auto-cart experiment on only, puts at most one stay in the cart at a time, lets it go
+  when the person declines or closes the payment window, and never checks out, agrees to RAC's
+  terms or sends card details: payment is the person's step;
 - keeps only the person's own member number, saved with their three statements, and never
   sends it;
 - treats members' rates and the members' pre-sale as bookable only with a member number;
@@ -234,7 +331,8 @@ The people who use it book on RAC's own pages, under RAC's terms:
 - a booking is personal: for the person and the guests named on it, never transferred or resold;
 - members' rates need the member to stay, and the booking to be in the name on their card;
 - a member may make at most two bookings for the same period: their own and one for their
-  guests, with the same arrival date and length;
+  guests, with the same arrival date and length (the auto-cart holds one stay at a time, well
+  inside that);
 - at most two pets per site, booked in advance;
 - payment, and agreeing to RAC's terms, are the person's own steps on RAC's pages.
 
@@ -261,7 +359,15 @@ show ParkStay only. RAC's monogram is plain text on the app's own colour; there 
   line, IPC answer, alert or email); `rac-explore-ipc.test.ts` and `rac-snipes-ipc.test.ts`
   through IPC.
 - `tests/unit/providers/rac-fixtures.test.ts`: the fixtures hold facts only, and the module's
-  code asks only RAC's host and names no cart address.
+  code asks only RAC's host and names no cart address outside the auto-cart.
+- The auto-cart: `tests/unit/providers/rac/holds.test.ts`, `cart-page.test.ts` and
+  `cart-guard.test.ts`; `tests/unit/providers/rac/no-checkout.test.ts` (no module names
+  checkout's or the card store's words, but the guard's deny list) and `no-live-cart.test.ts`
+  (every cart fixture is synthetic, no real cart token is kept, the e2e fixtures are cart-free);
+  `tests/integration/rac-auto-cart.test.ts` (held, let go, the night guard and one cart, through
+  the core) and `tests/integration/credentials-leak.test.ts` (no cart address or member number
+  leaks); and `rac-auto-cart.spec.ts` (the experiment turned on, taking effect after a restart,
+  and "Pay now" reaching only the guarded cart page).
 - `tests/unit/docs/rac-endpoints-doc.test.ts`: every row in [endpoints](endpoints.md) has a
   status, and every path the module requests is documented.
 - The Electron smoke tests: RAC's parks on Explore and a park's categories
@@ -272,5 +378,6 @@ show ParkStay only. RAC's monogram is plain text on the app's own colour; there 
   `npx cross-env PREVIEW_PROVIDER=rac PREVIEW_ARRIVAL=2026-11-06 playwright test preview-provider`
   (`xvfb-run -a` on Linux).
 
-The recorded answers were trimmed from anonymous, read-only requests. No test or agent run ever
-places a cart, hold, booking or payment with RAC, or sends a member number.
+The recorded answers were trimmed from anonymous, read-only requests; the cart's fixtures
+(`tests/fixtures/providers/rac/cart/`) are synthetic, written from RAC's scripts. No test or
+agent run ever places a cart, hold, booking or payment with RAC, or sends a member number.

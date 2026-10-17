@@ -285,8 +285,9 @@ pages, so it gets nothing of the app (`src/main/app/provider-windows.ts`):
   the app injected. Its webContents is never a trusted IPC sender.
 - Top-level navigations and main-frame redirects may only go to the provider's allow-list
   (ParkStay: its own site, the DBCA SSO gateway, Azure AD B2C and the DBCA queue; a payment
-  window also allows DBCA's own hosts, `*.dbca.wa.gov.au`, for the payment ledger). Anything
-  else is cancelled and logged by origin only; a sign-in window opens it in the system
+  window also allows DBCA's own hosts, `*.dbca.wa.gov.au`, for the payment ledger; RAC, with
+  its auto-cart experiment on: RAC Parks & Resorts' own origin only, for the park's cart page).
+  Anything else is cancelled and logged by origin only; a sign-in window opens it in the system
   browser instead. Sub-frames are not restricted (payment pages use them).
 - Every permission request and check is refused, certificate errors are rejected, and no
   client certificate or HTTP credentials are offered.
@@ -296,8 +297,35 @@ pages, so it gets nothing of the app (`src/main/app/provider-windows.ts`):
   confirmation's `checkouthash`.
 - A payment is recorded only from the provider's own confirmation page for that hold
   (ParkStay: `/success/` with `checkouthash = sha256(hold reference)`); any other page,
-  including another booking's confirmation, records nothing. The app never sees card
-  details: they are typed into the provider's own payment pages.
+  including another booking's confirmation, records nothing. RAC records none: its
+  confirmation page has not been seen, so a stay paid in its cart is never marked booked. The
+  app never sees card details: they are typed into the provider's own payment pages.
+
+### RAC's cart guard
+
+RAC's auto-cart (an experiment, off by default) adds a stay to the person's RAC cart, which the
+payment window then shows. The RAC client asks its cart guard
+(`src/main/providers/rac/cart-guard.ts`) about every request and every redirect before sending
+it, so neither a bug nor a page RAC sends back can take the app past the cart:
+
+- **An allow-list.** A GET of RAC's own pages (never NewBook's proxy), a POST of RAC's
+  availability form, and, only while the experiment is on, the cart address (a GET of the
+  park's `/booking/` page with exactly one empty `cart` and one token) and the cart removal (the
+  park's NewBook proxy with exactly `remove_item_from_cart`, and a form of exactly `item_offset`
+  and `cart_type`). Everything else is refused before anything is sent: other hosts (NewBook's
+  card store is one), other methods, checkout's form and post, card fields, extending a hold, a
+  membership check, and any other NewBook call, whatever is on.
+- **Read as the server reads it.** Paths are decoded (twice-encoded ones too), compared in lower
+  case with dot segments and repeated slashes resolved, and query and form names are read as PHP
+  reads them (`cart[]` is `cart`), so no spelling slips past.
+- **The token is never kept.** A cart address carries a token (`rest_api_data_id`). It lives
+  only in the hold's memory while it is sent: never stored, returned, logged (refusals and
+  errors name the path only), put in an error, a notification or an email. An abort after it
+  was sent clears RAC's cookies in the app.
+- **Payment stays the person's.** The payment window opens the park's cart page, never the cart
+  address, on RAC's own origin only; WA Stay never checks out, ticks RAC's terms, fills in the
+  member number or sends card details. `tests/unit/providers/rac/cart-guard.test.ts`,
+  `no-checkout.test.ts` and `tests/integration/credentials-leak.test.ts` check it.
 
 Signing out clears the partition (cookies, storage, HTTP auth cache) and nothing else: the
 local profile, watches, snipes and bookings stay. It is refused while a snipe or hold needs

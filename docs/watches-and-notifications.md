@@ -102,8 +102,9 @@ ParkStay asks for no pause. [How RAC is paced](providers/rac/README.md#pacing).
 
 ### Automatic holds
 
-For a provider with holds (ParkStay), **Hold a site automatically when found** places a hold
-on the first fully matching site, by the same path and safety rules as Site Sniper:
+For a provider with holds (ParkStay; RAC only with its auto-cart experiment turned on,
+[below](#rac-the-auto-cart)), **Hold a site automatically when found** places a hold on the
+first fully matching site, by the same path and safety rules as Site Sniper:
 
 - one booking per night: a night already held by a snipe or another watch's hold blocks it;
 - the hold is recorded on the watch with its reference and expiry, and a notification says
@@ -135,6 +136,31 @@ on the first fully matching site, by the same path and safety rules as Site Snip
   "Your stay" before the Alerts step (or Edit) goes on.
 
 Hold only what you will use ([Book responsibly](site-sniper.md#book-responsibly)).
+
+### RAC: the auto-cart
+
+RAC's holds are an experiment, off by default: **Put stays in my RAC cart automatically**, under
+Experimental on RAC's row in Settings → Accounts, which takes effect when WA Stay restarts.
+Until then an RAC watch only alerts. With it on, RAC's automatic hold is its cart:
+
+- **A stay in your RAC cart.** WA Stay adds the stay to your RAC cart in the app, and **Pay
+  now** opens RAC's cart page, where you check out and pay. WA Stay never marks it booked: look
+  for RAC's confirmation email.
+- **Your equipment, for a site.** Ticking **Hold a site automatically when found** at an RAC park
+  asks for your equipment (its type, length and width in metres), which RAC's cart needs for a
+  site. Without it a site is not held, and the watch says why. A cabin or a room needs none.
+- **"About" expiries.** The hold runs until RAC's cart says, or, when the cart page gives no
+  countdown, for about 10 minutes: the panel and the alert say "about".
+- **Let it go, or close the window.** **Let it go**, closing the payment window without paying,
+  and deleting the watch all take the stay out of the cart, but only while RAC's cart still
+  holds it: one you paid for has left the cart, and is never touched.
+- **One cart at a time.** RAC's cart holds one stay from WA Stay at a time: while it does, no
+  other is added ("Your RAC cart already holds a stay. Pay for it or let it go first."). Another
+  watch alerts as usual, with that note; a snipe keeps trying while its window lasts.
+- **Never past the cart.** WA Stay never checks out, agrees to RAC's terms, types your card or
+  fills in your member number: **Copy RAC member number** sits beside **Pay now** for that.
+
+[How the auto-cart works](providers/rac/README.md#the-auto-cart-experiment).
 
 ## Notifications
 

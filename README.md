@@ -77,7 +77,7 @@ Site Sniper and Bookings work but are still being finished, so the navigation ma
 | Provider | Status | Explore | Availability | Watches | Site Sniper | Holds and payment | Account |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | **ParkStay WA** (DBCA national-park campgrounds) | Built in | Yes, 169 campgrounds | Yes, per night with prices | Yes | Coming soon (alert or hold) | Yes (30-minute holds, paid on ParkStay) | Optional |
-| **RAC Parks & Resorts** (holiday parks and resorts) | Built in | Yes, 8 parks | Yes, per category and night with prices (members' rates with your member number) | Yes | Coming soon (release alerts) | No | Optional (your member number) |
+| **RAC Parks & Resorts** (holiday parks and resorts) | Built in | Yes, 8 parks | Yes, per category and night with prices (members' rates with your member number) | Yes | Coming soon (release alerts) | Off by default (an experimental cart, paid on RAC's own page) | Optional (your member number) |
 
 Providers are modules behind a provider SDK, so more can be added, including sites with no
 API: see [adding a provider](docs/providers/adding-a-provider.md). Each built-in provider has its

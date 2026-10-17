@@ -14,17 +14,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Release-alert snipes**: a snipe can alert you the moment the dates are free, with a link to book, instead of holding a site ("Alert me" or "Hold it for me"). RAC's snipes alert. A snipe the provider turns away (HTTP 403 or 429) stops at once and says so (#59, #60).
 - **Booking links in alerts**: an alert that a watch found something, or that a snipe found the dates free, and its email carry the provider's public booking page for those dates ("Book on {provider}"), so you can book from your phone. It is never a cart or checkout page (#54).
 - **Minimum stays and arrival days**: nights a provider refuses for your stay are marked on the place page with the reason, watches and snipes never alert on such a stay, and a price from a special rate is named ("Rate: RAC member rate") (#55).
+- **Experimental switches**: what a provider ships turned off appears under "Experimental" on its row in Settings → Accounts, asks before it is turned on, and takes effect when WA Stay restarts; turning off one that holds stops new holds at once (#64).
+- **Let it go**: for a provider that can, a held stay can be let go from its watch's or snipe's page, and is let go when its payment window closes unpaid or it is deleted, once the provider has checked it was not paid; a hold whose length the provider can only guess reads "about" (#65).
+- **RAC auto-cart, off by default** (experimental, not yet checked with a real booking): with "Put stays in my RAC cart automatically" turned on, a watch that holds automatically or a snipe set to "Hold it for me" puts the stay it finds in your RAC cart, one stay at a time (with your equipment for a site), for you to check out and pay on RAC's own page; "Let it go" or closing the payment window takes it out again. WA Stay never checks out, pays or fills in your member number (#66).
 
 ### Changed
 - Explore's "Type" filter is now **Stay type** (#51).
 - Clicking an alert that a watch found something, or that a snipe found the dates free, opens the provider's booking page for those dates in your browser as well as the watch or snipe in WA Stay, for every provider. An alert that a site is held still opens only the watch or snipe, where you pay (#54).
-- **Interactive pace**: what you start (your dates on Explore, a place's "Check availability", "Check now") goes first, while watches and snipes are spaced out in the background for a provider that asks for a pause between requests (RAC: 10 seconds) (#49).
+- **Interactive pace**: what you start (your dates on Explore, a place's "Check availability", "Check now", placing or letting go a hold) goes first, while watches and snipes are spaced out in the background for a provider that asks for a pause between requests (RAC: 10 seconds) (#49, #65).
 - Alerts and screens name what was found by its kind ("Cabins available at …", "A spot is free at …" for several kinds), not always "site" (#56).
 - Settings → Notifications no longer says "site" for what a watch finds or holds (#67).
 - A place's check that the provider rate-limits says "{provider} asked WA Stay to slow down. Try again later." rather than "Try again in a minute", which was wrong for RAC's longer pause (#67).
 
 ### Fixed
 - A watch check still running when the watch was moved to another place, or its dates, units, stay types or stay fields changed, could save what it found (or its error) for the old one and alert on it. Its answer and its failure are now dropped, and the watch checks again at once; only a provider turning the check away (HTTP 403 or 429) is still recorded, and then the watch waits its interval (#67).
+
+### Security
+- RAC's member number is write-only: kept encrypted on your computer, copied to the clipboard by the app on request, and never logged or sent by WA Stay (#62, #63).
+- Every RAC request passes a cart guard, an allow-list that refuses checkout, card details, extending a hold and any other NewBook call whatever is on, and the cart itself unless the auto-cart experiment is on. A cart's token is never stored or logged, and the payment window shows RAC's own pages only (#66).
 
 ## [2.0.0] - 2026-10-11
 

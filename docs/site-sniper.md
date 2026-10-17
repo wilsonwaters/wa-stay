@@ -17,8 +17,11 @@ Site Sniper never pays for you. A snipe holds when its provider can place holds,
 otherwise; a provider that places no holds offers alerts only.
 
 Two providers have Site Sniper. ParkStay WA's snipes hold by default (you can choose an alert
-instead), and its hold lasts **30 minutes**. RAC Parks & Resorts' snipes alert: WA Stay places
-no holds on RAC.
+instead), and its hold lasts **30 minutes**. RAC Parks & Resorts' snipes alert: RAC's holds are
+an experiment, off by default. With **Put stays in my RAC cart automatically** turned on
+(Settings → Accounts, under Experimental on RAC's row, after a restart), an RAC snipe holds by
+default too, by putting the stay in your RAC cart
+([the auto-cart](watches-and-notifications.md#rac-the-auto-cart)).
 
 ## How ParkStay releases sites
 
@@ -173,7 +176,10 @@ confirmation email."), freeing its nights for another hold. Such a provider may 
 hold go when its payment window closes without a confirmed payment; it checks its own side first,
 so a paid stay is never let go. Deleting a held snipe lets its hold go first. When the provider
 can only guess how long its hold lasts, the panel and the alert say "about". ParkStay does none
-of this: its hold runs out on its own.
+of this: its hold runs out on its own. RAC's auto-cart (an experiment, off by default) does all
+of it: **Pay now** opens RAC's cart page, where you check out yourself, its hold lasts as long as
+RAC's cart says (else about 10 minutes), and no RAC stay is ever marked **Booked**: look for
+RAC's confirmation email.
 
 ## Book responsibly
 

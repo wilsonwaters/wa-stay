@@ -10,7 +10,7 @@ do from its manifest.
 | Provider | Status | Explore | Availability | Watches | Site Sniper | Holds and payment | Booking import | Account |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | [ParkStay WA](parkstay/README.md) (DBCA national-park campgrounds) | Built in | Yes, 169 campgrounds, by stay type | Yes, per night with prices, and bulk for map pins | Yes; an alert opens ParkStay with the campground and dates | Coming soon: alert or hold | Yes, 30-minute holds paid on ParkStay | No | Optional |
-| [RAC Parks & Resorts](rac/README.md) (holiday parks and resorts) | Built in | Yes, 8 parks and their categories, by stay type | Yes, per category and night, with prices (members' rates with a saved member number) and stay rules, and free counts on Explore | Yes, no more often than every 15 minutes; an alert opens RAC's booking page | Coming soon: release alerts | No | No | Optional (the person's member number) |
+| [RAC Parks & Resorts](rac/README.md) (holiday parks and resorts) | Built in | Yes, 8 parks and their categories, by stay type | Yes, per category and night, with prices (members' rates with a saved member number) and stay rules, and free counts on Explore | Yes, no more often than every 15 minutes; an alert opens RAC's booking page | Coming soon: release alerts (or holds, with the cart experiment on) | Off by default: an experimental cart, paid on RAC's cart page | No | Optional (the person's member number) |
 
 Other providers (Hipcamp, holiday-park chains, Airbnb) are possible with the SDK, including
 ones with no API, but none is planned in this release.

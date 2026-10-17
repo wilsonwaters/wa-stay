@@ -5,6 +5,9 @@
  * - every row of its endpoint tables has a status from the page's own legend;
  * - every path the module requests (through `RacClient`, the only code that sends one) is in
  *   its first table, "Requests WA Stay sends";
+ * - the auto-cart's requests (the cart page, the cart address and the cart removal) are there,
+ *   sent by the cart's code only, and marked "From RAC's page code, not exercised": no cart was
+ *   ever opened live;
  * - a path it lists as "Known, never used" is named nowhere in the module's code, comments left
  *   out, except in the cart guard (`cart-guard.ts`), whose job is to refuse such paths.
  *
@@ -25,6 +28,25 @@ const NEVER_USED = 'Known, never used';
 const CART_GUARD = 'cart-guard.ts';
 /** Tables on the page that are not endpoints. */
 const NOT_ENDPOINTS = new Set(['Status legend', "RAC's codes"]);
+const FROM_PAGE_CODE = "From RAC's page code, not exercised";
+/** The auto-cart's code: the one file that sends requests whose address it is given. */
+const CART_CODE = 'holds.ts';
+/**
+ * The cart's requests whose address is a variable in `holds.ts`, by its name: the documented
+ * path each stands for (the tariff's cart address, and the cart page's proxy for a removal).
+ */
+const CART_ADDRESSES: ReadonlyMap<string, string> = new Map([
+  ['address', '/<slug>/booking/?cart&rest_api_data_id=…'],
+  [
+    'removal',
+    '/<slug>/wp-content/themes/parks-and-resorts/inc/newbook/api/<file>.php?newbook_api_action=data&query=remove_item_from_cart',
+  ],
+]);
+/** Whether a documented path is one of the cart's: its page, its address or its removal. */
+const isCartPath = (documented: string): boolean =>
+  documented === '/<slug>/booking/' ||
+  documented.includes('?cart&') ||
+  documented.includes('remove_item_from_cart');
 
 /**
  * What names each never-used path in code: the part of it no request WA Stay sends shares. Each
@@ -64,10 +86,15 @@ function stringConstants(sources: Map<string, string>): Map<string, string> {
 
 /**
  * The paths `code` passes to the RAC client (`getPage`, `postAjax`), as the doc writes them: a
- * park's slug is `<slug>`. A call whose path cannot be read (a variable) comes back as
+ * park's slug is `<slug>`. A variable named in `addresses` is the documented path it stands
+ * for, whole, as `exact: <path>`. Any other call whose path cannot be read comes back as
  * `unreadable: <the call>`, so a new kind of request is never missed.
  */
-function requestedPaths(code: string, constants: ReadonlyMap<string, string>): string[] {
+function requestedPaths(
+  code: string,
+  constants: ReadonlyMap<string, string>,
+  addresses: ReadonlyMap<string, string> = new Map()
+): string[] {
   const found: string[] = [];
   for (const match of code.matchAll(/\.(getPage|postAjax)\(\s*([^,)]*)/g)) {
     const [call, , argument] = match;
@@ -77,6 +104,8 @@ function requestedPaths(code: string, constants: ReadonlyMap<string, string>): s
       found.push(literal.replace(/\$\{[^}]*\bslug\}/g, '<slug>'));
     } else if (constants.has(text)) {
       found.push(constants.get(text) as string);
+    } else if (addresses.has(text)) {
+      found.push(`exact: ${addresses.get(text) as string}`);
     } else {
       found.push(`unreadable: ${call.trim()}`);
     }
@@ -133,13 +162,23 @@ describe(DOC, () => {
   it('documents in its first table every path the module requests', () => {
     const documented = rows
       .filter((r) => r.section === FIRST_TABLE)
-      .flatMap((r) => pathsIn(r.cells[1]))
-      .map(withoutQuery);
+      .flatMap((r) => pathsIn(r.cells[1]));
     const constants = stringConstants(sources);
-    const requested = [...callers.values()].flatMap((code) => requestedPaths(code, constants));
-    // The availability endpoint and the book-now page, at least
-    expect(requested.length).toBeGreaterThanOrEqual(2);
-    expect(requested.filter((used) => !documented.includes(used))).toEqual([]);
+    // Only the cart's code sends a request to an address it is given
+    const requested = [...callers].flatMap(([name, code]) =>
+      requestedPaths(code, constants, name === CART_CODE ? CART_ADDRESSES : undefined)
+    );
+    // The availability endpoint, the book-now page, and the cart's page, address and removal
+    expect(new Set(requested).size).toBeGreaterThanOrEqual(5);
+    expect(requested.filter((used) => used.startsWith('exact: '))).toHaveLength(
+      CART_ADDRESSES.size
+    );
+    const undocumented = requested.filter((used) =>
+      used.startsWith('exact: ')
+        ? !documented.includes(used.slice('exact: '.length))
+        : !documented.map(withoutQuery).includes(used)
+    );
+    expect(undocumented).toEqual([]);
     // Nothing sends a request but the client
     for (const [name, code] of callers) {
       expect([name, sendsOwnRequest(code)]).toEqual([name, false]);
@@ -157,13 +196,36 @@ describe(DOC, () => {
 
   it('reads the paths of a request in code, and flags one it cannot read', () => {
     const constants = new Map([['SOME_PATH', '/a/b.php']]);
-    expect(
-      requestedPaths(
-        'client.getPage(`/${park.slug}/book-now/`); client.postAjax(SOME_PATH, form, o); ' +
-          'client.getPage(address, { signal })',
-        constants
-      )
-    ).toEqual(['/<slug>/book-now/', '/a/b.php', 'unreadable: .getPage(address']);
+    const code =
+      'client.getPage(`/${park.slug}/book-now/`); client.postAjax(SOME_PATH, form, o); ' +
+      'client.getPage(address, { signal })';
+    expect(requestedPaths(code, constants)).toEqual([
+      '/<slug>/book-now/',
+      '/a/b.php',
+      'unreadable: .getPage(address',
+    ]);
+    expect(requestedPaths(code, constants, new Map([['address', '/x/?cart']]))).toEqual([
+      '/<slug>/book-now/',
+      '/a/b.php',
+      'exact: /x/?cart',
+    ]);
+  });
+
+  it("marks the cart's requests as RAC's page code, sent by the cart's code with the experiment on", () => {
+    const first = rows.filter((r) => r.section === FIRST_TABLE);
+    const cart = first.filter((r) => pathsIn(r.cells[1]).some(isCartPath));
+    expect(cart.map((r) => pathsIn(r.cells[1])[0])).toEqual([
+      '/<slug>/booking/',
+      ...CART_ADDRESSES.values(),
+    ]);
+    for (const row of cart) {
+      expect([row.cells[1], row.cells[2]]).toEqual([row.cells[1], FROM_PAGE_CODE]);
+      expect(row.cells[3]).toContain(`\`${CART_CODE}\``);
+      expect(row.cells[3]).toContain('auto-cart experiment on only');
+    }
+    // Nothing outside the cart is unverified
+    expect(first.filter((r) => r.cells[2] === FROM_PAGE_CODE && !cart.includes(r))).toEqual([]);
+    expect(isCartPath('/<slug>/book-now/')).toBe(false);
   });
 
   it('lists each never-used path by a name the module never uses outside the cart guard', () => {

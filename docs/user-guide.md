@@ -106,8 +106,8 @@ A watch checks a place for your dates on a schedule and tells you when sites fre
    only on stays the provider accepts.
 3. Choose the alerts: how often to check (every 15 minutes to daily; 1 hour by default; a
    provider may set a longer minimum), whether to tell you about partial availability (only
-   some nights free), whether to stop after the first alert, and, for ParkStay, **Hold a site
-   automatically when found**.
+   some nights free), whether to stop after the first alert, and, for ParkStay (and RAC with
+   its experimental auto-cart turned on), **Hold a site automatically when found**.
 4. Review and **Create watch**.
 
 Each watch shows its last result, when it last checked and next checks, and how many times it
@@ -150,7 +150,8 @@ When the dates are released depends on the provider:
 - **ParkStay WA:** when a new date opens (180 days ahead, at the campground's release time), at
   a scheduled block release, or when someone cancels. Site Sniper joins the DBCA queue when the
   release uses it.
-- **RAC Parks & Resorts** (alerts only): when your dates open, at midnight Perth time 364 days
+- **RAC Parks & Resorts** (alerts, unless you turn on its experimental auto-cart, below): when
+  your dates open, at midnight Perth time 364 days
   ahead; for WA school holidays, on RAC's own release days at each park's hour (7, 8 or 9 am),
   and with your RAC member number saved, at the members' pre-sale, 48 hours before everyone
   else; or at a time you set, for dates RAC releases on days of its own (Cable Beach's dry
@@ -175,6 +176,13 @@ A watch and a snipe show the same panel.
 3. Pay on ParkStay's pages. WA Stay never sees your card.
 4. When ParkStay confirms this booking, the snipe or watch shows **Booked** and the booking
    appears under Bookings.
+
+With RAC's auto-cart turned on (an experiment, below), a held RAC stay is in your RAC cart:
+**Pay now** opens RAC's cart page, where you check out and pay yourself, with **Copy RAC member
+number** beside it for RAC's member prompt. The hold lasts as long as RAC's cart says, or about
+10 minutes when it doesn't say. **Let it go** (or closing the window without paying) takes the
+stay out of the cart. WA Stay doesn't mark an RAC stay **Booked**: look for RAC's confirmation
+email.
 
 ## Bookings (coming soon)
 
@@ -222,13 +230,25 @@ Open Settings from the account menu (top right).
   - Site Sniper times school-holiday snipes to the members' pre-sale, 48 hours before everyone
     else (not for Margaret River's dorms, which are not in it);
   - **Book on RAC** opens the book-now page as a member, and **Copy RAC member number** sits
-    beside it (on a place's page, a watch and an alerted snipe). You type or paste the number at
-    RAC's own checkout, where RAC checks it against your name.
+    beside it (on a place's page, a watch and an alerted snipe), and beside **Pay now** for a
+    stay in your RAC cart. You type or paste the number at RAC's own checkout, where RAC checks
+    it against your name.
 
   Saving, replacing or removing it checks RAC's availability again. A copied number stays on
   the clipboard until you copy something else, and Windows keeps copies of what you copy if
   clipboard history (Windows key + V) or syncing across devices is on: clear it there, or turn
   them off in Windows Settings → System → Clipboard, if you share this computer.
+
+  RAC's row also has an **Experimental** group, for what RAC's support in WA Stay ships turned
+  off: **Put stays in my RAC cart automatically**. Turned on (it asks first, and warns that it
+  hasn't been checked with a real booking and that a cart isn't a booking), a watch that holds
+  automatically or a snipe set to **Hold it for me** puts the stay it finds in your RAC cart,
+  one at a time, for you to pay on RAC's own page
+  ([the auto-cart](watches-and-notifications.md#rac-the-auto-cart)). It takes effect when WA
+  Stay restarts ("Turns on when WA Stay restarts" until then), and so does turning it off, which
+  can't be done while an RAC snipe is running or a stay is held, being held or being let go: pay
+  for it or let it go first. Once it is off, no new stay goes in the cart, even before the
+  restart.
 - **Notifications.** **Desktop notifications** and **Play a sound**, and **Email**: your SMTP
   settings (Gmail, Outlook or your own server), where to send alerts, and **Send test email**.
   [Email setup](watches-and-notifications.md#email).
@@ -251,7 +271,9 @@ Open Settings from the account menu (top right).
 - **What WA Stay sends RAC, and how often.** Only what it needs for the places and dates you
   look at, watch or snipe, one request at a time: when you open a park, its book-now page (at
   Exmouth, Karri Valley and Monkey Mia, an availability request instead, which lists their
-  cabins and sites), and one availability request for a park and stay. Watches and snipes check in the
+  cabins and sites), and one availability request for a park and stay. With the auto-cart
+  turned on, a hold also reads the park's cart page and opens one cart address, and letting it
+  go sends RAC's own "remove" request. Watches and snipes check in the
   background, at least 10 seconds apart: a watch no more often than every 15 minutes, and a
   snipe every 10 seconds for at most 30 minutes after a release. Your member number is never
   sent.
