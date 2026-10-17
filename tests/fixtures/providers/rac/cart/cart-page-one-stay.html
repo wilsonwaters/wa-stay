@@ -1,0 +1,23 @@
+<!-- Synthetic: written from RAC's NewBook scripts, not recorded. RAC Busselton Holiday Park's booking page as the cart address leaves it, holding one stay (Powered Site, 6 to 8 Nov 2026, 2 nights, $150), with NewBook's hold fields (nb_common.min.js: hold_ids[], earliest_hold_expires_when in seconds, default_hold_duration in minutes) and its sidebar item (process.min.js: the removal link's rel, and .booking_<offset>_category, _arrival and _departure). No cart was ever opened. -->
+<!doctype html>
+<html>
+<body>
+<div id="newbook_config">
+newbook_api_path='https://parksandresorts.rac.com.au/busselton/wp-content/themes/parks-and-resorts/inc/newbook/api/rac-busselton-holiday-park.php?'
+var page_action = 'cart'
+var cart_breakdown = {"Online\\Step\\Booking":{"label":"Booking","amount":150,"deposit":75,"deposit_date":"20 Oct 2026","deposit_due_today":false,"totalBookingNights":2,"allow_popup":true}};
+</div>
+<div id="newbook_hold">
+<input type="hidden" name="hold_ids[]" value="501" />
+<input type="hidden" name="earliest_hold_expires_when" value="900" />
+<input type="hidden" name="default_hold_duration" value="20" />
+</div>
+<div id="newbook_online_sidebar">
+<div class="booking_0_category"><span class="sidebar_category_name">Powered Site</span></div>
+<span class="booking_0_arrival">Fri 6 Nov 2026</span>
+<span class="booking_0_departure">Sun 8 Nov 2026</span>
+<span class="booking_0_guests">2 Adults</span>
+<a class="remove_booking_from_cart" rel="0" tabindex="0">Remove</a>
+</div>
+</body>
+</html>

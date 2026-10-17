@@ -233,7 +233,7 @@ npm run test:electron -- http-transport
 
 ## Electron smoke tests (E2E)
 
-`tests/e2e/` holds the Electron smoke suite: 27 journeys in 16 specs through the **built** app
+`tests/e2e/` holds the Electron smoke suite: 29 journeys in 17 specs through the **built** app
 (main, preload and renderer together), driven by Playwright's `_electron` launcher. It
 catches what Jest cannot: startup crashes, preload or sandbox breakage, CSP violations,
 broken routing and focus, and a quit that hangs.
@@ -303,9 +303,9 @@ The `launchWaStay()` fixture starts the app with:
   other built-in providers are not registered, so the journeys' counts and pre-selections
   (ParkStay's 11 places, ParkStay chosen for you) hold however many providers are built in. A
   journey that counts or expects a pre-selection passes its list explicitly
-  (`rac-catalogue.spec.ts`, `rac-watch.spec.ts`, `rac-explore.spec.ts` and
-  `rac-member-number.spec.ts` pass `['parkstay', 'rac']`: RAC's eight parks beside ParkStay's 11
-  campgrounds). An id that is not a built-in provider stops the app at start-up, with the reason
+  (`rac-catalogue.spec.ts`, `rac-watch.spec.ts`, `rac-explore.spec.ts`,
+  `rac-member-number.spec.ts` and `rac-auto-cart.spec.ts` pass `['parkstay', 'rac']`: RAC's
+  eight parks beside ParkStay's 11 campgrounds). An id that is not a built-in provider stops the app at start-up, with the reason
   in the main process's output.
 - **A production renderer**: `NODE_ENV=production`, no `ELECTRON_RENDERER_URL`, no Mapbox
   token, `TZ=Australia/Perth`, `LANG=en_AU.UTF-8`.
@@ -340,6 +340,9 @@ better-sqlite3's Electron build loads and `dist/main` opens and migrates the dat
 - `seedAlertSnipe(userDataDir, …)`: an armed ParkStay snipe that alerts, watching for
   cancellations, and nothing else: the app's scheduler checks the place at once and records the
   alert and its `snipe_alert` notification itself (`alert-snipe.spec.ts`, with dated fixtures).
+- `seedHeldWatch(userDataDir, …)`: a watch whose automatic hold holds a unit, with the
+  provider's experiment choices stored first when given (`rac-auto-cart.spec.ts`: RAC's
+  auto-cart on and a held cart with a made-up reference). No cart or hold is ever created.
 - `writeLegacyV1Data(dir)`: a v1.2.0 data folder from `tests/fixtures/db/v5-release-1.2.0.sql`,
   for `WA_STAY_LEGACY_DATA_DIR` (the upgrade journey).
 

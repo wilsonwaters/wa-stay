@@ -88,11 +88,15 @@ export function heldNoun(
   return watchNoun(watch, manifest, { about: held, placeUnits });
 }
 
-/** A unit's name from the last check, else "site 12". */
+/**
+ * A unit's name from the last check, else "Site 12" for a numeric id (a site's number), else
+ * "A site": an id that is not a number (RAC's `cat:4`) is never shown, as a snipe's `unitLabel`.
+ */
 export function unitNameOf(watch: Watch, unitId: string | undefined, noun: UnitNoun): string {
-  if (!unitId) return `A ${noun.one}`;
-  const unit = watch.lastAvailability?.find((u) => u.unitId === unitId);
-  return unit?.unitName ?? `${capitalise(noun.one)} ${unitId}`;
+  const unit = unitId ? watch.lastAvailability?.find((u) => u.unitId === unitId) : undefined;
+  if (unit?.unitName) return unit.unitName;
+  if (!unitId || !/^\d+$/.test(unitId)) return `A ${noun.one}`;
+  return `${capitalise(noun.one)} ${unitId}`;
 }
 
 /** The hold panel's region name, unique per hold: "Hold at Osprey Bay". */
