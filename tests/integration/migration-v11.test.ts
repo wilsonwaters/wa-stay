@@ -3,8 +3,8 @@
  *
  * - From the real v5 (v1.2.0) and v6 fixtures: `locations`, `watches` and `site_snipes` gain
  *   `unit_kinds JSON NOT NULL DEFAULT '[]'`; existing watches and snipes read `'[]'` (any
- *   kind); every other table is unchanged from the same fixture at v10; `foreign_key_check`
- *   and `integrity_check` are clean.
+ *   kind), and read as `unitKinds: []` through their repositories (R3); every other table is
+ *   unchanged from the same fixture at v10; `foreign_key_check` and `integrity_check` are clean.
  * - A v10 database with one `locations` row per location kind is backfilled from each row's
  *   kind (`deriveUnitKinds`), so the catalogue's SQL filter sees every cached place.
  * - A column already there (a partly migrated database) is skipped, and a row that already has
@@ -20,7 +20,11 @@ import {
   openDatabase,
   runMigrations,
 } from '@main/database/connection';
-import { LocationRepository } from '@main/database/repositories';
+import {
+  LocationRepository,
+  SiteSniperRepository,
+  WatchRepository,
+} from '@main/database/repositories';
 import { logger } from '@main/utils/logger';
 import { LOCATION_KINDS, type LocationKind } from '@shared/types/provider.types';
 import { deriveUnitKinds } from '@shared/utils/unit-kinds';
@@ -126,6 +130,15 @@ describe.each(FIXTURES)('migration v11 from the %s fixture', (fixture) => {
       site_snipes: anyKind(atV10.site_snipes),
       locations: anyKind(atV10.locations),
     });
+  });
+
+  it('its watches and snipes read unitKinds: [] (any kind) through their repositories', () => {
+    const watches = new WatchRepository(db).findAll();
+    const snipes = new SiteSniperRepository(db).findAll();
+    // The v5 (v1.2.0) fixture has watches only; Site Sniper's table arrived in v6
+    expect(watches.length).toBeGreaterThan(0);
+    expect(snipes.length).toBe(fixture === 'v6-branch' ? 1 : 0);
+    for (const row of [...watches, ...snipes]) expect(row.unitKinds).toEqual([]);
   });
 
   it('passes foreign_key_check and integrity_check', () => {

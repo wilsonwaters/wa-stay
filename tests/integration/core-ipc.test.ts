@@ -1,8 +1,9 @@
 /**
  * The `watches`, `snipes` and `bookings` namespaces through P3's harness, against a real
  * container (built-in ParkStay plus FakeProviders added to its registry): capability errors,
- * field-level validation, list filters, booking import and `manageUrl`, the removed
- * `bookings:sync*` channels, and `*:updated` events reaching the trusted renderer.
+ * field-level validation, stay types (`unitKinds`) on watches and snipes, list filters,
+ * booking import and `manageUrl`, the removed `bookings:sync*` channels, and `*:updated`
+ * events reaching the trusted renderer.
  */
 
 import { EventEmitter } from 'events';
@@ -139,6 +140,56 @@ describe('watches / snipes / bookings over IPC', () => {
       error: 'A scheduled release needs a time',
     });
     expect(container.repositories.snipes.findAll()).toEqual([]);
+  });
+
+  describe.each([
+    ['watches', () => watchInput('fake')],
+    ['snipes', () => snipeInput()],
+  ])('%s: stay types (unitKinds)', (namespace, input) => {
+    it("create with unitKinds ['cabin'] round-trips through get", async () => {
+      const created = await call<Watch | SiteSnipe>(`${namespace}:create`, {
+        ...input(),
+        unitKinds: ['cabin'],
+      });
+      expect(created).toMatchObject({ success: true, data: { unitKinds: ['cabin'] } });
+      await expect(
+        call<Watch | SiteSnipe>(`${namespace}:get`, { id: created.data!.id })
+      ).resolves.toMatchObject({ success: true, data: { unitKinds: ['cabin'] } });
+    });
+
+    it("a kind it does not know (['castle']) is VALIDATION at unitKinds.0, and nothing is stored", async () => {
+      await expect(
+        call(`${namespace}:create`, { ...input(), unitKinds: ['castle'] })
+      ).resolves.toMatchObject({ success: false, code: 'VALIDATION', issues: ['unitKinds.0'] });
+      expect((await call<unknown[]>(`${namespace}:list`)).data).toEqual([]);
+    });
+
+    it('update sets and clears it; without unitKinds it reads [] (any kind)', async () => {
+      const created = await call<Watch | SiteSnipe>(`${namespace}:create`, input());
+      const id = created.data!.id;
+      expect(created.data?.unitKinds).toEqual([]);
+
+      await expect(
+        call(`${namespace}:update`, { id, updates: { unitKinds: ['cabin', 'dorm'] } })
+      ).resolves.toMatchObject({ success: true, data: { unitKinds: ['cabin', 'dorm'] } });
+      await expect(
+        call(`${namespace}:update`, { id, updates: { unitKinds: ['castle'] } })
+      ).resolves.toMatchObject({
+        success: false,
+        code: 'VALIDATION',
+        issues: ['updates.unitKinds.0'],
+      });
+      // `other` is accepted, though the flows never offer it
+      await expect(
+        call(`${namespace}:update`, { id, updates: { unitKinds: ['other'] } })
+      ).resolves.toMatchObject({ success: true, data: { unitKinds: ['other'] } });
+      await expect(
+        call(`${namespace}:update`, { id, updates: { unitKinds: [] } })
+      ).resolves.toMatchObject({ success: true, data: { unitKinds: [] } });
+      await expect(call(`${namespace}:get`, { id })).resolves.toMatchObject({
+        data: { unitKinds: [] },
+      });
+    });
   });
 
   it('list filters by provider and status, with or without a payload', async () => {

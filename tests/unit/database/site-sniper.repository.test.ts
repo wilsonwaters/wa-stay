@@ -121,6 +121,7 @@ describe('SiteSniperRepository', () => {
 
       expect(snipe.stayParams).toEqual({});
       expect(snipe.unitIds).toEqual([]);
+      expect(snipe.unitKinds).toEqual([]);
       expect(snipe.stay).toEqual({
         arrival: '2026-09-01',
         departure: '2026-09-03',
@@ -277,6 +278,30 @@ describe('SiteSniperRepository', () => {
       // Fields the update left out keep their values
       expect(updated.stayParams).toEqual(snipe.stayParams);
       expect(updated.location).toEqual(snipe.location);
+    });
+
+    it('round-trips stay types (unit_kinds, v11): set at create, kept, replaced and cleared', () => {
+      const db = dbHelper.getDb();
+      const snipe = repo.create(userId, createMockSiteSnipeInput({ unitKinds: ['cabin'] }));
+      expect(repo.findById(snipe.id)?.unitKinds).toEqual(['cabin']);
+      expect(db.prepare('SELECT unit_kinds FROM site_snipes WHERE id = ?').get(snipe.id)).toEqual({
+        unit_kinds: '["cabin"]',
+      });
+
+      expect(repo.update(snipe.id, { notes: 'x' }).unitKinds).toEqual(['cabin']);
+      expect(repo.update(snipe.id, { unitKinds: ['room', 'dorm'] }).unitKinds).toEqual([
+        'room',
+        'dorm',
+      ]);
+      expect(repo.update(snipe.id, { unitKinds: [] }).unitKinds).toEqual([]);
+
+      // Unknown or unreadable stored entries are dropped when read
+      db.prepare(`UPDATE site_snipes SET unit_kinds = '["yurt","glamping"]' WHERE id = ?`).run(
+        snipe.id
+      );
+      expect(repo.findById(snipe.id)?.unitKinds).toEqual(['glamping']);
+      db.prepare(`UPDATE site_snipes SET unit_kinds = '{' WHERE id = ?`).run(snipe.id);
+      expect(repo.findById(snipe.id)?.unitKinds).toEqual([]);
     });
   });
 });

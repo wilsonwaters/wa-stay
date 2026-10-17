@@ -2,8 +2,11 @@
  * What a watch finds in one availability check. Pure: everything comes from the one
  * `LocationAvailability` the provider returned, so partial matches cost no extra request.
  *
- * - Wanted units: every unit, or those the watch names by id, by name (legacy watches
- *   stored site names) or by an id the provider used for the unit before (`aliases`).
+ * - Wanted units: those the watch names by id, by name (legacy watches stored site names) or
+ *   by an id the provider used for the unit before (`aliases`); else those of the stay types
+ *   it wants (`unitKinds`, a unit with no kind counting as `other`); else every unit.
+ * - Mixed stay types (`kindsAmbiguous`): no units named, and the wanted units are of more
+ *   than one kind, free or not. Nothing is held automatically for such a watch or snipe.
  * - Price rule: `maxPrice` applies per night, and only when every night of the stay (or of
  *   the run) has a price. Otherwise the unit passes with `priceKnown: false`.
  * - Full match: a unit with every night available that passes the price rule.
@@ -11,27 +14,56 @@
  *   price rule, as its own stay (`departure` is the morning after the run's last night).
  */
 
-import type { NightStatus, UnitAvailability, WatchMatch } from '@shared/types';
+import type { NightStatus, UnitAvailability, UnitKind, WatchMatch } from '@shared/types';
 import { addDays } from '@shared/utils/calendar-date';
+import { isUnitKind } from '@shared/utils/unit-kinds';
 
-/** What matching needs from a watch. */
+/** What matching needs from a watch (or a snipe). */
 export interface MatchCriteria {
   unitIds: readonly string[];
+  /** The stay types wanted; none or empty means any kind. */
+  unitKinds?: readonly UnitKind[];
   maxPrice?: number;
 }
 
-/** The units the watch wants: any, or those named by id, name or an earlier id. */
+/** What `unit` is: its `unitKind`, or `other` when it has none (or one this app does not know). */
+function unitKindOfUnit(unit: Pick<UnitAvailability, 'unitKind'>): UnitKind {
+  return isUnitKind(unit.unitKind) ? unit.unitKind : 'other';
+}
+
+/**
+ * The units wanted: with `unitIds`, those named by id, name or an earlier id only (the person
+ * chose them, so kinds do not apply); else, with `unitKinds`, the units of those kinds; else
+ * every unit.
+ */
 export function wantedUnits(
-  criteria: Pick<MatchCriteria, 'unitIds'>,
+  criteria: Pick<MatchCriteria, 'unitIds' | 'unitKinds'>,
   units: readonly UnitAvailability[]
 ): UnitAvailability[] {
-  if (criteria.unitIds.length === 0) return [...units];
-  return units.filter(
-    (unit) =>
-      criteria.unitIds.includes(unit.unitId) ||
-      criteria.unitIds.includes(unit.unitName) ||
-      (unit.aliases ?? []).some((alias) => criteria.unitIds.includes(alias))
-  );
+  if (criteria.unitIds.length > 0) {
+    return units.filter(
+      (unit) =>
+        criteria.unitIds.includes(unit.unitId) ||
+        criteria.unitIds.includes(unit.unitName) ||
+        (unit.aliases ?? []).some((alias) => criteria.unitIds.includes(alias))
+    );
+  }
+  const kinds = criteria.unitKinds ?? [];
+  if (kinds.length === 0) return [...units];
+  return units.filter((unit) => kinds.includes(unitKindOfUnit(unit)));
+}
+
+/**
+ * Whether "any unit" would be ambiguous: no units named, and the wanted units (every one, free
+ * or not, so the answer is the same at every check) are of more than one kind. An automatic
+ * hold must not pick between a campsite and a cabin for the person.
+ */
+export function kindsAmbiguous(
+  criteria: Pick<MatchCriteria, 'unitIds'>,
+  wanted: readonly UnitAvailability[]
+): boolean {
+  if (criteria.unitIds.length > 0) return false;
+  return new Set(wanted.map(unitKindOfUnit)).size > 1;
 }
 
 /** The price rule for a run of nights: whether it passes, and whether every price is known. */

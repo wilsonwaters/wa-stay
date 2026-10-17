@@ -1,5 +1,5 @@
 import { SnipeResult, SnipeReleaseMode, SnipeStatus } from './common.types';
-import type { ProviderId, StayParams } from './provider.types';
+import type { ProviderId, StayParams, UnitKind } from './provider.types';
 import type { LocationRef, Stay, StayInput } from './stay.types';
 
 /**
@@ -20,6 +20,11 @@ export interface SiteSnipe {
   stay: Stay;
   /** Preferred units (ParkStay: site ids). Empty means any unit at the location. */
   unitIds: string[];
+  /**
+   * The stay types to hold (`UnitKind`s, no duplicates): without `unitIds`, only units of
+   * these kinds are candidates, a unit with no kind counting as `other`. Empty means any kind.
+   */
+  unitKinds: UnitKind[];
   /** The provider's own stay fields (ParkStay: `gearType`, `numVehicles`, `postcode`). */
   stayParams: StayParams;
   releaseMode: SnipeReleaseMode;
@@ -60,6 +65,8 @@ export interface SiteSnipeInput {
   location: LocationRef;
   stay: StayInput;
   unitIds?: string[];
+  /** Stay types (`SiteSnipe.unitKinds`); none or empty means any kind. Duplicates are dropped. */
+  unitKinds?: UnitKind[];
   stayParams?: StayParams;
   releaseMode: SnipeReleaseMode;
   releaseAt?: Date;

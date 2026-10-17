@@ -8,7 +8,9 @@
  *
  * Auto-hold (PQ4, architecture-notes §12.4): on a full match, a watch with `autoHold` places
  * one hold on the first matching unit through `provider.holds`, behind the same
- * one-booking-per-night guard as snipes, and stops. Payment stays a human step.
+ * one-booking-per-night guard as snipes, and stops. Payment stays a human step. It never
+ * picks between stay types: a watch with no units named whose wanted units are of more than
+ * one kind (`kindsAmbiguous`) notifies with a note instead.
  *
  * `execute` never throws for a failed check (only `NOT_FOUND`); after its `signal` aborts it
  * writes nothing, except a hold the provider already placed.
@@ -30,6 +32,7 @@ import { WatchResult } from '@shared/types/common.types';
 import type { StayFieldUse } from '@shared/types/provider.types';
 import { toStayQuery, type StayInput } from '@shared/types/stay.types';
 import { compareDates, isCalendarDate, todayIn } from '@shared/utils/calendar-date';
+import { cleanUnitKinds } from '@shared/utils/unit-kinds';
 import type { WatchRepository } from '../../database/repositories';
 import type { ProviderRegistry, ProviderWith } from '../../providers/registry';
 import { isAbortError, ProviderCapabilityError, toApiError } from '../../providers/sdk/errors';
@@ -39,10 +42,14 @@ import { logger } from '../../utils/logger';
 import type { NightGuard } from '../holds/night-guard';
 import type { NotificationService } from '../notifications/notification.service';
 import { resolveStayParams } from '../stay-params';
-import { fullMatches, partialMatches, wantedUnits } from './matching';
+import { fullMatches, kindsAmbiguous, partialMatches, wantedUnits } from './matching';
 import { effectiveIntervalMinutes, nextCheckAt } from './next-check';
 
 const log = logger.child({ module: 'watches' });
+
+/** Why an automatic hold was not placed at a place with more than one stay type. */
+const MIXED_KINDS_NOTE =
+  'Not held automatically: this place has more than one stay type. Choose a stay type or units to let WA Stay hold one.';
 
 /** The provider a watch runs on: one with availability. */
 export type WatchProvider = ProviderWith<'watches'>;
@@ -113,6 +120,7 @@ export class WatchService {
     this.assertStay(provider, input.stay);
     const prepared: WatchInput = {
       ...input,
+      unitKinds: cleanUnitKinds(input.unitKinds),
       stayParams: resolveStayParams(
         provider.manifest,
         stayFieldUses(input.autoHold === true),
@@ -133,8 +141,8 @@ export class WatchService {
   }
 
   /**
-   * Updates a watch. A change to what is checked (location, stay, units, stay fields) or to
-   * the interval makes it due at once.
+   * Updates a watch. A change to what is checked (location, stay, units, stay types, stay
+   * fields) or to the interval makes it due at once.
    */
   async update(id: number, updates: WatchUpdate): Promise<Watch> {
     const watch = this.require(id);
@@ -143,6 +151,7 @@ export class WatchService {
     if (updates.autoHold !== undefined) this.assertAutoHold(provider, updates.autoHold);
     if (updates.stay) this.assertStay(provider, updates.stay);
     const prepared: WatchUpdate = { ...updates };
+    if (updates.unitKinds !== undefined) prepared.unitKinds = cleanUnitKinds(updates.unitKinds);
     if (updates.stayParams !== undefined || updates.autoHold !== undefined) {
       prepared.stayParams = resolveStayParams(
         provider.manifest,
@@ -155,6 +164,7 @@ export class WatchService {
       updates.location !== undefined ||
       updates.stay !== undefined ||
       updates.unitIds !== undefined ||
+      updates.unitKinds !== undefined ||
       updates.stayParams !== undefined ||
       updates.checkIntervalMinutes !== undefined;
     if (reschedule) this.repo.setNextCheckAt(id, this.clock());
@@ -271,7 +281,7 @@ export class WatchService {
       }
 
       // One request: every unit, night by night. Wanted units are picked here, by id, name
-      // or an earlier id the provider recognises (`knownUnitIds` → `aliases`).
+      // or an earlier id the provider recognises (`knownUnitIds` → `aliases`), or by kind.
       const availability = await provider.availability.check(
         watch.location.externalId,
         toStayQuery(watch.stay, watch.stayParams),
@@ -302,7 +312,7 @@ export class WatchService {
       let hold: WatchHold | undefined;
       if (full.length > 0) {
         const outcome = watch.autoHold
-          ? await this.autoHold(watch, provider, full[0], signal)
+          ? await this.autoHold(watch, provider, full[0], kindsAmbiguous(watch, units), signal)
           : { note: undefined };
         hold = outcome.hold;
         // An automatic hold that was not placed says why (the run itself succeeded)
@@ -421,18 +431,24 @@ export class WatchService {
 
   /**
    * Places the auto-hold on `match`'s unit, or says (as a sentence for the found notification)
-   * why it did not.
+   * why it did not. `mixedKinds`: the watch names no units and wants units of more than one
+   * kind, so it holds nothing.
    */
   private async autoHold(
     watch: Watch,
     provider: WatchProvider,
     match: WatchMatch,
+    mixedKinds: boolean,
     signal: AbortSignal | undefined
   ): Promise<{ hold?: WatchHold; note?: string }> {
     const { manifest } = provider;
     const signInNote = `Sign in to ${manifest.shortName} to enable automatic holds`;
     if (!provider.holds || manifest.capabilities.holds !== true) {
       return { note: `${manifest.shortName} cannot hold sites automatically` };
+    }
+    if (mixedKinds) {
+      log.info(`Watch ${watch.id}: no automatic hold, more than one stay type`);
+      return { note: MIXED_KINDS_NOTE };
     }
     if (
       needsAccountForHolds(manifest.capabilities.account) &&

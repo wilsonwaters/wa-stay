@@ -2,6 +2,7 @@ import {
   Notification,
   NotificationInput,
   Watch,
+  type ProviderId,
   SiteSnipe,
   type Booking,
   type WatchHold,
@@ -30,6 +31,15 @@ function formatCalendarDate(date: string): string {
 
 /** What an email says a notification is about, beyond what is stored. */
 interface DispatchMeta {
+  locationName?: string;
+}
+
+/** What a general notification (`notifyWarning`) is about: a watch, snipe or booking. */
+export interface NotificationSubject {
+  providerId: ProviderId;
+  relatedType: RelatedType;
+  relatedId: number;
+  /** The place, for email. */
   locationName?: string;
 }
 
@@ -324,15 +334,32 @@ export class NotificationService {
   }
 
   /**
-   * Notify warning
+   * Notify warning. `about`, when the warning is about a watch, snipe or booking: its provider
+   * and its page (the notification links there), and its place for email.
    */
-  async notifyWarning(userId: number, title: string, message: string): Promise<void> {
-    await this.notify({
-      userId,
-      type: NotificationType.WARNING,
-      title,
-      message,
-    });
+  async notifyWarning(
+    userId: number,
+    title: string,
+    message: string,
+    about?: NotificationSubject
+  ): Promise<void> {
+    await this.notify(
+      {
+        userId,
+        type: NotificationType.WARNING,
+        title,
+        message,
+        ...(about
+          ? {
+              providerId: about.providerId,
+              relatedId: about.relatedId,
+              relatedType: about.relatedType,
+              actionUrl: relatedPath(about.relatedType, about.relatedId),
+            }
+          : {}),
+      },
+      about?.locationName ? { locationName: about.locationName } : undefined
+    );
   }
 
   /**

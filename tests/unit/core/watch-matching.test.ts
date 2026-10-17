@@ -1,10 +1,17 @@
 /**
- * What a watch finds in one availability answer (`core/watches/matching.ts`): wanted units,
- * full matches, partial runs from the same nights, and the per-night price rule.
+ * What a watch finds in one availability answer (`core/watches/matching.ts`): wanted units (by
+ * id, else by stay type), whether "any unit" spans stay types, full matches, partial runs from
+ * the same nights, and the per-night price rule.
  */
 
-import { fullMatches, partialMatches, priceCheck, wantedUnits } from '@main/core/watches/matching';
-import type { NightStatus, UnitAvailability } from '@shared/types';
+import {
+  fullMatches,
+  kindsAmbiguous,
+  partialMatches,
+  priceCheck,
+  wantedUnits,
+} from '@main/core/watches/matching';
+import type { NightStatus, UnitAvailability, UnitKind } from '@shared/types';
 
 const D1 = '2026-12-01';
 const D2 = '2026-12-02';
@@ -50,6 +57,90 @@ describe('watch matching', () => {
         'class:117',
       ]);
       expect(wantedUnits({ unitIds: ['350'] }, regrouped)).toEqual([]);
+    });
+  });
+
+  describe('stay types (unitKinds)', () => {
+    const kinded = (unitId: string, unitKind?: UnitKind, nights: NightStatus[] = []) =>
+      unit(unitId, nights, unitKind ? { unitKind } : {});
+    // A mixed place: two sites, a cabin, a dorm bed and a unit the provider gives no kind
+    const mixed = [
+      kinded('s1', 'campsite'),
+      kinded('c1', 'cabin'),
+      kinded('s2', 'campsite'),
+      kinded('d1', 'dorm'),
+      kinded('x1'),
+    ];
+    const ids = (units: UnitAvailability[]) => units.map((u) => u.unitId);
+
+    it('keeps only the units of the kinds wanted, in the provider’s order', () => {
+      expect(ids(wantedUnits({ unitIds: [], unitKinds: ['cabin'] }, mixed))).toEqual(['c1']);
+      expect(ids(wantedUnits({ unitIds: [], unitKinds: ['dorm', 'campsite'] }, mixed))).toEqual([
+        's1',
+        's2',
+        'd1',
+      ]);
+      expect(wantedUnits({ unitIds: [], unitKinds: ['room'] }, mixed)).toEqual([]);
+    });
+
+    it('counts a unit with no kind, or a kind it does not know, as other', () => {
+      const odd = [...mixed, unit('q1', [], { unitKind: 'castle' as UnitKind })];
+      expect(ids(wantedUnits({ unitIds: [], unitKinds: ['other'] }, odd))).toEqual(['x1', 'q1']);
+      expect(ids(wantedUnits({ unitIds: [], unitKinds: ['cabin'] }, odd))).toEqual(['c1']);
+    });
+
+    it('ids win over kinds: named units match by id, name or alias whatever their kind', () => {
+      const regrouped = [...mixed, { ...kinded('class:9', 'glamping'), aliases: ['309'] }];
+      expect(
+        ids(wantedUnits({ unitIds: ['s1', 'Site d1', '309'], unitKinds: ['cabin'] }, regrouped))
+      ).toEqual(['s1', 'd1', 'class:9']);
+    });
+
+    it('with no units and no kinds (none or empty) wants every unit', () => {
+      expect(ids(wantedUnits({ unitIds: [] }, mixed))).toEqual(ids(mixed));
+      expect(ids(wantedUnits({ unitIds: [], unitKinds: [] }, mixed))).toEqual(ids(mixed));
+    });
+
+    it('a provider that sets no kinds: every unit is other, so a cabin watch matches nothing', () => {
+      const plain = [unit('1', []), unit('2', [])];
+      expect(wantedUnits({ unitIds: [], unitKinds: ['cabin'] }, plain)).toEqual([]);
+      expect(kindsAmbiguous({ unitIds: [] }, plain)).toBe(false);
+    });
+
+    it('kindsAmbiguous: no units named and the wanted units span more than one kind', () => {
+      expect(kindsAmbiguous({ unitIds: [] }, mixed)).toBe(true);
+      expect(kindsAmbiguous({ unitIds: [] }, [kinded('s1', 'campsite'), kinded('x1')])).toBe(true);
+      const twoKinds = { unitIds: [], unitKinds: ['cabin', 'dorm'] as UnitKind[] };
+      expect(kindsAmbiguous(twoKinds, wantedUnits(twoKinds, mixed))).toBe(true);
+    });
+
+    it('kindsAmbiguous is false for one kind, for named units, and for a place with one unit', () => {
+      const cabins = { unitIds: [], unitKinds: ['cabin'] as UnitKind[] };
+      expect(kindsAmbiguous(cabins, wantedUnits(cabins, mixed))).toBe(false);
+      expect(
+        kindsAmbiguous({ unitIds: [] }, [kinded('s1', 'campsite'), kinded('s2', 'campsite')])
+      ).toBe(false);
+      expect(kindsAmbiguous({ unitIds: ['s1', 'c1'] }, mixed)).toBe(false);
+      expect(kindsAmbiguous({ unitIds: [] }, [kinded('c1', 'cabin')])).toBe(false);
+      expect(kindsAmbiguous({ unitIds: [] }, [])).toBe(false);
+    });
+
+    it('kindsAmbiguous counts every wanted unit, free or not', () => {
+      const oneFree = [
+        kinded('s1', 'campsite', [night(D1, 'available')]),
+        kinded('c1', 'cabin', [night(D1, 'booked')]),
+      ];
+      expect(kindsAmbiguous({ unitIds: [] }, oneFree)).toBe(true);
+    });
+
+    it('partial runs come from the same kind-filtered units', () => {
+      const units = [
+        kinded('s1', 'campsite', [night(D1, 'available'), night(D2, 'booked')]),
+        kinded('c1', 'cabin', [night(D1, 'booked'), night(D2, 'available')]),
+      ];
+      const wanted = wantedUnits({ unitIds: [], unitKinds: ['cabin'] }, units);
+      expect(partialMatches({}, wanted).map((m) => [m.unitId, m.arrival])).toEqual([['c1', D2]]);
+      expect(fullMatches({}, wanted)).toEqual([]);
     });
   });
 

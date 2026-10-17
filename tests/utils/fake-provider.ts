@@ -18,7 +18,7 @@
  * - `peakInFlight(module)`: the most calls into the module at once;
  * - `accessStates`: the states the access gate steps through on `ensure()`;
  * - `availability`: a state per unit for every night, or a list of nights (state and price);
- *   `setAvailability` changes it later;
+ *   `setAvailability` changes it later; `unitKinds`: what each unit id is (none by default);
  * - `scriptHold(...results)`: the next `holds.create` calls answer these;
  * - `account` / `setAccount(state)`: what `auth.isSignedIn` answers; `auth` replaces its
  *   sign-in URL, origins or completion pages.
@@ -62,6 +62,7 @@ import type {
   ProviderCapabilities,
   ProviderManifest,
   StayQuery,
+  UnitKind,
 } from '@shared/types/provider.types';
 import type { LocationDetail, LocationSummary } from '@shared/types/catalog.types';
 import { SnipeReleaseMode } from '@shared/types/common.types';
@@ -109,6 +110,8 @@ export interface FakeProviderOptions {
    * default to `u1` (available) and `u2` (booked).
    */
   availability?: Record<string, Record<string, FakeUnitNights>>;
+  /** What each unit is, by unit id, at every location (`unitKind`). Units left out have none. */
+  unitKinds?: Record<string, UnitKind>;
   /** The signed-in state `auth.isSignedIn` reports (`setAccount` changes it). */
   account?: AccountStatus['state'];
   /** Replaces parts of the `browser-session` auth (sign-in URL, origins, completion pages). */
@@ -350,10 +353,12 @@ export function createFakeProvider(options: FakeProviderOptions = {}): FakeProvi
         const fullyAvailable =
           nights.length > 0 && nights.every((night) => night.state === 'available');
         const priced = nights.every((night) => night.price !== undefined);
+        const unitKind = options.unitKinds?.[unitId];
         return {
           unitId,
           unitName: `Site ${unitId}`,
           unitType: 'Tent site',
+          ...(unitKind ? { unitKind } : {}),
           nights,
           fullyAvailable,
           total:

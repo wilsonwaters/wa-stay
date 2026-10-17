@@ -18,6 +18,7 @@ export const mockSiteSnipeInput: SiteSnipeInput = {
     concessions: 0,
   },
   unitIds: ['136', '137'],
+  unitKinds: [],
   stayParams: { gearType: 'all', numVehicles: 1, postcode: '6000' },
   releaseMode: SnipeReleaseMode.DAILY_ROLLOVER,
   accessGateEnabled: false,
@@ -44,6 +45,7 @@ export const mockSiteSnipe: SiteSnipe = {
     concessions: 0,
   },
   unitIds: ['136', '137'],
+  unitKinds: [],
   stayParams: { gearType: 'all', numVehicles: 1, postcode: '6000' },
   releaseMode: SnipeReleaseMode.DAILY_ROLLOVER,
   releaseAt: new Date('2026-01-19T16:00:00Z'),
@@ -75,6 +77,7 @@ export const mockCancellationSnipe: SiteSnipe = {
   releaseMode: SnipeReleaseMode.CANCELLATION,
   releaseAt: undefined,
   unitIds: [],
+  unitKinds: [],
   status: SnipeStatus.SNIPING,
 };
 

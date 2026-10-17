@@ -16,11 +16,11 @@ ParkStay WA is the only provider with Site Sniper today. Its hold lasts **30 min
 
 The release modes come from the provider's manifest (`releaseModes`). ParkStay has three:
 
-| Mode | In the app | What happens |
-| --- | --- | --- |
-| `daily_rollover` | **When new dates open** | ParkStay takes bookings 180 days ahead. Each day one more arrival date opens at the campground's own release time, Perth time (Bungarra's is 2:00 am; until the app has read a campground's time it assumes midnight). Site Sniper works out the instant for your arrival date. Uses the DBCA queue. |
-| `scheduled` | **At a scheduled time** | For campgrounds whose dates are released in blocks, such as those on the Ningaloo coast, at a time you set. The suggested default is the next first Tuesday of a month at 10:00 am AWST, but DBCA can change it, so check the published time. Uses the DBCA queue. |
-| `cancellation` | **When someone cancels** | There is no waitlist; cancelled and lapsed holds reappear straight away. Site Sniper keeps checking (no faster than every 3 s) until a site frees up. |
+| Mode             | In the app               | What happens                                                                                                                                                                                                                                                                                         |
+| ---------------- | ------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `daily_rollover` | **When new dates open**  | ParkStay takes bookings 180 days ahead. Each day one more arrival date opens at the campground's own release time, Perth time (Bungarra's is 2:00 am; until the app has read a campground's time it assumes midnight). Site Sniper works out the instant for your arrival date. Uses the DBCA queue. |
+| `scheduled`      | **At a scheduled time**  | For campgrounds whose dates are released in blocks, such as those on the Ningaloo coast, at a time you set. The suggested default is the next first Tuesday of a month at 10:00 am AWST, but DBCA can change it, so check the published time. Uses the DBCA queue.                                   |
+| `cancellation`   | **When someone cancels** | There is no waitlist; cancelled and lapsed holds reappear straight away. Site Sniper keeps checking (no faster than every 3 s) until a site frees up.                                                                                                                                                |
 
 Joining the DBCA queue early gives no advantage: for scheduled releases DBCA re-allocates
 queue places at random at the release time. WA Stay joins genuinely at the start of its
@@ -48,14 +48,14 @@ and dates). The flow has five steps:
 
 ## What a snipe does
 
-| Status | Meaning |
-| --- | --- |
-| Armed | Scheduled; a timer is set for the release. |
-| Waiting for release | Counting down to the release, less the early start. |
-| Queueing | Joining or holding the provider's queue. |
-| Sniping | Checking availability every few seconds across the release. |
-| Held | A site is held for you: pay before the countdown ends. |
-| Booked | The payment was confirmed; the booking is under Bookings. |
+| Status                        | Meaning                                                                                                                                                       |
+| ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Armed                         | Scheduled; a timer is set for the release.                                                                                                                    |
+| Waiting for release           | Counting down to the release, less the early start.                                                                                                           |
+| Queueing                      | Joining or holding the provider's queue.                                                                                                                      |
+| Sniping                       | Checking availability every few seconds across the release.                                                                                                   |
+| Held                          | A site is held for you: pay before the countdown ends.                                                                                                        |
+| Booked                        | The payment was confirmed; the booking is under Bookings.                                                                                                     |
 | Failed, Expired, Hold expired | It ended: no site within the window or attempts, the arrival date passed, or the hold ran out unpaid. A snipe you stop is disabled, and can be started again. |
 
 - Each snipe has its own timer chain (`src/main/scheduler/snipe-runner.ts`), re-armed after
@@ -63,6 +63,14 @@ and dates). The flow has five steps:
 - **One booking per night.** Before asking for a hold, the snipe reserves the stay's nights.
   A night already held or booked by another snipe or by a watch's automatic hold stops it with
   a clear message (`core/holds/night-guard.ts`).
+- **Which unit.** The first fully available unit of those you chose, or, with none chosen, of
+  the stay types you chose (campsites, cabins and villas, rooms, dorms or glamping; none: any
+  kind; a unit the provider gives no kind counts as "other"). A snipe never takes "any unit"
+  across stay types: with no units chosen, once one of its candidates comes free and they,
+  booked or free, are of more than one kind, it holds nothing, reserves no night and ends **Failed** with "Free units of
+  more than one stay type: choose a stay type or units for this snipe", and you get a
+  warning notification. Choose units (the snipe flow does not offer stay types yet) and start
+  it again.
 - **Run now** runs one attempt immediately (only while the snipe is running).
 - **WA Stay must be running**, and the computer awake, at the release.
 

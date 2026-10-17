@@ -11,7 +11,14 @@ import {
 import { WatchResult } from '@shared/types/common.types';
 import { DEFAULT_WATCH_INTERVAL } from '@shared/constants';
 import { AppError } from '../../utils/app-error';
-import { readStay, readStayParams, readUnitIds, StayRow, stayValues } from '../stay-columns';
+import {
+  readStay,
+  readStayParams,
+  readUnitIds,
+  readUnitKinds,
+  StayRow,
+  stayValues,
+} from '../stay-columns';
 
 interface WatchRow extends StayRow {
   id: number;
@@ -41,6 +48,8 @@ interface WatchRow extends StayRow {
   hold_unit_id: string | null;
   payment_url: string | null;
   last_error: string | null;
+  // Migration v11
+  unit_kinds: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -56,9 +65,9 @@ export class WatchRepository extends BaseRepository<Watch> {
       INSERT INTO watches (
         user_id, provider_id, name, location_external_id, location_name, area_name,
         arrival_date, departure_date, num_adults, num_children, num_infants, num_concessions,
-        unit_ids, stay_params, check_interval_minutes, auto_book, notify_only,
+        unit_ids, unit_kinds, stay_params, check_interval_minutes, auto_book, notify_only,
         allow_partial_match, max_price, notes
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
     const result = stmt.run(
@@ -70,6 +79,7 @@ export class WatchRepository extends BaseRepository<Watch> {
       input.location.areaName ?? null,
       ...stayValues(input.stay),
       JSON.stringify(input.unitIds ?? []),
+      JSON.stringify(input.unitKinds ?? []),
       JSON.stringify(input.stayParams ?? {}),
       input.checkIntervalMinutes || DEFAULT_WATCH_INTERVAL,
       input.autoHold ? 1 : 0,
@@ -113,6 +123,7 @@ export class WatchRepository extends BaseRepository<Watch> {
       push('num_concessions', concessions);
     }
     if (updates.unitIds !== undefined) push('unit_ids', JSON.stringify(updates.unitIds));
+    if (updates.unitKinds !== undefined) push('unit_kinds', JSON.stringify(updates.unitKinds));
     if (updates.stayParams !== undefined) push('stay_params', JSON.stringify(updates.stayParams));
     if (updates.checkIntervalMinutes !== undefined) {
       push('check_interval_minutes', updates.checkIntervalMinutes);
@@ -382,6 +393,7 @@ export class WatchRepository extends BaseRepository<Watch> {
       name: row.name,
       stay: readStay(row),
       unitIds: readUnitIds(row.unit_ids, where),
+      unitKinds: readUnitKinds(row.unit_kinds, where),
       stayParams: readStayParams(row.stay_params, where),
       checkIntervalMinutes: row.check_interval_minutes,
       isActive: Boolean(row.is_active),

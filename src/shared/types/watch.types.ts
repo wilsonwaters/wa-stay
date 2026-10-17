@@ -1,6 +1,6 @@
 import type { ApiErrorCode } from './api.types';
 import { WatchResult } from './common.types';
-import type { ProviderId, StayParams, UnitAvailability } from './provider.types';
+import type { ProviderId, StayParams, UnitAvailability, UnitKind } from './provider.types';
 import type { LocationRef, Stay, StayInput } from './stay.types';
 
 /**
@@ -19,6 +19,11 @@ export interface Watch {
   stay: Stay;
   /** Preferred units (ParkStay: site ids or names). Empty means any unit. */
   unitIds: string[];
+  /**
+   * The stay types wanted (`UnitKind`s, no duplicates): only units of these kinds match, a
+   * unit with no kind counting as `other`. Empty means any kind. `unitIds`, when set, win.
+   */
+  unitKinds: UnitKind[];
   /** The provider's own stay fields (ParkStay: `parkId`, `gearType`). */
   stayParams: StayParams;
   checkIntervalMinutes: number;
@@ -58,6 +63,8 @@ export interface WatchInput {
   location: LocationRef;
   stay: StayInput;
   unitIds?: string[];
+  /** Stay types (`Watch.unitKinds`); none or empty means any kind. Duplicates are dropped. */
+  unitKinds?: UnitKind[];
   stayParams?: StayParams;
   /** One of `WATCH_INTERVAL_OPTIONS`. */
   checkIntervalMinutes?: number;
