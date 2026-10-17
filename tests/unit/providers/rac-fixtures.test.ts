@@ -44,7 +44,9 @@ function filesIn(dir: string): string[] {
 const read = (file: string): string => fs.readFileSync(path.join(ROOT, file), 'utf8');
 
 /** What in `text` breaks rule 7, as messages ([] when nothing). */
-function fixtureViolations(text: string): string[] {
+function fixtureViolations(raw: string): string[] {
+  // JSON may escape its slashes (`https:\/\/…`): read it as written out.
+  const text = raw.replace(/\\\//g, '/');
   const found: string[] = [];
   // Images: every address of a photo, and every img source
   for (const [url] of text.matchAll(/https?:\/\/[^\s"'<>)\\]+/g)) {
@@ -141,6 +143,7 @@ describe('RAC fixtures (terms rule 7)', () => {
     const bad = [
       '<img src="https://driveau.newbook.cloud/crop_800_450/instances_d895bd707965db25abb932aba767878f_6.jpg">',
       '<img data-src="https://example.com/photo.png">',
+      '{"photo":"https:\\/\\/driveau.newbook.cloud\\/crop_800_450\\/instances_d895bd70_6.jpg"}',
       '<div class="accommodation-item__description">Wake up to birdsong.</div>',
       '{"api_key":"instances_d895bd707965db25abb932aba767878f"}',
       '{"online_cart_url":"https://parksandresorts.rac.com.au/busselton/booking/?cart"}',

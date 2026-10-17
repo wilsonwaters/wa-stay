@@ -65,8 +65,8 @@ describe('unitKindOf', () => {
 
 /**
  * Every park's categories (names and NewBook type ids), from the research's captures of
- * 16–17 Oct 2026: the widget parks' book-now pages and the native parks' availability answers.
- * Facts only (category names), no copy.
+ * 16–17 Oct 2026: the widget parks' book-now pages and the native parks' availability answers
+ * (inactive categories and Exmouth's closed site included). Facts only (category names), no copy.
  */
 const CATEGORIES: Record<string, Array<[string, string]>> = {
   busselton: [
@@ -104,12 +104,21 @@ const CATEGORIES: Record<string, Array<[string, string]>> = {
   esperance: [
     ['The Azure Lodge', '5'],
     ['Three Bedroom Bay Villa', '5'],
+    ['Three Bedroom Pool Villa', '5'],
+    ['Three Bedroom Garden Villa', '5'],
+    ['Two Bedroom Bay Villa', '5'],
     ['Two Bedroom Pool Villa', '5'],
+    ['Accessible Two Bedroom Pool Villa', '5'],
     ['Accessible One Bedroom Garden Villa', '5'],
     ['One Bedroom Bay Studio', '5'],
+    ['One Bedroom Garden Studio', '5'],
+    ['One Bedroom Studio', '5'],
     ['Two Bedroom Pet Friendly Park Cabin', '5'],
     ['Ensuite Powered Site', '2'],
     ['Powered Mat Site', '2'],
+    ['Powered Slab Site', '2'],
+    ['Powered Campervan Site', '2'],
+    ['Powered Tent Site', '2'],
     ['Powered Big Rig Slab Site', '2'],
   ],
   'margaret-river': [
@@ -125,27 +134,49 @@ const CATEGORIES: Record<string, Array<[string, string]>> = {
     ['Blue Reef Motel', '1'],
     ['Blue Reef Queen', '1'],
     ['Blue Reef Studio', '1'],
+    ['Ensuite Site - Natural Ground - No Pets', '2'],
     ['Ensuite Site - Slab - No Pets', '2'],
     ['One Bedroom Cabin', '1'],
-    ['Two Bedroom Budget Cabin with Shared Bathroom', '1'],
+    ['One Bedroom Family Cabin with External Bathroom', '1'],
+    ['One Bedroom Family Cabin with Shared Bathroom', '1'],
+    ['Powered Natural Ground Site - No Pets', '2'],
+    ['Powered Site - No Pets', '2'],
     ['Powered Site - Pets Welcome', '2'],
+    ['Powered Slab Site - No Pets', '2'],
+    ['Two Bedroom Budget Cabin with Shared Bathroom', '1'],
+    ['Two Bedroom Cabin', '1'],
+    ['Two Bedroom Double Cabin with External Bathroom', '1'],
+    ['Two Bedroom Pool View Cabin', '1'],
     ['Unpowered Site - No Pets', '2'],
   ],
   'karri-valley': [
     ['Lakeside Room', '2'],
     ['Lakeside Room Queen', '2'],
     ['Two Bedroom Chalet - Forest View', '2'],
+    ['Three Bedroom Chalet - Forest View', '2'],
+    ['Two Bedroom Chalet - Lake View', '2'],
     ['Three Bedroom Chalet - Lake View', '2'],
+    ['Three Bedroom Chalet - Family Lake View', '2'],
+    ['Two Bedroom Accessible Forest View Chalet', '2'],
     ['Ensuite Site', '7'],
+    ['Powered Site', '7'],
     ['Powered Slab Site', '7'],
     ['Unpowered Camper Site', '7'],
   ],
   'monkey-mia': [
     ['Accessible Two Bedroom Beachfront Villa', '1'],
     ['Garden View Room', '1'],
+    ['Pool View Room', '1'],
+    ['Beach View Room', '1'],
     ['Family Studio', '1'],
+    ['Superior Beach View Room', '1'],
+    ['Family Garden View Room', '1'],
+    ['2 Bedroom Beachfront Villa', '1'],
+    ['3 Bedroom Beachfront Villa', '1'],
     ['Budget Room Shared Bathroom', '1'],
     ['Powered Ensuite Site', '2'],
+    ['Powered Beach Site', '2'],
+    ['Powered Site', '2'],
     ['Unpowered Camping', '2'],
     ['Exclusive Use 4 Bed Dorms', '7'],
     ['Exclusive Use 8 Bed Dorms', '7'],
