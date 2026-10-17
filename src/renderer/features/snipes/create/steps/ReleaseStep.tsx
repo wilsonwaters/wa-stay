@@ -4,6 +4,7 @@ import type { ProviderManifest } from '../../../../../shared/types/provider.type
 import type { SnipeAction } from '../../../../../shared/types/site-sniper.types';
 import type { UnitNoun } from '../../../../components/stay/UnitPicker';
 import { Field, RadioCard, RadioCardGroup, TextField } from '../../../../components/ui';
+import { cx } from '../../../../components/ui/cx';
 import { windowCapMinutes } from '../snipeAction';
 import type { SnipeFormValues } from '../snipeForm';
 import { isComputedMode, useReleasePreview } from '../useReleasePreview';
@@ -15,6 +16,11 @@ export interface ReleaseStepProps {
   noun: UnitNoun;
   /** The place's release rule in words (`LocationDetail.releaseInfo`), when the provider has one. */
   releaseInfo?: string;
+  /**
+   * Why the provider could not time this stay in the chosen mode, from a refused create (its
+   * `VALIDATION` on `releaseAt`): shown in place of the preview's guess.
+   */
+  refusal?: string;
   now: Date;
 }
 
@@ -65,7 +71,7 @@ function WhenFree({ manifest, noun }: { manifest: ProviderManifest; noun: UnitNo
  * what happens when the dates are free (`WhenFree`), and the advanced timing, whose window is
  * checked again when a mode with a limit is chosen.
  */
-export function ReleaseStep({ manifest, noun, releaseInfo, now }: ReleaseStepProps) {
+export function ReleaseStep({ manifest, noun, releaseInfo, refusal, now }: ReleaseStepProps) {
   const { register, watch, setValue, formState, getFieldState, trigger } =
     useFormContext<SnipeFormValues>();
   // The date and time are checked together, on the date: a new time re-checks a date's error.
@@ -115,7 +121,11 @@ export function ReleaseStep({ manifest, noun, releaseInfo, now }: ReleaseStepPro
               isComputedMode(mode.id) ? (
                 <>
                   <span className="block">{mode.description}</span>
-                  <span className="mt-1 block font-semibold text-fg">{preview}</span>
+                  {refusal && mode.id === releaseMode ? (
+                    <span className="mt-1 block font-semibold text-danger">{refusal}</span>
+                  ) : (
+                    <span className="mt-1 block font-semibold text-fg">{preview}</span>
+                  )}
                 </>
               ) : (
                 mode.description
@@ -125,7 +135,11 @@ export function ReleaseStep({ manifest, noun, releaseInfo, now }: ReleaseStepPro
         ))}
       </RadioCardGroup>
       {errors.releaseMode && (
-        <p role="alert" className="text-sm text-danger">
+        // Said once on screen: a refusal shown in its card is announced here only
+        <p
+          role="alert"
+          className={cx('text-sm text-danger', errors.releaseMode.message === refusal && 'sr-only')}
+        >
           {errors.releaseMode.message}
         </p>
       )}

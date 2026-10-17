@@ -60,7 +60,9 @@ and dates). The flow has five steps:
    120), Check every (seconds, default 1.5; never under 0.5), Keep trying for (minutes, default
    15; a provider may set a limit for a release mode, `maxWindowMinutes`: the field says it, "Up
    to 30 minutes on {provider}", and refuses a longer window, and an older, longer one is cut to
-   it), Most attempts (no limit by default).
+   it), Most attempts (no limit by default). When the provider cannot time the stay in the mode
+   chosen (dates already open, a release it has not announced), creating the snipe is refused,
+   and the mode's card and the Review say why instead of the preview.
 5. **Review**: the summary, the queue use, what happens when the dates are free, a name and
    notes, and **Book responsibly**. For a snipe that holds, with an optional account (ParkStay)
    it suggests connecting before the release so checkout is quicker; for a provider whose holds

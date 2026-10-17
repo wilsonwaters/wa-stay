@@ -34,6 +34,7 @@ import { ReleaseStep } from './steps/ReleaseStep';
 import { ReviewStep } from './steps/ReviewStep';
 import { StayStep } from './steps/StayStep';
 import { isComputedMode, useReleasePreview } from './useReleasePreview';
+import { useReleaseRefusal } from './useReleaseRefusal';
 import { zonedInstant } from './zonedTime';
 
 const STEPS: (FlowStep & { id: SnipeStepId })[] = [
@@ -87,6 +88,7 @@ export function SnipeFlow({ manifests, initialValues, initialStep, notices = [] 
   });
   const { watch, setValue, getValues, trigger, getFieldState, setError, reset } = form;
   const values = watch();
+  const refusal = useReleaseRefusal(values);
   const manifest = manifestOf(values.providerId);
   const today = providerToday(manifest, now);
   const detail = useLocationDetail(
@@ -155,6 +157,8 @@ export function SnipeFlow({ manifests, initialValues, initialStep, notices = [] 
       const fields = (apiError.issues ?? [])
         .map((path) => issueField(path, mode))
         .filter((n): n is SnipeFieldName => Boolean(n));
+      if (apiError.code === 'VALIDATION' && apiError.issues?.includes('releaseAt'))
+        refusal.remember(getValues(), apiError.message);
       if (apiError.code === 'VALIDATION' && fields.length > 0) {
         for (const name of fields) setError(name, { type: 'server', message: apiError.message });
         const failing = firstStepWithError();
@@ -175,11 +179,12 @@ export function SnipeFlow({ manifests, initialValues, initialStep, notices = [] 
       ? zonedInstant(values.releaseDate, values.releaseTime, manifest.timezone)
       : undefined;
   const modeLabel = releaseModeLabel(manifest, values.releaseMode);
+  const { refused } = refusal;
   const releaseSummary =
     scheduledAt && manifest
       ? `${modeLabel}: ${whenInZone(scheduledAt, manifest.timezone)}`
       : isComputedMode(values.releaseMode)
-        ? `${modeLabel}. ${preview}`
+        ? `${modeLabel}. ${refused ?? preview}`
         : modeLabel;
 
   return (
@@ -218,6 +223,7 @@ export function SnipeFlow({ manifests, initialValues, initialStep, notices = [] 
               manifest={manifest}
               noun={noun}
               releaseInfo={detail.data?.releaseInfo}
+              refusal={refused}
               now={now}
             />
           )}
