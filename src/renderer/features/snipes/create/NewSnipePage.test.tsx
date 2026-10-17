@@ -25,6 +25,27 @@ describe('NewSnipePage', () => {
     await waitFor(() => expect(location).toHaveFocus());
   });
 
+  it('says what Site Sniper does, in the providers’ words for their units', async () => {
+    renderWithApp({ route: '/site-sniper/new', api: api() });
+    expect(
+      await screen.findByText(
+        'Choose a place, your dates and when its sites are released. Site Sniper alerts you the moment one opens or, where the provider allows it, tries to hold it; you book and pay yourself.'
+      )
+    ).toBeInTheDocument();
+  });
+
+  it('without a provider for Site Sniper, says so in words of dates, not units', async () => {
+    renderWithApp({ route: '/site-sniper/new', api: api({}, [FAKE_MANIFEST]) });
+    expect(
+      await screen.findByRole('heading', { name: 'No provider supports Site Sniper yet' })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        'When a provider that releases its dates on a schedule is added, you can create a snipe here.'
+      )
+    ).toBeInTheDocument();
+  });
+
   it('lists the place’s units as checkboxes, never a free-text site id', async () => {
     const { user } = renderWithApp({ route: PREFILL, api: api() });
     await step(/Your stay$/);

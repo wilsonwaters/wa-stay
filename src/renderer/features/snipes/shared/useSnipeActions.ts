@@ -32,6 +32,11 @@ export function runResultMessage(
   }
   if (!result.success) return result.error ?? `The attempt at ${place} failed. Try again soon.`;
   switch (result.result) {
+    case SnipeResult.ALERTED: {
+      const noun = heldUnitNoun(snipe, manifest, units?.units, result.matchedSiteId);
+      const unit = unitLabel(result.matchedSiteId, noun, units?.names);
+      return `${unit} is free at ${place}. Book on ${provider}.`;
+    }
     case SnipeResult.TOO_EARLY:
       return `${place} isn't released yet. Site Sniper tries again at the release.`;
     case SnipeResult.UNAVAILABLE:
@@ -43,16 +48,26 @@ export function runResultMessage(
   }
 }
 
+export interface SnipeActionOptions {
+  /**
+   * After Arm, Arm again or Disarm succeeds, when the button pressed goes away: focus the
+   * snipe's status line, so focus is never left on the page's body.
+   */
+  onActiveChanged?: () => void;
+}
+
 /**
  * The actions a snipe offers wherever it is shown (card, detail), each telling the outcome in a
- * toast. Arming a snipe of a provider whose holds need an account, while signed out, opens the
- * Connect prompt instead (`connectOpen`), as does main refusing it for that (`AUTH_REQUIRED`,
- * when the recorded account was stale; §12.32). `units` names a unit Run now holds.
+ * toast. Arming a snipe that holds, of a provider whose holds need an account, while signed
+ * out, opens the Connect prompt instead (`connectOpen`), as does main refusing it for that
+ * (`AUTH_REQUIRED`, when the recorded account was stale; §12.32); an alert needs no account.
+ * `units` names a unit Run now holds or alerts on.
  */
 export function useSnipeActions(
   snipe: SiteSnipe,
   manifest: ProviderManifest | undefined,
-  units?: PlaceUnits
+  units?: PlaceUnits,
+  { onActiveChanged }: SnipeActionOptions = {}
 ) {
   const toast = useToast();
   const setActive = useSetSnipeActive();
@@ -64,6 +79,7 @@ export function useSnipeActions(
   const running = useRef(false);
   const requirement = manifest?.capabilities.account;
   const needsAccount =
+    snipe.action === 'hold' &&
     (requirement === 'required' || requirement === 'required-for-holds') &&
     account.data?.status !== 'signed-in';
 
@@ -71,7 +87,10 @@ export function useSnipeActions(
     setActive.mutate(
       { id: snipe.id, active },
       {
-        onSuccess: () => toast.success(active ? `Armed ${snipe.name}` : `Disarmed ${snipe.name}`),
+        onSuccess: () => {
+          toast.success(active ? `Armed ${snipe.name}` : `Disarmed ${snipe.name}`);
+          onActiveChanged?.();
+        },
         onError: (error) => {
           if (active && manifest && toApiError(error).code === 'AUTH_REQUIRED')
             setConnectOpen(true);

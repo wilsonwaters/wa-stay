@@ -4,8 +4,15 @@
  * number of steps in every state.
  */
 import { SnipeStatus } from '../../../../shared/types/common.types';
-import { makeSnipe } from '@tests/fixtures/renderer/snipes';
-import { isFinished, releaseLineFor, sortSnipes, statusPillFor, timelineSteps } from './snipeState';
+import { makeAlertedSnipe, makeSnipe } from '@tests/fixtures/renderer/snipes';
+import {
+  isFinished,
+  primaryActionFor,
+  releaseLineFor,
+  sortSnipes,
+  statusPillFor,
+  timelineSteps,
+} from './snipeState';
 
 const ids = (steps: ReturnType<typeof timelineSteps>) => steps.map((s) => `${s.id}:${s.state}`);
 
@@ -54,5 +61,11 @@ describe('an alerted snipe', () => {
       makeSnipe({ id: 4, status: SnipeStatus.SNIPING }),
     ];
     expect(sortSnipes(list).map((s) => s.id)).toEqual([4, 3, 2, 1]);
+  });
+});
+
+describe('an alerted snipe’s action (R13)', () => {
+  it('leads with Arm again', () => {
+    expect(primaryActionFor(makeAlertedSnipe())).toBe('arm-again');
   });
 });

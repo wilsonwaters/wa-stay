@@ -1,6 +1,7 @@
 import { useProviders } from '../../../api';
 import { ROUTES } from '../../../app/routes';
 import { Button, EmptyState, Notice, PageHeader, Spinner } from '../../../components/ui';
+import { NO_SNIPE_PROVIDER_DESCRIPTION, sniperNoun } from '../shared/snipeNouns';
 import { SnipeFlow } from './SnipeFlow';
 import { useSnipePrefill } from './useSnipePrefill';
 
@@ -12,6 +13,8 @@ export function NewSnipePage() {
   const manifests = providers.data ?? NO_MANIFESTS;
   const prefill = useSnipePrefill(manifests);
   const canSnipe = manifests.some((m) => m.capabilities.snipes);
+  // What the providers with Site Sniper call their units (R9): ParkStay's sites
+  const noun = sniperNoun(manifests);
 
   let body;
   if (providers.isPending || (providers.isSuccess && !prefill.ready)) {
@@ -35,7 +38,7 @@ export function NewSnipePage() {
       <EmptyState
         size="md"
         title="No provider supports Site Sniper yet"
-        description="When a provider that releases sites on a schedule is added, you can create a snipe here." // unit-noun-ok: R13 rewrites the Site Sniper intros
+        description={NO_SNIPE_PROVIDER_DESCRIPTION}
       />
     );
   } else {
@@ -53,7 +56,7 @@ export function NewSnipePage() {
     <div className="mx-auto flex w-full max-w-3xl flex-col gap-8 px-6 py-8 lg:px-8">
       <PageHeader
         title="New snipe"
-        description="Choose a place, your dates and when its sites are released. Site Sniper tries to hold one the moment it opens; you pay for it yourself." // unit-noun-ok: R13 rewrites the Site Sniper intros
+        description={`Choose a place, your dates and when its ${noun.many} are released. Site Sniper alerts you the moment one opens or, where the provider allows it, tries to hold it; you book and pay yourself.`}
         back={{ label: 'Site Sniper', href: `#${ROUTES.snipes()}` }}
       />
       {body}

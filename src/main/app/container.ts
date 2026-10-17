@@ -284,13 +284,16 @@ export function createContainer({
     // `accounts.copyCredential`: main writes a saved value, so it never reaches the renderer
     clipboard: { writeText: (text) => clipboard.writeText(text) },
     events: rendererEvents,
-    // Signing out would lose a queue place, a hold being placed, or a hold awaiting payment.
+    // Signing out would lose a queue place (any snipe's: the queue session is on the partition),
+    // a hold being placed, or a hold awaiting payment. An alert snipe's check needs no session.
     isBusy: (providerId, now) =>
-      repositories.snipes.countByStatus(providerId, [
-        SnipeStatus.QUEUEING,
-        SnipeStatus.SNIPING,
-        SnipeStatus.HELD,
-      ]) > 0 || repositories.watches.countUnexpiredHolds(providerId, now) > 0,
+      repositories.snipes.countByStatus(providerId, [SnipeStatus.QUEUEING]) > 0 ||
+      repositories.snipes.countByStatus(
+        providerId,
+        [SnipeStatus.SNIPING, SnipeStatus.HELD],
+        'hold'
+      ) > 0 ||
+      repositories.watches.countUnexpiredHolds(providerId, now) > 0,
     logger,
   });
 

@@ -3,6 +3,7 @@ import { useFormContext } from 'react-hook-form';
 import { SnipeReleaseMode } from '../../../../../shared/types/common.types';
 import type { ProviderManifest } from '../../../../../shared/types/provider.types';
 import { Checkbox, Disclosure, Field, TextField } from '../../../../components/ui';
+import { windowCapMinutes } from '../snipeAction';
 import { MAX_POLL_SECONDS, MIN_POLL_SECONDS, type SnipeFormValues } from '../snipeForm';
 import { modeUsesQueue } from '../snipeFormMapping';
 
@@ -16,8 +17,9 @@ const TIMING_FIELDS = [
 /**
  * "Advanced timing", collapsed by default: how early to start, how often to check, how long to
  * keep trying and how many attempts, in seconds and minutes (the contract's ms on submit), and
- * the provider's queue where it has one (§12.2). It opens by itself when one of its fields has
- * an error, so the error is never hidden.
+ * the provider's queue where it has one (§12.2). How long to keep trying says the release mode's
+ * limit (`maxWindowMinutes`) when it has one. It opens by itself when one of its fields has an
+ * error, so the error is never hidden.
  */
 export function AdvancedTiming({ manifest }: { manifest: ProviderManifest }) {
   const { register, watch, formState } = useFormContext<SnipeFormValues>();
@@ -27,6 +29,7 @@ export function AdvancedTiming({ manifest }: { manifest: ProviderManifest }) {
   const continuous = releaseMode === SnipeReleaseMode.CANCELLATION;
   const hasError = TIMING_FIELDS.some((name) => errors[name]);
   const queue = modeUsesQueue(manifest, releaseMode);
+  const cap = windowCapMinutes(manifest, releaseMode);
 
   return (
     <Disclosure summary="Advanced timing" open={userOpen || hasError} onOpenChange={setUserOpen}>
@@ -50,7 +53,7 @@ export function AdvancedTiming({ manifest }: { manifest: ProviderManifest }) {
         {!continuous && (
           <Field
             label="Keep trying for (minutes)"
-            hint="How long after the release to keep trying."
+            hint={`How long after the release to keep trying.${cap === undefined ? '' : ` Up to ${cap} minutes on ${manifest.shortName}.`}`}
             error={errors.windowMinutes?.message}
           >
             <TextField inputMode="numeric" autoComplete="off" {...register('windowMinutes')} />

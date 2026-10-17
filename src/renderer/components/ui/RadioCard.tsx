@@ -1,5 +1,5 @@
 import { createContext, useContext, useId, useState, type ReactNode } from 'react';
-import { CircleCheck } from 'lucide-react';
+import { CircleAlert, CircleCheck } from 'lucide-react';
 import { cx } from './cx';
 
 interface RadioCardGroupContextValue {
@@ -19,6 +19,11 @@ export interface RadioCardGroupProps {
   name?: string;
   /** Extra help, read as the group's description. */
   hint?: ReactNode;
+  /**
+   * Validation message, under the cards: marks the group invalid and reads with it, and the
+   * group can take focus (a step that fails its check sends focus to it).
+   */
+  error?: ReactNode;
   children: ReactNode;
   className?: string;
 }
@@ -34,6 +39,7 @@ export function RadioCardGroup({
   onValueChange,
   name,
   hint,
+  error,
   children,
   className,
 }: RadioCardGroupProps) {
@@ -41,6 +47,7 @@ export function RadioCardGroup({
   const groupName = name ?? `radiocard${generated}`;
   const labelId = `${groupName}-label`;
   const hintId = hint ? `${groupName}-hint` : undefined;
+  const errorId = error ? `${groupName}-error` : undefined;
   const [inner, setInner] = useState(defaultValue);
   const current = value ?? inner;
   const select = (next: string) => {
@@ -63,11 +70,19 @@ export function RadioCardGroup({
         <div
           role="radiogroup"
           aria-labelledby={labelId}
-          aria-describedby={hintId}
+          aria-describedby={cx(hintId, errorId) || undefined}
+          aria-invalid={error ? true : undefined}
+          tabIndex={error ? -1 : undefined}
           className="grid gap-3"
         >
           {children}
         </div>
+        {error && (
+          <p id={errorId} className="flex items-start gap-1.5 text-sm font-medium text-danger">
+            <CircleAlert size={16} className="mt-0.5 shrink-0" aria-hidden="true" />
+            <span>{error}</span>
+          </p>
+        )}
       </div>
     </RadioCardGroupContext.Provider>
   );

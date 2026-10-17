@@ -1,8 +1,10 @@
 import { useFormContext } from 'react-hook-form';
 import { SnipeReleaseMode } from '../../../../../shared/types/common.types';
 import type { ProviderManifest } from '../../../../../shared/types/provider.types';
+import type { SnipeAction } from '../../../../../shared/types/site-sniper.types';
 import type { UnitNoun } from '../../../../components/stay/UnitPicker';
 import { Field, RadioCard, RadioCardGroup, TextField } from '../../../../components/ui';
+import { windowCapMinutes } from '../snipeAction';
 import type { SnipeFormValues } from '../snipeForm';
 import { isComputedMode, useReleasePreview } from '../useReleasePreview';
 import { inZoneAndLocal, zonedInstant, zoneName } from '../zonedTime';
@@ -17,9 +19,51 @@ export interface ReleaseStepProps {
 }
 
 /**
- * Step 4: when the sites are released, as the provider describes its modes (§12.3). The place's
+ * What the snipe does when the dates are free: "Alert me" or "Hold it for me" where the provider
+ * places holds (RS9), with the hold rule's message when a hold would have to choose between stay
+ * types; one line saying it alerts where it does not.
+ */
+function WhenFree({ manifest, noun }: { manifest: ProviderManifest; noun: UnitNoun }) {
+  const { watch, setValue, formState } = useFormContext<SnipeFormValues>();
+  const action = watch('action');
+  const provider = manifest.shortName;
+  if (manifest.capabilities.holds !== true) {
+    return (
+      <p className="text-sm text-fg-secondary">
+        When the dates are free, Site Sniper alerts you with a link to book on {provider}. Automatic
+        holds aren&apos;t available for {provider}.
+      </p>
+    );
+  }
+  return (
+    <RadioCardGroup
+      label="When the dates are free"
+      value={action}
+      onValueChange={(next) =>
+        setValue('action', next as SnipeAction, { shouldDirty: true, shouldValidate: true })
+      }
+      error={formState.errors.action?.message}
+    >
+      <RadioCard
+        value="alert"
+        title="Alert me"
+        description={`A desktop alert and email with a link to book on ${provider}. Nothing is held, so book it before someone else does.`}
+      />
+      <RadioCard
+        value="hold"
+        title="Hold it for me"
+        description={`Holds a ${noun.one} for you, then you pay on ${provider}'s page in WA Stay.`}
+      />
+    </RadioCardGroup>
+  );
+}
+
+/**
+ * Step 4: when the units are released, as the provider describes its modes (§12.3). The place's
  * release rule leads, and a computed mode previews when the stay's first night opens, from the
- * provider's own check. A scheduled release asks for its date and time where the place is.
+ * provider's own check. A scheduled release asks for its date and time where the place is. Then
+ * what happens when the dates are free (`WhenFree`), and the advanced timing, whose window is
+ * checked again when a mode with a limit is chosen.
  */
 export function ReleaseStep({ manifest, noun, releaseInfo, now }: ReleaseStepProps) {
   const { register, watch, setValue, formState, getFieldState, trigger } =
@@ -55,9 +99,12 @@ export function ReleaseStep({ manifest, noun, releaseInfo, now }: ReleaseStepPro
         label={`When are the ${noun.many} released?`}
         hint={releaseInfo ? `${location?.name ?? 'This place'}: ${releaseInfo}` : undefined}
         value={releaseMode}
-        onValueChange={(id) =>
-          setValue('releaseMode', id, { shouldDirty: true, shouldValidate: true })
-        }
+        onValueChange={(id) => {
+          setValue('releaseMode', id, { shouldDirty: true, shouldValidate: true });
+          // A mode's limit on the window (`maxWindowMinutes`) applies at once
+          if (windowCapMinutes(manifest, id) !== undefined || getFieldState('windowMinutes').error)
+            void trigger('windowMinutes');
+        }}
       >
         {modes.map((mode) => (
           <RadioCard
@@ -99,6 +146,7 @@ export function ReleaseStep({ manifest, noun, releaseInfo, now }: ReleaseStepPro
           </Field>
         </div>
       )}
+      <WhenFree manifest={manifest} noun={noun} />
       <AdvancedTiming manifest={manifest} />
     </>
   );

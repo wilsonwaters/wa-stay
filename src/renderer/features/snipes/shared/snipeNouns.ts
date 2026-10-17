@@ -35,6 +35,23 @@ export function snipeNoun(
 }
 
 /**
+ * Site Sniper's pages when no provider offers it: no units to name, so it speaks of dates.
+ */
+export const NO_SNIPE_PROVIDER_DESCRIPTION =
+  'When a provider that releases its dates on a schedule is added, you can create a snipe here.';
+
+/**
+ * What the units of every provider with Site Sniper are called together, for the pages that
+ * speak of them all (Site Sniper's intros): ParkStay's sites; "spots" for providers whose units
+ * are of different kinds, or when none offers Site Sniper.
+ */
+export function sniperNoun(manifests: readonly ProviderManifest[]): UnitNoun {
+  return unitNounFrom(
+    manifests.filter((manifest) => manifest.capabilities.snipes).flatMap(providerUnitKinds)
+  );
+}
+
+/**
  * What one unit (`unitId`, by default the held one) is called: by its kind among the place's
  * `units`; when it is not there, as `snipeNoun` falls back without the named units.
  */

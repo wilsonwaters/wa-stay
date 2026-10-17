@@ -1,4 +1,4 @@
-import { useId, useState } from 'react';
+import { useId, useRef, useState } from 'react';
 import { Link } from 'react-router';
 import { SnipeStatus } from '../../../../shared/types/common.types';
 import type { ProviderManifest } from '../../../../shared/types/provider.types';
@@ -7,7 +7,8 @@ import { ROUTES } from '../../../app/routes';
 import { ConnectAccountPrompt } from '../../../components/accounts/ConnectAccountPrompt';
 import { PlacePhoto, type PhotoPlace } from '../../../components/PlacePhoto';
 import { partyLabel, stayDatesLabel, stayNightsLabel } from '../../../components/stay/stayFormat';
-import { Card, ProviderBadge, StatusPill } from '../../../components/ui';
+import { Card, ProviderBadge, StatusPill, VisuallyHidden } from '../../../components/ui';
+import { AlertedSummary } from '../shared/AlertedPanel';
 import { ConnectToArmDialog } from '../shared/ConnectToArmDialog';
 import { DeleteSnipeDialog } from '../shared/DeleteSnipeDialog';
 import { HeldPanel } from '../shared/HeldPanel';
@@ -34,13 +35,18 @@ const attempts = (n: number) => `${n} ${n === 1 ? 'attempt' : 'attempts'}`;
 /**
  * One snipe in the list, photo first: whose and where, the stay, its status and current step,
  * when its units open (the only part that ticks), the hold to pay for (its unit named as the
- * place names it), and one action with a menu for the rest.
+ * place names it) or the alert sent (when, what was free, "Book on {shortName}"), and one action
+ * with a menu for the rest. After Arm, Arm again or Disarm, focus moves to its status.
  */
 export function SnipeCard({ snipe, manifest, today, place, placeLoading }: SnipeCardProps) {
   const headingId = useId();
   // The place's units (its cached catalogue detail), asked only for a held snipe.
   const units = usePlaceUnits(snipe, snipe.status === SnipeStatus.HELD);
-  const actions = useSnipeActions(snipe, manifest, units);
+  const status = useRef<HTMLParagraphElement>(null);
+  const actions = useSnipeActions(snipe, manifest, units, {
+    onActiveChanged: () => status.current?.focus(),
+  });
+  const holds = snipe.action === 'hold';
   const [confirming, setConfirming] = useState(false);
   const { location, stay } = snipe;
   const provider = manifest?.shortName ?? 'the provider';
@@ -68,10 +74,12 @@ export function SnipeCard({ snipe, manifest, today, place, placeLoading }: Snipe
               {snipe.name}
             </Link>
           </h2>
-          <StatusPill
-            {...statusPillFor(snipe.status, heldUnitNoun(snipe, manifest, units.units))}
-            className="shrink-0"
-          />
+          <p ref={status} tabIndex={-1} className="shrink-0 rounded-full">
+            <VisuallyHidden>Status: </VisuallyHidden>
+            <StatusPill
+              {...statusPillFor(snipe.status, heldUnitNoun(snipe, manifest, units.units))}
+            />
+          </p>
         </div>
         <p className="flex min-w-0 items-center gap-2 text-sm text-fg-secondary">
           <ProviderBadge providerId={snipe.providerId} size="sm" className="shrink-0" />
@@ -93,6 +101,9 @@ export function SnipeCard({ snipe, manifest, today, place, placeLoading }: Snipe
             variant="card"
           />
         )}
+        {snipe.status === SnipeStatus.ALERTED && (
+          <AlertedSummary snipe={snipe} manifest={manifest} />
+        )}
         {snipe.status === SnipeStatus.BOOKED && (
           <p className="text-sm text-available-fg">
             Booked on {provider}
@@ -102,7 +113,7 @@ export function SnipeCard({ snipe, manifest, today, place, placeLoading }: Snipe
         {snipe.lastError && snipe.status !== SnipeStatus.HELD && (
           <p className="text-sm text-danger">{snipe.lastError}</p>
         )}
-        {manifest && !isFinished(snipe) && (
+        {manifest && holds && !isFinished(snipe) && (
           <ConnectAccountPrompt
             manifest={manifest}
             when="required"

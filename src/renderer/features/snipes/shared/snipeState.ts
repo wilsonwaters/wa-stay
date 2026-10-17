@@ -49,9 +49,10 @@ export function isFinished(snipe: Pick<SiteSnipe, 'status'>): boolean {
 }
 
 /**
- * The one visible action, by status: Arm a paused (or ended) snipe, Disarm a running one, pay
- * for a held site, see a booked one. Main refuses to arm a held or booked snipe again (§12.31),
- * so neither is ever offered Arm.
+ * The one visible action, by status: Arm a paused snipe, Arm again an ended or alerted one,
+ * Disarm a running one, pay for a held unit, see a booked one. Main refuses to arm a held or
+ * booked snipe again (§12.31), so neither is ever offered Arm; an alerted one holds nothing, so
+ * it may be (§12.35).
  */
 export type PrimaryAction = 'arm' | 'arm-again' | 'disarm' | 'pay' | 'booking';
 
@@ -65,6 +66,7 @@ export function primaryActionFor(
       return 'booking';
     case SnipeStatus.EXPIRED:
     case SnipeStatus.FAILED:
+    case SnipeStatus.ALERTED:
       return 'arm-again';
     case SnipeStatus.DISABLED:
       return 'arm';

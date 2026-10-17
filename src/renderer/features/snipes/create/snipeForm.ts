@@ -1,7 +1,8 @@
 /**
  * The new-snipe form: its values, the rules each step checks (zod, with the provider's own stay
  * field rules), and a blank form for a provider. Advanced timing is typed as text (seconds and
- * minutes, as people think of them) and becomes the contract's ms fields on submit.
+ * minutes, as people think of them) and becomes the contract's ms fields on submit. `action`
+ * (alert or hold, `snipeAction.ts`) is chosen on the Release step.
  */
 import { z } from 'zod';
 import {
@@ -19,6 +20,7 @@ import {
   type StayFieldDescriptor,
   type UnitKind,
 } from '../../../../shared/types/provider.types';
+import { SNIPE_ACTIONS } from '../../../../shared/types/site-sniper.types';
 import { DEFAULT_UNIT_NOUN, type UnitNoun } from '../../../components/nightGridModel';
 import {
   stayFieldDefaults,
@@ -26,6 +28,7 @@ import {
   stayFieldsFor,
 } from '../../../components/stay/stayFields';
 import { holdNeedsChoice } from '../../../components/stay/stayTypes';
+import { defaultSnipeAction, snipeHoldChoiceMessage, windowCapMinutes } from './snipeAction';
 import { zonedInstant } from './zonedTime';
 
 const shape = z.object({
@@ -51,6 +54,8 @@ const shape = z.object({
   unitKinds: z.array(z.enum(UNIT_KINDS)),
   /** A `releaseModes` id of the provider. */
   releaseMode: z.string(),
+  /** What the snipe does when the dates are free: alert, or hold (where the provider can). */
+  action: z.enum(SNIPE_ACTIONS),
   /** A scheduled release, in the provider's zone: `YYYY-MM-DD` and `HH:MM`. */
   releaseDate: z.string(),
   releaseTime: z.string(),
@@ -89,6 +94,7 @@ export function emptySnipeForm(manifest: ProviderManifest | undefined): SnipeFor
     unitIds: [],
     unitKinds: [],
     releaseMode: manifest?.releaseModes?.[0]?.id ?? '',
+    action: defaultSnipeAction(manifest),
     releaseDate: '',
     releaseTime: '',
     accessGateEnabled: manifest?.capabilities.accessGate === true,
@@ -117,21 +123,13 @@ export interface SnipeFormContext {
   today: string;
   now: Date;
   /**
-   * The kinds of the place's units (`placeUnitKinds`), once its detail has loaded. A snipe holds,
-   * so at a mixed place it needs a stay type or a unit; without them nothing is enforced here
-   * (main then ends the snipe without holding).
+   * The kinds of the place's units (`placeUnitKinds`), once its detail has loaded. A snipe that
+   * holds needs a stay type or a unit at a mixed place; without them nothing is enforced here
+   * (main then alerts instead of holding). An alert needs neither.
    */
   placeKinds?: readonly UnitKind[];
   /** What a unit is called here, for the hold rule's message. */
   noun?: UnitNoun;
-}
-
-/**
- * Why a snipe at a mixed place needs one stay type or a unit chosen: none, or more than one, is
- * chosen.
- */
-export function snipeHoldChoiceMessage(noun: UnitNoun): string {
-  return `Choose one stay type or a ${noun.one}. At a place with more than one stay type, Site Sniper holds only what you choose.`;
 }
 
 /** Midnight of check-in day where the provider is (epoch ms), or never when there is no date. */
@@ -164,8 +162,8 @@ export function snipeFormSchema({
       const message = stayFieldIssue(field, v.stayParams[field.key]);
       if (message) issue(['stayParams', field.key], message);
     }
-    if (placeKinds && holdNeedsChoice(placeKinds, v.unitKinds, v.unitIds)) {
-      issue(['unitKinds'], snipeHoldChoiceMessage(noun));
+    if (v.action === 'hold' && placeKinds && holdNeedsChoice(placeKinds, v.unitKinds, v.unitIds)) {
+      issue(['action'], snipeHoldChoiceMessage(noun));
     }
 
     if (!modes.some((mode) => mode.id === v.releaseMode)) {
@@ -198,8 +196,12 @@ export function snipeFormSchema({
       );
     }
     const window = whole(v.windowMinutes);
+    // The mode's limit (`maxWindowMinutes`), in the provider's words
+    const cap = windowCapMinutes(manifest, v.releaseMode) ?? 1440;
     if (!continuous && (window === undefined || window < 1 || window > 1440)) {
       issue(['windowMinutes'], 'Enter whole minutes, from 1 to 1440');
+    } else if (!continuous && manifest && window !== undefined && window > cap) {
+      issue(['windowMinutes'], `${manifest.shortName} allows at most ${cap} minutes`);
     }
     if (whole(v.maxAttempts) === undefined)
       issue(['maxAttempts'], 'Enter a whole number; 0 means no limit');
@@ -226,12 +228,12 @@ export function stepFields(
         'departure',
         'adults',
         ...snipeStayFields(manifest).map((field) => `stayParams.${field.key}` as const),
-        'unitKinds',
       ];
     case 'release':
       return [
         'releaseMode',
         'releaseDate',
+        'action',
         'leadTimeSeconds',
         'pollIntervalSeconds',
         'windowMinutes',

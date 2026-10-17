@@ -54,6 +54,11 @@ describe('toSnipeInput', () => {
     expect(input.pollIntervalMs).toBe(1500);
   });
 
+  it('sends what the snipe does when the dates are free, always', () => {
+    expect(toSnipeInput(filled(), PARKSTAY_MANIFEST).action).toBe('hold');
+    expect(toSnipeInput({ ...filled(), action: 'alert' }, PARKSTAY_MANIFEST).action).toBe('alert');
+  });
+
   it('sends the chosen stay types, and nothing for any', () => {
     expect(
       toSnipeInput({ ...filled(), unitKinds: ['cabin', 'room'] }, PARKSTAY_MANIFEST)
@@ -73,6 +78,8 @@ describe('issueField', () => {
     expect(issueField('stay')).toBe('arrival');
     expect(issueField('stayParams.postcode')).toBe('stayParams.postcode');
     expect(issueField('pollIntervalMs')).toBe('pollIntervalSeconds');
+    // Main refusing a hold (a provider without holds): the "When the dates are free" choice
+    expect(issueField('action')).toBe('action');
     expect(issueField('somethingElse')).toBeUndefined();
   });
 });

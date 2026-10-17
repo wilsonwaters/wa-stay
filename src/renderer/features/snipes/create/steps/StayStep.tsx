@@ -36,27 +36,44 @@ export interface StayStepProps {
 /**
  * Step 3: the dates, who is coming, the provider's own snipe and hold fields (vehicles,
  * postcode…), the stay types at a place whose units are of more than one kind, and the
- * preferred units: none chosen means any unit. A snipe holds, so at such a place it needs a
- * stay type or a unit. Warnings say when the stay is shorter than the units take
- * (`MinStayNotice`), or the party more than they hold.
+ * preferred units: none chosen means any unit. A snipe that holds needs a stay type or a unit
+ * at such a place, which the Release step asks for where "Hold it for me" is chosen; changing
+ * either here checks that rule again once its message shows. Warnings say when the stay is
+ * shorter than the units take (`MinStayNotice`), or the party more than they hold.
  */
 export function StayStep({ manifest, today, units, noun }: StayStepProps) {
   const { watch, formState, getFieldState, trigger } = useFormContext<SnipeFormValues>();
   const set = useSetSnipeField();
   const setFields = useSetSnipeFields();
   const { errors } = formState;
-  const [arrival, departure, adults, children, infants, stayParams, unitIds, unitKinds, location] =
-    watch([
-      'arrival',
-      'departure',
-      'adults',
-      'children',
-      'infants',
-      'stayParams',
-      'unitIds',
-      'unitKinds',
-      'location',
-    ]);
+  const [
+    arrival,
+    departure,
+    adults,
+    children,
+    infants,
+    stayParams,
+    unitIds,
+    unitKinds,
+    location,
+    action,
+  ] = watch([
+    'arrival',
+    'departure',
+    'adults',
+    'children',
+    'infants',
+    'stayParams',
+    'unitIds',
+    'unitKinds',
+    'location',
+    'action',
+  ]);
+  const holds = action === 'hold';
+  // A unit or a stay type meets the hold rule: check it again once its message shows.
+  const recheckHoldRule = () => {
+    if (getFieldState('action').error) void trigger('action');
+  };
   const fields = snipeStayFields(manifest);
   const placeKinds = useMemo(() => (units ? placeUnitKinds(units) : undefined), [units]);
   const stayTypes = placeKinds ? stayTypeOptions(placeKinds, unitKinds) : [];
@@ -72,7 +89,7 @@ export function StayStep({ manifest, today, units, noun }: StayStepProps) {
           setFields(['arrival', range.arrival ?? ''], ['departure', range.departure ?? ''])
         }
         minDate={today}
-        hint="The nights you want to hold, even if they aren't released yet."
+        hint={`The nights you want${holds ? ' to hold' : ''}, even if they aren't released yet.`}
         error={errors.arrival?.message ?? errors.departure?.message}
       />
       <GuestsField
@@ -99,8 +116,10 @@ export function StayStep({ manifest, today, units, noun }: StayStepProps) {
         <StayTypeChips
           options={stayTypes}
           value={unitKinds}
-          onChange={(kinds) => set('unitKinds', kinds)}
-          error={errors.unitKinds?.message}
+          onChange={(kinds) => {
+            set('unitKinds', kinds);
+            recheckHoldRule();
+          }}
         />
       )}
       {units && units.length > 0 && (
@@ -109,11 +128,14 @@ export function StayStep({ manifest, today, units, noun }: StayStepProps) {
           value={unitIds}
           onChange={(ids) => {
             set('unitIds', ids);
-            // A unit also meets the stay-type rule: check it again once its error shows.
-            if (getFieldState('unitKinds').error) void trigger('unitKinds');
+            recheckHoldRule();
           }}
           noun={noun}
-          hint={`Leave all unticked and Site Sniper holds the first ${noun.one} that comes free.`}
+          hint={
+            holds
+              ? `Leave all unticked and Site Sniper holds the first ${noun.one} that comes free.`
+              : `Leave all unticked and Site Sniper alerts you to the first ${noun.one} that comes free.`
+          }
           kinds={stayTypes.length > 0 ? unitKinds : undefined}
         />
       )}
@@ -126,7 +148,7 @@ export function StayStep({ manifest, today, units, noun }: StayStepProps) {
         place={location?.name}
         noun={noun}
         shortName={manifest.shortName}
-        action="holds"
+        action={holds ? 'holds' : 'alerts on'}
       />
       {capacity !== undefined && party > capacity && (
         <Notice tone="warning">

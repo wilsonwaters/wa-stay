@@ -77,9 +77,10 @@ function Item({ label, children }: { label: string; children: ReactNode }) {
 }
 
 /**
- * Step 5: what was chosen (Where, When and who, Release), the name and notes, a reminder to hold
- * only what will be used, and the provider's account: a blocking prompt where holds need one,
- * a gentle hint where it is optional (§12.32).
+ * Step 5: what was chosen (Where, When and who, Release and what happens when the dates are
+ * free), the name and notes, a reminder to hold (or book) only what will be used, and, for a
+ * snipe that holds, the provider's account: a blocking prompt where holds need one, a gentle
+ * hint where it is optional (§12.32). An alert needs no account.
  */
 export function ReviewStep(props: ReviewStepProps) {
   const { manifest, today, noun, place, placeKinds, placeLoading, releaseSummary, onChangeStep } =
@@ -90,6 +91,7 @@ export function ReviewStep(props: ReviewStepProps) {
     (id) => place?.units?.find((u) => u.unitId === id || u.unitName === id)?.unitName ?? id
   );
   const queue = modeUsesQueue(manifest, v.releaseMode) && v.accessGateEnabled;
+  const holds = v.action === 'hold';
 
   return (
     <>
@@ -139,6 +141,7 @@ export function ReviewStep(props: ReviewStepProps) {
         >
           <Items>
             <Item label="When">{releaseSummary}</Item>
+            <Item label="When the dates are free">{holds ? `Hold a ${noun.one}` : 'Alert me'}</Item>
             {manifest.capabilities.accessGate && (
               <Item label="Queue">
                 {queue ? `Uses the ${manifest.shortName} queue` : 'Not used'}
@@ -158,16 +161,20 @@ export function ReviewStep(props: ReviewStepProps) {
         <Textarea rows={3} {...register('notes')} />
       </Field>
       <Notice tone="info" title="Book responsibly">
-        Hold only what you will use. Payment is always completed by you on {manifest.shortName}.
+        {holds
+          ? `Hold only what you will use. Payment is always completed by you on ${manifest.shortName}.`
+          : `Book only what you will use. You book and pay for it on ${manifest.shortName}.`}
       </Notice>
-      <ConnectAccountPrompt
-        manifest={manifest}
-        message={
-          manifest.capabilities.account === 'optional'
-            ? `Connect ${manifest.shortName} before the release so checkout is quicker.`
-            : `${manifest.shortName} needs you signed in before Site Sniper can hold a ${noun.one}. You can create the snipe now; it stays paused until you connect.`
-        }
-      />
+      {holds && (
+        <ConnectAccountPrompt
+          manifest={manifest}
+          message={
+            manifest.capabilities.account === 'optional'
+              ? `Connect ${manifest.shortName} before the release so checkout is quicker.`
+              : `${manifest.shortName} needs you signed in before Site Sniper can hold a ${noun.one}. You can create the snipe now; it stays paused until you connect.`
+          }
+        />
+      )}
       {props.submitError && (
         <Notice tone="danger" title="The snipe couldn't be created">
           {props.submitError}

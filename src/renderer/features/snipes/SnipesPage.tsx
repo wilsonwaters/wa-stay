@@ -14,6 +14,7 @@ import {
 } from '../../components/ui';
 import { useNow } from '../../hooks/useNow';
 import { SnipeCard } from './list/SnipeCard';
+import { NO_SNIPE_PROVIDER_DESCRIPTION, sniperNoun } from './shared/snipeNouns';
 import { sortSnipes } from './shared/snipeState';
 import { HoldAlert, useStatusAnnouncements } from './shared/useStatusAnnouncements';
 
@@ -33,6 +34,8 @@ export function SnipesPage() {
   const canSnipe = !providers.isSuccess || manifests.some((m) => m.capabilities.snipes);
   const list = useMemo(() => sortSnipes(snipes.data ?? []), [snipes.data]);
   const places = useCatalogPlaces(list.length > 0);
+  // What the providers with Site Sniper call their units (R9): ParkStay's sites
+  const noun = sniperNoun(manifests);
 
   const newSnipe = canSnipe ? (
     <Button
@@ -63,7 +66,7 @@ export function SnipesPage() {
     <div className="mx-auto flex w-full max-w-5xl flex-col gap-8 px-6 py-8 lg:px-8">
       <PageHeader
         title="Site Sniper"
-        description="Hold a hard-to-get site the moment it is released, then pay for it yourself." // unit-noun-ok: R13 rewrites the Site Sniper intros
+        description={`Catch a hard-to-get ${noun.one} the moment it is released: Site Sniper alerts you or, where the provider allows it, tries to hold it for you to pay for.`}
         actions={newSnipe}
       />
       <ComingSoonBanner featureName="Site Sniper" />
@@ -116,8 +119,8 @@ export function SnipesPage() {
           title={canSnipe ? 'No snipes yet' : 'No provider supports Site Sniper yet'}
           description={
             canSnipe
-              ? 'A snipe waits for a place’s sites to be released and tries to hold one for you the moment they open.' // unit-noun-ok: R13 rewrites the Site Sniper intros
-              : 'When a provider that releases sites on a schedule is added, you can create a snipe here.' // unit-noun-ok: R13 rewrites the Site Sniper intros
+              ? `A snipe waits for a place’s ${noun.many} to be released, then alerts you the moment they open or, where the provider allows it, tries to hold one for you.`
+              : NO_SNIPE_PROVIDER_DESCRIPTION
           }
           actions={
             canSnipe ? (
