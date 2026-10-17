@@ -148,6 +148,35 @@ describe('a paced provider', () => {
     expect(check.value?.units).toHaveLength(1);
   });
 
+  it('a sync of 8 stored places gets 60 s + 8 × 20 s: a 70 s catalogue answer still syncs', async () => {
+    let syncMs = SECOND;
+    const s = setUp({ respond: (path) => (path === '/places' ? { delayMs: syncMs } : {}) });
+    await synced(s);
+    syncMs = 70 * SECOND;
+
+    // Its 10 s background gap, then 70 s on the wire: past the unpaced 60 s, inside 220 s
+    const { error, ms } = await timed(s.catalog.refresh('paced'));
+
+    expect(error).toBeUndefined();
+    expect(Math.round(ms)).toBe(80 * SECOND);
+    expect(s.catalog.status().providers[0].lastError).toBeUndefined();
+  });
+
+  it('a sync that runs past its grown deadline fails with it', async () => {
+    let syncMs = SECOND;
+    const s = setUp({ respond: (path) => (path === '/places' ? { delayMs: syncMs } : {}) });
+    await synced(s);
+    syncMs = 5 * 60 * SECOND;
+
+    const { ms } = await timed(s.catalog.refresh('paced'));
+
+    expect(Math.round(ms)).toBe(220 * SECOND);
+    expect(s.catalog.status().providers[0]).toMatchObject({
+      count: 8,
+      lastError: 'paced: no answer within 220 s',
+    });
+  });
+
   it('get, checkLocation and availability send interactive requests, and sync sends background ones', async () => {
     const s = setUp();
     await synced(s);

@@ -20,9 +20,9 @@
  * not compared.
  *
  * A request no route matches is never sent anywhere: it is appended to the
- * unexpected-requests log (with its form fields, if it had a body) and rejected with
- * `UnexpectedNetworkRequestError`, whose message names the form fields and the manifest to add
- * the route to.
+ * unexpected-requests log (with its form fields and their values, if it had a body) and
+ * rejected with `UnexpectedNetworkRequestError`, whose message names the form fields (never
+ * their values: an error can reach the app's log) and the manifest to add the route to.
  *
  * Built on `BaseHttpClient`, so redirects, timeouts, aborts, cookies and the JSON helpers
  * behave exactly as in the real clients.
@@ -112,18 +112,18 @@ export function matchFixtureRoute(
 /** A provider request that no fixture route answers. It was logged, never sent. */
 export class UnexpectedNetworkRequestError extends ProviderHttpError {
   readonly method: HttpMethod;
-  /** The request's form fields, when it had a body. */
-  readonly form?: Record<string, string>;
+  /** The names of the request's form fields, when it had a body (never their values). */
+  readonly formFields?: string[];
 
   constructor(options: {
     providerId: ProviderId;
     method: HttpMethod;
     url: string;
-    form?: Record<string, string>;
+    formFields?: string[];
     manifest: string;
   }) {
-    const { providerId, method, url, form, manifest } = options;
-    const fields = form ? ` with form ${JSON.stringify(form)}` : '';
+    const { providerId, method, url, formFields, manifest } = options;
+    const fields = formFields ? ` with form fields ${formFields.join(', ') || '(none)'}` : '';
     super({
       providerId,
       status: 0,
@@ -133,7 +133,7 @@ export class UnexpectedNetworkRequestError extends ProviderHttpError {
     });
     this.name = 'UnexpectedNetworkRequestError';
     this.method = method;
-    if (form) this.form = form;
+    if (formFields) this.formFields = formFields;
   }
 }
 
@@ -176,7 +176,7 @@ export class FixtureHttpClient extends BaseHttpClient {
         providerId: this.providerId,
         method: hop.method,
         url: hop.url,
-        form,
+        ...(form ? { formFields: Object.keys(form) } : {}),
         manifest: this.manifestPath,
       });
     }

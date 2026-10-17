@@ -70,8 +70,9 @@ The first matching route wins, so put specific routes (with `query` or `form`) b
 ones.
 
 A request that no route matches is not sent. It fails with `no fixture for GET <url>; add a
-route to <manifest>` (for a request with a body, `no fixture for POST <url> with form {…}`), and
-is appended to `<userData>/e2e-unexpected-requests.log`, with its `form` fields when it had a
+route to <manifest>` (for a request with a body, `no fixture for POST <url> with form fields
+<names>`: the names only, as the error can reach the app's log), and is appended to
+`<userData>/e2e-unexpected-requests.log`, with its `form` fields and their values when it had a
 body. A failed test attaches that log as `unexpected-requests`, which lists exactly the routes
 to add.
 

@@ -376,6 +376,27 @@ describe('request priority', () => {
     expect(gaps()).toEqual([INTERACTIVE_REQUEST_GAP_MS, INTERVAL]);
   });
 
+  it("a module's own limiter in front of the paced client lets an interactive request go next", async () => {
+    setUp();
+    // As the scaffold's API provider does: every request through one limiter
+    const limit = createLimiter(1);
+    const background = ['/bg1', '/bg2', '/bg3'].map((path) => limit(() => get(path)));
+    await jest.advanceTimersByTimeAsync(SECOND);
+    const interactive = withRequestPriority('interactive', () => limit(() => get('/now')));
+
+    await jest.advanceTimersByTimeAsync(2 * 60 * SECOND);
+    await Promise.all([...background, interactive]);
+
+    // Next after the one in flight, not behind the background requests queued before it
+    expect(inner.requests.map((r) => [new URL(r.url).pathname, r.priority])).toEqual([
+      ['/bg1', 'background'],
+      ['/now', 'interactive'],
+      ['/bg2', 'background'],
+      ['/bg3', 'background'],
+    ]);
+    expect(starts()).toEqual({ '/bg1': 0, '/now': 4_000, '/bg2': 17_000, '/bg3': 30_000 });
+  });
+
   it('the ambient priority holds inside a limiter task', async () => {
     setUp();
     const limit = createLimiter(1);

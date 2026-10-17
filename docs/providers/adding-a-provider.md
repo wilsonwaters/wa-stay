@@ -322,7 +322,7 @@ context gives the effective values as `ctx.limits`.
 | Limit | What reads it |
 | --- | --- |
 | `minWatchIntervalMinutes` | The watch form offers no shorter interval, and the scheduler runs a shorter stored one at this interval (`core/watches/next-check.ts`). |
-| `maxConcurrentRequests` | The watch loop runs at most `min(2, maxConcurrentRequests)` checks at once for the provider, and a `search` catalogue's area searches stay within it. **Your module enforces it for every request it sends**, with `createLimiter` from the SDK: Example Parks sends its catalogue, availability, hold and sign-in check requests through one limiter, reading each answer inside it, and the scaffold's API provider limits its requests the same way. A browser provider's `withPage` calls already run one at a time. |
+| `maxConcurrentRequests` | The watch loop runs at most `min(2, maxConcurrentRequests)` checks at once for the provider, and a `search` catalogue's area searches stay within it. **Your module enforces it for every request it sends**, with `createLimiter` from the SDK: Example Parks sends its catalogue, availability, hold and sign-in check requests through one limiter, reading each answer inside it, and the scaffold's API provider limits its requests the same way. A limiter starts the tasks the person is waiting on before background ones ([pacing](#limits)). A browser provider's `withPage` calls already run one at a time. |
 | `catalogTtlHours` | How long a synced catalogue stays fresh before the catalogue service syncs it again; for a `search` catalogue, how long an area or text search is not repeated. |
 | `minRequestIntervalMs` | Optional, 0 to 60 000 ms; 0 or absent leaves the provider unpaced. For a site that asks for a gap between automated requests (a `Crawl-delay`, or its terms), the core paces `ctx.http` itself: one request in flight, each starting only this long after the previous one ended. It needs `maxConcurrentRequests: 1`, or the provider does not register. |
 
@@ -336,12 +336,15 @@ place's page and its check, Explore's availability for their dates, "Check now" 
 (the catalogue sync, scheduled watch checks, snipes, the sign-in check) is `background` and
 waits the full gap. The core labels each call's requests itself, so your module needs no
 change; `HttpRequestOptions.priority` (`'interactive'` or `'background'`) overrides the label
-for one request. A request's `timeoutMs` counts from when it is sent, not while it waits, and
-an aborted `signal` takes a waiting request out of the queue at once. A module's own
-`createLimiter` is then redundant but harmless: a task waiting in it keeps its caller's
-priority. Pacing covers `ctx.http` only, not `ctx.browser`'s pages, and fixture mode is never
-paced. Each call's deadline grows with the gaps it may wait ([timeouts](#timeouts)), so ask
-for as few requests per call as you can.
+for one request. Long-lived work your module starts during an interactive call (a timer, a
+keep-alive) inherits the interactive priority, so pass `priority: 'background'` for its
+requests. A request's `timeoutMs` counts from when it is sent, not while it waits, and an
+aborted `signal` takes a waiting request out of the queue at once. A module's own
+`createLimiter` honours priorities as well: it starts a waiting interactive task before waiting
+background ones (first in, first out within each), and the task keeps its caller's priority,
+so the person's request still goes next. Pacing covers `ctx.http` only, not `ctx.browser`'s
+pages, and fixture mode is never paced. Each call's deadline grows with the gaps it may wait
+([timeouts](#timeouts)), so ask for as few requests per call as you can.
 
 ### Stay fields
 

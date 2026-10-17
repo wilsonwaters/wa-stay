@@ -263,7 +263,8 @@ export function createFakePacedProvider(options: FakePacedProviderOptions = {}):
         },
         catalog: {
           async listLocations(signal) {
-            await ctx.http.getJson(`${base}/places`, { signal });
+            // A whole catalogue may be slow to answer: the core's deadline bounds it
+            await ctx.http.getJson(`${base}/places`, { signal, timeoutMs: 10 * 60_000 });
             return externalIds.map(summary);
           },
           async getLocation(externalId, signal) {

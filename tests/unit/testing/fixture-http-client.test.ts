@@ -196,7 +196,7 @@ describe('FixtureHttpClient', () => {
     ).rejects.toBeInstanceOf(UnexpectedNetworkRequestError);
   });
 
-  it('names the form fields of a refused request in its log entry and its message', async () => {
+  it('names the form fields of a refused request in its message, and logs them with their values', async () => {
     const http = client();
 
     const error = await http
@@ -204,10 +204,14 @@ describe('FixtureHttpClient', () => {
       .catch((e: unknown) => e);
 
     expect(error).toBeInstanceOf(UnexpectedNetworkRequestError);
-    expect(error).toMatchObject({ form: { blog_id: '9', arrive: '2026-11-10' } });
+    expect(error).toMatchObject({ formFields: ['blog_id', 'arrive'] });
     expect((error as Error).message).toContain(
-      `POST ${BASE}/booking/ with form {"blog_id":"9","arrive":"2026-11-10"}; add a route to`
+      `POST ${BASE}/booking/ with form fields blog_id, arrive; add a route to`
     );
+    // The error can reach the app's log: it never carries the values
+    expect(JSON.stringify(error)).not.toContain('2026-11-10');
+    expect((error as Error).message).not.toContain('2026-11-10');
+    expect((error as Error).message).not.toMatch(/blog_id.?=.?9/);
     expect(readUnexpectedRequests(logFile)).toEqual([
       {
         time: expect.any(String),

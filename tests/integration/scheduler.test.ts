@@ -486,26 +486,30 @@ describe('JobScheduler (fake timers, FakeProvider, real database)', () => {
       ).toBe(true);
     });
 
-    it('a check queued behind another keeps its own priority, whichever check’s end starts it', async () => {
-      // One check at a time for the provider; each takes 40 s
+    it('"Check now" goes ahead of due checks waiting for the provider, and each check keeps its own priority', async () => {
+      // One check at a time for the provider; each takes 100 s
       setUp(
         createFakeProvider({
           limits: { maxConcurrentRequests: 1 },
-          delays: { availability: 40 * SECOND },
+          delays: { availability: 100 * SECOND },
           availability: { '1': { u1: 'booked' } },
         })
       );
-      const [, now] = [
+      const [first, due, now] = [
         await h.watches.create(h.userId, h.watchInput({ name: 'First' })),
-        await h.watches.create(h.userId, h.watchInput({ name: 'Now' })),
         await h.watches.create(h.userId, h.watchInput({ name: 'Due' })),
+        await h.watches.create(h.userId, h.watchInput({ name: 'Now' })),
       ];
-      // The three are due at 0, 20 and 40 s (the startup stagger); the first runs at once
+      // Due at 0, 40 and 80 s (the startup stagger): the first runs at once, and the 60 s tick
+      // queues the second behind it
       h.scheduler.start();
-      await jest.advanceTimersByTimeAsync(SECOND);
-      // "Check now" waits behind the first; the third falls due and waits behind it
+      await jest.advanceTimersByTimeAsync(61 * SECOND);
+      expect(checks()).toHaveLength(1);
+      expect(h.scheduler.watchLoop.inFlightIds).toEqual([first.id, due.id]);
+      // "Check now" arrives after the due check, yet runs next (started by the first's end),
+      // and the due check after it (started by an interactive check's end) stays background
       void h.scheduler.runWatchNow(now.id).catch(() => undefined);
-      await jest.advanceTimersByTimeAsync(3 * MINUTE);
+      await jest.advanceTimersByTimeAsync(6 * MINUTE);
 
       expect(h.fake.peakInFlight('availability')).toBe(1);
       expect(checks().map((c) => c.priority)).toEqual(['background', 'interactive', 'background']);
