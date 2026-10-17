@@ -1349,6 +1349,13 @@ person saves it once, and WA Stay keeps it encrypted on the computer. A `credent
   details"), or `unknown` when you cannot tell; a rejection counts as `unknown`, and nothing is
   stored. A local check (the format) needs no request at all. Never put a value in an error
   message, a log line, or a request that does not need it.
+- **Your own form of a value:** a `signed-in` answer may carry `values`
+  (`CredentialsSignInResult`), and the core stores those instead of what was typed, so the saved
+  value, the one `ctx.secrets` reads and the one "Copy" puts on the clipboard are yours: a
+  member number typed "1234 5678 9012" can be kept as "123456789012". Declared keys only, each a
+  string that is not empty and at most 256 characters once trimmed; a key you leave out keeps
+  what was typed. Anything else is ignored (the core logs a warning that names no value) and
+  the typed values are stored.
 - **`isSignedIn`** must exist but is never called: the account counts as signed in when every
   field has a stored value, worked out on the computer with no request. Return `unknown`.
 

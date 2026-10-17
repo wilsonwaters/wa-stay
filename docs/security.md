@@ -26,8 +26,8 @@ Account details are write-only over IPC too (`src/main/core/accounts/provider-ac
 
 - The window sends them once, with `accounts.saveCredentials`, after the person ticks the
   provider's statements; main checks them (and the statements) again. Only the provider's
-  `signIn` sees them before they are stored, and only its `signed-in` answer stores them, all
-  or nothing.
+  `signIn` sees them before they are stored, and only its `signed-in` answer stores them (in
+  the provider's own form when it returns one, such as digits only), all or nothing.
 - Nothing sends them back: an account lists `savedFields`, the names of the fields that have a
   value. The form forgets what was typed when it closes, and the renderer keeps no copy (the
   save is not a React Query mutation, so its cache never holds the values).

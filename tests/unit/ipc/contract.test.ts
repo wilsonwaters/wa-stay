@@ -125,6 +125,43 @@ describe('IPC contract', () => {
     }
   });
 
+  it('bounds a credentials save generously; the account service checks the real rules', () => {
+    // Made-up values only
+    const save = contract.accounts.saveCredentials.request;
+    const ok = (values: Record<string, unknown>, confirmed: unknown[] = ['own']) =>
+      save.safeParse({ providerId: 'rac', values, confirmed }).success;
+    const many = (count: number) =>
+      Object.fromEntries(Array.from({ length: count }, (_, i) => [`field${i}`, '1']));
+
+    expect(ok({ memberNumber: '1234567890123' })).toBe(true);
+    // Up to 1024 characters passes here (the service refuses over 256); 1025 does not
+    expect(ok({ memberNumber: '1'.repeat(1024) })).toBe(true);
+    expect(ok({ memberNumber: '1'.repeat(1025) })).toBe(false);
+    // Keys: 64 characters at most, alphanumeric
+    expect(ok({ [`k${'e'.repeat(63)}`]: '1' })).toBe(true);
+    expect(ok({ [`k${'e'.repeat(64)}`]: '1' })).toBe(false);
+    expect(ok({ 'member-number': '1' })).toBe(false);
+    expect(ok({ memberNumber: 1234567890123 })).toBe(false);
+    expect(ok(many(16))).toBe(true);
+    expect(ok(many(17))).toBe(false);
+    expect(
+      ok(
+        { memberNumber: '1' },
+        Array.from({ length: 16 }, (_, i) => `s${i}`)
+      )
+    ).toBe(true);
+    expect(
+      ok(
+        { memberNumber: '1' },
+        Array.from({ length: 17 }, (_, i) => `s${i}`)
+      )
+    ).toBe(false);
+
+    const copy = contract.accounts.copyCredential.request;
+    expect(copy.safeParse({ providerId: 'rac', key: 'memberNumber' }).success).toBe(true);
+    expect(copy.safeParse({ providerId: 'rac', key: `k${'e'.repeat(64)}` }).success).toBe(false);
+  });
+
   it('has no request schema with a key named userId', () => {
     const offenders: string[] = [];
     let keysSeen = 0;

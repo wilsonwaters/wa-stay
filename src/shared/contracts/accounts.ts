@@ -54,14 +54,26 @@ const openSignInLinkRequest = z.object({
   providerId: ProviderIdSchema,
   url: z.url().refine((url) => url.startsWith('https://'), 'Sign-in links must be https'),
 });
-// Values are checked by the account service (trimmed, declared, at most 256 characters), so a
-// refusal names its field without zod quoting what was typed.
+/** Generous bounds on a payload; the account service checks the real rules (256 characters). */
+export const CREDENTIALS_PAYLOAD_LIMITS = Object.freeze({
+  keyLength: 64,
+  valueLength: 1024,
+  values: 16,
+  confirmed: 16,
+});
+const L = CREDENTIALS_PAYLOAD_LIMITS;
+const credentialKey = AccountKeySchema.max(L.keyLength);
+// A refusal here is answered by handle() with its issue paths only (`values.memberNumber`),
+// never zod's messages, so nothing typed is quoted. The account service then checks every
+// value: trimmed, declared, not empty, at most 256 characters.
 const saveCredentialsRequest = z.object({
   providerId: ProviderIdSchema,
-  values: z.record(AccountKeySchema, z.string()),
-  confirmed: z.array(AccountKeySchema),
+  values: z
+    .record(credentialKey, z.string().max(L.valueLength))
+    .refine((values) => Object.keys(values).length <= L.values, `At most ${L.values} values`),
+  confirmed: z.array(credentialKey).max(L.confirmed),
 });
-const copyCredentialRequest = z.object({ providerId: ProviderIdSchema, key: AccountKeySchema });
+const copyCredentialRequest = z.object({ providerId: ProviderIdSchema, key: credentialKey });
 assertTypeEquals<z.input<typeof providerPayload>, AccountRequest>(true);
 assertTypeEquals<z.output<typeof providerPayload>, AccountRequest>(true);
 assertTypeEquals<z.input<typeof openSignInLinkRequest>, OpenSignInLinkRequest>(true);

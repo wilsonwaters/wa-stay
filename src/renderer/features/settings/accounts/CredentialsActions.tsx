@@ -110,6 +110,7 @@ export function CredentialsActions({
               <Button
                 key={field.key}
                 variant="secondary"
+                aria-describedby={statusId}
                 loading={copy.isPending && copy.variables?.key === field.key}
                 leadingIcon={<Copy size={18} aria-hidden="true" />}
                 onClick={() => void copyField(field)}

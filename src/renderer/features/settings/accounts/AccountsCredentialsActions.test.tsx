@@ -85,6 +85,7 @@ describe('Settings → Accounts: saved details (credentials): replace, remove an
     await rows();
 
     const copy = within(row('Key Stay')).getByRole('button', { name: 'Copy member number' });
+    expect(copy).toHaveAccessibleDescription('Member number saved');
     await user.click(copy);
     expect(mock.api.accounts.copyCredential).toHaveBeenCalledWith('keystay', 'memberNumber');
     await waitFor(() => expect(politeAnnouncement()).toBe('Copied'));

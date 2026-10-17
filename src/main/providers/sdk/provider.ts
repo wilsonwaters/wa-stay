@@ -303,13 +303,26 @@ export interface CredentialsAuth extends AuthBase {
    * Checks the values (trimmed, every declared field, none empty) before they are stored,
    * within 15 s: `signed-in` stores them, `signed-out` refuses them ("{shortName} didn't accept
    * these details"), and `unknown` or a rejection stores nothing ("Couldn't check these
-   * details"). Never put a value in an error message or a log line.
+   * details"). A `signed-in` answer may carry `values` to store instead, in the provider's own
+   * form (see `CredentialsSignInResult`). Never put a value in an error message or a log line.
    */
   signIn(
     values: Readonly<Record<string, string>>,
     http: HttpClient,
     signal?: AbortSignal
-  ): Promise<AccountStatus>;
+  ): Promise<CredentialsSignInResult>;
+}
+
+/**
+ * What a `credentials` sign-in's `signIn` answers: the status, and with `signed-in` optionally
+ * the values to store (and copy) instead of what was typed, normalised the provider's way
+ * ("1234 5678 9012" → "123456789012"). Only declared keys, each a string that is not empty and
+ * at most 256 characters once trimmed; a declared key left out keeps the typed value. Anything
+ * else makes the core ignore `values` (with a warning that names no value) and store what was
+ * typed.
+ */
+export interface CredentialsSignInResult extends AccountStatus {
+  values?: Readonly<Record<string, string>>;
 }
 
 /** Sign-in that browser automation performs (§12.30). Declared and validated only. */

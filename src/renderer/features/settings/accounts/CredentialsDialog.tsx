@@ -14,7 +14,7 @@ export interface CredentialsDialogProps {
   onSave(values: Record<string, string>, confirmed: string[]): Promise<ProviderAccount>;
   /** After a save: the parent unmounts the dialog, so the typed values leave memory. */
   onSaved(account: ProviderAccount): void;
-  /** Cancel, Escape, the scrim or the close button. */
+  /** Cancel, Escape, the scrim or the close button; never while a save is pending. */
   onClose(): void;
 }
 
@@ -100,7 +100,10 @@ export function CredentialsDialog({
   return (
     <Dialog
       open
-      onClose={onClose}
+      // Escape, the scrim and the close button too: a pending save is seen through
+      onClose={() => {
+        if (!pending) onClose();
+      }}
       title={credentialsDialogTitle(manifest)}
       description={CREDENTIALS_TEXT.storage}
       closeOnEsc={!pending}

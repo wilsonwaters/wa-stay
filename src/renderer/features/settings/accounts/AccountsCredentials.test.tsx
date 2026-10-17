@@ -181,7 +181,7 @@ describe('Settings → Accounts: saved details (credentials): the form', () => {
     expect(field).not.toHaveAttribute('aria-invalid');
   });
 
-  it('while a save is pending, Save shows it and the dialog stays open', async () => {
+  it('while a save is pending, Save shows it and nothing closes the dialog: Cancel, Escape or Close', async () => {
     const pending = deferred<unknown>();
     const { user } = setupCredentials({ saveCredentials: () => pending.promise });
     await rows();
@@ -195,6 +195,8 @@ describe('Settings → Accounts: saved details (credentials): the form', () => {
     expect(save).toHaveAttribute('aria-busy', 'true');
     expect(within(credentialsDialog()).getByRole('button', { name: 'Cancel' })).toBeDisabled();
     await user.keyboard('{Escape}');
+    expect(credentialsDialog()).toBeInTheDocument();
+    await user.click(within(credentialsDialog()).getByRole('button', { name: 'Close' }));
     expect(credentialsDialog()).toBeInTheDocument();
 
     await act(async () => pending.resolve(ok(KEY_SAVED)));

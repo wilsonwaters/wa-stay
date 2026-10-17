@@ -817,6 +817,62 @@ describe('ProviderAccountService', () => {
       );
     });
 
+    it('a signIn may return normalised values: those are stored and copied, and none is logged', async () => {
+      registry = new ProviderRegistry();
+      keystay = registerKeyStay({
+        signIn: (values) => ({
+          state: 'signed-in',
+          // The provider's own form: digits only. The password is left out, so kept as typed.
+          values: { memberNumber: values.memberNumber.replace(/[\s-]/g, '') },
+        }),
+      });
+      build();
+
+      const spaced = '1234 5678-90123';
+      await service.saveCredentials(
+        'keystay',
+        { memberNumber: ` ${spaced} `, password: PASSWORD },
+        ['own']
+      );
+      await expect(keystay.ctx!.secrets.get('account.memberNumber')).resolves.toBe(NUMBER);
+      await expect(keystay.ctx!.secrets.get('account.password')).resolves.toBe(PASSWORD);
+      await service.copyCredential('keystay', 'memberNumber');
+
+      expect(clipboard.writeText.mock.calls).toEqual([[NUMBER]]);
+      for (const value of [NUMBER, spaced, PASSWORD]) expect(everything()).not.toContain(value);
+      expect(logger.lines.filter((l) => l.level === 'warn')).toEqual([]);
+    });
+
+    it.each<[string, unknown]>([
+      ['an undeclared key', { memberNumber: NUMBER, pin: '4321' }],
+      ['an empty value', { memberNumber: '  ' }],
+      ['a value over 256 characters', { memberNumber: '1'.repeat(257) }],
+      ['a value that is not text', { memberNumber: 1234567890123 }],
+      ['values that are not an object', 'digits'],
+    ])(
+      'normalised values with %s are ignored: the typed ones are stored, with a warning that names none',
+      async (_label, returned) => {
+        registry = new ProviderRegistry();
+        keystay = registerKeyStay({
+          signIn: () => ({ state: 'signed-in', values: returned }) as unknown as AccountStatus,
+        });
+        build();
+
+        await service.saveCredentials(
+          'keystay',
+          { memberNumber: '012345678', password: PASSWORD },
+          ['own']
+        );
+
+        await expect(keystay.ctx!.secrets.get('account.memberNumber')).resolves.toBe('012345678');
+        const warnings = logger.lines.filter((l) => l.level === 'warn').map((l) => l.message);
+        expect(warnings).toEqual([
+          'Account keystay: its normalised values were ignored (an undeclared key, or a value that is not text, empty or too long); the typed ones are kept',
+        ]);
+        expect(everything()).not.toContain('012345678');
+      }
+    );
+
     it('a signed-out answer is VALIDATION and an unknown one PROVIDER_ERROR; neither stores anything', async () => {
       registry = new ProviderRegistry();
       const scripted: AccountStatus['state'][] = ['signed-out', 'unknown'];
@@ -895,6 +951,33 @@ describe('ProviderAccountService', () => {
       gates[1]();
       await second;
       await expect(keystay.ctx!.secrets.get('account.memberNumber')).resolves.toBe('012345678');
+    });
+
+    it('a save the provider answers after quit stores nothing: "WA Stay is closing; nothing was saved."', async () => {
+      registry = new ProviderRegistry();
+      let answer!: () => void;
+      keystay = registerKeyStay({
+        signIn: () =>
+          new Promise<AccountStatus>((resolve) => {
+            answer = () => resolve({ state: 'signed-in' });
+          }),
+      });
+      build();
+
+      const saving = refusal(service.saveCredentials('keystay', VALUES, ['own']));
+      await later();
+      service.dispose();
+      answer();
+
+      await expect(saving).resolves.toEqual({
+        code: 'INTERNAL',
+        message: 'WA Stay is closing; nothing was saved.',
+        issues: undefined,
+      });
+      expect(secretRows()).toEqual([]);
+      expect(repo.get('keystay')).toBeNull();
+      expect(updates()).toEqual([]);
+      expect(credentialsChanged).not.toHaveBeenCalled();
     });
 
     it('a vault that is not ready fails the save with INTERNAL (nothing stored) and reads as not saved, with one warning per key', async () => {

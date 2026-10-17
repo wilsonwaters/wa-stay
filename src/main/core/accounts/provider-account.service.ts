@@ -85,6 +85,7 @@ import type {
   AccommodationProvider,
   BrowserSessionAuth,
   CredentialsAuth,
+  CredentialsSignInResult,
 } from '../../providers/sdk/provider';
 import { matchesOrigin, matchesUrlPattern } from '../../providers/sdk/url-patterns';
 import { AppError } from '../../utils/app-error';
@@ -519,21 +520,28 @@ export class ProviderAccountService implements AccountGate {
     const { manifest } = provider;
     const providerId = manifest.id;
     const answer = await this.askProvider(provider, auth, values);
-    if (answer === 'signed-out') {
+    if (answer.state === 'signed-out') {
       throw new AppError('VALIDATION', `${manifest.shortName} didn't accept these details`, {
         issues: auth.fields.map((field) => `values.${field.key}`),
       });
     }
-    if (answer !== 'signed-in') {
+    if (answer.state !== 'signed-in') {
       throw new AppError('PROVIDER_ERROR', "Couldn't check these details. Try again.");
     }
     if (this.disposed) throw new AppError('INTERNAL', 'WA Stay is closing; nothing was saved.');
+    let toStore = normalisedValues(auth, values, answer.values);
+    if (!toStore) {
+      this.log.warn(
+        `Account ${providerId}: its normalised values were ignored (an undeclared key, or a value that is not text, empty or too long); the typed ones are kept`
+      );
+      toStore = values;
+    }
 
     const secrets = this.providers.secretsOf(providerId);
     let written = 0;
     try {
       for (const field of auth.fields) {
-        await secrets.set(credentialKey(field.key), values[field.key]);
+        await secrets.set(credentialKey(field.key), toStore[field.key]);
         written++;
       }
     } catch (error) {
@@ -562,7 +570,7 @@ export class ProviderAccountService implements AccountGate {
     provider: AccommodationProvider,
     auth: CredentialsAuth,
     values: Readonly<Record<string, string>>
-  ): Promise<AccountStatus['state']> {
+  ): Promise<CredentialsSignInResult> {
     const providerId = provider.manifest.id;
     const controller = new AbortController();
     let timer: ReturnType<typeof setTimeout> | undefined;
@@ -582,12 +590,12 @@ export class ProviderAccountService implements AccountGate {
         ),
         timedOut,
       ]);
-      return answer?.state ?? 'unknown';
+      return answer?.state ? answer : { state: 'unknown' };
     } catch (error) {
       this.log.debug(
         `Account ${providerId}: the details could not be checked (${errorName(error)})`
       );
-      return 'unknown';
+      return { state: 'unknown' };
     } finally {
       clearTimeout(timer);
     }
@@ -1013,4 +1021,27 @@ function checkCredentials(
 
   if (issues.length) throw new AppError('VALIDATION', message, { issues });
   return checked;
+}
+
+/**
+ * The values to store: the typed ones, with any the provider's `signIn` returned in their
+ * place (`CredentialsSignInResult.values`), or null when what it returned breaks the rules
+ * (an undeclared key, or a value that is not text, empty or over `ACCOUNT_VALUE_MAX_LENGTH`
+ * characters once trimmed).
+ */
+function normalisedValues(
+  auth: CredentialsAuth,
+  typed: Readonly<Record<string, string>>,
+  returned: unknown
+): Record<string, string> | null {
+  if (returned === undefined) return { ...typed };
+  if (typeof returned !== 'object' || returned === null || Array.isArray(returned)) return null;
+  const values: Record<string, string> = { ...typed };
+  for (const [key, raw] of Object.entries(returned)) {
+    if (!auth.fields.some((field) => field.key === key) || typeof raw !== 'string') return null;
+    const value = raw.trim();
+    if (!value || [...value].length > ACCOUNT_VALUE_MAX_LENGTH) return null;
+    values[key] = value;
+  }
+  return values;
 }

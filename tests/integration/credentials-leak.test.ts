@@ -6,14 +6,15 @@
  * FakeProvider ("KeyStay") built the way the container builds a provider: its state in
  * `provider_state`, its secrets sealed by the container's SecretVault, the app logger, and an
  * HTTP client that records every request. Its `signIn` makes one request of its own (with no
- * value in it) and accepts only the right member number.
+ * value in it), accepts only the right member number, and returns it normalised (digits only)
+ * for the core to store instead of what was typed.
  *
  * Two made-up sentinels (never a real member number) go through every `accounts` channel:
  * list, status, saveCredentials (each refusal and the save), copyCredential (refused and
  * done) and signOut. Neither is in any IPC response, any `account:updated` payload, any log
  * line (debug included), any request the provider's HTTP client sees, or the database in
- * plain text. The clipboard (Electron's `clipboard`, mocked) receives the member number
- * exactly once, on copy.
+ * plain text (while the values are stored, and after they are removed). The clipboard
+ * (Electron's `clipboard`, mocked) receives the normalised member number exactly once, on copy.
  */
 
 import { Writable } from 'stream';
@@ -53,8 +54,10 @@ const { clipboard } = jest.requireMock('electron') as { clipboard: { writeText: 
 
 /** Made-up sentinels: a member number in the documented test format, and a password. */
 const NUMBER = '1234567890123';
+/** The same number as the person types it; KeyStay's `signIn` normalises it to `NUMBER`. */
+const TYPED = '1234 5678 90123';
 const PASSWORD = 'made-up-sentinel-Q7v';
-const SENTINELS = [NUMBER, PASSWORD];
+const SENTINELS = [NUMBER, TYPED, PASSWORD];
 
 describe('credentials values never leak', () => {
   let container: AppContainer;
@@ -69,6 +72,12 @@ describe('credentials values never leak', () => {
 
   const call = <T = unknown>(channel: string, payload?: unknown): Promise<APIResponse<T>> =>
     ipc.invoke(channel, fakeEvent(), payload) as Promise<APIResponse<T>>;
+  /** What the database holds, as plain text. */
+  const plainDatabase = () =>
+    JSON.stringify([
+      container.db.prepare('SELECT * FROM provider_state').all(),
+      container.db.prepare('SELECT * FROM provider_accounts').all(),
+    ]);
 
   beforeEach(() => {
     // Every log line, debug included; the console stays quiet
@@ -106,9 +115,13 @@ describe('credentials values never leak', () => {
       capabilities: { account: 'optional' },
       credentials: {
         // A check of its own, with no value in it; only the right number is accepted
+        // and it returns the number in its own form (digits only) to store instead
         signIn: async (values, client, signal) => {
           await client.request('GET', 'https://keystay.example/api/members/check', { signal });
-          return { state: values.memberNumber === NUMBER ? 'signed-in' : 'signed-out' };
+          const digits = values.memberNumber.replace(/[\s-]/g, '');
+          return digits === NUMBER
+            ? { state: 'signed-in', values: { memberNumber: digits } }
+            : { state: 'signed-out' };
         },
       },
     });
@@ -183,7 +196,7 @@ describe('credentials values never leak', () => {
     expect(clipboard.writeText).not.toHaveBeenCalled();
 
     // The save, and everything a renderer can read afterwards
-    const saved = await save({ memberNumber: ` ${NUMBER} `, password: PASSWORD });
+    const saved = await save({ memberNumber: ` ${TYPED} `, password: PASSWORD });
     expect(saved).toMatchObject({
       success: true,
       data: { status: 'signed-in', savedFields: ['memberNumber', 'password'] },
@@ -202,8 +215,12 @@ describe('credentials values never leak', () => {
     });
     expect(copied).toEqual({ success: true });
     responses.push(copied);
-    // The provider reads it back with ctx.secrets (R16 learns membership this way)
+    // The provider reads it back with ctx.secrets (R16 learns membership this way), normalised
     await expect(keystay.ctx!.secrets.get('account.memberNumber')).resolves.toBe(NUMBER);
+    // The stored rows, before sign-out deletes them: envelopes only
+    const savedDatabase = plainDatabase();
+    expect(savedDatabase).toContain('secret:account.memberNumber');
+    expect(savedDatabase).toContain('secret:account.password');
 
     responses.push(await call('accounts:sign-out', { providerId: 'keystay' }));
     responses.push(await call('accounts:list'));
@@ -215,10 +232,7 @@ describe('credentials values never leak', () => {
     expect(updates.length).toBeGreaterThanOrEqual(2);
     // The provider's own checks went out, with neither value in them
     expect(http.requests.length).toBeGreaterThanOrEqual(2);
-    const plainDatabase = JSON.stringify([
-      container.db.prepare('SELECT * FROM provider_state').all(),
-      container.db.prepare('SELECT * FROM provider_accounts').all(),
-    ]);
+    const removedDatabase = plainDatabase();
     const logs = logLines.join('\n');
     expect(logs).toContain('accounts:save-credentials');
 
@@ -227,7 +241,8 @@ describe('credentials values never leak', () => {
       expect(JSON.stringify(updates)).not.toContain(sentinel);
       expect(logs).not.toContain(sentinel);
       expect(JSON.stringify(http.requests)).not.toContain(sentinel);
-      expect(plainDatabase).not.toContain(sentinel);
+      expect(savedDatabase).not.toContain(sentinel);
+      expect(removedDatabase).not.toContain(sentinel);
     }
   });
 });

@@ -54,6 +54,7 @@ import {
   type BrowserSessionAuth,
   type CatalogModule,
   type CredentialsAuth,
+  type CredentialsSignInResult,
   type ExternalBooking,
   type HttpClient,
   type HoldResult,
@@ -176,7 +177,7 @@ export interface FakeCredentialsOptions {
   confirmations?: AccountConfirmation[];
   /**
    * What `signIn` answers: a state, or a function of the trimmed values and the HTTP client
-   * the core passes (it may reject). Default `signed-in`.
+   * the core passes (it may reject, or return normalised `values`). Default `signed-in`.
    */
   signIn?:
     | AccountStatus['state']
@@ -184,7 +185,7 @@ export interface FakeCredentialsOptions {
         values: Readonly<Record<string, string>>,
         http: HttpClient,
         signal?: AbortSignal
-      ) => AccountStatus | Promise<AccountStatus>);
+      ) => CredentialsSignInResult | Promise<CredentialsSignInResult>);
 }
 
 /** The fake's default `credentials` fields: a copyable member number, and a password that is not. */
