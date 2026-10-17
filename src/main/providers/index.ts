@@ -22,6 +22,14 @@ export interface BuiltInRegistration {
 const reasonOf = (error: unknown): string =>
   error instanceof Error ? error.message : String(error);
 
+/** Experiments a factory's own manifest marks applied: only the person's choice applies one. */
+function markedApplied(factory: ProviderFactory): string[] {
+  const experiments: unknown = factory.manifest?.experiments;
+  return Array.isArray(experiments)
+    ? experiments.filter((e: { applied?: unknown }) => e?.applied).map((e) => String(e.id))
+    : [];
+}
+
 /**
  * Registers each factory with a context `makeContext` builds from its validated manifest. A
  * provider that fails to register is logged and skipped, so the app still starts with the
@@ -29,7 +37,8 @@ const reasonOf = (error: unknown): string =>
  *
  * With `experiments`, each provider registers with the experiments the person turned on
  * (`withExperiments`), before the registry parses and freezes its manifest; if it cannot, it
- * registers without them, which is logged and read as `failed`.
+ * registers without them, which is logged and read as `failed`. A factory whose own manifest
+ * marks an experiment `applied` is refused: experiments ship off.
  */
 export function registerBuiltInProviders(
   registry: ProviderRegistry,
@@ -44,6 +53,16 @@ export function registerBuiltInProviders(
   const result: BuiltInRegistration = { registered: [], failed: [] };
 
   for (const factory of factories) {
+    const marked = markedApplied(factory);
+    if (marked.length) {
+      const failure = new ProviderRegistrationError(
+        factory.id,
+        `its manifest marks experiment ${marked.join(', ')} applied, but experiments ship off`
+      );
+      logger?.error(failure.message);
+      result.failed.push(failure);
+      continue;
+    }
     const enabled = experiments?.enabledFor(factory.manifest) ?? [];
     if (experiments && enabled.length) {
       try {

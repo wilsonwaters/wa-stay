@@ -265,6 +265,7 @@ export const exampleApiManifest: ProviderManifest = {
 | `stayFields` | Provider-specific stay inputs ([below](#stay-fields)). |
 | `releaseModes` | Site Sniper's release modes, when `capabilities.snipes` ([below](#release-modes)). |
 | `bulkAvailabilityStayFields` | What bulk availability depends on ([below](#bulk-availability-stay-fields)). |
+| `experiments` | What you ship switched off, for the person to turn on ([below](#experiments)). |
 
 ### Location kinds
 
@@ -404,6 +405,46 @@ the cached answer instead of asking the provider again. Example Parks reads only
 ParkStay reads the dates and the gear type, so changing the number of guests on Explore costs
 no request.
 
+### Experiments
+
+Something your provider can do but should not do for everyone yet, such as placing holds before
+anyone has paid for one end to end, ships as an experiment: declared in the manifest, off until
+the person turns it on.
+
+```ts
+interface ProviderExperiment {
+  id: string; // a lower-case letter, then 1–31 letters or digits, e.g. 'autoCart'; never changes
+  label: string; // the switch's label
+  description: string; // one or two sentences under it
+  warning?: string; // shown in the confirm dialog before it is turned on
+  turnsOn: BooleanCapability[]; // capabilities that are off in your manifest
+}
+```
+
+- **Where the person turns it on.** Your row in Settings → Accounts gets an "Experimental" group,
+  shown to everyone, with a switch per experiment. Turning one on asks first, with the
+  description and the warning; turning one off does not.
+- **When it takes effect: after a restart.** At start-up the app registers your provider with the
+  experiments that are on: the capabilities they turn on are on in the manifest the registry
+  freezes, so in `ctx.manifest` and on every screen, with the experiment marked `applied: true`
+  (never set `applied` yourself: a provider whose manifest does is not registered). Build the
+  modules behind them only when `ctx.manifest` has them on
+  (`holds: ctx.manifest.capabilities.holds ? createHolds(ctx) : undefined`), so with the
+  experiment off no code path can reach them. If your provider cannot register with an
+  experiment on (a module missing), it registers without it, the log says why, and the switch
+  reads "Couldn't turn on".
+- **Holds stop at once.** Turning off an experiment that turns on `holds` is refused while a hold
+  or snipe needs your provider. Once it is off, the app places no new hold on your provider until
+  the restart: a watch says so in its alert, and a snipe tells the person what is free instead.
+- **What it may turn on.** Only boolean capabilities that are off in your manifest, never
+  `account` or `catalogMode`, and every experiment on together must still pass the manifest
+  rules (`MANIFEST_RULES`: Site Sniper turned on needs holds, availability and a release mode).
+- **The person's choice is not yours.** The app keeps it in your `provider_state` under
+  `core.experiments`, which your `ctx.state` cannot reach. To test your provider with an
+  experiment on, register `withExperiments(factory, ['autoCart'])`
+  (`src/main/providers/experiments.ts`) instead of the factory: the contract suite runs on it
+  as on any provider.
+
 ## 3. The provider context
 
 `create(ctx)` receives a `ProviderContext` (`src/main/providers/sdk/context.ts`), built from
@@ -415,7 +456,7 @@ reaches for globals, never imports `electron`, an HTTP library, the database or 
 | `id`, `manifest`, `timezone`, `limits` | From your manifest (limits with defaults applied). |
 | `http` | Your `HttpClient` ([below](#the-httpclient)). |
 | `browser` | A `BrowserAutomation` that drives the installed Edge or Chrome, with your own persistent profile at `<userData>/providers/<id>/browser`. It costs nothing until first used ([browser providers](browser-providers.md)). |
-| `state` | Your own key-value store (`provider_state` table, namespaced by your id). |
+| `state` | Your own key-value store (`provider_state` table, namespaced by your id). Keys starting `core.` are the app's: getting, setting or deleting one rejects, and `list` leaves them out. |
 | `secrets` | Your encrypted secrets (`ScopedSecretVault`): ciphertext from the app's SecretVault (Electron `safeStorage`), stored in your state under `secret:<key>`, readable only by your provider. Never put a secret in `state`. |
 | `logger` | A child logger tagged `{ provider: id }`. Never log cookies, tokens, form values or personal details; log URLs without query strings. |
 | `clock` | The current time. Use it rather than `new Date()`, so tests can fix it. |

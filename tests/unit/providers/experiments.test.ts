@@ -174,6 +174,20 @@ describe('experiments', () => {
       expect(stored()).toEqual({ autoCart: true });
     });
 
+    it('a built-in whose own manifest marks an experiment applied is refused: experiments ship off', () => {
+      const fake = cartProvider();
+      const result = start({
+        ...fake,
+        factory: withExperiments(fake.factory, ['autoCart']),
+      } as FakeProvider);
+
+      expect(result.registered).toEqual([]);
+      expect(result.failed.map((f) => f.message)).toEqual([
+        'Provider "expstay" could not be registered: its manifest marks experiment autoCart applied, but experiments ship off',
+      ]);
+      expect(registry.tryGet('expstay')).toBeUndefined();
+    });
+
     it('a provider without experiments (ParkStay) registers as it always has', () => {
       start(createFakeProvider({ id: 'plain' }));
       registerBuiltInProviders(registry, (m) => createTestProviderContext(m), {

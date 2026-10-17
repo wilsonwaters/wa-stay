@@ -80,6 +80,34 @@ export const OPENSTAY = {
   },
 } as unknown as ProviderManifest;
 
+/** CartStay's experiment (R17): holds, shipped off, as RAC's auto-cart will be. */
+export const AUTO_CART = {
+  id: 'autoCart',
+  label: 'Hold a stay in the cart',
+  description: 'When a watch finds your stay, WA Stay puts it in the cart on CartStay for you.',
+  warning: 'Turn this on only after a booking of your own has worked.',
+  turnsOn: ['holds'],
+} as const;
+
+/** A provider with watches and no account, whose holds sit behind an experiment (R17). */
+export const CARTSTAY = {
+  ...PARKSTAY_MANIFEST,
+  id: 'cartstay',
+  name: 'Cart Stay',
+  shortName: 'CartStay',
+  brand: { color: '#3A3F47', monogram: 'CS' }, // token-guard-ignore: provider brand data
+  capabilities: {
+    ...PARKSTAY_MANIFEST.capabilities,
+    holds: false,
+    snipes: false,
+    bookingImport: false,
+    accessGate: false,
+    account: 'none',
+  },
+  releaseModes: [],
+  experiments: [AUTO_CART],
+} as unknown as ProviderManifest;
+
 /** A provider whose account is details saved in the app (`credentials`, R15), optional. */
 export const KEYSTAY = {
   ...PARKSTAY_MANIFEST,

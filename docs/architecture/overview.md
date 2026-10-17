@@ -151,7 +151,7 @@ records the versions applied. At version 11 the tables are:
 | `notification_delivery_logs` | Each notifier delivery; deleted after 30 days. |
 | `settings` | Typed key-value settings (`SETTING_KEYS`). |
 | `provider_accounts` | The person's account state with each provider (no secrets). |
-| `provider_state` | Each provider's key-value state: the DBCA queue session, release times, scoped secrets. |
+| `provider_state` | Each provider's key-value state: the DBCA queue session, release times, scoped secrets; and the app's own `core.*` keys, which the provider cannot reach: catalogue sync times and the person's experiment choices (`core.experiments`). |
 | `locations`, `locations_fts` | The synced catalogue of every provider, with an FTS5 index for search. |
 | `maintenance` | Pending maintenance tasks (the post-v9 VACUUM). |
 | `migrations` | The versions applied. |
