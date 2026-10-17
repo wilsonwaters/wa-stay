@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **RAC Parks & Resorts**, WA Stay's second provider: its eight open holiday parks and resorts on Explore beside ParkStay's campgrounds, each park's categories (powered sites, cabins, rooms, dorms, glamping) night by night with prices and RAC's stay rules, its free counts for your dates on Explore, watches, and Site Sniper release alerts timed to RAC's 364-day window and its school-holiday releases (#52, #57, #58, #61).
+- **Stay type**: one filter for Camping, Cabins & villas, Rooms, Dorms and Glamping, across providers: on Explore, where the free counts follow it, and in new watches and snipes, which then look only at those kinds (#48, #50, #51, #53).
+- **Your RAC member number**, saved in Settings → Accounts after three statements (it is your own, you will stay, you will book in the name on your card): RAC's members' rates in prices and counts, snipes timed to the members' school-holiday pre-sale, 48 hours early, and "Copy RAC member number" beside "Book on RAC" for RAC's checkout. It is kept encrypted on your computer, never shown again and never sent (#62, #63).
+- **Release-alert snipes**: a snipe can alert you the moment the dates are free, with a link to book, instead of holding a site ("Alert me" or "Hold it for me"). RAC's snipes alert. A snipe the provider turns away (HTTP 403 or 429) stops at once and says so (#59, #60).
+- **Booking links in alerts**: an alert that a watch found something, or that a snipe found the dates free, and its email carry the provider's public booking page for those dates ("Book on {provider}"), so you can book from your phone. It is never a cart or checkout page (#54).
+- **Minimum stays and arrival days**: nights a provider refuses for your stay are marked on the place page with the reason, watches and snipes never alert on such a stay, and a price from a special rate is named ("Rate: RAC member rate") (#55).
+
+### Changed
+- Explore's "Type" filter is now **Stay type** (#51).
+- Clicking an alert that a watch found something, or that a snipe found the dates free, opens the provider's booking page for those dates in your browser as well as the watch or snipe in WA Stay, for every provider. An alert that a site is held still opens only the watch or snipe, where you pay (#54).
+- **Interactive pace**: what you start (your dates on Explore, a place's "Check availability", "Check now") goes first, while watches and snipes are spaced out in the background for a provider that asks for a pause between requests (RAC: 10 seconds) (#49).
+- Alerts and screens name what was found by its kind ("Cabins available at …", "A spot is free at …" for several kinds), not always "site" (#56).
+- Settings → Notifications no longer says "site" for what a watch finds or holds.
+
+### Fixed
+- A watch check still running when the watch was moved to another place, or its dates or units changed, could save what it found for the old one and alert on it. Its answer is now dropped, and the watch checks again at once.
+
 ## [2.0.0] - 2026-10-11
 
 WA ParkStay Bookings becomes **WA Stay**: an app for finding and booking places to stay across
