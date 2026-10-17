@@ -3,9 +3,13 @@
  *
  * - **Rule 7, the fixtures.** Every file in `tests/fixtures/providers/rac/` and
  *   `tests/e2e/fixtures/http/rac/` is trimmed to facts: no image URL but the placeholder
- *   pattern (and the widget's 1×1 lazy-load gif), only placeholder category descriptions,
- *   `<redacted>` for every `api_key`, `rest_api_data_id` and `online_cart_url`, and no email
- *   address, phone number or script.
+ *   pattern (and the widget's 1×1 lazy-load gif), no NewBook instance key but the placeholder
+ *   one (anywhere, not only in a photo's address), photo alt text only as "Photo <n>", only
+ *   placeholder category descriptions (in whatever element), no description, inclusions,
+ *   deposits, fees or membership copy in an availability answer, `<redacted>` for every
+ *   `api_key`, `rest_api_data_id` and `online_cart_url`, and no email address, phone number,
+ *   IP address, Cloudflare cookie or `cf-ray` value, or script. Each availability answer says
+ *   where it was trimmed from and when (`_fixture`).
  * - **Rule 1, the source.** Every URL in `src/main/providers/rac/` is on RAC's host; NewBook's
  *   image host is named only where photos are checked; and nothing names a cart address
  *   (`online_cart_url`, `/booking/?cart`).
@@ -28,6 +32,18 @@ const PLACEHOLDER_IMAGE =
 const LAZY_GIF = 'data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==';
 const PLACEHOLDER_DESCRIPTION = 'Placeholder description.';
 const SECRET_KEYS = ['api_key', 'rest_api_data_id', 'online_cart_url'];
+/** Keys an availability answer's fixture drops: RAC's copy, an image, money terms. */
+const DROPPED_KEYS = [
+  'tariff_inclusions',
+  'tariff_short_description',
+  'membership_description',
+  'membership_icon',
+  'membership_discount_pricing',
+  'deposits',
+  'adjustment_fees',
+];
+/** A notice's text is a booking rule, kept as a fact; every other description is RAC's copy. */
+const KEPT_DESCRIPTION_CLASS = 'booking-notification__description';
 const RAC_HOST = 'parksandresorts.rac.com.au';
 
 function filesIn(dir: string): string[] {
@@ -56,12 +72,38 @@ function fixtureViolations(raw: string): string[] {
   for (const [, src] of text.matchAll(/\b(?:data-)?src(?:set)?\s*=\s*"([^"]*)"/gi)) {
     if (src !== LAZY_GIF && !PLACEHOLDER_IMAGE.test(src)) found.push(`image source ${src}`);
   }
-  for (const [, description] of text.matchAll(
-    /class="[^"]*\baccommodation-item__description\b[^"]*"[^>]*>([\s\S]*?)<\/div>/g
+  for (const [, tag, classes, description] of text.matchAll(
+    /<([a-z][a-z0-9]*)\b[^>]*\bclass="([^"]*description[^"]*)"[^>]*>([\s\S]*?)<\/\1>/gi
   )) {
-    if (description.trim() !== PLACEHOLDER_DESCRIPTION) {
-      found.push(`description "${description.trim().slice(0, 40)}"`);
+    if (classes.split(/\s+/).includes(KEPT_DESCRIPTION_CLASS)) continue;
+    const plain = description.replace(/<[^>]*>/g, '').trim();
+    if (plain !== PLACEHOLDER_DESCRIPTION && plain !== '') {
+      found.push(`description in a <${tag}> "${plain.slice(0, 40)}"`);
     }
+  }
+  for (const [key, value] of text.matchAll(/"([a-z_]*description)"\s*:\s*"((?:[^"\\]|\\.)*)"/gi)) {
+    if (value !== '' && value !== PLACEHOLDER_DESCRIPTION) found.push(`description ${key}`);
+  }
+  for (const key of DROPPED_KEYS) {
+    if (new RegExp(`["']${key}["']\\s*:`).test(text)) found.push(`a "${key}"`);
+  }
+  for (const [key] of text.matchAll(/instances_[0-9a-f]{32}/gi)) {
+    if (key !== `instances_${'0'.repeat(32)}`) found.push(`a NewBook instance key ${key}`);
+  }
+  for (const [, alt] of text.matchAll(/\balt\s*=\s*"([^"]*)"/gi)) {
+    if (alt !== '' && !/^Photo \d+$/.test(alt)) found.push(`photo alt text "${alt}"`);
+  }
+  for (const [ip] of text.matchAll(/(?<![\d.])(?:\d{1,3}\.){3}\d{1,3}(?![\d.])/g)) {
+    if (ip.split('.').every((octet) => Number(octet) <= 255)) found.push(`IP address ${ip}`);
+  }
+  for (const [ip] of text.matchAll(/(?<![\w:])(?:[0-9a-f]{1,4}:){4,7}[0-9a-f]{1,4}(?![\w:])/gi)) {
+    found.push(`IP address ${ip}`);
+  }
+  for (const [cookie] of text.matchAll(/\b(?:__cf_bm|_cfuvid|cf_clearance|__cfruid)\s*[=:]/gi)) {
+    found.push(`a Cloudflare cookie ${cookie}`);
+  }
+  for (const [ray] of text.matchAll(/\bcf[-_]ray["']?\s*[:=]\s*["']?[0-9a-f]{8,}/gi)) {
+    found.push(`a cf-ray value ${ray}`);
   }
   for (const key of SECRET_KEYS) {
     const values = text.matchAll(new RegExp(`${key}["']?\\s*[:=]\\s*["']?([^"'&\\s,}]*)`, 'g'));
@@ -116,8 +158,19 @@ describe('RAC fixtures (terms rule 7)', () => {
         'tests/fixtures/providers/rac/blocked-403.html',
         'tests/fixtures/providers/rac/blocked-429.html',
         'tests/fixtures/providers/rac/challenge.html',
+        'tests/fixtures/providers/rac/availability-busselton-2026-11-06-2n.json',
+        'tests/fixtures/providers/rac/availability-busselton-school-holidays-2027-09-25-2n.json',
+        'tests/fixtures/providers/rac/availability-busselton-leavers-2027-11-20-1n.json',
+        'tests/fixtures/providers/rac/availability-busselton-window-edge-2027-10-13-6n.json',
+        'tests/fixtures/providers/rac/availability-busselton-window-after-midnight-2027-10-15-3n.json',
+        'tests/fixtures/providers/rac/availability-exmouth-closed-2027-10-13-7n.json',
+        'tests/fixtures/providers/rac/availability-exmouth-2026-10-31-1n.json',
+        'tests/fixtures/providers/rac/availability-karri-valley-2026-10-31-1n.json',
+        'tests/fixtures/providers/rac/availability-monkey-mia-2026-10-31-1n.json',
+        'tests/fixtures/providers/rac/availability-no-direct-file-access.txt',
         'tests/e2e/fixtures/http/rac/book-now-busselton.html',
         'tests/e2e/fixtures/http/rac/book-now-margaret-river.html',
+        'tests/e2e/fixtures/http/rac/availability-busselton-2026-11-06-2n.json',
       ])
     );
   });
@@ -137,6 +190,15 @@ describe('RAC fixtures (terms rule 7)', () => {
         /^<!-- Synthetic, written by hand/
       );
     }
+    for (const file of files.filter((f) => /\/availability-[^/]+\.json$/.test(f))) {
+      const note = (JSON.parse(read(file)) as { _fixture?: string })._fixture;
+      expect([file, note]).toEqual([
+        file,
+        expect.stringMatching(
+          /^Trimmed from RAC Parks & Resorts' availability answer for .+ \(blog \d+\), .+, fetched anonymously; .+\(Fetched \d{1,2} \w{3} \d{4}, \d{2}:\d{2} Perth\.\)$/
+        ),
+      ]);
+    }
   });
 
   it('catches what it guards against', () => {
@@ -153,13 +215,32 @@ describe('RAC fixtures (terms rule 7)', () => {
       'Free call: 1800 871 570',
       '<a href="tel:0897554241">call</a>',
       '<script>window.x = 1</script>',
+      // A bare NewBook instance key, outside any photo address
+      '{"note":"instances_d895bd707965db25abb932aba767878f"}',
+      // Photo alt text, a description in another element, and RAC's copy in an answer
+      '<img alt="Sunset over the bay">',
+      '<p class="accommodation-item__description">Wake up to birdsong.</p>',
+      '<span class="category__description">Spacious and bright.</span>',
+      '{"tariff_short_description":"Our most flexible rate"}',
+      '{"membership_icon":"<redacted>"}',
+      '{"deposits":[]}',
+      '{"tariff_inclusions":[]}',
+      // An IP address, Cloudflare's cookies and a cf-ray value
+      'REMOTE_ADDR: 203.0.113.42',
+      '"client_ip":"2001:db8:85a3:0:0:8a2e:370:7334"',
+      'set-cookie: __cf_bm=abc123; path=/',
+      '_cfuvid=xyz',
+      'cf-ray: a4bc3afc690b4f8b-IAD',
     ];
     for (const sample of bad)
       expect([sample, fixtureViolations(sample).length]).not.toEqual([sample, 0]);
     expect(
       fixtureViolations(
-        `<img src="${LAZY_GIF}" data-src="https://driveau.newbook.cloud/crop_800_450/instances_${'0'.repeat(32)}_7.jpg">` +
-          '{"api_key":"<redacted>","online_cart_url":"<redacted>"} data-date-from="20270924"'
+        `<img src="${LAZY_GIF}" data-src="https://driveau.newbook.cloud/crop_800_450/instances_${'0'.repeat(32)}_7.jpg" alt="Photo 7">` +
+          '{"api_key":"<redacted>","online_cart_url":"<redacted>"} data-date-from="20270924"' +
+          '<div class="booking-notification__description"><p>Arrivals on Fridays only.</p></div>' +
+          '<p class="accommodation-item__description">Placeholder description.</p>' +
+          '{"timestamp":"2026-10-16 23:35:15","newbook_version":"2025.03.12-6acd5eef54202"}'
       )
     ).toEqual([]);
   });

@@ -1,12 +1,14 @@
 /**
  * RAC Parks & Resorts: RAC's holiday parks and resorts across Western Australia, WA Stay's
- * second provider. For now its eight open parks are on Explore, each with its categories
- * (powered site, two-bedroom cabin, dorm…) on its page.
+ * second provider. Its eight open parks are on Explore, each with its categories (powered site,
+ * two-bedroom cabin, dorm…) on its page; a stay's availability is checked per category, with
+ * prices and RAC's stay rules, and watches run on it.
  *
  * - `manifest.ts`: who RAC is, what the module does, and its limits;
  * - `parks.ts`: the parks, as a seed of facts (no request per sync);
  * - `catalog.ts` and `book-now.ts`: the catalogue, and a park's categories from its book-now
- *   page; `unit-kinds.ts`: what each category is;
+ *   page (a native park's from one availability POST); `unit-kinds.ts`: what each category is;
+ * - `availability.ts` and `mapping.ts`: a stay's availability, from RAC's availability answer;
  * - `links.ts`: RAC's own pages, never its cart;
  * - `client.ts`: every request, on RAC's host only, with the block cool-down.
  *
@@ -15,21 +17,26 @@
  * site's terms limit its use to "personal non-commercial home use". So the module:
  * 1. talks only to RAC's own host, for the person's own trip, from their own computer;
  * 2. sends at most one background request every 10 s, and none when the catalogue syncs;
- * 3. lets watches run every 15 minutes at most (when they come);
+ * 3. lets watches run every 15 minutes at most;
  * 4. sends one request at a time, on one session;
- * 5. never answers or works around a bot check: a block stops every request for 30 minutes;
+ * 5. never answers or works around a bot check: a block stops every request for 30 minutes,
+ *    longer for blocks in a row or when RAC asks (up to a day);
  * 6. shows facts (names, categories) and links to RAC's pages; RAC's photos and descriptions
  *    are fetched live and shown only in the app;
  * 7. keeps nothing of RAC's in the repository's fixtures but trimmed facts (a test checks it);
- * 10. never cancels or changes a booking: there is no bookings module.
+ * 10. never cancels or changes a booking: there is no bookings module;
+ * 16. respects RAC's stay rules: a stay RAC refuses (a minimum, an arrival day, a closed or
+ *     unreleased date, too many pets) is never free, and a booking takes at most two pets.
  */
 
 import { defineProvider, type ProviderModules } from '../sdk/provider';
 import type { ProviderContext } from '../sdk/context';
+import { createRacAvailability } from './availability';
 import { createRacCatalog } from './catalog';
 import { RacClient } from './client';
 import { racLinks } from './links';
 import { racManifest } from './manifest';
+import { createKindResolver } from './unit-kinds';
 
 export { RAC_SITE_URL } from './client';
 export { racLinks } from './links';
@@ -48,9 +55,12 @@ export function createRacModules(ctx: ProviderContext): ProviderModules {
     timezone: ctx.timezone,
     maxConcurrent: ctx.limits.maxConcurrentRequests,
   });
+  const kindOf = createKindResolver((message) => ctx.logger.warn(message));
+  const availability = createRacAvailability({ ctx, client, links: racLinks, kindOf });
   return {
     links: racLinks,
-    catalog: createRacCatalog({ ctx, client, links: racLinks }),
+    catalog: createRacCatalog({ ctx, client, links: racLinks, availability, kindOf }),
+    availability,
   };
 }
 

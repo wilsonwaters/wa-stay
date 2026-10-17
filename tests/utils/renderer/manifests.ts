@@ -122,3 +122,50 @@ export const BROWSE_ONLY_MANIFEST: ProviderManifest = {
   brand: { color: '#1F5F7A', monogram: 'BO' }, // token-guard-ignore: provider brand data
   capabilities: { ...FAKE_MANIFEST.capabilities, watches: false },
 };
+
+/**
+ * RAC Parks & Resorts as main registers it (tests/unit/renderer/mock-manifests.test.ts pins it
+ * to the real manifest): watches with no holds, the pets stay field, and its terms' limits.
+ */
+export const RAC_MANIFEST: ProviderManifest = {
+  id: 'rac',
+  name: 'RAC Parks & Resorts',
+  shortName: 'RAC',
+  description: 'Holiday parks and resorts across Western Australia, from RAC Parks & Resorts.',
+  website: 'https://parksandresorts.rac.com.au',
+  integration: 'api',
+  brand: { color: '#3A3F47', monogram: 'RAC' }, // token-guard-ignore: provider brand data
+  locationKinds: ['holiday-park'],
+  timezone: 'Australia/Perth',
+  currency: 'AUD',
+  capabilities: {
+    catalog: true,
+    catalogMode: 'full',
+    availability: true,
+    bulkAvailability: false,
+    watches: true,
+    snipes: false,
+    holds: false,
+    bookingImport: false,
+    accessGate: false,
+    account: 'none',
+  },
+  limits: {
+    minWatchIntervalMinutes: 15,
+    maxConcurrentRequests: 1,
+    minRequestIntervalMs: 10_000,
+    catalogTtlHours: 24,
+  },
+  stayFields: [
+    {
+      key: 'pets',
+      label: 'Pets',
+      help: 'Up to 2, where pets are allowed.',
+      type: 'number',
+      min: 0,
+      max: 2,
+      default: 0,
+      appliesTo: ['availability', 'watch', 'snipe'],
+    },
+  ],
+};
