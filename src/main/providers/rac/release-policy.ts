@@ -16,7 +16,7 @@
  *     periods takes the later release. Cable Beach is in no school-holiday release: only the
  *     rolling window applies there, member number or not.
  *
- *   A snipe keeps checking for `RAC_RELEASE_WINDOW_MINUTES` after its release. When that window
+ *   A snipe keeps checking for `RAC_SNIPE_WINDOW_MINUTES` (30) after its release. When that window
  *   has passed for the member instant, but not for the public one, the public instant is
  *   used (a member who missed the pre-sale still gets the public release). When every window
  *   has passed, the stay is refused: the dates are open already, and a watch suits them.
@@ -45,7 +45,7 @@ import {
 import { ProviderError, throwIfAborted } from '../sdk/errors';
 import type { ReleaseComputeInput, ReleaseModeId, ReleasePolicy } from '../sdk/provider';
 import { categoryIdOf } from './links';
-import { racManifest } from './manifest';
+import { RAC_SNIPE_WINDOW_MINUTES, racManifest } from './manifest';
 import { racPark, type RacPark, type SchoolHolidayRelease } from './parks';
 import { isAnnounced, isCovered, periodOf } from './release-calendar';
 
@@ -56,17 +56,17 @@ export const RAC_TIME_ZONE = racManifest.timezone;
 export const RAC_WINDOW_DAYS = 364;
 
 /**
- * How long a snipe keeps checking after its release, in minutes: the release modes'
- * `maxWindowMinutes` (`manifest.ts`). The rolling window's exact opening moment is unmeasured
- * (closed at 23:42, open at 00:01:40), so checking from 00:00 for 30 minutes covers it.
+ * The fastest a snipe checks inside its window: the gap RAC's robots.txt asks for between
+ * requests (`limits.minRequestIntervalMs`, 10 s).
  */
-export const RAC_RELEASE_WINDOW_MINUTES = 30;
+export const RAC_WINDOW_POLL_FLOOR_MS = racManifest.limits?.minRequestIntervalMs ?? 10_000;
 
-/** The fastest a snipe checks inside its window: 10 s, the gap RAC's robots.txt asks for. */
-export const RAC_WINDOW_POLL_FLOOR_MS = 10_000;
-
-/** No mode polls continuously; should one ever, no faster than watches (15 minutes). */
-export const RAC_CONTINUOUS_POLL_FLOOR_MS = 15 * 60_000;
+/**
+ * No mode polls continuously; should one ever, no faster than watches
+ * (`limits.minWatchIntervalMinutes`, 15 minutes).
+ */
+export const RAC_CONTINUOUS_POLL_FLOOR_MS =
+  (racManifest.limits?.minWatchIntervalMinutes ?? 15) * 60_000;
 
 const MODES: readonly ReleaseModeId[] = [
   SnipeReleaseMode.DAILY_ROLLOVER,
@@ -74,7 +74,7 @@ const MODES: readonly ReleaseModeId[] = [
 ];
 
 const MIDNIGHT = { hour: 0, minute: 0 };
-const WINDOW_MS = RAC_RELEASE_WINDOW_MINUTES * 60_000;
+const WINDOW_MS = RAC_SNIPE_WINDOW_MINUTES * 60_000;
 
 /** The instant a stay's last night comes into the rolling window: 00:00 on departure − 365. */
 export function rollingInstant(departure: CalendarDate): Date {

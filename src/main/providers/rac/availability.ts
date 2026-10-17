@@ -23,7 +23,7 @@
  *   one). A night RAC reports free stays free: its engine decides (terms rule 16). The result's
  *   `release` is `{ open: false, opensAt }` when a night is not open yet, with `opensAt` the
  *   policy's `daily_rollover` instant for the stay (left out when the policy would refuse it),
- *   else `{ open: true }`.
+ *   else `{ open: true }`; none when no unit is in the answer.
  * - **Refusals.** A park the seed does not have, a stay that is not two calendar dates in order,
  *   or pets outside 0–2 reject with a `ProviderError` and nothing is sent. An answer that is no
  *   answer (`readAvailability`) is a `ProviderParseError`. A block, a 5xx or a network failure
@@ -220,9 +220,14 @@ export function createRacAvailability({
         key: makeLocationKey(ctx.id, park.slug),
         checkedAt: ctx.clock().toISOString(),
         units,
-        release: open
-          ? { open: true }
-          : { open: false, ...(opensAt ? { opensAt: opensAt.toISOString() } : {}) },
+        // With no unit, nothing says whether the stay is open
+        ...(units.length === 0
+          ? {}
+          : {
+              release: open
+                ? { open: true }
+                : { open: false, ...(opensAt ? { opensAt: opensAt.toISOString() } : {}) },
+            }),
         ...(bookingUrl ? { bookingUrl } : {}),
       };
     },

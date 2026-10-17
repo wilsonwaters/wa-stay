@@ -308,6 +308,11 @@ describe('RAC release policy', () => {
 
     it('checks every 10 s in a window, and no faster than a watch otherwise', () => {
       expect(makePolicy().policy.pollFloorMs).toEqual({ window: 10_000, continuous: 900_000 });
+      // The terms' gap between requests, and the watch floor
+      expect(makePolicy().policy.pollFloorMs).toEqual({
+        window: racManifest.limits!.minRequestIntervalMs,
+        continuous: racManifest.limits!.minWatchIntervalMinutes * 60_000,
+      });
     });
 
     it('asks isMember at every compute and keeps nothing, so a saved number shows at once', async () => {

@@ -957,6 +957,15 @@ describe('RAC availability: releases (release.opensAt)', () => {
     expect(result.release).toEqual({ open: true });
   });
 
+  it('says nothing about the release when no unit is in the answer', async () => {
+    const provider = racFactory(fixtureContext({ clock: () => EDGE_CHECKED }));
+    const result = await provider.availability!.check('busselton', WINDOW_EDGE, {
+      unitIds: ['cat:999'],
+    });
+    expect(result.units).toEqual([]);
+    expect(result.release).toBeUndefined();
+  });
+
   it('a stay beyond the window that the policy would refuse has no opensAt', async () => {
     // Leavers, 20 Nov 2027 (site code 9), asked an hour after its rolling window closed
     const provider = racFactory(

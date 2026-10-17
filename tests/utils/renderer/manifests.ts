@@ -144,7 +144,7 @@ export const RAC_MANIFEST: ProviderManifest = {
     availability: true,
     bulkAvailability: false,
     watches: true,
-    snipes: false,
+    snipes: true,
     holds: false,
     bookingImport: false,
     accessGate: false,
@@ -166,6 +166,26 @@ export const RAC_MANIFEST: ProviderManifest = {
       max: 2,
       default: 0,
       appliesTo: ['availability', 'watch', 'snipe'],
+    },
+  ],
+  releaseModes: [
+    {
+      id: 'daily_rollover',
+      label: 'When these dates open',
+      description:
+        'New dates open each midnight, 364 days ahead, and school holidays on their own release ' +
+        'days. Site Sniper works out when yours open and checks then.',
+      usesAccessGate: false,
+      maxWindowMinutes: 30,
+    },
+    {
+      id: 'scheduled',
+      label: 'At a time you set',
+      description:
+        'For dates released on a day you know, such as seasonal dates at Cable Beach. ' +
+        'Site Sniper checks from the time you set.',
+      usesAccessGate: false,
+      maxWindowMinutes: 30,
     },
   ],
 };

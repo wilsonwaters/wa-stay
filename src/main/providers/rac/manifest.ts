@@ -17,6 +17,13 @@ import { RAC_SITE_URL } from './client';
 
 export const RAC_PROVIDER_ID = 'rac';
 
+/**
+ * How long a snipe keeps checking after its release, in minutes: every release mode's
+ * `maxWindowMinutes`. The rolling window's exact opening moment is unmeasured (closed at 23:42,
+ * open at 00:01:40), so checking from midnight for 30 minutes covers it.
+ */
+export const RAC_SNIPE_WINDOW_MINUTES = 30;
+
 export const racManifest: ProviderManifest = {
   // Stored in every watch, snipe, booking and notification, so it never changes once shipped.
   id: RAC_PROVIDER_ID,
@@ -84,7 +91,7 @@ export const racManifest: ProviderManifest = {
         'New dates open each midnight, 364 days ahead, and school holidays on their own release ' +
         'days. Site Sniper works out when yours open and checks then.',
       usesAccessGate: false,
-      maxWindowMinutes: 30,
+      maxWindowMinutes: RAC_SNIPE_WINDOW_MINUTES,
     },
     {
       id: SnipeReleaseMode.SCHEDULED,
@@ -93,7 +100,7 @@ export const racManifest: ProviderManifest = {
         'For dates released on a day you know, such as seasonal dates at Cable Beach. ' +
         'Site Sniper checks from the time you set.',
       usesAccessGate: false,
-      maxWindowMinutes: 30,
+      maxWindowMinutes: RAC_SNIPE_WINDOW_MINUTES,
     },
   ],
 };
