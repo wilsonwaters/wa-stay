@@ -129,7 +129,8 @@ public search page with the campground and the dates. The core keeps a link only
 https on the provider's own site (its website's host, or a subdomain of it); a link that adds to
 a cart is never one (the provider's rule). It is never stored: the watch's page works out the
 same link from the last check ("Book on {provider}" under the result, while the stay has not
-begun), and logs name only a link's origin.
+begun), and logs name only a link's origin. Moving a watch to another place forgets what its
+last check saw, so the page shows no link (and no result) until the new place is checked.
 
 ### For developers
 
@@ -137,8 +138,9 @@ begun), and logs name only a link's origin.
   notification (with its `provider_id`; the stored title has no provider prefix), shows the
   desktop notification and emits `notification:created`. An alert's booking page and whether it
   is about a hold in the app (`dispatchMeta.bookingUrl`, `heldInApp`) go to the notifiers and
-  the desktop click only, never to `notifications` or the delivery log; a click opens the
-  booking page with the `openExternal` option (`shell.openExternal`) after `app:navigate`.
+  the desktop click only, never to `notifications` or the delivery log. `notify` keeps a link
+  only when it is on the notification's provider's site (the `providerManifest` option); a
+  click opens it with the `openExternal` option (`shell.openExternal`) after `app:navigate`.
 - `NotificationDispatcher` (`notification-dispatcher.ts`) sends it to every enabled notifier
   and records each delivery in `notification_delivery_logs`.
 - A **notifier** is an outbound channel (`notifiers/base.notifier.ts`); the only one is

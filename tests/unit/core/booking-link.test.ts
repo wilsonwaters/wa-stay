@@ -16,6 +16,8 @@ import {
 import { parkstayLinks, parkstayManifest } from '@main/providers/parkstay';
 import type { StayQuery } from '@shared/types/provider.types';
 import type { UnitAvailability, Watch, WatchMatch } from '@shared/types';
+import { createCoreHarness, fakeDateOnly } from '@tests/utils/core-harness';
+import { createFakeProvider } from '@tests/utils/fake-provider';
 
 jest.mock('@main/utils/logger', () => {
   const log: Record<string, unknown> = {
@@ -243,5 +245,74 @@ describe('matchedStayLink', () => {
       arrival: '2026-11-11',
       departure: '2026-11-13',
     });
+  });
+});
+
+describe('quiet: the watch reads log nothing', () => {
+  const watch: Pick<Watch, 'location' | 'stay' | 'stayParams'> = {
+    location: { externalId: '1', name: 'Banksia Camp' },
+    stay: { arrival: '2026-12-01', departure: '2026-12-04', adults: 2 },
+    stayParams: {},
+  };
+  const full: WatchMatch = {
+    unitId: 'u1',
+    unitName: 'Site u1',
+    arrival: '2026-12-01',
+    departure: '2026-12-04',
+    partial: false,
+    priceKnown: false,
+  };
+
+  it('firstBookingLink and matchedStayLink log nothing when quiet, refused or throwing', () => {
+    expect(firstBookingLink(PARKSTAY, ['https://evil.test/x'], { quiet: true })).toBeUndefined();
+    const refusing = {
+      manifest: WWW_SITE,
+      links: { location: () => null, booking: () => 'https://elsewhere.test/book' },
+    };
+    const throwing = {
+      manifest: WWW_SITE,
+      links: {
+        location: () => null,
+        booking: (): string => {
+          throw new Error('boom');
+        },
+      },
+    };
+    const unit: UnitAvailability = {
+      unitId: 'u1',
+      unitName: 'Site u1',
+      nights: [],
+      fullyAvailable: true,
+      bookingUrl: 'https://cart.elsewhere.test/add',
+    };
+    expect(matchedStayLink(refusing, watch, full, [unit], { quiet: true })).toBeUndefined();
+    expect(matchedStayLink(throwing, watch, full, [], { quiet: true })).toBeUndefined();
+    expect(mockLog.warn).not.toHaveBeenCalled();
+  });
+
+  it('a provider with off-site links: the alert logs it once, and get, list and refreshes never', async () => {
+    fakeDateOnly(new Date('2026-10-04T02:00:00.000Z'));
+    const offSite = createFakeProvider();
+    offSite.links.booking = () => 'https://elsewhere.test/book?stay=1';
+    const h = createCoreHarness({ providers: [offSite] });
+    try {
+      const created = await h.watches.create(h.userId, h.watchInput({ notifyOnly: false }));
+      await h.watches.execute(created.id);
+      expect(h.notifications.notifyWatchFound.mock.calls[0][3]).toBeUndefined();
+      expect(mockLog.warn).toHaveBeenCalledTimes(1);
+      expect(logged()).toContain('https://elsewhere.test');
+      expect(logged()).not.toContain('stay=1');
+
+      mockLog.warn.mockClear();
+      for (let i = 0; i < 3; i++) {
+        expect((await h.watches.get(created.id))?.bookingLink).toBeUndefined();
+        await h.watches.list(h.userId);
+        await h.watches.update(created.id, { name: `Banksia ${i}` });
+      }
+      expect(mockLog.warn).not.toHaveBeenCalled();
+    } finally {
+      await h.close();
+      jest.useRealTimers();
+    }
   });
 });

@@ -293,6 +293,8 @@ export function createContainer({
 
   // A provider's short name (`ParkStay`), for emails and desktop notification titles
   const providerName = (id: string): string | undefined => providers.tryGet(id)?.manifest.shortName;
+  // Its manifest, to check an alert's booking link against its website
+  const providerManifest = (id: string) => providers.tryGet(id)?.manifest;
   const notifierDispatcher = new NotificationDispatcher(repositories.notifiers, [
     new SmtpEmailNotifier({ providerName, logoPath: getEmailLogoPath() }),
   ]);
@@ -305,7 +307,13 @@ export function createContainer({
     repositories.notifications,
     notifierDispatcher,
     rendererEvents,
-    { providerName, showMainWindow, openExternal, preferences: notificationPreferences }
+    {
+      providerName,
+      providerManifest,
+      showMainWindow,
+      openExternal,
+      preferences: notificationPreferences,
+    }
   );
   // Core services resolve every provider through the registry and its capabilities.
   const nightGuard = new NightGuard(repositories.snipes, repositories.watches);

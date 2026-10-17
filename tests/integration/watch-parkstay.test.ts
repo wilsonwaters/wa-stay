@@ -249,6 +249,7 @@ describe('WatchService on ParkStay (fixture server)', () => {
         undefined,
         {
           providerName,
+          providerManifest: (id) => parkstay.registry.tryGet(id)?.manifest,
           preferences: () => ({ desktop: false, sound: false }),
         }
       );

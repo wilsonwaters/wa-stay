@@ -248,10 +248,19 @@ describe('createContainer', () => {
       r.notifications,
       container.notifierDispatcher,
       container.rendererEvents,
-      { providerName: expect.any(Function), preferences: expect.any(Function) }
+      {
+        providerName: expect.any(Function),
+        providerManifest: expect.any(Function),
+        preferences: expect.any(Function),
+      }
     );
     const [, , , notificationOptions] = jest.mocked(NotificationService).mock.calls[0];
     expect(notificationOptions?.providerName?.('parkstay')).toBe('ParkStay');
+    // An alert's booking link is checked against the registry's manifest
+    expect(notificationOptions?.providerManifest?.('parkstay')).toBe(
+      container.providers.get('parkstay').manifest
+    );
+    expect(notificationOptions?.providerManifest?.('gone')).toBeUndefined();
     // Settings → Notifications, read from the stored settings (defaults while none stored)
     expect(notificationOptions?.preferences?.()).toEqual({ desktop: true, sound: true });
     expect(AutoUpdaterService).toHaveBeenCalledWith(container.rendererEvents);

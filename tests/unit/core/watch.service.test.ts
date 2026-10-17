@@ -418,6 +418,68 @@ describe('WatchService', () => {
       );
     });
 
+    it('after the location is edited there is none, also for a paused watch the due-loop skips', async () => {
+      // notifyOnly: paused right after its found alert, so no check runs on its own
+      const watch = await h.watches.create(h.userId, h.watchInput({ notifyOnly: true }));
+      await h.watches.execute(watch.id);
+      const paused = await h.watches.get(watch.id);
+      expect(paused).toMatchObject({ isActive: false, lastResult: WatchResult.FOUND });
+      expect(paused?.bookingLink?.url).toBe(WHOLE_STAY);
+
+      // A new name for the same place keeps what the check found
+      await h.watches.update(watch.id, { location: { externalId: '1', name: 'Banksia (north)' } });
+      expect((await h.watches.get(watch.id))?.bookingLink?.url).toBe(WHOLE_STAY);
+
+      const moved = await h.watches.update(watch.id, {
+        location: { externalId: '2', name: 'Karri Grove' },
+      });
+      expect(moved.bookingLink).toBeUndefined();
+      expect(moved).toMatchObject({ isActive: false });
+      // The old place's check is forgotten: no result, units or time to show for the new one
+      expect(moved.lastResult).toBeUndefined();
+      expect(moved.lastAvailability).toBeUndefined();
+      expect(moved.lastCheckedAt).toBeUndefined();
+      expect(updates(watch.id).at(-1)?.bookingLink).toBeUndefined();
+      expect((await h.watches.get(watch.id))?.bookingLink).toBeUndefined();
+      expect((await h.watches.list(h.userId))[0].bookingLink).toBeUndefined();
+      expect(h.watches.findDue(new Date(NOW.getTime() + 60_000), ['fake'])).toEqual([]);
+
+      // Its next check is of the new place, with the new place's link
+      await h.watches.execute(watch.id, { manual: true });
+      expect((await h.watches.get(watch.id))?.bookingLink?.url).toBe(
+        'https://fake.example/book/2?arrival=2026-12-01&departure=2026-12-04'
+      );
+    });
+
+    it('a held watch moved to another place keeps its hold and the held unit, and gets no link', async () => {
+      const watch = await h.watches.create(h.userId, h.watchInput({ autoHold: true }));
+      await h.watches.execute(watch.id);
+      const moved = await h.watches.update(watch.id, {
+        location: { externalId: '2', name: 'Karri Grove' },
+      });
+      expect(moved).toMatchObject({ lastResult: WatchResult.HELD, hold: { reference: 'FAKE-1' } });
+      expect(moved.lastAvailability?.map((u) => u.unitName)).toEqual(['Site u1', 'Site u2']);
+      expect(moved.bookingLink).toBeUndefined();
+    });
+
+    it('a stored check it cannot read gives no link, and get and list still answer', async () => {
+      const watch = await h.watches.create(h.userId, h.watchInput());
+      await h.watches.execute(watch.id);
+      h.db
+        .prepare('UPDATE watches SET last_availability = ? WHERE id = ?')
+        .run(
+          JSON.stringify([
+            { unitId: 'u1', unitName: 'Site u1', nights: [null], fullyAvailable: true },
+          ]),
+          watch.id
+        );
+
+      expect((await h.watches.get(watch.id))?.bookingLink).toBeUndefined();
+      expect((await h.watches.list(h.userId)).map((w) => [w.id, w.bookingLink])).toEqual([
+        [watch.id, undefined],
+      ]);
+    });
+
     it('a notifyOnly watch paused after its alert keeps the link; an unregistered provider gives none', async () => {
       const watch = await h.watches.create(h.userId, h.watchInput({ notifyOnly: true }));
       await h.watches.execute(watch.id);
