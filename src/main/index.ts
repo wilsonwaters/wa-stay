@@ -17,7 +17,7 @@
  * copied before `createContainer` (architecture-notes §12.23).
  */
 
-import { app, BrowserWindow, dialog, safeStorage, session } from 'electron';
+import { app, BrowserWindow, dialog, safeStorage, session, shell } from 'electron';
 import path from 'path';
 import { openDatabase } from './database/connection';
 import { bootstrapShell } from './app/bootstrap';
@@ -164,6 +164,8 @@ async function start(): Promise<void> {
     fixtureMode,
     providerFactories,
     showMainWindow,
+    // An alert's booking page, after a click on its desktop notification (core checks it first)
+    openExternal: (url) => shell.openExternal(url),
   });
   container = ready;
   ready.profile.ensureLocalProfile();

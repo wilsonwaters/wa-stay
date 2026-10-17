@@ -10,6 +10,7 @@ import { createFakeProvider, createTestProviderContext } from '@tests/utils/fake
 import { createFakeSearchProvider } from '@tests/utils/fake-search-provider';
 import {
   abortViolation,
+  bookingLinkViolations,
   defaultSearchText,
   describeProviderContract,
   searchAreaViolations,
@@ -37,6 +38,10 @@ describeProviderContract('FakeProvider with only catalogue and availability', ()
       account: 'none',
     },
   }),
+}));
+
+describeProviderContract('FakeProvider with unit booking links', () => ({
+  provider: createFakeProvider({ unitBookingUrls: true }),
 }));
 
 describeProviderContract('FakeProvider with a search-mode catalogue', () => ({
@@ -146,6 +151,65 @@ describe('the search-mode checks of the contract suite', () => {
     expect(await searchTextViolations(foreign, 'bad', 'bay')).toEqual([
       'searchText("bay"): other:1 is not a location of bad',
     ]);
+  });
+});
+
+describe('the booking-link check of the contract suite', () => {
+  const stay = { arrival: '2026-11-10', departure: '2026-11-12', adults: 2 };
+  const unit = (unitId: string, bookingUrl?: string) => ({
+    unitId,
+    unitName: `Site ${unitId}`,
+    nights: [],
+    fullyAvailable: false,
+    ...(bookingUrl ? { bookingUrl } : {}),
+  });
+
+  it("passes links on the provider's site: its website's host and a subdomain of it", async () => {
+    const fake = createFakeProvider({ unitBookingUrls: true });
+    const result = await fake.availability!.check('1', stay);
+    expect(result.bookingUrl).toMatch(/^https:\/\/fake\.example\//);
+    expect(result.units[0].bookingUrl).toMatch(/^https:\/\/book\.fake\.example\//);
+    expect(bookingLinkViolations(fake.manifest, result)).toEqual([]);
+    expect(bookingLinkViolations(fake.manifest, { units: [unit('u1')] })).toEqual([]);
+  });
+
+  it('fails a provider whose check returns an off-site link, for the location or a unit', async () => {
+    // A provider whose booking links are on another site: its check returns them as they are
+    const offSite = createFakeProvider();
+    offSite.links.booking = () => 'https://cart.elsewhere.test/add?campground=1';
+    const result = await offSite.availability!.check('1', stay);
+    expect(result.bookingUrl).toBe('https://cart.elsewhere.test/add?campground=1');
+    expect(bookingLinkViolations(offSite.manifest, result)).toEqual([
+      "the location's bookingUrl https://cart.elsewhere.test/add?campground=1 is not on https://fake.example",
+    ]);
+
+    // A look-alike host on a unit
+    const lookAlike = {
+      ...result,
+      bookingUrl: undefined,
+      units: [
+        result.units[0],
+        { ...result.units[1], bookingUrl: 'https://fake.example.evil.test/u2' },
+      ],
+    };
+    expect(bookingLinkViolations(offSite.manifest, lookAlike)).toEqual([
+      "unit u2's bookingUrl https://fake.example.evil.test/u2 is not on https://fake.example",
+    ]);
+  });
+
+  it('fails an http link, credentials and a non-URL', () => {
+    expect(
+      bookingLinkViolations(
+        { website: 'https://fake.example' },
+        {
+          units: [
+            unit('a', 'http://fake.example/book'),
+            unit('b', 'https://me:pw@fake.example/book'),
+            unit('c', 'javascript:alert(1)'),
+          ],
+        }
+      ).map((violation) => violation.split("'")[0])
+    ).toEqual(['unit a', 'unit b', 'unit c']);
   });
 });
 

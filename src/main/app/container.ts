@@ -165,6 +165,11 @@ export interface ContainerOptions {
    * notification; false when there is no window or the app is quitting.
    */
   readonly showMainWindow?: () => boolean;
+  /**
+   * Opens an alert's booking page in the system browser (`shell.openExternal`), after a click
+   * on its desktop notification has opened its page in the app.
+   */
+  readonly openExternal?: (url: string) => Promise<void>;
 }
 
 export function createContainer({
@@ -176,6 +181,7 @@ export function createContainer({
   fixtureMode,
   providerFactories = BUILT_IN_PROVIDERS,
   showMainWindow,
+  openExternal,
 }: ContainerOptions): AppContainer {
   // Lazy: no safeStorage call and no key file until the first secret is read or written
   const vault = new SecretVault({
@@ -299,7 +305,7 @@ export function createContainer({
     repositories.notifications,
     notifierDispatcher,
     rendererEvents,
-    { providerName, showMainWindow, preferences: notificationPreferences }
+    { providerName, showMainWindow, openExternal, preferences: notificationPreferences }
   );
   // Core services resolve every provider through the registry and its capabilities.
   const nightGuard = new NightGuard(repositories.snipes, repositories.watches);

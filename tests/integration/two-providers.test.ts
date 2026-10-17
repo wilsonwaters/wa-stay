@@ -7,6 +7,7 @@
  *
  * The key reads over IPC (`providers.list`, `catalog.search`, `accounts.list`) answer for both
  * providers, and filtered to ParkStay they equal what a container with ParkStay alone answers.
+ * Each provider's watch carries its own booking link (R7).
  */
 
 import fs from 'fs';
@@ -24,9 +25,12 @@ import type {
   CatalogSearchResult,
   CatalogStatus,
   ProviderAccount,
+  Watch,
+  WatchInput,
 } from '@shared/types';
 import type { ProviderManifest } from '@shared/types/provider.types';
-import { createFakeProvider, type FakeProvider } from '@tests/utils/fake-provider';
+import { fakeDateOnly } from '@tests/utils/core-harness';
+import { createFakeProvider, FIXED_NOW, type FakeProvider } from '@tests/utils/fake-provider';
 import { containerSecrets, removeUserData } from '@tests/utils/fake-safe-storage';
 import { FakeIpcMain, fakeEvent, TEST_LOGS_DIR } from '@tests/utils/ipc-harness';
 
@@ -99,6 +103,7 @@ describe('a container with ParkStay and a second provider', () => {
     await Promise.all(worlds.splice(0).map((w) => w.container.dispose()));
     dirs.splice(0).forEach(removeUserData);
     autoUpdater.removeAllListeners();
+    jest.useRealTimers();
   });
 
   it('providers.list() lists both, and ParkStay as it is alone', async () => {
@@ -177,5 +182,54 @@ describe('a container with ParkStay and a second provider', () => {
       requirement: 'optional',
       status: 'unknown',
     });
+  });
+
+  it("each provider's watch carries its own booking link: the second's unit link, ParkStay's search page", async () => {
+    // 2 Oct 2026: the recorded Bungarra stay, 10–12 Nov, is ahead
+    fakeDateOnly(FIXED_NOW);
+    second = createFakeProvider({
+      id: 'bush-camps',
+      name: 'Bush Camps WA',
+      shortName: 'Bush Camps',
+      account: 'signed-out',
+      unitBookingUrls: true,
+    });
+    const both = await world([parkstayFactory, second.factory]);
+    const stay = { arrival: '2026-11-10', departure: '2026-11-12', adults: 1 };
+    const watchFor = async (input: WatchInput): Promise<Watch> => {
+      const watch = await both.read<Watch>('watches:create', input);
+      await both.read('watches:run-now', { id: watch.id });
+      return both.read<Watch>('watches:get', { id: watch.id });
+    };
+
+    const bush = await watchFor({
+      providerId: 'bush-camps',
+      name: 'Banksia',
+      location: { externalId: '1', name: 'Banksia Camp' },
+      stay,
+    });
+    const bungarra = await watchFor({
+      providerId: 'parkstay',
+      name: 'Bungarra',
+      location: { externalId: '20', name: 'Bungarra' },
+      stay,
+      stayParams: { gearType: 'all' },
+    });
+
+    expect(bush.bookingLink).toEqual({
+      url: 'https://book.bush-camps.example/1/u1?arrival=2026-11-10&departure=2026-11-12',
+      arrival: '2026-11-10',
+      departure: '2026-11-12',
+    });
+    expect(bungarra.bookingLink).toEqual({
+      url: 'https://parkstay.dbca.wa.gov.au/search-availability/information/?campground_id=20&arrival=2026/11/10&departure=2026/11/12',
+      arrival: '2026-11-10',
+      departure: '2026-11-12',
+    });
+    const listed = await both.read<Watch[]>('watches:list', {});
+    expect(listed.map((w) => [w.providerId, w.bookingLink?.url])).toEqual([
+      ['bush-camps', bush.bookingLink?.url],
+      ['parkstay', bungarra.bookingLink?.url],
+    ]);
   });
 });

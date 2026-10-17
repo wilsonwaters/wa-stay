@@ -308,6 +308,14 @@ export interface UnitAvailability {
   fullyAvailable: boolean;
   /** Price for the whole stay, when known. */
   total?: number;
+  /**
+   * The booking page for this unit and the stay asked about, prefilled where the provider can
+   * (place, dates, guests, unit or category): what "Book on {shortName}" opens from an alert.
+   * A booking link is an absolute https URL on the provider's own site (`manifest.website`'s
+   * host, or a subdomain of it); a public page that works with no sign-in and no app session,
+   * on a phone too; and never a URL that adds to a cart, holds or books when it is opened.
+   */
+  bookingUrl?: string;
 }
 
 export interface LocationAvailability {
@@ -317,7 +325,11 @@ export interface LocationAvailability {
   checkedAt: string;
   units: UnitAvailability[];
   release?: { opensAt?: string; open: boolean };
-  /** A stay-specific deep link (§12.17). Prefer it over `LocationDetail.bookingUrl`. */
+  /**
+   * A stay-specific deep link (§12.17). Prefer it over `LocationDetail.bookingUrl`. A booking
+   * link, by the rule on `UnitAvailability.bookingUrl`: https on the provider's own site, a
+   * public page that needs no sign-in, never one that adds to a cart, holds or books.
+   */
   bookingUrl?: string;
 }
 

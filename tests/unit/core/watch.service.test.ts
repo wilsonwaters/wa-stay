@@ -279,6 +279,158 @@ describe('WatchService', () => {
     });
   });
 
+  describe('booking links (R7)', () => {
+    /** The fake's booking page (`links.booking`) for location 1 and these dates. */
+    const bookingUrl = (arrival: string, departure: string) =>
+      `https://fake.example/book/1?arrival=${arrival}&departure=${departure}`;
+    const WHOLE_STAY = bookingUrl('2026-12-01', '2026-12-04');
+    /** The `watch:updated` payloads for `id`, oldest first. */
+    const updates = (id: number) =>
+      h.events.emit.mock.calls
+        .filter(([name, watch]) => name === 'watch:updated' && watch.id === id)
+        .map(([, watch]) => watch);
+
+    it('a found alert gets the booking page for the stay, and get, list and watch:updated carry it', async () => {
+      const watch = await h.watches.create(h.userId, h.watchInput());
+      expect(watch.bookingLink).toBeUndefined();
+      await h.watches.execute(watch.id);
+
+      expect(h.notifications.notifyWatchFound).toHaveBeenCalledWith(
+        expect.objectContaining({ id: watch.id }),
+        [expect.objectContaining({ unitId: 'u1' })],
+        undefined,
+        WHOLE_STAY
+      );
+      const link = { url: WHOLE_STAY, arrival: '2026-12-01', departure: '2026-12-04' };
+      expect((await h.watches.get(watch.id))?.bookingLink).toEqual(link);
+      expect((await h.watches.list(h.userId)).map((w) => w.bookingLink)).toEqual([link]);
+      expect(updates(watch.id).at(-1)?.bookingLink).toEqual(link);
+      // Derived, never stored
+      expect(h.watchRepo.findById(watch.id)?.bookingLink).toBeUndefined();
+    });
+
+    it("a partial alert gets the booking page for the longest run, with the run's dates", async () => {
+      h.fake.setAvailability('1', {
+        u1: [{ state: 'available' }, { state: 'booked' }, { state: 'available' }],
+        u2: [{ state: 'available' }, { state: 'available' }, { state: 'booked' }],
+      });
+      const watch = await h.watches.create(h.userId, h.watchInput({ allowPartialMatch: true }));
+      await h.watches.execute(watch.id);
+
+      const runUrl = bookingUrl('2026-12-01', '2026-12-03');
+      expect(h.notifications.notifyWatchPartialFound).toHaveBeenCalledWith(
+        expect.objectContaining({ id: watch.id }),
+        expect.arrayContaining([expect.objectContaining({ unitId: 'u2', partial: true })]),
+        runUrl
+      );
+      expect((await h.watches.get(watch.id))?.bookingLink).toEqual({
+        url: runUrl,
+        arrival: '2026-12-01',
+        departure: '2026-12-03',
+      });
+    });
+
+    it('a held alert gets the booking page too (the email’s fallback), and the held watch has none', async () => {
+      const watch = await h.watches.create(h.userId, h.watchInput({ autoHold: true }));
+      await h.watches.execute(watch.id);
+
+      expect(h.notifications.notifyWatchHeld).toHaveBeenCalledWith(
+        expect.objectContaining({ id: watch.id }),
+        expect.objectContaining({ reference: 'FAKE-1' }),
+        'Site u1',
+        WHOLE_STAY
+      );
+      const held = await h.watches.get(watch.id);
+      expect(held?.lastResult).toBe(WatchResult.HELD);
+      expect(held?.bookingLink).toBeUndefined();
+    });
+
+    it("uses the first full match's own unit link, after maxPrice has left a unit out", async () => {
+      await h.close();
+      h = createCoreHarness({
+        providers: [
+          createFakeProvider({
+            unitBookingUrls: true,
+            availability: {
+              '1': {
+                u1: [
+                  { state: 'available', price: 40 },
+                  { state: 'available', price: 40 },
+                  { state: 'available', price: 40 },
+                ],
+                u2: 'available',
+                u3: 'available',
+              },
+            },
+          }),
+        ],
+      });
+      const watch = await h.watches.create(h.userId, h.watchInput({ maxPrice: 35 }));
+      await h.watches.execute(watch.id);
+
+      const u2 = 'https://book.fake.example/1/u2?arrival=2026-12-01&departure=2026-12-04';
+      const [, matches, , url] = h.notifications.notifyWatchFound.mock.calls[0];
+      expect(matches.map((m: { unitId: string }) => m.unitId)).toEqual(['u2', 'u3']);
+      expect(url).toBe(u2);
+      expect((await h.watches.get(watch.id))?.bookingLink?.url).toBe(u2);
+    });
+
+    it('get and list have none for a result other than found or partly found', async () => {
+      const watch = await h.watches.create(h.userId, h.watchInput());
+      await h.watches.execute(watch.id);
+      expect((await h.watches.get(watch.id))?.bookingLink).toBeDefined();
+
+      // A failed check keeps the stored units but is no longer a find
+      h.fake.failNext('availability', new Error('HTTP 500'));
+      await h.watches.execute(watch.id, { manual: true });
+      expect((await h.watches.get(watch.id))?.lastResult).toBe(WatchResult.ERROR);
+      expect((await h.watches.get(watch.id))?.bookingLink).toBeUndefined();
+
+      h.fake.setAvailability('1', { u1: 'booked', u2: 'booked' });
+      await h.watches.execute(watch.id, { manual: true });
+      expect((await h.watches.get(watch.id))?.lastResult).toBe(WatchResult.NOT_FOUND);
+      expect((await h.watches.list(h.userId))[0].bookingLink).toBeUndefined();
+      expect(updates(watch.id).at(-1)?.bookingLink).toBeUndefined();
+    });
+
+    it('after the stay is edited there is none, until a check of the new stay', async () => {
+      const watch = await h.watches.create(h.userId, h.watchInput());
+      await h.watches.execute(watch.id);
+      expect((await h.watches.get(watch.id))?.bookingLink).toBeDefined();
+
+      const newStay = { arrival: '2026-12-02', departure: '2026-12-05', adults: 2 };
+      const updated = await h.watches.update(watch.id, { stay: newStay });
+      expect(updated.lastResult).toBe(WatchResult.FOUND);
+      expect(updated.bookingLink).toBeUndefined();
+      expect(updates(watch.id).at(-1)?.bookingLink).toBeUndefined();
+      expect((await h.watches.get(watch.id))?.bookingLink).toBeUndefined();
+      expect((await h.watches.list(h.userId))[0].bookingLink).toBeUndefined();
+
+      // A longer stay that still starts on the same night has none either
+      await h.watches.update(watch.id, {
+        stay: { arrival: '2026-12-01', departure: '2026-12-05', adults: 2 },
+      });
+      expect((await h.watches.get(watch.id))?.bookingLink).toBeUndefined();
+
+      await h.watches.execute(watch.id, { manual: true });
+      expect((await h.watches.get(watch.id))?.bookingLink?.url).toBe(
+        bookingUrl('2026-12-01', '2026-12-05')
+      );
+    });
+
+    it('a notifyOnly watch paused after its alert keeps the link; an unregistered provider gives none', async () => {
+      const watch = await h.watches.create(h.userId, h.watchInput({ notifyOnly: true }));
+      await h.watches.execute(watch.id);
+      const paused = await h.watches.get(watch.id);
+      expect(paused?.isActive).toBe(false);
+      expect(paused?.bookingLink?.url).toBe(WHOLE_STAY);
+
+      h.db.prepare("UPDATE watches SET provider_id = 'gone' WHERE id = ?").run(watch.id);
+      expect((await h.watches.get(watch.id))?.bookingLink).toBeUndefined();
+      expect((await h.watches.list(h.userId))[0].bookingLink).toBeUndefined();
+    });
+  });
+
   describe('lifecycle', () => {
     it('activate makes a watch due now; a held or booked watch cannot be activated again', async () => {
       const watch = await h.watches.create(h.userId, h.watchInput());
