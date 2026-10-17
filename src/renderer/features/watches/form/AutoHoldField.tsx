@@ -24,7 +24,7 @@ export interface AutoHoldFieldProps {
  * error shows under the box, which it describes.
  */
 export function AutoHoldField({ manifest, noun }: AutoHoldFieldProps) {
-  const { register, watch, formState } = useFormContext<WatchFormValues>();
+  const { register, watch, formState, trigger } = useFormContext<WatchFormValues>();
   const set = useSetWatchField();
   const account = useAccountStatus(manifest.id);
   const autoHold = watch('autoHold');
@@ -45,7 +45,11 @@ export function AutoHoldField({ manifest, noun }: AutoHoldFieldProps) {
           description={`When a ${noun.one} is free for your whole stay, WA Stay places a temporary hold on it. You pay for it on ${manifest.shortName} before the hold runs out.`}
           aria-invalid={holdError ? true : undefined}
           aria-describedby={holdError ? holdErrorId : undefined}
-          {...register('autoHold')}
+          {...register('autoHold', {
+            // The stay-type rule is checked as the box is ticked, not when it loses focus: an
+            // error appearing on blur would move Continue from under the pointer mid-click.
+            onChange: () => void trigger('autoHold'),
+          })}
         />
         {holdError && (
           <p id={holdErrorId} className="flex items-start gap-1.5 text-sm font-medium text-danger">

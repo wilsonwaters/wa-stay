@@ -120,11 +120,13 @@ describe('NewWatchPage at a place with sites and cabins', () => {
     await user.click(button('Continue'));
     await step(/Alerts$/);
     const hold = screen.getByRole('checkbox', { name: 'Hold a site automatically when found' });
-    await user.click(hold);
-    await user.click(button('Continue'));
-
     const message =
       'Osprey Bay has more than one stay type. Choose a stay type or a site on the Stay step to hold one automatically.';
+    await user.click(hold);
+    // Said as the box is ticked, so Continue does not move when the box loses focus.
+    expect(await screen.findByText(message)).toBeInTheDocument();
+    await user.click(button('Continue'));
+
     await waitFor(() => expect(hold).toHaveFocus());
     expect(hold).toHaveAttribute('aria-invalid', 'true');
     expect(hold).toHaveAccessibleDescription(expect.stringContaining(message));
