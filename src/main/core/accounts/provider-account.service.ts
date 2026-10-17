@@ -50,8 +50,9 @@
  *   most 256 characters) and every confirmation ticked (`VALIDATION`, with `values.<key>` or
  *   `confirmed`), then asks the provider's `signIn` (15 s, at interactive priority). Only a
  *   `signed-in` answer stores the values, each as `account.<key>` in the provider's scoped
- *   secret vault (`registry.secretsOf`), all or nothing. Saving again replaces them; saves and
- *   removals for a provider run one after another.
+ *   secret vault (`registry.secretsOf`), all or nothing. A `signed-out` one is `VALIDATION`, in
+ *   the provider's own words (`message`) when they quote nothing typed. Saving again replaces
+ *   them; saves and removals for a provider run one after another.
  * - The status is worked out from what is stored: signed in when every field has a readable
  *   value. `isSignedIn` is never called and no request is made; `refreshStale` skips them.
  * - `signOut(id)` deletes the values and stores `signed-out`: no session to clear, never
@@ -81,11 +82,12 @@ import type { ProviderRegistry } from '../../providers/registry';
 import type { ProviderLogger } from '../../providers/sdk/context';
 import { ProviderAuthRequiredError, ProviderCapabilityError } from '../../providers/sdk/errors';
 import { withRequestPriority } from '../../providers/sdk/pacing';
-import type {
-  AccommodationProvider,
-  BrowserSessionAuth,
-  CredentialsAuth,
-  CredentialsSignInResult,
+import {
+  CREDENTIALS_MESSAGE_MAX_LENGTH,
+  type AccommodationProvider,
+  type BrowserSessionAuth,
+  type CredentialsAuth,
+  type CredentialsSignInResult,
 } from '../../providers/sdk/provider';
 import { matchesOrigin, matchesUrlPattern } from '../../providers/sdk/url-patterns';
 import { AppError } from '../../utils/app-error';
@@ -521,7 +523,10 @@ export class ProviderAccountService implements AccountGate {
     const providerId = manifest.id;
     const answer = await this.askProvider(provider, auth, values);
     if (answer.state === 'signed-out') {
-      throw new AppError('VALIDATION', `${manifest.shortName} didn't accept these details`, {
+      const refusal =
+        refusalMessage(answer.message, values) ??
+        `${manifest.shortName} didn't accept these details`;
+      throw new AppError('VALIDATION', refusal, {
         issues: auth.fields.map((field) => `values.${field.key}`),
       });
     }
@@ -1021,6 +1026,28 @@ function checkCredentials(
 
   if (issues.length) throw new AppError('VALIDATION', message, { issues });
   return checked;
+}
+
+/**
+ * A refusal's own words (`CredentialsSignInResult.message`), or undefined when they cannot be
+ * shown: not text, empty, over `CREDENTIALS_MESSAGE_MAX_LENGTH` characters once trimmed, or
+ * containing a value that was typed (trimmed, or with its spaces and dashes left out), so a
+ * provider's refusal never puts what was typed on screen.
+ */
+function refusalMessage(
+  message: unknown,
+  typed: Readonly<Record<string, string>>
+): string | undefined {
+  if (typeof message !== 'string') return undefined;
+  const text = message.trim();
+  if (!text || [...text].length > CREDENTIALS_MESSAGE_MAX_LENGTH) return undefined;
+  const plain = text.toLowerCase();
+  const squeezed = plain.replace(/[\s-]/g, '');
+  const quotes = Object.values(typed).some((value) => {
+    const forms = [value.trim().toLowerCase(), value.replace(/[\s-]/g, '').toLowerCase()];
+    return forms.some((form) => form && (plain.includes(form) || squeezed.includes(form)));
+  });
+  return quotes ? undefined : text;
 }
 
 /**

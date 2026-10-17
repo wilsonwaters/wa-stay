@@ -1,6 +1,6 @@
 /**
  * Checks one value of a provider's stay field against its descriptor (architecture-notes
- * §12.1): select options, number range, text pattern and type. Pure, so main
+ * §12.1, §12.35): select options, a whole number in its range, text pattern and type. Pure, so main
  * (`core/stay-params.ts`) and the renderer's forms validate with the same rules and words.
  *
  * No node or electron imports: the renderer compiles this file too.
@@ -21,6 +21,8 @@ export function stayFieldProblem(field: StayFieldDescriptor, value: unknown): st
       if (typeof value !== 'number' || !Number.isFinite(value)) {
         return `${field.label} must be a number`;
       }
+      // Every number field is a count (pets, vehicles): `1.5` is refused here, not by the provider
+      if (!Number.isInteger(value)) return `${field.label} must be a whole number`;
       if (field.min !== undefined && value < field.min) {
         return `${field.label} must be at least ${field.min}`;
       }

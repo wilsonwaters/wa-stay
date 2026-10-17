@@ -10,14 +10,20 @@
  * access`, sent without `X-Requested-With`) is no answer (`readAvailability`), never an empty
  * one.
  *
- * **Tariffs.** A tariff counts when RAC says `tariff_success: "true"` and it is public: its label
- * does not name members ("RAC Member Rate", "RAC Members Special", NewBook's "Members-Only"
- * pre-sale rates; "Non-Member" is public). Members' rates come with the member number, later. Prices come
- * from the cheapest tariff that counts: each night's `tariffs_quoted[date].amount`, and the
- * stay's `tariff_total`. A refused tariff never gives a price (its total can be a placeholder,
- * `999`). Nor does NewBook's placeholder amount, `999`, which a tariff that counts quotes for a
- * night just inside the 364-day window (the night has no price, and the stay no total).
- * `priceNote` is the tariff's label when it is not "Standard Rate".
+ * **Tariffs.** A tariff counts when RAC says `tariff_success: "true"` and either it is public or
+ * the person has saved an RAC member number (`member`, from `membership.ts`; terms rule 14). A
+ * members' tariff is told by its label or its short description naming members ("RAC Member
+ * Rate", "Exclusive to RAC WA members", "Stay & Save This Spring - RAC Member", NewBook's
+ * "Members-Only" pre-sale rates; "Non-Member" is public): `isMemberTariff`, one classifier
+ * for every rule here. Without a number a stay is free only through a public tariff, and with
+ * one through any (a pre-sale that lists only members' tariffs is free for a member, RS8).
+ * Prices come from the cheapest tariff that counts: each night's
+ * `tariffs_quoted[date].amount`, and the stay's `tariff_total`. A refused tariff never gives a
+ * price (its total can be a placeholder, `999`). Nor does NewBook's placeholder amount, `999`,
+ * which a tariff that counts quotes for a night just inside the 364-day window (the night has
+ * no price, and the stay no total). `priceNote` is "RAC member rate" when the prices come from
+ * a members' tariff, else the tariff's label when it is not "Standard Rate". The short
+ * description only classifies: it is RAC's copy, never shown or kept.
  *
  * **Nights**, from `sites_code[date]` and `sites_available[date]`:
  *
@@ -109,6 +115,8 @@ const RawQuoteSchema = z.object({
 
 const RawTariffSchema = z.object({
   tariff_label: z.string(),
+  // Read only to tell a members' tariff (`isMemberTariff`); never shown or kept
+  tariff_short_description: text,
   tariff_success: z.union([z.string(), z.boolean()]),
   tariff_code: looseNumber,
   tariff_message: text,
@@ -240,13 +248,26 @@ export function nightPriceOf(tariff: RawTariff | undefined, date: string): numbe
     : undefined;
 }
 
+/** The price note when the prices come from a members' tariff. */
+export const RAC_MEMBER_PRICE_NOTE = 'RAC member rate';
+
+/** Names members, but not non-members ("Non-Member Rate", "Non Member", "Nonmember"). */
+const NAMES_MEMBERS = /(?<!\bnon[-\s]?)\bmembers?\b/i;
+
 /**
- * A members' tariff: its label names members ("RAC Member Rate", "Stay & Save This Spring - RAC
- * Member", "RAC Members Special", "Members-Only Spring Rate"), but not non-members
- * ("Non-Member Rate").
+ * A members' tariff: its label or its short description names members ("RAC Member Rate",
+ * "Exclusive to RAC WA members", "Stay & Save This Spring - RAC Member", "RAC Members Special",
+ * "Members-Only Spring Rate"), but not non-members ("Non-Member Rate"). RAC's answer has no
+ * "members only" flag, so the wording is all there is: a tariff RAC renames reads as public,
+ * which is wrong but safe (no one is told a stay is free that is not).
  */
-export function isMemberTariff(tariff: Pick<RawTariff, 'tariff_label'>): boolean {
-  return /(?<!\bnon[-\s]?)\bmembers?\b/i.test(tariff.tariff_label);
+export function isMemberTariff(
+  tariff: Pick<RawTariff, 'tariff_label'> & Partial<Pick<RawTariff, 'tariff_short_description'>>
+): boolean {
+  return (
+    NAMES_MEMBERS.test(tariff.tariff_label) ||
+    NAMES_MEMBERS.test(tariff.tariff_short_description ?? '')
+  );
 }
 
 /** RAC took the tariff for this stay. */
@@ -254,18 +275,24 @@ function succeeded(tariff: RawTariff): boolean {
   return tariff.tariff_success === 'true' || tariff.tariff_success === true;
 }
 
-/** A tariff that counts: public, and RAC took it for the stay. */
-export function countsTariff(tariff: RawTariff): boolean {
-  return succeeded(tariff) && !isMemberTariff(tariff);
+/**
+ * A tariff that counts: RAC took it for the stay, and it is public or the person has saved a
+ * member number (`member`; terms rule 14).
+ */
+export function countsTariff(tariff: RawTariff, member = false): boolean {
+  return succeeded(tariff) && (member || !isMemberTariff(tariff));
 }
 
 /**
- * The cheapest tariff that counts, by its total (one without a total last), the first on a
- * tie; undefined when none counts.
+ * The cheapest tariff that counts for the person (`member`), by its total (one without a total
+ * last), the first on a tie; undefined when none counts.
  */
-export function priceTariffOf(tariffs: readonly RawTariff[]): RawTariff | undefined {
+export function priceTariffOf(
+  tariffs: readonly RawTariff[],
+  member = false
+): RawTariff | undefined {
   let cheapest: RawTariff | undefined;
-  for (const tariff of tariffs.filter(countsTariff)) {
+  for (const tariff of tariffs.filter((t) => countsTariff(t, member))) {
     const total = tariff.tariff_total ?? Number.POSITIVE_INFINITY;
     if (!cheapest || total < (cheapest.tariff_total ?? Number.POSITIVE_INFINITY)) {
       cheapest = tariff;
@@ -274,17 +301,28 @@ export function priceTariffOf(tariffs: readonly RawTariff[]): RawTariff | undefi
   return cheapest;
 }
 
-/** When no tariff counts: the public "Standard Rate", else the first public tariff. */
-export function decidingTariffOf(tariffs: readonly RawTariff[]): RawTariff | undefined {
+/**
+ * When no tariff counts: the public "Standard Rate", else the first public tariff; for a
+ * member (`member`), the first members' tariff when there is no public one.
+ */
+export function decidingTariffOf(
+  tariffs: readonly RawTariff[],
+  member = false
+): RawTariff | undefined {
   const publicTariffs = tariffs.filter((tariff) => !isMemberTariff(tariff));
   return (
     publicTariffs.find((tariff) => tariff.tariff_label.trim().toLowerCase() === STANDARD_RATE) ??
-    publicTariffs[0]
+    publicTariffs[0] ??
+    (member ? tariffs[0] : undefined)
   );
 }
 
-/** The price note for prices from `tariff`: its label, unless it is the Standard Rate. */
+/**
+ * The price note for prices from `tariff`: "RAC member rate" for a members' tariff, else its
+ * label, unless it is the Standard Rate.
+ */
 export function priceNoteOf(tariff: RawTariff): string | undefined {
+  if (isMemberTariff(tariff)) return RAC_MEMBER_PRICE_NOTE;
   const label = plainText(tariff.tariff_label);
   return label && label.toLowerCase() !== STANDARD_RATE ? label : undefined;
 }
@@ -389,14 +427,18 @@ export type CategoryAvailability = Pick<
   'nights' | 'fullyAvailable' | 'total' | 'minNights' | 'priceNote'
 >;
 
-/** A category's nights for the stay's `nights` (its dates, in order), and the stay's verdict. */
+/**
+ * A category's nights for the stay's `nights` (its dates, in order), and the stay's verdict,
+ * for a person with a saved member number (`member`) or without one.
+ */
 export function categoryAvailability(
   category: RawCategory,
-  nights: readonly string[]
+  nights: readonly string[],
+  { member = false }: { member?: boolean } = {}
 ): CategoryAvailability {
   const tariffs = category.tariffs_available ?? [];
-  const priceTariff = priceTariffOf(tariffs);
-  const deciding = priceTariff ? undefined : decidingTariffOf(tariffs);
+  const priceTariff = priceTariffOf(tariffs, member);
+  const deciding = priceTariff ? undefined : decidingTariffOf(tariffs, member);
   const rulesTariff = priceTariff ?? deciding;
 
   let unitNights = nights.map((date) => siteNight(category, date));

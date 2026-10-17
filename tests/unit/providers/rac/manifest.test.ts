@@ -44,7 +44,7 @@ describe('racManifest', () => {
     });
   });
 
-  it('has a catalogue, availability (free counts on Explore too), watches and release alerts (snipes without holds), and no account', () => {
+  it('has a catalogue, availability (free counts on Explore too), watches and release alerts (snipes without holds), and an optional account (the member number)', () => {
     expect(racManifest.capabilities).toEqual({
       catalog: true,
       catalogMode: 'full',
@@ -55,7 +55,7 @@ describe('racManifest', () => {
       holds: false,
       bookingImport: false,
       accessGate: false,
-      account: 'none',
+      account: 'optional',
     });
   });
 
@@ -149,16 +149,19 @@ describe('racManifest', () => {
     expect(racManifest.releaseModes?.map((mode) => mode.id)).not.toContain('cancellation');
   });
 
-  it('registers with links, a catalogue, availability and a release policy: no holds, and no bookings module, so it can never change a booking (rule 10)', () => {
+  it('registers with links, a catalogue, availability, a release policy and a credentials sign-in: no holds, and no bookings module, so it can never change a booking (rule 10)', () => {
     const registry = new ProviderRegistry();
     const provider = registry.register(racFactory, createTestProviderContext);
     expect(Object.keys(provider).sort()).toEqual([
+      'auth',
       'availability',
       'catalog',
       'links',
       'manifest',
       'release',
     ]);
+    // The registry accepts RAC's member number sign-in (`authViolation` found nothing)
+    expect(provider.auth?.kind).toBe('credentials');
     expect(registry.require('rac', 'snipes').release).toBe(provider.release);
     expect(provider.holds).toBeUndefined();
     expect(provider.bookings).toBeUndefined();

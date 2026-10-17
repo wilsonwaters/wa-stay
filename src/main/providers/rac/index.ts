@@ -4,7 +4,8 @@
  * two-bedroom cabin, dorm…) on its page and its free units for the dates Explore is given; a
  * stay's availability is checked per category, with prices and RAC's stay rules, and watches
  * run on it. Site Sniper alerts when a stay's dates open (RAC's holds are off, so a snipe never
- * holds).
+ * holds). A person who saves their RAC member number in Settings → Accounts gets members' rates
+ * and the member pre-sale's release times.
  *
  * - `manifest.ts`: who RAC is, what the module does, and its limits;
  * - `parks.ts`: the parks, as a seed of facts (no request per sync);
@@ -16,6 +17,8 @@
  *   window, or a school-holiday release, 48 hours earlier for members), for snipes and for
  *   availability's `release.opensAt`;
  * - `links.ts`: RAC's own pages, never its cart;
+ * - `auth.ts` and `membership.ts`: the person's own member number (a `credentials` sign-in that
+ *   checks its format and sends nothing), and whether one is saved, which every module asks;
  * - `client.ts`: every request, on RAC's host only, with the block cool-down.
  *
  * **Terms** (`ai-state/research/rac-terms.md`, read 16 Oct 2026). Nothing in RAC's terms
@@ -33,19 +36,25 @@
  *    are fetched live and shown only in the app;
  * 7. keeps nothing of RAC's in the repository's fixtures but trimmed facts (a test checks it);
  * 10. never cancels or changes a booking: there is no bookings module;
- * 14. times the member pre-sale only for a person with a member number (`isMember`);
+ * 11. keeps only the person's own member number, one, saved with their three confirmations;
+ * 12. keeps it secret: encrypted by the core, never logged, returned or sent (RAC's checkout
+ *     gets it from the person); no module reads it, only whether it is saved (`membership.ts`);
+ * 14. counts members' tariffs and times the member pre-sale only for a person with a member
+ *     number (`isMember`);
  * 16. respects RAC's stay rules: a stay RAC refuses (a minimum, an arrival day, a closed or
  *     unreleased date, too many pets) is never free, and a booking takes at most two pets.
  */
 
 import { defineProvider, type ProviderModules } from '../sdk/provider';
 import type { ProviderContext } from '../sdk/context';
+import { createRacAuth } from './auth';
 import { createRacAvailability } from './availability';
 import { createRacBulkSearch } from './bulk';
 import { createRacCatalog } from './catalog';
 import { RacClient } from './client';
-import { racLinks } from './links';
+import { createRacLinks } from './links';
 import { racManifest } from './manifest';
+import { createMembership, hasMemberNumber } from './membership';
 import { RacReleasePolicy } from './release-policy';
 import { createKindResolver } from './unit-kinds';
 
@@ -56,8 +65,9 @@ export { RAC_PROVIDER_ID, racManifest } from './manifest';
 
 export interface RacModuleOptions {
   /**
-   * Whether the person has saved an RAC member number, asked at every release compute. Until
-   * the member number can be saved, no one is a member.
+   * Whether the person has saved an RAC member number, asked at every check, bulk search and
+   * release compute. Default: `hasMemberNumber(ctx)` (`membership.ts`); a failure counts as no
+   * member.
    */
   isMember?: () => Promise<boolean>;
 }
@@ -78,19 +88,25 @@ export function createRacModules(
     maxConcurrent: ctx.limits.maxConcurrentRequests,
   });
   const kindOf = createKindResolver((message) => ctx.logger.warn(message));
+  // One place every module learns membership from: a boolean, never the number
+  const membership = createMembership(options.isMember ?? (() => hasMemberNumber(ctx)), ctx.logger);
+  const links = createRacLinks(membership.last);
   const release = new RacReleasePolicy({
     providerId: ctx.id,
-    isMember: options.isMember ?? (async () => false),
+    isMember: membership.read,
     logger: ctx.logger,
   });
-  const availability = createRacAvailability({ ctx, client, links: racLinks, kindOf, release });
+  const availability = createRacAvailability({ ctx, client, links, kindOf, release });
   return {
-    links: racLinks,
-    catalog: createRacCatalog({ ctx, client, links: racLinks, availability, kindOf, release }),
+    links,
+    catalog: createRacCatalog({ ctx, client, links, availability, kindOf, release }),
     availability: { ...availability, search: createRacBulkSearch({ ctx, availability }) },
     release,
+    auth: createRacAuth(ctx),
   };
 }
 
 /** What `BUILT_IN_PROVIDERS` in `src/main/providers/index.ts` registers. */
-export const racFactory = defineProvider(racManifest, (ctx) => createRacModules(ctx));
+export const racFactory = defineProvider(racManifest, (ctx) =>
+  createRacModules(ctx, { isMember: () => hasMemberNumber(ctx) })
+);

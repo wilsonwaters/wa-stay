@@ -973,7 +973,11 @@ describe('RAC availability: releases (release.opensAt)', () => {
     );
     const result = await provider.availability!.check('busselton', LEAVERS);
     expect(states(unit(result, 'cat:4'))).toEqual([['2027-11-20', 'not-released']]);
-    expect(result.release).toEqual({ open: false });
+    // The policy's reason, for Site Sniper's release preview
+    expect(result.release).toEqual({
+      open: false,
+      refused: 'These dates are already open on RAC. Set a watch to hear about cancellations.',
+    });
   });
 
   it('holds back nights RAC does not report free in holidays still to come; a free night stays free', async () => {

@@ -5,7 +5,9 @@
  * - booking, with no category: its book-now page, `/<slug>/book-now/`. With a stay, the page's
  *   own search parameters (checked live for Busselton on 16 Oct 2026: the page shows the dates
  *   and searches them): `available_from` and `available_to` (`YYYY-MM-DD`), `adults`,
- *   `children`, `infants`, `pets` (the stay's, 0 to 2) and `membership_type=non-member`;
+ *   `children`, `infants`, `pets` (the stay's, 0 to 2) and `membership_type`: `member` while
+ *   the person has a member number saved (`membership.ts`), else `non-member`. The number
+ *   itself is never in a link: the person types it at RAC's checkout;
  * - booking a category (a unit `cat:<id>`) for a stay: the park's booking page,
  *   `/<slug>/booking/?available_from=…&available_to=…&force_category_id=<id>&adults=…&children=…
  *   &infants=…&animals=…`, the form of the `online_booking_url` RAC's availability answers
@@ -41,11 +43,20 @@ export function categoryIdOf(unitId: string | undefined): string | undefined {
   return unitId === undefined ? undefined : /^cat:(\d+)$/.exec(unitId)?.[1];
 }
 
+/** RAC's book-now `membership_type` for a person with a member number saved, or without. */
+export const membershipType = (member: boolean): 'member' | 'non-member' =>
+  member ? 'member' : 'non-member';
+
 /**
  * The park's booking page for the stay, with the unit's category when it names one (`cat:<id>`),
- * else its book-now page, prefilled with the stay when there is one.
+ * else its book-now page, prefilled with the stay (and `membership_type`) when there is one.
  */
-function booking(externalId: string, stay?: StayQuery, unitId?: string): string | null {
+function booking(
+  member: boolean,
+  externalId: string,
+  stay?: StayQuery,
+  unitId?: string
+): string | null {
   const category = stay ? categoryIdOf(unitId) : undefined;
   if (stay && category) {
     const page = parkPage(externalId, 'booking/');
@@ -70,7 +81,7 @@ function booking(externalId: string, stay?: StayQuery, unitId?: string): string 
     children: String(stay.children ?? 0),
     infants: String(stay.infants ?? 0),
     pets: petsParam(stay),
-    membership_type: 'non-member',
+    membership_type: membershipType(member),
   });
   return `${page}?${search}`;
 }
@@ -99,7 +110,23 @@ export function racBookingPage(url: string | undefined, slug: string): string | 
   return parsed.href;
 }
 
-export const racLinks: ProviderLinks = {
-  location: (externalId) => parkPage(externalId),
-  booking,
-};
+/** RAC's links, with a book-now page for a member (`member` true) or not. */
+export interface RacLinks extends ProviderLinks {
+  bookNow(externalId: string, stay: StayQuery, member: boolean): string | null;
+}
+
+/**
+ * RAC's links. `isMember` is what `links.booking` (synchronous) knows of the member number: the
+ * last answer the modules read (`RacMembership.last`); an availability check, which has just
+ * asked, uses `bookNow` with its own answer instead.
+ */
+export function createRacLinks(isMember: () => boolean = () => false): RacLinks {
+  return {
+    location: (externalId) => parkPage(externalId),
+    booking: (externalId, stay, unitId) => booking(isMember(), externalId, stay, unitId),
+    bookNow: (externalId, stay, member) => booking(member, externalId, stay),
+  };
+}
+
+/** RAC's links for a person with no member number saved. */
+export const racLinks: RacLinks = createRacLinks();
