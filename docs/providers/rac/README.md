@@ -118,6 +118,12 @@ answer to a unit, night by night (the codes are in [endpoints](endpoints.md#racs
   none.
 - **A stay is free** only when every night is free, one site is free for the whole stay, a rate
   counts, and RAC's stay rules allow it.
+- **Free count.** A category free for the stay carries how many of its sites are free for the
+  whole stay (`freeCount`, RAC's whole-stay count, not a night's), and any other category
+  carries none. Every count of what is free adds these up, so a park reads the same number on
+  Explore, on its page ("51 spots free for all 2 nights") and in a watch and its alert ("Found
+  51 sites available"), never one per category and never "of" a total: RAC gives no total of
+  its sites.
 - **Stay rules.** A minimum stay (from the rate's minimum for the arrival night), and days with
   no arrivals or no departures. A stay that breaks them is never free: its free nights read
   "stay rules apply", and a watch never alerts on it.
@@ -139,8 +145,8 @@ per park, one after another, at the pace of something the person asked for (belo
 reads the number of units free for the whole stay ("27 spots free", "1 cabin free"), by stay type
 for the Stay type filter, and never "N of M": RAC gives no total of its sites. A park that fails
 reads as unknown; a park with nothing free reads "None free", and one where nothing can be booked
-for those dates at all (not released yet, or closed) reads "Not open". The counts use the same
-mapping as the place page, so the two agree.
+for those dates at all (not released yet, or closed) reads "Not open". The counts add up the same
+`freeCount` as the place page and a watch, so all three agree.
 
 ## Pacing
 
@@ -351,13 +357,14 @@ show ParkStay only. RAC's monogram is plain text on the app's own colour; there 
 ## Tests
 
 - `tests/unit/providers/rac/`: the manifest, the client (one host, redirects by hand, blocks and
-  their pause), book-now pages, stay types, the member number's form, members' tariffs, the
-  release calendar and the release policy (on a fake clock).
+  their pause), book-now pages, stay types, the member number's form, members' tariffs, free
+  counts (`free-count.test.ts`), the release calendar and the release policy (on a fake clock).
 - `tests/integration/rac-provider.test.ts`: the provider contract suite and the catalogue;
   `rac-availability.test.ts` (every code and refusal), `rac-watch.test.ts`, `rac-snipes.test.ts`,
   `rac-member-rates.test.ts` and `rac-member-number.test.ts` (the number is in no request, log
   line, IPC answer, alert or email); `rac-explore-ipc.test.ts` and `rac-snipes-ipc.test.ts`
-  through IPC.
+  through IPC; `rac-free-counts.test.ts` (for every recorded answer, Explore, the place page, a
+  watch, its alert and its email count the same, through IPC).
 - `tests/unit/providers/rac-fixtures.test.ts`: the fixtures hold facts only, and the module's
   code asks only RAC's host and names no cart address outside the auto-cart.
 - The auto-cart: `tests/unit/providers/rac/holds.test.ts`, `cart-page.test.ts` and
@@ -371,8 +378,8 @@ show ParkStay only. RAC's monogram is plain text on the app's own colour; there 
 - `tests/unit/docs/rac-endpoints-doc.test.ts`: every row in [endpoints](endpoints.md) has a
   status, and every path the module requests is documented.
 - The Electron smoke tests: RAC's parks on Explore and a park's categories
-  (`rac-catalogue.spec.ts`), its free counts (`rac-explore.spec.ts`), a watch
-  (`rac-watch.spec.ts`) and the member number (`rac-member-number.spec.ts`), from the recorded
+  (`rac-catalogue.spec.ts`), its free counts on Explore and the park's page
+  (`rac-explore.spec.ts`), a watch and its count (`rac-watch.spec.ts`) and the member number (`rac-member-number.spec.ts`), from the recorded
   answers in `tests/e2e/fixtures/http/rac/` (every park's, for 6–8 Nov 2026).
 - The preview: `npm run build:e2e`, then
   `npx cross-env PREVIEW_PROVIDER=rac PREVIEW_ARRIVAL=2026-11-06 playwright test preview-provider`

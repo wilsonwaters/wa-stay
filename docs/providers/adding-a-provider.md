@@ -839,6 +839,16 @@ The rules the normalised types carry (`src/shared/types/provider.types.ts`,
   plain text ("RAC member rate"), shown under its name. A `UnitSummary`'s `minNights` is the
   unit's usual minimum, for the watch and snipe steps' warning; leave it out where the minimum
   depends on the dates (the night grid explains it after a check).
+- **Free counts** (optional). When one unit stands for several booked alike (a category or class
+  of sites, where the provider says how many are free), set its `freeCount`: how many it has
+  free for the whole stay, a whole number of at least 1 when the unit is `fullyAvailable`,
+  else 0, on every unit of the check (RAC: each category's sites free for the whole stay).
+  Every count of what is free for a stay adds these up (`freeUnitsOf`,
+  `src/shared/utils/free-units.ts`): the place page's summary, a watch's alert, email, card and
+  Check now, so they say the same number as your bulk `availableUnits` should. Such a provider
+  has no total of its units, so those counts give no "of M" ("51 spots free for all 2
+  nights"). Without it each unit counts as one ("2 of 5 sites free"). The contract suite checks
+  the numbers (`freeCountViolations`).
 - **Dates and time zones.** Stays are calendar dates: never turn them into `Date` objects and
   back (a time zone shifts them). Convert to the provider's own format with a string
   transform, as ParkStay's `toParkStayDate` does (`2026-11-10` → `2026/11/10`). "Today" is

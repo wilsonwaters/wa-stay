@@ -80,7 +80,9 @@ Click a place to open its page:
 - **Check your dates**: pick dates and guests and **Check availability** to see every site
   (or cabin, room…) night by night, with prices ("3 of 5 sites free for all 2 nights"; **Fully
   available only** narrows the table), and under each one's name how many people and vehicles
-  it takes and the provider's description of it. A price from a special rate says so under the
+  it takes and the provider's description of it. At an RAC park each row is a kind of site or
+  cabin, and the count is the same as on Explore: how many are free for your whole stay, with
+  no total ("51 spots free for all 2 nights"). A price from a special rate says so under the
   name: with your RAC member number saved, RAC's members' rates count, marked "Rate: RAC member
   rate". A night the provider refuses for your stay (a minimum stay, a day with no arrivals) is
   marked, with the reason;
@@ -111,7 +113,9 @@ A watch checks a place for your dates on a schedule and tells you when sites fre
 4. Review and **Create watch**.
 
 Each watch shows its last result, when it last checked and next checks, and how many times it
-has found something. **Check now** checks at once. The menu lets you edit, pause or resume, and
+has found something. Its count of what is free, in the alert too, is the one Explore shows:
+at an RAC park, how many sites (or cabins…) are free for your whole stay, not how many kinds
+("Found 51 sites available"). **Check now** checks at once. The menu lets you edit, pause or resume, and
 delete it. Filter the list by provider and by status (active or paused).
 
 A watch that holds a site shows **Pay now**: see [Site Sniper](#when-a-site-is-held). More
