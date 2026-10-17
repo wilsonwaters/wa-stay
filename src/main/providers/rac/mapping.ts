@@ -43,15 +43,16 @@
  * takes arrivals and this many nights. When some nights are booked, closed or not released, the
  * free nights stay `available`, so partial matches still work. Otherwise the free nights become,
  * in this order:
- * 1. `unknown` with `split`: every night has free sites, but no site is free for the whole stay
+ * 1. `unknown` with `min-stay`: the stay rules above refuse it (a minimum above the stay's
+ *    nights, or no arrivals on its first night);
+ * 2. `unknown` with `split`: every night has free sites, but no site is free for the whole stay
  *    (stay-through code 3 or 5, or 0 with no site);
- * 2. `unknown` with `min-stay`: the stay rules above refuse it, or no tariff counts and the
- *    deciding tariff (the public "Standard Rate", else the first public tariff) has code 6, 7,
- *    9 or 10;
- * 3. `closed`, labelled with RAC's message: the deciding tariff's code 2, 3, 4, 8 or 11, or the
+ * 3. `unknown` with `min-stay`: no tariff counts and the deciding tariff (the public "Standard
+ *    Rate", else the first public tariff) has code 6, 7, 9 or 10;
+ * 4. `closed`, labelled with RAC's message: the deciding tariff's code 2, 3, 4, 8 or 11, or the
  *    stay-through code 2, 4, 6, 7 or 8;
- * 4. `not-released`: the deciding tariff's code 5, or the stay-through code 9;
- * 5. `unknown` otherwise.
+ * 5. `not-released`: the deciding tariff's code 5, or the stay-through code 9;
+ * 6. `unknown` otherwise.
  *
  * Messages are plain text: tags stripped, entities decoded, every part RAC joined with `; `
  * kept. Dates are calendar strings throughout, never `Date` objects.
@@ -346,8 +347,9 @@ function verdictOf(category: RawCategory, deciding: RawTariff | undefined, rules
   const stayCode = category.stay_through_sites_code;
   const tariffCode = deciding?.tariff_code;
   let verdict: Verdict = { state: 'unknown' };
-  if (noSiteForStay(category)) verdict = { state: 'unknown', reason: 'split' };
-  else if (rulesRefuse || (tariffCode !== undefined && MIN_STAY_TARIFF_CODES.has(tariffCode))) {
+  if (rulesRefuse) verdict = { state: 'unknown', reason: 'min-stay' };
+  else if (noSiteForStay(category)) verdict = { state: 'unknown', reason: 'split' };
+  else if (tariffCode !== undefined && MIN_STAY_TARIFF_CODES.has(tariffCode)) {
     verdict = { state: 'unknown', reason: 'min-stay' };
   } else if (tariffCode !== undefined && CLOSED_TARIFF_CODES.has(tariffCode)) {
     verdict = { state: 'closed', message: deciding?.tariff_message };

@@ -331,7 +331,9 @@ export class RacClient {
       throw this.blockError(response.url, block);
     }
     // An answer: the run of blocks, if any, is over.
-    if (response.ok) await this.deps.state.delete(RAC_BLOCK_STATE_KEY);
+    if (response.ok && (await this.deps.state.get(RAC_BLOCK_STATE_KEY)) !== undefined) {
+      await this.deps.state.delete(RAC_BLOCK_STATE_KEY);
+    }
     if (!response.ok) {
       throw new ProviderHttpError({
         providerId: this.deps.providerId,

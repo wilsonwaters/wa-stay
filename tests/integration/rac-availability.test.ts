@@ -475,6 +475,20 @@ describe('RAC availability: the mapping of a stay', () => {
     expect(site.total).toBeUndefined();
   });
 
+  it('a minimum above the stay comes before split: the nights are min-stay', async () => {
+    const site = await poweredSite((s) => {
+      Object.assign(s, { stay_through_sites_available: 0, stay_through_sites_code: 3 });
+      for (const quote of Object.values(s.tariffs_available[0].tariffs_quoted as object)) {
+        Object.assign(quote, { minimum_periods: '3' });
+      }
+    });
+    expect(site.nights.map((n) => [n.state, n.reason, n.minNights])).toEqual([
+      ['unknown', 'min-stay', 3],
+      ['unknown', 'min-stay', 3],
+    ]);
+    expect(site.fullyAvailable).toBe(false);
+  });
+
   it('a whole-stay count lower than every night (51 against 53 and 55) is still bookable above 0', async () => {
     const site = await poweredSite((s) => Object.assign(s, { stay_through_sites_available: 1 }));
     expect(site.fullyAvailable).toBe(true);

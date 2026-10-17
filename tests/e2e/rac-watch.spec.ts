@@ -47,14 +47,14 @@ test('an RAC watch for camping at Busselton finds the powered site and links to 
   const steps = window.getByRole('navigation', { name: 'New watch steps' });
   await expectCurrentStep(steps, 'Your stay');
   await expect(steps.getByRole('button', { name: 'Provider, done' })).toBeVisible();
-  await expect(window.getByRole('img', { name: 'RAC Parks & Resorts' }).first()).toBeVisible();
 
   // 2. Your stay: camping, from RAC's categories at Busselton (sites and cabins)
   const stayType = window.getByRole('group', { name: 'Stay type' });
   const camping = stayType.getByRole('button', { name: 'Camping' });
   await camping.click();
   await expect(camping).toHaveAttribute('aria-pressed', 'true');
-  await expect(window.getByRole('spinbutton', { name: 'Pets' })).toHaveValue('0');
+  // RAC's own stay field: no pets unless the person adds them
+  await expect(window.getByRole('group', { name: 'Pets' }).getByRole('status')).toHaveText('0');
   await window.getByRole('button', { name: 'Continue' }).click();
 
   // 3. Alerts: RAC holds nothing, so no automatic hold is offered
@@ -71,6 +71,7 @@ test('an RAC watch for camping at Busselton finds the powered site and links to 
     .poll(() => window.evaluate(() => document.location.hash))
     .toMatch(/^#\/watches\/\d+$/);
   await expect(window.getByRole('heading', { level: 1, name })).toBeVisible();
+  await expect(window.getByRole('img', { name: 'RAC Parks & Resorts' }).first()).toBeVisible();
 
   // 5. Check now: the night grid, and RAC's booking page for the powered site
   await window.getByRole('button', { name: 'Check now' }).click();
