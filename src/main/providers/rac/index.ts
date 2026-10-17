@@ -5,7 +5,9 @@
  * stay's availability is checked per category, with prices and RAC's stay rules, and watches
  * run on it. Site Sniper alerts when a stay's dates open (RAC's holds are off, so a snipe never
  * holds). A person who saves their RAC member number in Settings → Accounts gets members' rates
- * and the member pre-sale's release times.
+ * and the member pre-sale's release times. Auto-cart (R19) is built but off: only with the
+ * `autoCart` experiment on (`ctx.manifest.capabilities.holds`) does the factory build `holds`
+ * and give the client cart access.
  *
  * - `manifest.ts`: who RAC is, what the module does, and its limits;
  * - `parks.ts`: the parks, as a seed of facts (no request per sync);
@@ -19,7 +21,9 @@
  * - `links.ts`: RAC's own pages, never its cart;
  * - `auth.ts` and `membership.ts`: the person's own member number (a `credentials` sign-in that
  *   checks its format and sends nothing), and whether one is saved, which every module asks;
- * - `client.ts`: every request, on RAC's host only, with the block cool-down.
+ * - `holds.ts` and `cart-page.ts`: the auto-cart (the experiment's), its cart page and release;
+ * - `client.ts` and `cart-guard.ts`: every request, on RAC's host only, with the block
+ *   cool-down, and never to checkout, payment or NewBook (the cart only while it is on).
  *
  * **Terms** (`ai-state/research/rac-terms.md`, read 16 Oct 2026). Nothing in RAC's terms
  * addresses automated access, and robots.txt allows every path with a 10 s crawl delay; the
@@ -35,12 +39,20 @@
  * 6. shows facts (names, categories) and links to RAC's pages; RAC's photos and descriptions
  *    are fetched live and shown only in the app;
  * 7. keeps nothing of RAC's in the repository's fixtures but trimmed facts (a test checks it);
- * 10. never cancels or changes a booking: there is no bookings module;
+ *    the cart's fixtures are synthetic, written from RAC's scripts (no cart was ever opened);
+ * 8. leaves payment and acceptance to the person: the cart guard refuses checkout, card and
+ *    NewBook calls, and the auto-cart sends one GET of the cart address and nothing more;
+ * 10. never cancels or changes a booking: there is no bookings module, and a release takes out
+ *     only a stay the cart still holds (a paid one has left it);
  * 11. keeps only the person's own member number, one, saved with their three confirmations;
  * 12. keeps it secret: encrypted by the core, never logged, returned or sent (RAC's checkout
  *     gets it from the person); no module reads it, only whether it is saved (`membership.ts`);
+ * 13. holds at most one stay at a time (one cart, `holds.ts`), and never two for the same nights
+ *     (the core's night guard), well inside the member's two bookings per period;
  * 14. counts members' tariffs and times the member pre-sale only for a person with a member
  *     number (`isMember`);
+ * 15. holds only with the experiment on: one cart, let go when the person declines or the
+ *     payment window closes, never "secured" (no `bookedReference`), never live in a test;
  * 16. respects RAC's stay rules: a stay RAC refuses (a minimum, an arrival day, a closed or
  *     unreleased date, too many pets) is never free, and a booking takes at most two pets.
  */
@@ -52,16 +64,17 @@ import { createRacAvailability } from './availability';
 import { createRacBulkSearch } from './bulk';
 import { createRacCatalog } from './catalog';
 import { RacClient } from './client';
+import { createRacHolds } from './holds';
 import { createRacLinks } from './links';
 import { racManifest } from './manifest';
 import { createMembership, hasMemberNumber } from './membership';
 import { RacReleasePolicy } from './release-policy';
-import { createKindResolver } from './unit-kinds';
+import { createCategoryMemo, createKindResolver } from './unit-kinds';
 
 export { RAC_SITE_URL } from './client';
 export { racLinks } from './links';
 export { RAC_PARKS } from './parks';
-export { RAC_PROVIDER_ID, racManifest } from './manifest';
+export { RAC_AUTO_CART_EXPERIMENT, RAC_PROVIDER_ID, racManifest } from './manifest';
 
 export interface RacModuleOptions {
   /**
@@ -77,6 +90,8 @@ export function createRacModules(
   ctx: ProviderContext,
   options: RacModuleOptions = {}
 ): ProviderModules {
+  // The cart is the `autoCart` experiment's: off, there is no holds module and no cart access
+  const cartEnabled = ctx.manifest.capabilities.holds === true;
   const client = new RacClient({
     providerId: ctx.id,
     providerName: ctx.manifest.name,
@@ -86,6 +101,7 @@ export function createRacModules(
     clock: ctx.clock,
     timezone: ctx.timezone,
     maxConcurrent: ctx.limits.maxConcurrentRequests,
+    cartEnabled,
   });
   const kindOf = createKindResolver((message) => ctx.logger.warn(message));
   // One place every module learns membership from: a boolean, never the number
@@ -102,13 +118,18 @@ export function createRacModules(
     isMember: membership.read,
     logger: ctx.logger,
   });
-  const availability = createRacAvailability({ ctx, client, links, kindOf, release });
+  // What each category is, from this run's checks: a hold must know a site before it asks
+  const categories = createCategoryMemo();
+  const availability = createRacAvailability({ ctx, client, links, kindOf, release, categories });
   return {
     links,
     catalog: createRacCatalog({ ctx, client, links, availability, kindOf, release }),
     availability: { ...availability, search: createRacBulkSearch({ ctx, availability }) },
     release,
     auth: createRacAuth(ctx),
+    ...(cartEnabled
+      ? { holds: createRacHolds({ ctx, client, membership, categories, kindOf }) }
+      : {}),
   };
 }
 

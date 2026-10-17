@@ -11,7 +11,8 @@
  *   sends before a person picks equipment.
  * - **The units.** One per category, `cat:<category id>`, named as RAC names it, with its kind by
  *   `unit-kinds.ts` (for categories the book-now page leaves out too) and its kind's group as
- *   its type. `unitIds` keeps only those categories.
+ *   its type. `unitIds` keeps only those categories. Each unit's name and kind are remembered
+ *   (`categories`, `RacCategoryMemo`) for a hold, which must know a site before it asks anything.
  * - **Booking links.** A unit's `bookingUrl` is the `online_booking_url` RAC sent when it is a
  *   booking page of the park (`racBookingPage`: https on RAC's site, under `/<slug>/booking/`,
  *   no cart key), else `links.booking` for the stay and the unit. The location's is the
@@ -60,7 +61,7 @@ import {
 } from './mapping';
 import { racPark, type RacPark } from './parks';
 import type { RacReleasePolicy, StayRelease } from './release-policy';
-import { unitTypeOfKind } from './unit-kinds';
+import { unitTypeOfKind, type RacCategoryMemo } from './unit-kinds';
 
 /** RAC's availability endpoint, at the site's root (the park is the form's `blog_id`). */
 export const RAC_AVAILABILITY_PATH =
@@ -79,6 +80,8 @@ export interface RacAvailabilityDeps {
   kindOf: CategoryKindOf;
   /** When the stay opens, and which nights a school-holiday release still holds back. */
   release: Pick<RacReleasePolicy, 'forStay'>;
+  /** Where each unit's name and kind are remembered for a hold (`holds.ts`). */
+  categories?: Pick<RacCategoryMemo, 'remember'>;
 }
 
 /**
@@ -168,6 +171,7 @@ export function createRacAvailability({
   links,
   kindOf,
   release,
+  categories: memo,
 }: RacAvailabilityDeps): RacAvailability {
   const refuse = (message: string): ProviderError =>
     new ProviderError({ providerId: ctx.id, message: `${ctx.manifest.name}: ${message}` });
@@ -218,6 +222,10 @@ export function createRacAvailability({
       typeId: category.category_type_id,
     });
     const unitType = unitTypeOfKind(unitKind);
+    memo?.remember(park.slug, String(category.category_id), {
+      name: category.category_name,
+      kind: unitKind,
+    });
     const bookingUrl =
       racBookingPage(category.online_booking_url, park.slug) ??
       links.booking(park.slug, stay, unitId) ??

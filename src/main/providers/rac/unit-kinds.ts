@@ -92,3 +92,28 @@ export function createKindResolver(
     return 'other';
   };
 }
+
+/** What a park's category is, as a check last saw it. */
+export interface RacCategoryInfo {
+  /** RAC's name for it ("Powered Site"). */
+  name: string;
+  kind: UnitKind;
+}
+
+/**
+ * The categories the module has seen in its checks this run, by park and category id: what a
+ * hold needs to know before it asks anything (whether the category is a site, which needs
+ * equipment, and its name in the cart). Every check and bulk search fills it; nothing is stored.
+ */
+export interface RacCategoryMemo {
+  remember(slug: string, categoryId: string, info: RacCategoryInfo): void;
+  recall(slug: string, categoryId: string): RacCategoryInfo | undefined;
+}
+
+export function createCategoryMemo(): RacCategoryMemo {
+  const seen = new Map<string, RacCategoryInfo>();
+  return {
+    remember: (slug, categoryId, info) => seen.set(`${slug}:${categoryId}`, { ...info }),
+    recall: (slug, categoryId) => seen.get(`${slug}:${categoryId}`),
+  };
+}

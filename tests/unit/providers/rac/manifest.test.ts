@@ -4,21 +4,31 @@
  * fields), its pets stay field (rule 16), its
  * badge (a text monogram whose white text passes WCAG AA), what it does not do (no bookings
  * module, rule 10), links to RAC's own pages and never its cart (rule 6), and a seed of facts
- * with no photo or copy (rule 6).
+ * with no photo or copy (rule 6). Auto-cart (R19) ships off: `holds` is false, the `autoCart`
+ * experiment turns it on, `holdRelease` is declared, the equipment fields apply to a hold only,
+ * and the factory builds `holds` only with the experiment on.
  */
 
 import fs from 'fs';
 import path from 'path';
-import { RAC_PARKS, racFactory, racLinks, racManifest } from '@main/providers/rac';
+import { applyExperiments, withExperiments } from '@main/providers/experiments';
+import {
+  RAC_AUTO_CART_EXPERIMENT,
+  RAC_PARKS,
+  racFactory,
+  racLinks,
+  racManifest,
+} from '@main/providers/rac';
+import { RAC_EQUIPMENT_TYPES } from '@main/providers/rac/manifest';
 import { effectiveIntervalMinutes } from '@main/core/watches/next-check';
 import { resolveStayParams } from '@main/core/stay-params';
 import { readBookNowPage } from '@main/providers/rac/book-now';
 import { categoryIdOf, racBookingPage } from '@main/providers/rac/links';
 import { racPark } from '@main/providers/rac/parks';
-import { ProviderRegistry } from '@main/providers/registry';
+import { MANIFEST_RULES, ProviderRegistry, providerViolations } from '@main/providers/registry';
 import { AppError } from '@main/utils/app-error';
 import { contrastRatio } from '@renderer/styles/contrast';
-import type { StayQuery } from '@shared/types/provider.types';
+import { ProviderManifestSchema, type StayQuery } from '@shared/types/provider.types';
 import { createTestProviderContext } from '@tests/utils/fake-provider';
 
 const RAC = 'https://parksandresorts.rac.com.au';
@@ -102,7 +112,7 @@ describe('racManifest', () => {
     expect(effectiveIntervalMinutes(60, racManifest)).toBe(60);
   });
 
-  it('has a pets stay field, 0 to 2, 0 by default, for checks, watches and snipes (rule 16)', () => {
+  it('has a pets stay field, 0 to 2, 0 by default, for checks, watches and snipes (rule 16), and the equipment for a hold only (R19)', () => {
     expect(racManifest.stayFields).toEqual([
       expect.objectContaining({
         key: 'pets',
@@ -113,6 +123,9 @@ describe('racManifest', () => {
         default: 0,
         appliesTo: ['availability', 'watch', 'snipe'],
       }),
+      expect.objectContaining({ key: 'equipmentType', type: 'select', appliesTo: ['hold'] }),
+      expect.objectContaining({ key: 'equipmentLength', type: 'text', appliesTo: ['hold'] }),
+      expect.objectContaining({ key: 'equipmentWidth', type: 'text', appliesTo: ['hold'] }),
     ]);
     expect(resolveStayParams(racManifest, ['watch'], {})).toEqual({ pets: 0 });
     expect(resolveStayParams(racManifest, ['watch'], { pets: 2 })).toEqual({ pets: 2 });
@@ -131,6 +144,37 @@ describe('racManifest', () => {
       expect(error).toMatchObject({ code: 'VALIDATION', issues: ['stayParams.pets'] });
     }
   );
+
+  it("offers NewBook's 15 equipment types, after none (a cabin or a room), and lengths in metres", () => {
+    const [, type, length, width] = racManifest.stayFields ?? [];
+    expect(type.options).toEqual([
+      { value: '', label: 'None (a cabin or a room)' },
+      ...RAC_EQUIPMENT_TYPES,
+    ]);
+    expect(RAC_EQUIPMENT_TYPES).toHaveLength(15);
+    expect(new Set(RAC_EQUIPMENT_TYPES.map((option) => option.value))).toEqual(
+      new Set(Array.from({ length: 15 }, (_, at) => String(at + 1)))
+    );
+    // The equipment is a hold's: a watch that does not hold, and a check, never ask for it
+    expect(resolveStayParams(racManifest, ['watch'], {})).toEqual({ pets: 0 });
+    expect(
+      resolveStayParams(racManifest, ['watch', 'hold'], {
+        equipmentType: '1',
+        equipmentLength: '6.5',
+        equipmentWidth: '2.5',
+      })
+    ).toEqual({ pets: 0, equipmentType: '1', equipmentLength: '6.5', equipmentWidth: '2.5' });
+    for (const [field, value] of [
+      [length, '6.555'],
+      [length, '120'],
+      [width, 'wide'],
+      [type, '99'],
+    ] as const) {
+      expect(() =>
+        resolveStayParams(racManifest, ['watch', 'hold'], { [field.key]: value })
+      ).toThrow(AppError);
+    }
+  });
 
   it('declares two timed release modes, each checked for at most 30 minutes, and no cancellation mode', () => {
     expect(racManifest.releaseModes).toEqual([
@@ -169,6 +213,66 @@ describe('racManifest', () => {
     expect(provider.holds).toBeUndefined();
     expect(provider.bookings).toBeUndefined();
     expect(provider.manifest.capabilities.bookingImport).toBe(false);
+  });
+});
+
+describe('auto-cart, off by default (R19)', () => {
+  it('ships holds off, with the autoCart experiment that turns them on, its warning, and holdRelease', () => {
+    expect(racManifest.capabilities.holds).toBe(false);
+    expect(racManifest.holdRelease).toBe(true);
+    expect(racManifest.experiments).toEqual([
+      {
+        id: RAC_AUTO_CART_EXPERIMENT,
+        label: 'Put stays in my RAC cart automatically',
+        description:
+          'When a watch or a snipe finds your stay, WA Stay adds it to your RAC cart. ' +
+          "You check out and pay on RAC's own page.",
+        warning:
+          'Experimental: not yet checked with a real booking. A cart is not a booking: ' +
+          'only a paid booking secures your stay.',
+        turnsOn: ['holds'],
+      },
+    ]);
+    expect(RAC_AUTO_CART_EXPERIMENT).toBe('autoCart');
+  });
+
+  it('is a valid manifest, off and on, that keeps the flag rules', () => {
+    const on = applyExperiments(racManifest, [RAC_AUTO_CART_EXPERIMENT]);
+    for (const manifest of [racManifest, on]) {
+      expect(ProviderManifestSchema.safeParse(manifest).success).toBe(true);
+      expect(MANIFEST_RULES.map((rule) => rule.violation(manifest)).filter(Boolean)).toEqual([]);
+    }
+    expect(on.capabilities.holds).toBe(true);
+  });
+
+  it('with the experiment off, the registry accepts holdRelease alone, and RAC has no holds', () => {
+    const provider = new ProviderRegistry().register(racFactory, createTestProviderContext);
+    expect(provider.manifest.holdRelease).toBe(true);
+    expect(provider.holds).toBeUndefined();
+    expect(providerViolations(provider)).toEqual([]);
+  });
+
+  it('with it on (withExperiments), RAC registers with holds: the cart page to pay, RAC alone in the window, release on close, never booked', () => {
+    const registry = new ProviderRegistry();
+    const provider = registry.register(
+      withExperiments(racFactory, [RAC_AUTO_CART_EXPERIMENT]),
+      createTestProviderContext
+    );
+    expect(provider.manifest.capabilities.holds).toBe(true);
+    expect(providerViolations(provider)).toEqual([]);
+    const holds = registry.require('rac', 'holds').holds;
+    expect(typeof holds.create).toBe('function');
+    expect(typeof holds.release).toBe('function');
+    expect(holds.releaseOnPaymentClose).toBe(true);
+    expect(holds.paymentOrigins).toEqual([RAC]);
+    expect(holds.bookedReference).toBeUndefined();
+    expect(
+      holds.paymentUrl({
+        ok: true,
+        reference: 'rac-cart:busselton:2026-11-06:0a1b2c',
+        expiresAt: new Date(),
+      })
+    ).toBe(`${RAC}/busselton/booking/`);
   });
 });
 

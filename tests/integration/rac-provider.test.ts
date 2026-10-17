@@ -33,7 +33,8 @@ import { ProviderRegistry } from '@main/providers/registry';
 import { LocationCatalogService } from '@main/core/catalog/location-catalog.service';
 import { openDatabase } from '@main/database/connection';
 import { LocationRepository, ProviderStateRepository } from '@main/database/repositories';
-import { RAC_PARKS, racFactory, racManifest } from '@main/providers/rac';
+import { withExperiments } from '@main/providers/experiments';
+import { RAC_AUTO_CART_EXPERIMENT, RAC_PARKS, racFactory, racManifest } from '@main/providers/rac';
 import { racPark, type RacPark } from '@main/providers/rac/parks';
 import { RAC_AVAILABILITY_PATH } from '@main/providers/rac/availability';
 import { RAC_BLOCK_STATE_KEY, RacClient } from '@main/providers/rac/client';
@@ -131,6 +132,33 @@ describe('at NOW', () => {
     sample: { externalId: 'busselton', stay: UNRELEASED_STAY },
     unknownExternalId: 'ningaloo',
   }));
+});
+
+// Auto-cart on (R19): the same suite with RAC's holds, abort included. No cart is opened: the
+// suite's holds check aborts before the cart page is asked.
+describe('at NOW, with auto-cart on', () => {
+  beforeAll(() => fakeDateOnly(NOW));
+  afterAll(() => jest.useRealTimers());
+
+  const autoCart = withExperiments(racFactory, [RAC_AUTO_CART_EXPERIMENT]);
+  describeProviderContract('rac (autoCart)', () => {
+    const provider = autoCart(
+      createTestProviderContext(autoCart.manifest, {
+        http: new FixtureHttpClient({
+          providerId: 'rac',
+          fixturesDir: FIXTURES_DIR,
+          logFile: UNEXPECTED_LOG,
+        }),
+        clock: () => NOW,
+      })
+    );
+    expect(provider.holds).toBeDefined();
+    return {
+      provider,
+      sample: { externalId: 'busselton', stay: UNRELEASED_STAY },
+      unknownExternalId: 'ningaloo',
+    };
+  });
 });
 
 describe('RAC Parks & Resorts', () => {
