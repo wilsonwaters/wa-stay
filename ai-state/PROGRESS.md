@@ -10,11 +10,12 @@ Branch `ccr-573ddb1d-hir0sq` (from `main` at `4bd5d62`, the v2.0.0 release). The
 Phase 3–4 (task specs, then execution). The stakeholder approved the 20-task plan and decided R6–R8 (alert clicks for every provider, a phone booking link in alert emails, interactive pacing).
 
 ## Currently in flight
-- **R17 (#64)**: review REQUEST_CHANGES (a hold in flight slipped past the turn-off guard); the implementer is fixing on `lane/r17`.
+- **R18 (#65)**: implementation agent in `/home/user/lanes/r18`.
 - **R13 (#60)** and **R14 (#61)**: implementation agents in `/home/user/lanes/r13` and `r14` (at `348d6d2`).
 - Next: R16 (after R11, R13, R14, R15), R18 (after R12, R17), R19, R20.
 
 ## Completed
+- **R17 (#64) merged** (`9cf103b`): `manifest.experiments` applied at registration (after a restart), state in `provider_state` (`core.*` keys refused to providers), `providers.experiments`/`setExperiment`, an "Experimental" switch with a warning and confirm dialog on the provider's Accounts row (shown to everyone, off); turning holds off acts at once (`holdsTurningOff`: watches note it, hold snipes alert instead) and is `ACCOUNT_BUSY` while a hold is held or being placed (`NightGuard.reserving`). Review REQUEST_CHANGES (in-flight hold) → fixes `67cc164`, `9958c49`, `e113a57`, merged R12 and replaced the stand-in with the alert (`4891e91`) → APPROVE. Gate: 5164 tests, e2e 24.
 - **R11 (#58) merged**: RAC bulk availability on Explore (one interactive POST per park; "51 spots free", no "of M"; `bookableUnits` optional end to end; "Still checking RAC…"; a newer search cancels the older one's waiting POSTs but lets a sent one finish, via a new SDK `HttpRequestOptions.onSend`); bulk agrees with the per-park check on every fixture; every park's fixture now a real recording (7 anonymous POSTs on 17 Oct 2026, ≥12 s apart). Review REQUEST_CHANGES (party refusals counted bookable; overlapping requests on RAC's server) → fixes `ba2e798`, `6e3e378` → APPROVE. Gate: 5161 tests, e2e 25, RAC preview passed.
 - **R12 (#59) merged** (`348d6d2`): snipes without holds; per-snipe `action` (`alert` | `hold`, default `hold`) and `alert` (v12, plus `hold_expires_estimated` for R18); `ALERTED` reserves no night; an alert notification and email with the public booking link; `maxWindowMinutes`; a 403/429 ends a snipe FAILED for every provider; §12.35 catch-up for R1–R9. Review APPROVE (minors routed to R13/R14). Gate: 5085 tests, e2e 24.
 - 2026-10-17 ~07:00–08:10 UTC: a second account usage limit stopped the R11 implementer, the R12 reviewer and the R17 fixer (R17 review: REQUEST_CHANGES — a hold in flight slipped past the turn-off guard); all resumed after the reset.
