@@ -12,7 +12,11 @@
 
 import type Database from 'better-sqlite3';
 import { closeDatabase, openDatabase } from '@main/database/connection';
-import { ProviderAccountRepository } from '@main/database/repositories';
+import {
+  ProviderAccountRepository,
+  ProviderStateRepository,
+  SqliteKeyValueStore,
+} from '@main/database/repositories';
 import {
   ProviderAccountService,
   type AccountTimings,
@@ -20,19 +24,28 @@ import {
 import type { ProviderSessionStore } from '@main/core/accounts/ports';
 import { ProviderRegistry } from '@main/providers/registry';
 import {
+  createScopedSecretVault,
+  FakeSecretVault,
   ProviderAuthRequiredError,
   ProviderCapabilityError,
   toApiError,
   UnknownProviderError,
+  type SecretVaultLike,
 } from '@main/providers/sdk';
+import { SecretVaultNotReadyError } from '@main/security/secret-vault';
 import { PARKSTAY_SIGN_IN_COMPLETE } from '@main/providers/parkstay/auth';
 import { AppError } from '@main/utils/app-error';
-import type { ProviderAccount } from '@shared/types/provider.types';
+import type { AccountStatus, ProviderAccount } from '@shared/types/provider.types';
+import { RecordingHttpClient } from '@tests/utils/fake-paced-provider';
 import {
+  FAKE_CONFIRMATIONS,
+  FAKE_CREDENTIAL_FIELDS,
   createFakeProvider,
   createMemoryLogger,
   createTestProviderContext,
+  type FakeCredentialsOptions,
   type FakeProvider,
+  type MemoryLogger,
 } from '@tests/utils/fake-provider';
 import { FakeOpener } from '@tests/utils/fake-provider-windows';
 
@@ -53,6 +66,9 @@ describe('ProviderAccountService', () => {
   let events: { emit: jest.Mock };
   let busy: boolean;
   let busyAsked: Date[];
+  let logger: MemoryLogger;
+  let clipboard: { writeText: jest.Mock };
+  let credentialsChanged: jest.Mock;
   let service: ProviderAccountService;
 
   const probes = (fake: FakeProvider = parkstay) =>
@@ -70,12 +86,14 @@ describe('ProviderAccountService', () => {
       accounts: repo,
       windows,
       sessions,
+      clipboard,
       events,
       isBusy: (_providerId, now) => {
         busyAsked.push(now);
         return busy;
       },
-      logger: createMemoryLogger(),
+      onCredentialsChanged: credentialsChanged,
+      logger,
       timings,
     });
     return service;
@@ -111,6 +129,9 @@ describe('ProviderAccountService', () => {
     events = { emit: jest.fn() };
     busy = false;
     busyAsked = [];
+    logger = createMemoryLogger();
+    clipboard = { writeText: jest.fn() };
+    credentialsChanged = jest.fn();
     build();
   });
 
@@ -121,15 +142,21 @@ describe('ProviderAccountService', () => {
   });
 
   describe('list and status', () => {
-    it('lists only providers with accounts, from the stored rows, without asking anyone', () => {
-      expect(service.list()).toEqual([
-        { providerId: 'parkstay', requirement: 'optional', status: 'unknown' },
-      ]);
-      repo.upsert({ providerId: 'parkstay', status: 'signed-out', email: 'hint@example.com' });
-      expect(service.list()).toEqual([
+    it('lists only providers with accounts, from the stored rows, without asking anyone', async () => {
+      await expect(service.list()).resolves.toEqual([
         {
           providerId: 'parkstay',
           requirement: 'optional',
+          authKind: 'browser-session',
+          status: 'unknown',
+        },
+      ]);
+      repo.upsert({ providerId: 'parkstay', status: 'signed-out', email: 'hint@example.com' });
+      await expect(service.list()).resolves.toEqual([
+        {
+          providerId: 'parkstay',
+          requirement: 'optional',
+          authKind: 'browser-session',
           status: 'signed-out',
           email: 'hint@example.com',
         },
@@ -374,6 +401,7 @@ describe('ProviderAccountService', () => {
       await expect(pending).resolves.toEqual({
         providerId: 'parkstay',
         requirement: 'optional',
+        authKind: 'browser-session',
         status: 'signed-out',
         email: 'hint@example.com',
         lastCheckedAt: expect.any(String),
@@ -555,6 +583,485 @@ describe('ProviderAccountService', () => {
         status: 'unknown',
       });
       expect(probes()).toBe(0);
+    });
+  });
+
+  describe('credentials accounts', () => {
+    /** Made-up values only (never a real member number). */
+    const NUMBER = '1234567890123';
+    const PASSWORD = 'made-up-pass-77';
+    const VALUES = { memberNumber: ` ${NUMBER} `, password: PASSWORD };
+
+    let keystay: FakeProvider;
+    let http: RecordingHttpClient;
+    let state: ProviderStateRepository;
+    let answers: Array<Readonly<Record<string, string>>>;
+
+    /** A `credentials` provider whose secrets live in `provider_state`, through `vault`. */
+    function registerKeyStay(
+      options: { vault?: SecretVaultLike; signIn?: FakeCredentialsOptions['signIn'] } = {}
+    ): FakeProvider {
+      const fake = createFakeProvider({
+        id: 'keystay',
+        name: 'Key Stay',
+        shortName: 'KeyStay',
+        capabilities: { account: 'optional' },
+        credentials: {
+          signIn:
+            options.signIn ??
+            ((values) => {
+              answers.push(values);
+              return { state: 'signed-in' };
+            }),
+        },
+      });
+      registry.register(fake.factory, (m) => {
+        const store = new SqliteKeyValueStore(state, m.id);
+        return createTestProviderContext(m, {
+          http,
+          state: store,
+          secrets: createScopedSecretVault({
+            providerId: m.id,
+            vault: options.vault ?? new FakeSecretVault(),
+            store,
+            logger: createMemoryLogger(),
+          }),
+        });
+      });
+      return fake;
+    }
+
+    const secretRows = () =>
+      db
+        .prepare("SELECT key, value FROM provider_state WHERE provider_id = 'keystay' ORDER BY key")
+        .all() as Array<{ key: string; value: string }>;
+    const everything = () =>
+      JSON.stringify([
+        db.prepare('SELECT * FROM provider_state').all(),
+        db.prepare('SELECT * FROM provider_accounts').all(),
+        logger.lines,
+        events.emit.mock.calls,
+      ]);
+    /** After the fake's own timer (its calls wait one). */
+    const later = () => new Promise((resolve) => setTimeout(resolve, 10));
+    const signIns = () =>
+      keystay.calls.filter((c) => c.module === 'auth' && c.method === 'signIn').length;
+    const refusal = (promise: Promise<unknown>) =>
+      promise.then(
+        () => {
+          throw new Error('expected a refusal');
+        },
+        (error: AppError) => ({ code: error.code, message: error.message, issues: error.issues })
+      );
+
+    beforeEach(() => {
+      http = new RecordingHttpClient({ providerId: 'keystay' });
+      state = new ProviderStateRepository(db);
+      answers = [];
+      keystay = registerKeyStay();
+    });
+
+    it('lists the account with its fields and statements, worked out with no isSignedIn and no request', async () => {
+      const expected = {
+        providerId: 'keystay',
+        requirement: 'optional',
+        authKind: 'credentials',
+        status: 'signed-out',
+        fields: FAKE_CREDENTIAL_FIELDS,
+        confirmations: FAKE_CONFIRMATIONS,
+        savedFields: [],
+      };
+
+      expect((await service.list()).find((a) => a.providerId === 'keystay')).toEqual(expected);
+      await expect(service.status('keystay', { force: true })).resolves.toEqual(expected);
+      await service.ensureForHolds('keystay');
+      await service.recheck('keystay');
+      await service.refreshStale();
+
+      expect(probes(keystay)).toBe(0);
+      expect(http.requests).toEqual([]);
+      expect(service.storedState('keystay')).toBe('unknown');
+      expect(updates().filter((a) => (a as ProviderAccount).providerId === 'keystay')).toEqual([]);
+    });
+
+    it('saving stores ciphertext under secret:account.<key> in provider_state, and no row holds the plaintext', async () => {
+      const account = await service.saveCredentials('keystay', VALUES, ['own']);
+
+      expect(account).toEqual({
+        providerId: 'keystay',
+        requirement: 'optional',
+        authKind: 'credentials',
+        status: 'signed-in',
+        lastSignedInAt: expect.any(String),
+        lastCheckedAt: expect.any(String),
+        fields: FAKE_CREDENTIAL_FIELDS,
+        confirmations: FAKE_CONFIRMATIONS,
+        savedFields: ['memberNumber', 'password'],
+      });
+      // The provider checked the trimmed values, at the person's (interactive) priority
+      expect(answers).toEqual([{ memberNumber: NUMBER, password: PASSWORD }]);
+      expect(keystay.calls.find((c) => c.method === 'signIn')).toMatchObject({
+        args: [['memberNumber', 'password']],
+        priority: 'interactive',
+      });
+      const rows = secretRows();
+      expect(rows.map((r) => r.key)).toEqual([
+        'secret:account.memberNumber',
+        'secret:account.password',
+      ]);
+      for (const row of rows) expect(JSON.parse(row.value)).toMatch(/^fake-vault:/);
+      expect(everything()).not.toContain(NUMBER);
+      expect(everything()).not.toContain(PASSWORD);
+      // The provider reads it back with ctx.secrets
+      await expect(keystay.ctx!.secrets.get('account.memberNumber')).resolves.toBe(NUMBER);
+      expect(repo.get('keystay')).toMatchObject({
+        status: 'signed-in',
+        lastSignedInAt: expect.any(Date),
+      });
+      expect(updates()).toEqual([account]);
+      expect(credentialsChanged.mock.calls).toEqual([['keystay']]);
+      expect(http.requests).toEqual([]);
+    });
+
+    it('saving again replaces every value; removing deletes them, never ACCOUNT_BUSY or a cleared session', async () => {
+      await service.saveCredentials('keystay', VALUES, ['own']);
+      await service.saveCredentials(
+        'keystay',
+        { memberNumber: '012345678', password: 'other-made-up-1' },
+        ['own']
+      );
+      await expect(keystay.ctx!.secrets.get('account.memberNumber')).resolves.toBe('012345678');
+      await expect(keystay.ctx!.secrets.get('account.password')).resolves.toBe('other-made-up-1');
+
+      busy = true;
+      const removed = await service.signOut('keystay');
+
+      expect(removed).toMatchObject({ status: 'signed-out', savedFields: [] });
+      expect(secretRows()).toEqual([]);
+      expect(sessions.clear).not.toHaveBeenCalled();
+      expect(busyAsked).toEqual([]);
+      expect(service.storedState('keystay')).toBe('signed-out');
+      expect(updates().at(-1)).toEqual(removed);
+      // Save, replace, remove: once each, with the provider id and nothing else
+      expect(credentialsChanged.mock.calls).toEqual([['keystay'], ['keystay'], ['keystay']]);
+      expect((await service.list()).find((a) => a.providerId === 'keystay')).toMatchObject({
+        status: 'signed-out',
+        savedFields: [],
+      });
+    });
+
+    it('saving without the confirmations is VALIDATION with ["confirmed"]; nothing is asked or stored', async () => {
+      await expect(refusal(service.saveCredentials('keystay', VALUES, []))).resolves.toEqual({
+        code: 'VALIDATION',
+        message: 'Tick each statement to save',
+        issues: ['confirmed'],
+      });
+      await expect(
+        refusal(service.saveCredentials('keystay', VALUES, ['other']))
+      ).resolves.toMatchObject({
+        issues: ['confirmed'],
+      });
+      expect(signIns()).toBe(0);
+      expect(secretRows()).toEqual([]);
+      expect(credentialsChanged).not.toHaveBeenCalled();
+    });
+
+    it.each<[string, Record<string, string>, string[], string]>([
+      ['a missing field', { memberNumber: NUMBER }, ['values.password'], 'Password is missing'],
+      [
+        'an empty field',
+        { memberNumber: '   ', password: PASSWORD },
+        ['values.memberNumber'],
+        'Member number is missing',
+      ],
+      [
+        'an unknown field',
+        { ...VALUES, pin: '4321' },
+        ['values.pin'],
+        "KeyStay doesn't ask for that detail",
+      ],
+      [
+        'a value over 256 characters',
+        { memberNumber: '9'.repeat(257), password: PASSWORD },
+        ['values.memberNumber'],
+        'Member number is too long (256 characters at most)',
+      ],
+    ])(
+      '%s is VALIDATION with values.<key>, and the message quotes no value',
+      async (_label, values, issues, message) => {
+        await expect(refusal(service.saveCredentials('keystay', values, ['own']))).resolves.toEqual(
+          {
+            code: 'VALIDATION',
+            message,
+            issues,
+          }
+        );
+        expect(signIns()).toBe(0);
+        expect(secretRows()).toEqual([]);
+      }
+    );
+
+    it('trims the ends only: spaces and dashes inside, and Unicode, are kept for the provider', async () => {
+      await service.saveCredentials(
+        'keystay',
+        { memberNumber: ' 1234-5678 90 ', password: 'Zoë ß ✓' },
+        ['own']
+      );
+      await expect(keystay.ctx!.secrets.get('account.memberNumber')).resolves.toBe('1234-5678 90');
+      await expect(keystay.ctx!.secrets.get('account.password')).resolves.toBe('Zoë ß ✓');
+      // 256 characters (code points) is allowed
+      await service.saveCredentials(
+        'keystay',
+        { memberNumber: '😀'.repeat(256), password: PASSWORD },
+        ['own']
+      );
+    });
+
+    it('a signed-out answer is VALIDATION and an unknown one PROVIDER_ERROR; neither stores anything', async () => {
+      registry = new ProviderRegistry();
+      const scripted: AccountStatus['state'][] = ['signed-out', 'unknown'];
+      keystay = registerKeyStay({ signIn: () => ({ state: scripted.shift()! }) });
+      build();
+
+      await expect(refusal(service.saveCredentials('keystay', VALUES, ['own']))).resolves.toEqual({
+        code: 'VALIDATION',
+        message: "KeyStay didn't accept these details",
+        issues: ['values.memberNumber', 'values.password'],
+      });
+      await expect(refusal(service.saveCredentials('keystay', VALUES, ['own']))).resolves.toEqual({
+        code: 'PROVIDER_ERROR',
+        message: "Couldn't check these details. Try again.",
+        issues: undefined,
+      });
+      expect(secretRows()).toEqual([]);
+      expect(repo.get('keystay')).toBeNull();
+      expect(updates()).toEqual([]);
+      expect(credentialsChanged).not.toHaveBeenCalled();
+    });
+
+    it('a signIn that throws is PROVIDER_ERROR, and its message (which quotes the value) is never logged', async () => {
+      registry = new ProviderRegistry();
+      keystay = registerKeyStay({
+        signIn: (values) => {
+          throw new Error(`bad number ${values.memberNumber}`);
+        },
+      });
+      build();
+
+      await expect(
+        refusal(service.saveCredentials('keystay', VALUES, ['own']))
+      ).resolves.toMatchObject({
+        code: 'PROVIDER_ERROR',
+      });
+      expect(everything()).not.toContain(NUMBER);
+      expect(secretRows()).toEqual([]);
+    });
+
+    it('the check is bounded by the probe limit, even when the provider ignores its signal', async () => {
+      registry = new ProviderRegistry();
+      keystay = registerKeyStay({ signIn: () => new Promise<AccountStatus>(() => undefined) });
+      build({ probeTimeoutMs: 20 });
+
+      await expect(
+        refusal(service.saveCredentials('keystay', VALUES, ['own']))
+      ).resolves.toMatchObject({
+        code: 'PROVIDER_ERROR',
+      });
+      expect(secretRows()).toEqual([]);
+    });
+
+    it('saves for a provider are one at a time: the second waits for the first', async () => {
+      registry = new ProviderRegistry();
+      const gates: Array<() => void> = [];
+      keystay = registerKeyStay({
+        signIn: () =>
+          new Promise<AccountStatus>((resolve) =>
+            gates.push(() => resolve({ state: 'signed-in' }))
+          ),
+      });
+      build();
+
+      const first = service.saveCredentials('keystay', VALUES, ['own']);
+      const second = service.saveCredentials('keystay', { ...VALUES, memberNumber: '012345678' }, [
+        'own',
+      ]);
+      await later();
+      expect(gates).toHaveLength(1);
+
+      gates[0]();
+      await first;
+      await later();
+      expect(gates).toHaveLength(2);
+      gates[1]();
+      await second;
+      await expect(keystay.ctx!.secrets.get('account.memberNumber')).resolves.toBe('012345678');
+    });
+
+    it('a vault that is not ready fails the save with INTERNAL (nothing stored) and reads as not saved, with one warning per key', async () => {
+      registry = new ProviderRegistry();
+      let ready = false;
+      const fake = new FakeSecretVault();
+      const notReady = () => {
+        if (!ready) throw new SecretVaultNotReadyError();
+      };
+      keystay = registerKeyStay({
+        vault: {
+          encrypt: (text) => (notReady(), fake.encrypt(text)),
+          decrypt: (text) => (notReady(), fake.decrypt(text)),
+        },
+      });
+      build();
+
+      await expect(refusal(service.saveCredentials('keystay', VALUES, ['own']))).resolves.toEqual({
+        code: 'INTERNAL',
+        message: "Couldn't save your details on this computer. Try again.",
+        issues: undefined,
+      });
+      expect(secretRows()).toEqual([]);
+      expect(credentialsChanged).not.toHaveBeenCalled();
+      expect(updates()).toEqual([]);
+
+      ready = true;
+      await service.saveCredentials('keystay', VALUES, ['own']);
+      ready = false;
+      for (let i = 0; i < 2; i++) {
+        expect((await service.list()).find((a) => a.providerId === 'keystay')).toMatchObject({
+          status: 'signed-out',
+          savedFields: [],
+        });
+      }
+
+      const warnings = logger.lines.filter((l) => l.level === 'warn').map((l) => l.message);
+      expect(warnings).toEqual([
+        'Account keystay: the details could not be stored (SecretVaultNotReadyError)',
+        "Account keystay: the saved memberNumber can't be read; it counts as not saved",
+        "Account keystay: the saved password can't be read; it counts as not saved",
+      ]);
+      expect(everything()).not.toContain(NUMBER);
+    });
+
+    it('a failure part-way through leaves no half-saved set: the values already written are deleted', async () => {
+      await service.saveCredentials('keystay', VALUES, ['own']);
+      registry = new ProviderRegistry();
+      let encrypts = 0;
+      const fake = new FakeSecretVault();
+      keystay = registerKeyStay({
+        vault: {
+          encrypt: (text) => {
+            if (++encrypts === 2) throw new Error('disk full');
+            return fake.encrypt(text);
+          },
+          decrypt: (text) => fake.decrypt(text),
+        },
+      });
+      build();
+
+      await expect(
+        refusal(
+          service.saveCredentials('keystay', { memberNumber: '012345678', password: 'x-1' }, [
+            'own',
+          ])
+        )
+      ).resolves.toMatchObject({ code: 'INTERNAL' });
+
+      expect(secretRows()).toEqual([]);
+      expect(service.storedState('keystay')).toBe('signed-out');
+      expect(credentialsChanged.mock.calls).toEqual([['keystay'], ['keystay']]);
+    });
+
+    it('a saved value that cannot be read counts as not saved, with one warning naming the key only', async () => {
+      await service.saveCredentials('keystay', VALUES, ['own']);
+      events.emit.mockClear();
+      state.set('keystay', 'secret:account.memberNumber', 'not-a-vault-envelope');
+
+      const listed = (await service.list()).find((a) => a.providerId === 'keystay');
+      expect(listed).toMatchObject({ status: 'signed-out', savedFields: ['password'] });
+      // status() brings the stored row in line, once
+      await expect(service.status('keystay')).resolves.toMatchObject({ status: 'signed-out' });
+      await service.status('keystay');
+      expect(service.storedState('keystay')).toBe('signed-out');
+      expect(updates()).toHaveLength(1);
+      await expect(refusal(service.copyCredential('keystay', 'memberNumber'))).resolves.toEqual({
+        code: 'INTERNAL',
+        message: "Couldn't read your saved Member number. Add it again.",
+        issues: undefined,
+      });
+
+      const warnings = logger.lines.filter((l) => l.level === 'warn').map((l) => l.message);
+      expect(warnings).toEqual([
+        "Account keystay: the saved memberNumber can't be read; it counts as not saved",
+      ]);
+      expect(clipboard.writeText).not.toHaveBeenCalled();
+    });
+
+    it('copyCredential writes a saved copyable value to the clipboard once, and answers nothing', async () => {
+      await service.saveCredentials('keystay', VALUES, ['own']);
+
+      await expect(service.copyCredential('keystay', 'memberNumber')).resolves.toBeUndefined();
+
+      expect(clipboard.writeText.mock.calls).toEqual([[NUMBER]]);
+      expect(JSON.stringify(logger.lines)).not.toContain(NUMBER);
+    });
+
+    it('copyCredential refuses a field that is not copyable, not declared, or not saved', async () => {
+      await expect(refusal(service.copyCredential('keystay', 'memberNumber'))).resolves.toEqual({
+        code: 'NOT_FOUND',
+        message: 'No Member number is saved',
+        issues: undefined,
+      });
+      await service.saveCredentials('keystay', VALUES, ['own']);
+      await expect(refusal(service.copyCredential('keystay', 'password'))).resolves.toEqual({
+        code: 'VALIDATION',
+        message: "Password can't be copied",
+        issues: ['key'],
+      });
+      await expect(refusal(service.copyCredential('keystay', 'pin'))).resolves.toMatchObject({
+        code: 'VALIDATION',
+        issues: ['key'],
+      });
+      expect(clipboard.writeText).not.toHaveBeenCalled();
+    });
+
+    it('a browser-session provider is VALIDATION; unknown is UNKNOWN_PROVIDER; no account is CAPABILITY; no sign-in window', async () => {
+      await expect(refusal(service.saveCredentials('parkstay', {}, []))).resolves.toEqual({
+        code: 'VALIDATION',
+        message: "ParkStay doesn't use saved details",
+        issues: ['providerId'],
+      });
+      await expect(service.copyCredential('parkstay', 'x')).rejects.toMatchObject({
+        code: 'VALIDATION',
+      });
+      await expect(service.saveCredentials('nope', {}, [])).rejects.toBeInstanceOf(
+        UnknownProviderError
+      );
+      await expect(service.saveCredentials('noacct', {}, [])).rejects.toBeInstanceOf(
+        ProviderCapabilityError
+      );
+      expect(() => service.signIn('keystay')).toThrow(
+        expect.objectContaining({ code: 'NOT_IMPLEMENTED' })
+      );
+      expect(() => service.openSignInLink('keystay', 'https://keystay.example/x')).toThrow(
+        expect.objectContaining({ code: 'NOT_IMPLEMENTED' })
+      );
+      expect(windows.windows).toHaveLength(0);
+    });
+
+    it('a failing change hook is logged by name and never fails the save', async () => {
+      credentialsChanged.mockImplementation(() => {
+        throw new Error(`hook saw ${NUMBER}`);
+      });
+      await expect(service.saveCredentials('keystay', VALUES, ['own'])).resolves.toMatchObject({
+        status: 'signed-in',
+      });
+      credentialsChanged.mockImplementation(() => Promise.reject(new Error('later')));
+      await service.signOut('keystay');
+      await settle();
+
+      const warnings = logger.lines.filter((l) => l.level === 'warn').map((l) => l.message);
+      expect(warnings).toEqual([
+        'Account keystay: the change hook failed (Error)',
+        'Account keystay: the change hook failed (Error)',
+      ]);
     });
   });
 });

@@ -185,7 +185,9 @@ The baseline (architecture-notes §7), as built:
 - **Secrets** are encrypted by the SecretVault with Electron `safeStorage` (Windows DPAPI,
   macOS Keychain, a Linux keyring), or a local AES-256-GCM key file where no OS encryption
   exists. Secrets are write-only over IPC: the SMTP password is never sent back to the window
-  (`hasPassword` instead). v1.x ciphertexts are migrated once.
+  (`hasPassword` instead), nor is an account detail a provider asks for, such as a member
+  number (`savedFields` instead; main copies it to the clipboard on request). v1.x ciphertexts
+  are migrated once.
 - **Provider windows** (sign-in, payment) show the provider's own pages on its session
   partition, sandboxed, with no script of the app's, a top-level origin allow-list, and every
   permission request and certificate error refused.

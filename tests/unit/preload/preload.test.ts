@@ -91,6 +91,9 @@ describe('preload window.api', () => {
     await api.catalog.refresh('parkstay');
     await api.accounts.status('parkstay');
     await api.accounts.openSignInLink('parkstay', 'https://dbcab2c.b2clogin.com/x');
+    // Made-up values: a credentials save carries them to main once, and a copy only the key
+    await api.accounts.saveCredentials('rac', { memberNumber: '1234567890123' }, ['own']);
+    await api.accounts.copyCredential('rac', 'memberNumber');
 
     expect(ipcRenderer.invoke.mock.calls).toEqual([
       ['providers:list', undefined],
@@ -107,6 +110,11 @@ describe('preload window.api', () => {
         'accounts:open-sign-in-link',
         { providerId: 'parkstay', url: 'https://dbcab2c.b2clogin.com/x' },
       ],
+      [
+        'accounts:save-credentials',
+        { providerId: 'rac', values: { memberNumber: '1234567890123' }, confirmed: ['own'] },
+      ],
+      ['accounts:copy-credential', { providerId: 'rac', key: 'memberNumber' }],
     ]);
   });
 

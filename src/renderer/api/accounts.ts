@@ -1,4 +1,4 @@
-import { useCallback } from 'react';
+import { useCallback, useState } from 'react';
 import { useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import type { ProviderAccount, ProviderId } from '../../shared/types/provider.types';
 import { unwrap } from './client';
@@ -101,7 +101,8 @@ export function useSignIn() {
 
 /**
  * Signs out of a provider: its session on this computer is cleared. Rejects with
- * `ACCOUNT_BUSY` while a snipe or hold needs the session.
+ * `ACCOUNT_BUSY` while a snipe or hold needs the session. For a `credentials` account it
+ * removes the saved details instead (never refused).
  */
 export function useSignOut() {
   const queryClient = useQueryClient();
@@ -121,5 +122,50 @@ export function useOpenSignInLink() {
   return useMutation({
     mutationFn: ({ providerId, url }: { providerId: ProviderId; url: string }) =>
       unwrap((api) => api.accounts.openSignInLink(providerId, url)),
+  });
+}
+
+/**
+ * Saves a `credentials` account's details (`accounts.saveCredentials`): main checks them with
+ * the provider and keeps them encrypted, and the account it answers (with `savedFields`, key
+ * names only) goes into the stored list. Resolves with that account; rejects with an `ApiError`
+ * (`VALIDATION` with `issues` such as `values.memberNumber`, `PROVIDER_ERROR`, `INTERNAL`).
+ *
+ * Write-only: this is not a React Query mutation, because a mutation keeps its variables in
+ * the query client's cache. The typed values live only in the caller's form, which resets.
+ */
+export function useSaveCredentials() {
+  const queryClient = useQueryClient();
+  const storeAccount = useStoreAccount();
+  const [pending, setPending] = useState(0);
+  const save = async (
+    providerId: ProviderId,
+    values: Record<string, string>,
+    confirmed: string[]
+  ): Promise<ProviderAccount> => {
+    setPending((count) => count + 1);
+    try {
+      const account = await unwrap((api) =>
+        api.accounts.saveCredentials(providerId, values, confirmed)
+      );
+      storeAccount(account);
+      return account;
+    } finally {
+      setPending((count) => count - 1);
+      void queryClient.invalidateQueries({ queryKey: queryKeys.accounts.all });
+    }
+  };
+  return { save, isPending: pending > 0 };
+}
+
+/**
+ * Asks main to put a saved, copyable `credentials` value on the clipboard
+ * (`accounts.copyCredential`). The value never comes here: the mutation's variables are the
+ * provider and the field's key, and it answers nothing.
+ */
+export function useCopyCredential() {
+  return useMutation({
+    mutationFn: ({ providerId, key }: { providerId: ProviderId; key: string }) =>
+      unwrap((api) => api.accounts.copyCredential(providerId, key)),
   });
 }

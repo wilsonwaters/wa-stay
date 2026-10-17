@@ -14,6 +14,7 @@
 
 import type {
   AccessStatus,
+  AccountConfirmation,
   AccountFieldDescriptor,
   AccountStatus,
   BulkAvailabilityEntry,
@@ -285,14 +286,25 @@ export interface BrowserSessionAuth extends AuthBase {
 }
 
 /**
- * Sign-in with values the app asks for (§12.30). Declared and validated; the account
- * service does not implement it yet. Secret values are kept in the provider's scoped
- * secret vault, never in plain state.
+ * Sign-in with details the app asks for (§12.30, §12.35): Settings → Accounts shows `fields`
+ * and `confirmations`, and `accounts.saveCredentials` stores the values once `signIn` accepts
+ * them. The core keeps every value in the provider's scoped secret vault as `account.<key>`
+ * (`ctx.secrets.get('account.<key>')` reads it), never in plain state, never in a log and never
+ * back to the renderer. The status is worked out from what is stored: `isSignedIn` is not
+ * called.
  */
 export interface CredentialsAuth extends AuthBase {
   kind: 'credentials';
   /** At least one, with unique keys. */
   fields: readonly AccountFieldDescriptor[];
+  /** Statements the person must tick to save, with unique keys. */
+  confirmations?: readonly AccountConfirmation[];
+  /**
+   * Checks the values (trimmed, every declared field, none empty) before they are stored,
+   * within 15 s: `signed-in` stores them, `signed-out` refuses them ("{shortName} didn't accept
+   * these details"), and `unknown` or a rejection stores nothing ("Couldn't check these
+   * details"). Never put a value in an error message or a log line.
+   */
   signIn(
     values: Readonly<Record<string, string>>,
     http: HttpClient,

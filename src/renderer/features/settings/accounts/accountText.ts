@@ -1,9 +1,15 @@
 /**
  * What an account row says (Settings → Accounts): its status line, its action, and what the
  * account is needed for, from the provider's manifest (architecture-notes §12.32: signing in
- * is a soft suggestion for providers whose account is optional, never a blocker).
+ * is a soft suggestion for providers whose account is optional, never a blocker). A
+ * `credentials` account (details saved in the app, §12.35) has its own words below.
  */
-import type { ProviderAccount, ProviderManifest } from '../../../../shared/types/provider.types';
+import {
+  ACCOUNT_VALUE_MAX_LENGTH,
+  type AccountFieldDescriptor,
+  type ProviderAccount,
+  type ProviderManifest,
+} from '../../../../shared/types/provider.types';
 import { formatDay } from '../format';
 
 export type AccountAction = 'connect' | 'reconnect' | 'sign-out';
@@ -118,7 +124,102 @@ export function missingAccountWarning(
   account: ProviderAccount | undefined
 ): string | null {
   if (!requiresAccount(manifest) || account?.status === 'signed-in') return null;
+  const until =
+    account?.authKind === 'credentials'
+      ? `until you add your ${inSentence(credentialsName(account))}`
+      : 'until you connect';
   return manifest.capabilities.account === 'required'
-    ? `${manifest.shortName} can't be used until you connect.`
-    : `${manifest.shortName} holds can't be placed until you connect.`;
+    ? `${manifest.shortName} can't be used ${until}.`
+    : `${manifest.shortName} holds can't be placed ${until}.`;
+}
+
+// ---------------------------------------------------------------------------------------
+// `credentials` accounts: details saved in the app (a member number), write-only
+// ---------------------------------------------------------------------------------------
+
+/** A label inside a sentence: "Member number" → "member number"; "RAC number" is kept. */
+export function inSentence(label: string): string {
+  return /^[A-Z][a-z]/.test(label) ? label.charAt(0).toLowerCase() + label.slice(1) : label;
+}
+
+/** What the saved details are called: the one field's label, or "Details" for several. */
+export function credentialsName(account: Pick<ProviderAccount, 'fields'>): string {
+  const fields = account.fields ?? [];
+  return fields.length === 1 ? fields[0].label : 'Details';
+}
+
+/** True when every field has a saved value (main's `signed-in`). */
+export function credentialsSaved(account: ProviderAccount): boolean {
+  return account.status === 'signed-in';
+}
+
+/** The status line and tone of a `credentials` row: "Member number saved" or "Not added". */
+export function credentialsRowText(
+  manifest: ProviderManifest,
+  account: ProviderAccount
+): Pick<AccountRowText, 'status' | 'tone'> {
+  if (credentialsSaved(account)) {
+    return { status: `${credentialsName(account)} saved`, tone: 'signed-in' };
+  }
+  return { status: 'Not added', tone: requiresAccount(manifest) ? 'warning' : 'neutral' };
+}
+
+export const CREDENTIALS_TEXT = {
+  replace: 'Replace',
+  remove: 'Remove',
+  save: 'Save',
+  cancel: 'Cancel',
+  copied: 'Copied',
+  /** The statements' group. */
+  statements: 'Before you save',
+  saveFailed: "Couldn't save. Try again.",
+  copyFailed: "Couldn't copy it. Try again.",
+  /** Under the statements while Save is disabled; Save is described by it. */
+  tickEach: 'Tick each statement to save.',
+  /** The form's description: what happens to what is typed. */
+  storage: 'Kept encrypted on this computer. WA Stay never shows it again.',
+  removeMessage: 'WA Stay forgets it; you can add it again any time.',
+} as const;
+
+/** "Add member number", or "Add details" when the provider asks for several. */
+export function addCredentialsLabel(account: ProviderAccount): string {
+  return `Add ${inSentence(credentialsName(account))}`;
+}
+
+/** "Copy member number". */
+export function copyCredentialLabel(field: AccountFieldDescriptor): string {
+  return `Copy ${inSentence(field.label)}`;
+}
+
+/** The form's title: "RAC account". */
+export function credentialsDialogTitle(manifest: ProviderManifest): string {
+  return `${manifest.shortName} account`;
+}
+
+/** "Remove your member number?" */
+export function removeCredentialsTitle(account: ProviderAccount): string {
+  return `Remove your ${inSentence(credentialsName(account))}?`;
+}
+
+/** Announced after a save: "Member number saved". */
+export function credentialsSavedAnnouncement(account: ProviderAccount): string {
+  return `${credentialsName(account)} saved`;
+}
+
+/** Announced after a removal: "Member number removed". */
+export function credentialsRemovedAnnouncement(account: ProviderAccount): string {
+  return `${credentialsName(account)} removed`;
+}
+
+/**
+ * What is wrong with a typed value before main sees it (main checks the same), or null. Main
+ * trims it; nothing here quotes it.
+ */
+export function credentialFieldError(field: AccountFieldDescriptor, value: string): string | null {
+  const trimmed = value.trim();
+  if (!trimmed) return `Enter your ${inSentence(field.label)}.`;
+  if ([...trimmed].length > ACCOUNT_VALUE_MAX_LENGTH) {
+    return `${field.label} is too long (${ACCOUNT_VALUE_MAX_LENGTH} characters at most).`;
+  }
+  return null;
 }

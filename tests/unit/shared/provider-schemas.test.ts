@@ -4,6 +4,7 @@
  */
 
 import {
+  AccountConfirmationsSchema,
   AccountFieldsSchema,
   CalendarDateSchema,
   DEFAULT_PROVIDER_LIMITS,
@@ -339,5 +340,41 @@ describe('AccountFieldsSchema (credentials sign-in fields)', () => {
     ],
   ])('rejects %s', (_label, fields) => {
     expect(AccountFieldsSchema.safeParse(fields).success).toBe(false);
+  });
+
+  it('a field may be copyable (R15); it must say so with a boolean', () => {
+    const memberNumber = { key: 'memberNumber', label: 'Member number', secret: true };
+    expect(AccountFieldsSchema.safeParse([{ ...memberNumber, copyable: true }]).success).toBe(true);
+    expect(AccountFieldsSchema.safeParse([memberNumber]).success).toBe(true);
+    expect(AccountFieldsSchema.safeParse([{ ...memberNumber, copyable: 'yes' }]).success).toBe(
+      false
+    );
+  });
+});
+
+describe('AccountConfirmationsSchema (statements ticked before a credentials save)', () => {
+  it('accepts none, or statements with alphanumeric keys and a label', () => {
+    expect(AccountConfirmationsSchema.safeParse([]).success).toBe(true);
+    expect(
+      AccountConfirmationsSchema.safeParse([
+        { key: 'own', label: 'This is my own member number.' },
+        { key: 'stay', label: 'I will be staying.' },
+      ]).success
+    ).toBe(true);
+  });
+
+  it.each<[string, unknown]>([
+    ['an empty label', [{ key: 'own', label: '  ' }]],
+    ['a key with a hyphen', [{ key: 'my-own', label: 'Mine' }]],
+    ['no label', [{ key: 'own' }]],
+    [
+      'duplicate keys',
+      [
+        { key: 'own', label: 'Mine' },
+        { key: 'own', label: 'Still mine' },
+      ],
+    ],
+  ])('rejects %s', (_label, confirmations) => {
+    expect(AccountConfirmationsSchema.safeParse(confirmations).success).toBe(false);
   });
 });

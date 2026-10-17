@@ -163,7 +163,15 @@ describe('IPC contract', () => {
     expect(Object.keys(contract)).not.toContain('auth');
     expect(Object.keys(CHANNELS)).not.toContain('auth');
     expect(Object.keys(contract.accounts).sort()).toEqual(
-      ['list', 'openSignInLink', 'signIn', 'signOut', 'status'].sort()
+      [
+        'list',
+        'openSignInLink',
+        'signIn',
+        'signOut',
+        'status',
+        'saveCredentials',
+        'copyCredential',
+      ].sort()
     );
   });
 

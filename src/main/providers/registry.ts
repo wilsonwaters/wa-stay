@@ -17,6 +17,7 @@
  */
 
 import {
+  AccountConfirmationsSchema,
   AccountFieldsSchema,
   ProviderIdSchema,
   type BooleanCapability,
@@ -30,6 +31,7 @@ import {
   UnknownProviderError,
 } from './sdk/errors';
 import type { HttpClient } from './sdk/http';
+import type { ScopedSecretVault } from './sdk/secrets';
 import { parseProviderManifest } from './sdk/manifest';
 import { isHttpsOriginPattern, isHttpsUrlPattern } from './sdk/url-patterns';
 import {
@@ -146,6 +148,12 @@ export function authViolation(auth: ProviderAuth): string | undefined {
     case 'credentials':
       if (!AccountFieldsSchema.safeParse(auth.fields).success) {
         return 'credentials auth needs fields (at least one, unique alphanumeric keys)';
+      }
+      if (
+        auth.confirmations !== undefined &&
+        !AccountConfirmationsSchema.safeParse(auth.confirmations).success
+      ) {
+        return 'credentials auth confirmations need labels and unique alphanumeric keys';
       }
       return fn(auth.signIn) ? undefined : 'credentials auth needs signIn';
     case 'automation':
@@ -390,6 +398,17 @@ export class ProviderRegistry {
     const entry = this.entries.get(id);
     if (!entry) throw new UnknownProviderError(id);
     return entry.ctx.http;
+  }
+
+  /**
+   * The provider's scoped secret vault (its context's `secrets`), the one the provider reads
+   * with `ctx.secrets`. The account service keeps a `credentials` sign-in's values there.
+   * Throws `UnknownProviderError`.
+   */
+  secretsOf(id: ProviderId): ScopedSecretVault {
+    const entry = this.entries.get(id);
+    if (!entry) throw new UnknownProviderError(id);
+    return entry.ctx.secrets;
   }
 
   /** Every manifest (parsed and frozen), sorted by name. */

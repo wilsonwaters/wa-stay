@@ -19,7 +19,9 @@ export {
   useAccountCheck,
   useAccounts,
   useAccountStatus,
+  useCopyCredential,
   useOpenSignInLink,
+  useSaveCredentials,
   useSignIn,
   useSignOut,
 } from './accounts';

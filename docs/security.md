@@ -16,10 +16,30 @@ The app keeps these secrets on disk:
 | --- | --- |
 | Email (SMTP) notifier settings, including the app password | `notifiers.config` in the database |
 | Provider secrets (`ProviderContext.secrets`) | the provider's own state (`provider_state`), under `secret:<key>` |
+| Account details a provider asks for (a `credentials` sign-in, such as a member number) | the provider's secrets, as `account.<key>`: `secret:account.<key>` in `provider_state` |
 
 No built-in provider stores a secret yet. The email password is write-only over IPC: the
 window gets the notifier settings without it (`hasPassword` instead), and saving without a
 password keeps the stored one only for the same server, port and account.
+
+Account details are write-only over IPC too (`src/main/core/accounts/provider-account.service.ts`):
+
+- The window sends them once, with `accounts.saveCredentials`, after the person ticks the
+  provider's statements; main checks them (and the statements) again. Only the provider's
+  `signIn` sees them before they are stored, and only its `signed-in` answer stores them, all
+  or nothing.
+- Nothing sends them back: an account lists `savedFields`, the names of the fields that have a
+  value. The form forgets what was typed when it closes, and the renderer keeps no copy (the
+  save is not a React Query mutation, so its cache never holds the values).
+- "Copy" (`accounts.copyCredential`, only for fields the provider marks `copyable`) has main
+  write the value to the system clipboard. The clipboard is not cleared afterwards: copying is
+  the person's own action.
+- They are never logged, never quoted in an error message (a provider's own error is reduced to
+  its name), and never sent by the core. Removing them (`accounts.signOut`) deletes them and
+  touches no session.
+- `tests/integration/credentials-leak.test.ts` checks every `accounts` response, every
+  `account:updated` payload, every log line, every request the provider's HTTP client makes and
+  the database for a made-up value; only the clipboard gets it, once.
 
 Provider sign-in (ParkStay) stores no secret of the app's: the person signs in on the
 provider's own page in an app window, and the session cookies stay in the provider's
@@ -209,6 +229,7 @@ user saving a new one. What the user sees:
 | Secret | When unreadable |
 | --- | --- |
 | Email notifier | The notifier shows `secretState: 'unreadable'`, status `error` and "Saved password could not be decrypted; re-enter it". Nothing is sent through it, and the skip is logged once. Saving the email settings again fixes it. |
+| Account details | The account reads as not saved ("Not added"), with one warning that names the field's key. "Copy" says "Couldn't read your saved {label}. Add it again." Adding the details again fixes it. |
 
 A locked keyring is usually temporary: unlock it and restart the app, and the secrets read
 again. Nothing was overwritten in the meantime.
@@ -302,7 +323,8 @@ window runs on the default session, and `guardPermissions` (`src/main/app/main-w
 gives it handlers that refuse every permission request and every permission check, with one
 exception: `clipboard-sanitized-write`, for the app's own page in its top frame.
 `navigator.clipboard.writeText` needs it ("Copy reference" on a booking, "Copy error details"
-on the error screen) and fails without it. Desktop notifications are shown by the main process
+on the error screen) and fails without it. Copying a saved account detail does not use it: main
+writes that to the clipboard itself, so the value never reaches the page. Desktop notifications are shown by the main process
 (Electron's `Notification`) and need no permission. A refused request is logged with the
 permission and the page's origin only. The Electron smoke tests check, in the built app, that
 the clipboard write is granted, that other permissions read as denied, and that copying works.

@@ -16,7 +16,7 @@
 
 import path from 'path';
 import type Database from 'better-sqlite3';
-import { app, powerMonitor } from 'electron';
+import { app, clipboard, powerMonitor } from 'electron';
 import { SnipeReleaseMode, SnipeStatus } from '@shared/types/common.types';
 import { ProviderAccountService } from '../core/accounts/provider-account.service';
 import { LocationCatalogService } from '../core/catalog/location-catalog.service';
@@ -280,6 +280,8 @@ export function createContainer({
     accounts: repositories.providerAccounts,
     windows: providerWindows,
     sessions: providerWindows,
+    // `accounts.copyCredential`: main writes a saved value, so it never reaches the renderer
+    clipboard: { writeText: (text) => clipboard.writeText(text) },
     events: rendererEvents,
     // Signing out would lose a queue place, a hold being placed, or a hold awaiting payment.
     isBusy: (providerId, now) =>

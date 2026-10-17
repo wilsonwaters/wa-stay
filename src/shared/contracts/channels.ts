@@ -89,6 +89,8 @@ export const CHANNELS = {
     signIn: 'accounts:sign-in',
     signOut: 'accounts:sign-out',
     openSignInLink: 'accounts:open-sign-in-link',
+    saveCredentials: 'accounts:save-credentials',
+    copyCredential: 'accounts:copy-credential',
   },
 } as const;
 

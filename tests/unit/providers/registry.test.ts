@@ -483,6 +483,31 @@ describe('ProviderRegistry.register', () => {
         null,
       ],
       [
+        'credentials with confirmations and a copyable field',
+        {
+          kind: 'credentials',
+          fields: [{ key: 'memberNumber', label: 'Member number', secret: true, copyable: true }],
+          confirmations: [{ key: 'own', label: 'This is my own member number.' }],
+          signIn: signedIn,
+          isSignedIn: signedIn,
+        },
+        null,
+      ],
+      [
+        'credentials with duplicate confirmation keys',
+        {
+          kind: 'credentials',
+          fields: [{ key: 'memberNumber', label: 'Member number', secret: true }],
+          confirmations: [
+            { key: 'own', label: 'Mine' },
+            { key: 'own', label: 'Still mine' },
+          ],
+          signIn: signedIn,
+          isSignedIn: signedIn,
+        },
+        /credentials auth confirmations need labels and unique alphanumeric keys/,
+      ],
+      [
         'credentials without fields',
         { kind: 'credentials', fields: [], signIn: signedIn, isSignedIn: signedIn },
         /credentials auth needs fields/,
@@ -547,6 +572,14 @@ describe('ProviderRegistry lookups', () => {
     fake = createFakeProvider({ id: 'fake', name: 'Zebra Fake' });
     register(registry, fake);
     register(registry, fake2);
+  });
+
+  it("secretsOf returns the provider context's scoped secret vault (the one ctx.secrets is); unknown ids throw", async () => {
+    expect(registry.secretsOf('fake')).toBe(fake.ctx?.secrets);
+    await registry.secretsOf('fake').set('account.memberNumber', '1234567890123');
+    await expect(fake.ctx!.secrets.get('account.memberNumber')).resolves.toBe('1234567890123');
+    await expect(fake2.ctx!.secrets.get('account.memberNumber')).resolves.toBeUndefined();
+    expect(() => registry.secretsOf('nope')).toThrow(UnknownProviderError);
   });
 
   it('httpOf returns the HTTP client of the provider context; unknown ids throw', () => {
