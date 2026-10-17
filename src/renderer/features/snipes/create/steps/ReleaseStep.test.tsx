@@ -4,7 +4,8 @@
  * not, one line says the snipe alerts. Choosing "Alert me" hides what only a hold needs (the
  * account prompt, the hold's words), and choosing "Hold it for me" again shows it.
  */
-import { act, screen, within } from '@testing-library/react';
+import { act, screen, waitFor, within } from '@testing-library/react';
+import type { ProviderManifest } from '../../../../../shared/types/provider.types';
 import {
   ACCOUNT_REQUIRED_MANIFEST,
   ALERT_ONLY_MANIFEST,
@@ -118,5 +119,57 @@ describe('ReleaseStep: when the dates are free', () => {
       )
     ).toBeInTheDocument();
     expect(screen.queryByText(/holds the first site/)).toBeNull();
+  });
+
+  describe('while the provider’s holds are turning off (R17)', () => {
+    /** Holds behind an experiment that is on in this run (`applied`). */
+    const CARTED: ProviderManifest = {
+      ...ALERT_ONLY_MANIFEST,
+      capabilities: { ...ALERT_ONLY_MANIFEST.capabilities, holds: true },
+      experiments: [
+        {
+          id: 'autoHold',
+          label: 'Hold a stay automatically',
+          description: 'Places a hold for you.',
+          turnsOn: ['holds'],
+          applied: true,
+        },
+      ],
+    };
+    const states = (enabled: boolean) =>
+      jest.fn().mockResolvedValue(ok([{ id: 'autoHold', enabled, active: true }]));
+
+    it('offers no hold and alerts, as main would, until WA Stay restarts', async () => {
+      const mock = api(
+        { providers: { experiments: states(false) } },
+        [CARTED],
+        placeOf('alertstay')
+      );
+      const { user } = renderWithApp({ route: route('alertstay'), api: mock });
+      await toRelease(user);
+      expect(
+        await screen.findByText(
+          "When the dates are free, Site Sniper alerts you with a link to book on Alert Stay. Automatic holds aren't available for Alert Stay."
+        )
+      ).toBeInTheDocument();
+      expect(screen.queryByRole('radiogroup', { name: 'When the dates are free' })).toBeNull();
+      await user.click(button('Continue'));
+      await step(/Review$/);
+      await user.click(button('Create snipe'));
+      await waitFor(() => expect(mock.snipes.create).toHaveBeenCalledTimes(1));
+      expect(mock.snipes.create.mock.calls[0][0]).toMatchObject({ action: 'alert' });
+    });
+
+    it('offers both, holding by default, while the experiment is still chosen', async () => {
+      const mock = api(
+        { providers: { experiments: states(true) } },
+        [CARTED],
+        placeOf('alertstay')
+      );
+      const { user } = renderWithApp({ route: route('alertstay'), api: mock });
+      await toRelease(user);
+      const choice = await screen.findByRole('radiogroup', { name: 'When the dates are free' });
+      expect(within(choice).getByRole('radio', { name: 'Hold it for me' })).toBeChecked();
+    });
   });
 });

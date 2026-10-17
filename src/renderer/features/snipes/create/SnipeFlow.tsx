@@ -3,7 +3,6 @@ import { FormProvider, useForm, type Resolver } from 'react-hook-form';
 import { useNavigate } from 'react-router';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { toApiError, useCreateSnipe, useLocationDetail } from '../../../api';
-import { SnipeReleaseMode } from '../../../../shared/types/common.types';
 import type { ProviderManifest, UnitKind } from '../../../../shared/types/provider.types';
 import type { UnitNoun } from '../../../components/nightGridModel';
 import { providerToday } from '../../../components/stay/providerToday';
@@ -17,8 +16,6 @@ import { ROUTES } from '../../../app/routes';
 import { StepFlow, type FlowStep } from '../../../components/StepFlow';
 import { Notice, useToast } from '../../../components/ui';
 import { useNow } from '../../../hooks/useNow';
-import { releaseModeLabel } from '../shared/snipeFormat';
-import { whenInZone } from './releasePreview';
 import {
   emptySnipeForm,
   snipeFormSchema,
@@ -33,9 +30,9 @@ import { ProviderStep } from './steps/ProviderStep';
 import { ReleaseStep } from './steps/ReleaseStep';
 import { ReviewStep } from './steps/ReviewStep';
 import { StayStep } from './steps/StayStep';
-import { isComputedMode, useReleasePreview } from './useReleasePreview';
-import { useReleaseRefusal } from './useReleaseRefusal';
-import { zonedInstant } from './zonedTime';
+import { useReleasePreview } from './useReleasePreview';
+import { releaseSummaryFor, useReleaseRefusal } from './useReleaseRefusal';
+import { useSnipeHolds } from './useSnipeHolds';
 
 const STEPS: (FlowStep & { id: SnipeStepId })[] = [
   { id: 'provider', title: 'Provider' },
@@ -88,8 +85,9 @@ export function SnipeFlow({ manifests, initialValues, initialStep, notices = [] 
   });
   const { watch, setValue, getValues, trigger, getFieldState, setError, reset } = form;
   const values = watch();
-  const refusal = useReleaseRefusal(values);
+  const { refused, remember } = useReleaseRefusal(values);
   const manifest = manifestOf(values.providerId);
+  const placesHolds = useSnipeHolds(manifest, form);
   const today = providerToday(manifest, now);
   const detail = useLocationDetail(
     values.location ? `${values.providerId}:${values.location.externalId}` : null
@@ -158,7 +156,7 @@ export function SnipeFlow({ manifests, initialValues, initialStep, notices = [] 
         .map((path) => issueField(path, mode))
         .filter((n): n is SnipeFieldName => Boolean(n));
       if (apiError.code === 'VALIDATION' && apiError.issues?.includes('releaseAt'))
-        refusal.remember(getValues(), apiError.message);
+        remember(getValues(), apiError.message);
       if (apiError.code === 'VALIDATION' && fields.length > 0) {
         for (const name of fields) setError(name, { type: 'server', message: apiError.message });
         const failing = firstStepWithError();
@@ -174,18 +172,7 @@ export function SnipeFlow({ manifests, initialValues, initialStep, notices = [] 
     step === 'review' ? submit() : trigger(stepFields(step, manifest));
   const linkNotices = [...notices, ...placeNotices];
 
-  const scheduledAt =
-    values.releaseMode === SnipeReleaseMode.SCHEDULED && manifest
-      ? zonedInstant(values.releaseDate, values.releaseTime, manifest.timezone)
-      : undefined;
-  const modeLabel = releaseModeLabel(manifest, values.releaseMode);
-  const { refused } = refusal;
-  const releaseSummary =
-    scheduledAt && manifest
-      ? `${modeLabel}: ${whenInZone(scheduledAt, manifest.timezone)}`
-      : isComputedMode(values.releaseMode)
-        ? `${modeLabel}. ${refused ?? preview}`
-        : modeLabel;
+  const releaseSummary = releaseSummaryFor(manifest, values, refused ?? preview);
 
   return (
     <FormProvider {...form}>
@@ -224,6 +211,7 @@ export function SnipeFlow({ manifests, initialValues, initialStep, notices = [] 
               noun={noun}
               releaseInfo={detail.data?.releaseInfo}
               refusal={refused}
+              placesHolds={placesHolds}
               now={now}
             />
           )}

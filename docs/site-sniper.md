@@ -56,7 +56,8 @@ and dates). The flow has five steps:
    dates are free**: **Alert me** (a desktop alert and email with a link to book on the
    provider's site; nothing is held) or **Hold it for me** (a hold you pay for on the provider's
    page in WA Stay), where the provider places holds; ParkStay holds by default. For a provider
-   without holds one line says the snipe alerts. **Advanced timing**: Start early (seconds, default
+   without holds, or one whose holds are turning off (an experiment switched off, until WA Stay
+   restarts), one line says the snipe alerts. **Advanced timing**: Start early (seconds, default
    120), Check every (seconds, default 1.5; never under 0.5), Keep trying for (minutes, default
    15; a provider may set a limit for a release mode, `maxWindowMinutes`: the field says it, "Up
    to 30 minutes on {provider}", and refuses a longer window, and an older, longer one is cut to

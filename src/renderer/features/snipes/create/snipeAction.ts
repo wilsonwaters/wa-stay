@@ -4,9 +4,25 @@
  * a hold where the provider places holds (its default there, RS9), else an alert; and a release
  * mode's limit on the window (`maxWindowMinutes`). Pure.
  */
+import type { ProviderExperimentState } from '../../../../shared/contracts/providers';
 import type { ProviderManifest } from '../../../../shared/types/provider.types';
 import type { SnipeAction } from '../../../../shared/types/site-sniper.types';
 import type { UnitNoun } from '../../../../shared/utils/unit-noun';
+
+/**
+ * Whether the provider's holds are turning off: an experiment that turns them on is on in this
+ * run but no longer chosen, so main treats the provider as without holds until WA Stay restarts
+ * (`holdsOf`, R17): new snipes alert, and a hold is refused.
+ */
+export function holdsTurningOff(
+  manifest: ProviderManifest | undefined,
+  states: readonly ProviderExperimentState[] | undefined
+): boolean {
+  const holds = (manifest?.experiments ?? []).filter((e) => e.turnsOn.includes('holds'));
+  const state = (id: string) => states?.find((s) => s.id === id);
+  if (!holds.some((e) => state(e.id)?.active)) return false;
+  return !holds.some((e) => state(e.id)?.enabled);
+}
 
 /** What a new snipe does by default: hold where the provider places holds, else alert. */
 export function defaultSnipeAction(manifest: ProviderManifest | undefined): SnipeAction {

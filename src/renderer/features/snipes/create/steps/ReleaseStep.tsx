@@ -21,6 +21,8 @@ export interface ReleaseStepProps {
    * `VALIDATION` on `releaseAt`): shown in place of the preview's guess.
    */
   refusal?: string;
+  /** "Hold it for me" is offered: the provider places holds, and they are not turning off. */
+  placesHolds: boolean;
   now: Date;
 }
 
@@ -29,11 +31,12 @@ export interface ReleaseStepProps {
  * places holds (RS9), with the hold rule's message when a hold would have to choose between stay
  * types; one line saying it alerts where it does not.
  */
-function WhenFree({ manifest, noun }: { manifest: ProviderManifest; noun: UnitNoun }) {
+function WhenFree(props: { manifest: ProviderManifest; noun: UnitNoun; placesHolds: boolean }) {
+  const { manifest, noun, placesHolds } = props;
   const { watch, setValue, formState } = useFormContext<SnipeFormValues>();
   const action = watch('action');
   const provider = manifest.shortName;
-  if (manifest.capabilities.holds !== true) {
+  if (!placesHolds) {
     return (
       <p className="text-sm text-fg-secondary">
         When the dates are free, Site Sniper alerts you with a link to book on {provider}. Automatic
@@ -71,7 +74,8 @@ function WhenFree({ manifest, noun }: { manifest: ProviderManifest; noun: UnitNo
  * what happens when the dates are free (`WhenFree`), and the advanced timing, whose window is
  * checked again when a mode with a limit is chosen.
  */
-export function ReleaseStep({ manifest, noun, releaseInfo, refusal, now }: ReleaseStepProps) {
+export function ReleaseStep(props: ReleaseStepProps) {
+  const { manifest, noun, releaseInfo, refusal, placesHolds, now } = props;
   const { register, watch, setValue, formState, getFieldState, trigger } =
     useFormContext<SnipeFormValues>();
   // The date and time are checked together, on the date: a new time re-checks a date's error.
@@ -160,7 +164,7 @@ export function ReleaseStep({ manifest, noun, releaseInfo, refusal, now }: Relea
           </Field>
         </div>
       )}
-      <WhenFree manifest={manifest} noun={noun} />
+      <WhenFree manifest={manifest} noun={noun} placesHolds={placesHolds} />
       <AdvancedTiming manifest={manifest} />
     </>
   );
