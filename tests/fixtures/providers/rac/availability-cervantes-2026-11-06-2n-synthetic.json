@@ -1,0 +1,144 @@
+{
+  "_fixture": "Synthetic, written by hand for WA Stay's tests: an availability answer for RAC Cervantes Holiday Park (blog 5), 6-8 Nov 2026, 2 adults, in the shape of RAC's trimmed answers. The categories are the park's own (from its book-now page); every count, code and amount is made up, and there is no cart address. (Written 17 Oct 2026.)",
+  "success": "true",
+  "message": "",
+  "timezone": "Australia/West",
+  "api_key": "<redacted>",
+  "data": {
+    "1": {
+      "category_id": 1,
+      "category_type_id": "2",
+      "category_name": "Powered Firm Ground Site",
+      "sort": 1,
+      "sites_available": {
+        "2026-11-06": 20,
+        "2026-11-07": 22
+      },
+      "sites_code": {
+        "2026-11-06": 0,
+        "2026-11-07": 0
+      },
+      "sites_message": {
+        "2026-11-06": "",
+        "2026-11-07": ""
+      },
+      "stay_through_sites_available": 18,
+      "stay_through_sites_code": 0,
+      "stay_through_sites_message": "",
+      "online_booking_url": "https://parksandresorts.rac.com.au/cervantes/booking/?available_from=2026-11-06&available_to=2026-11-08&force_category_id=1&adults=2&children=0&infants=0&animals=0",
+      "tariffs_available": [
+        {
+          "tariff_label": "Standard Rate",
+          "tariff_success": "true",
+          "tariff_code": 0,
+          "tariff_message": "",
+          "tariff_total": 104,
+          "tariffs_quoted": {
+            "2026-11-06": {
+              "amount": 52,
+              "minimum_periods": "1",
+              "close_arrival": "0",
+              "close_departure": "0"
+            },
+            "2026-11-07": {
+              "amount": 52,
+              "minimum_periods": "1",
+              "close_arrival": "0",
+              "close_departure": "0"
+            }
+          }
+        }
+      ]
+    },
+    "3": {
+      "category_id": 3,
+      "category_type_id": "2",
+      "category_name": "Powered Tent Site",
+      "sort": 2,
+      "sites_available": {
+        "2026-11-06": 6,
+        "2026-11-07": 6
+      },
+      "sites_code": {
+        "2026-11-06": 0,
+        "2026-11-07": 0
+      },
+      "sites_message": {
+        "2026-11-06": "",
+        "2026-11-07": ""
+      },
+      "stay_through_sites_available": 6,
+      "stay_through_sites_code": 0,
+      "stay_through_sites_message": "",
+      "online_booking_url": "https://parksandresorts.rac.com.au/cervantes/booking/?available_from=2026-11-06&available_to=2026-11-08&force_category_id=3&adults=2&children=0&infants=0&animals=0",
+      "tariffs_available": [
+        {
+          "tariff_label": "Standard Rate",
+          "tariff_success": "false",
+          "tariff_code": 6,
+          "tariff_message": "This Rate has a 3 Night Minimum",
+          "tariff_total": 90,
+          "tariffs_quoted": {
+            "2026-11-06": {
+              "amount": 45,
+              "minimum_periods": "3",
+              "close_arrival": "0",
+              "close_departure": "0"
+            },
+            "2026-11-07": {
+              "amount": 45,
+              "minimum_periods": "3",
+              "close_arrival": "0",
+              "close_departure": "0"
+            }
+          }
+        }
+      ]
+    },
+    "20": {
+      "category_id": 20,
+      "category_type_id": "1",
+      "category_name": "Two Bedroom Villa",
+      "sort": 3,
+      "sites_available": {
+        "2026-11-06": 1,
+        "2026-11-07": 1
+      },
+      "sites_code": {
+        "2026-11-06": 0,
+        "2026-11-07": 0
+      },
+      "sites_message": {
+        "2026-11-06": "",
+        "2026-11-07": ""
+      },
+      "stay_through_sites_available": 1,
+      "stay_through_sites_code": 0,
+      "stay_through_sites_message": "",
+      "online_booking_url": "https://parksandresorts.rac.com.au/cervantes/booking/?available_from=2026-11-06&available_to=2026-11-08&force_category_id=20&adults=2&children=0&infants=0&animals=0",
+      "tariffs_available": [
+        {
+          "tariff_label": "Standard Rate",
+          "tariff_success": "true",
+          "tariff_code": 0,
+          "tariff_message": "",
+          "tariff_total": 420,
+          "tariffs_quoted": {
+            "2026-11-06": {
+              "amount": 210,
+              "minimum_periods": "1",
+              "close_arrival": "0",
+              "close_departure": "0"
+            },
+            "2026-11-07": {
+              "amount": 210,
+              "minimum_periods": "1",
+              "close_arrival": "0",
+              "close_departure": "0"
+            }
+          }
+        }
+      ]
+    }
+  }
+}

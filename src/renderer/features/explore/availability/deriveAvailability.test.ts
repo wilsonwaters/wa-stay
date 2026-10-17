@@ -426,6 +426,145 @@ describe('countedKinds and the noun it gives (R9)', () => {
   });
 });
 
+describe('free counts without a provider total (RS12)', () => {
+  /** An RAC park: sites and cabins, whose provider counts free units and gives no total. */
+  const RAC_PARK = {
+    bookingMode: 'online' as const,
+    kind: 'holiday-park' as const,
+    unitKinds: ['campsite', 'cabin'] as UnitKind[],
+  };
+  const noTotal = (patch: Partial<BulkAvailabilityEntry> = {}): BulkAvailabilityEntry => ({
+    key: 'rac:busselton',
+    availableUnits: 27,
+    byKind: { campsite: { availableUnits: 26 }, cabin: { availableUnits: 1 } },
+    ...patch,
+  });
+  const derive = (entry: BulkAvailabilityEntry, stayTypes: UnitKind[] = []) =>
+    deriveAvailability(RAC_PARK, {
+      staySet: true,
+      capabilities: BULK,
+      status: 'success',
+      entry,
+      stayTypes,
+    });
+  const label = (entry: BulkAvailabilityEntry, stayTypes: UnitKind[] = []) =>
+    availabilityLabel(derive(entry, stayTypes), countedKinds(RAC_PARK, stayTypes), 'RAC');
+
+  it('reads 27 free with no total as "27 free" on the pill and "27 spots free" on the card', () => {
+    expect(derive(noTotal())).toEqual({ state: 'available', availableUnits: 27 });
+    expect(label(noTotal())).toEqual({
+      pill: '27 free',
+      card: '27 spots free',
+      tone: 'available',
+    });
+    expect(label(noTotal())?.card).not.toMatch(/\bof\b/);
+  });
+
+  it('reads one free cabin with Cabins & villas chosen as "1 cabin free"', () => {
+    expect(derive(noTotal(), ['cabin'])).toEqual({ state: 'available', availableUnits: 1 });
+    expect(label(noTotal(), ['cabin'])).toEqual({
+      pill: '1 free',
+      card: '1 cabin free',
+      tone: 'available',
+    });
+    expect(label(noTotal(), ['campsite'])?.card).toBe('26 sites free');
+  });
+
+  it('reads none free with no total as "None free", and a total of 0 as "Not open"', () => {
+    const full = noTotal({ availableUnits: 0, byKind: undefined });
+    expect(derive(full)).toEqual({ state: 'full' });
+    expect(label(full)).toEqual({
+      pill: 'None free',
+      card: 'No spot free every night',
+      tone: 'neutral',
+    });
+    const closed = noTotal({ availableUnits: 0, bookableUnits: 0, byKind: undefined });
+    expect(derive(closed)).toEqual({ state: 'none-open' });
+    expect(label(closed)).toEqual({
+      pill: 'Not open',
+      card: 'No spots open for these dates',
+      tone: 'neutral',
+    });
+    // A null total is left out too, never 0
+    expect(
+      derive(
+        noTotal({ availableUnits: 0, bookableUnits: null as unknown as number, byKind: undefined })
+      )
+    ).toEqual({ state: 'full' });
+  });
+
+  it('keeps "Not open" for a chosen kind whose total is 0, and "None free" for one with none', () => {
+    const counts = noTotal({
+      byKind: { campsite: { availableUnits: 0 }, cabin: { availableUnits: 0, bookableUnits: 0 } },
+    });
+    expect(derive(counts, ['cabin'])).toEqual({ state: 'none-open' });
+    expect(label(counts, ['cabin'])?.card).toBe('No cabins open for these dates');
+    expect(derive(counts, ['campsite'])).toEqual({ state: 'full' });
+    expect(label(counts, ['campsite'])?.card).toBe('No site free every night');
+  });
+
+  it('sums kinds with no total when any kind summed has none', () => {
+    const park = { ...RAC_PARK, unitKinds: ['campsite', 'cabin', 'glamping'] as UnitKind[] };
+    const counts = noTotal({
+      byKind: {
+        campsite: { availableUnits: 3 },
+        cabin: { availableUnits: 2, bookableUnits: 10 },
+        glamping: { availableUnits: 1, bookableUnits: 4 },
+      },
+    });
+    const derived = (stayTypes: UnitKind[]) =>
+      deriveAvailability(park, {
+        staySet: true,
+        capabilities: BULK,
+        status: 'success',
+        entry: counts,
+        stayTypes,
+      });
+    // One kind without a total: the sum has none
+    expect(derived(['campsite', 'cabin'])).toEqual({ state: 'available', availableUnits: 5 });
+    expect(
+      availabilityLabel(derived(['campsite', 'cabin']), ['campsite', 'cabin'], 'RAC')?.card
+    ).toBe('5 spots free');
+    // Every kind summed has one: the sum has one
+    expect(derived(['cabin', 'glamping'])).toEqual({
+      state: 'available',
+      availableUnits: 3,
+      bookableUnits: 14,
+    });
+  });
+
+  it('keeps ParkStay\'s "N of M" with a total', () => {
+    expect(
+      availabilityLabel(
+        { state: 'available', availableUnits: 8, bookableUnits: 24 },
+        ['campsite'],
+        'ParkStay'
+      )
+    ).toEqual({
+      pill: '8 available',
+      card: '8 of 24 sites available',
+      tone: 'available',
+      statesTotal: true,
+    });
+  });
+
+  it('sorts places without a total among the available by their free count', () => {
+    const places = [
+      {
+        name: 'ParkStay 3',
+        availability: { state: 'available', availableUnits: 3, bookableUnits: 9 },
+      },
+      { name: 'RAC 27', availability: derive(noTotal()) },
+      { name: 'RAC none', availability: derive(noTotal({ availableUnits: 0, byKind: undefined })) },
+    ] as const;
+    expect(sortByAvailability(places, (place) => place.availability).map((p) => p.name)).toEqual([
+      'RAC 27',
+      'ParkStay 3',
+      'RAC none',
+    ]);
+  });
+});
+
 describe('sortByAvailability', () => {
   const place = (name: string, availability: PlaceAvailability) => ({ name, availability });
   const sort = (items: ReturnType<typeof place>[]) =>

@@ -386,9 +386,10 @@ export interface LocationAvailability {
 
 /**
  * One place's availability for a stay, from a provider's bulk `availability.search`: counts of
- * units, not nights. Explore shows "2 of 5 sites available" (`availableUnits` above 0), "No site
- * free every night" (none free, some bookable) or "No sites open for these dates" (none
- * bookable). A place the provider has no answer for gets no entry, and reads as unknown.
+ * units, not nights. Explore shows "2 of 5 sites available" (`availableUnits` above 0), "27
+ * spots free" (above 0, with no total), "No site free every night" (none free, some bookable)
+ * or "No sites open for these dates" (none bookable). A place the provider has no answer for
+ * gets no entry, and reads as unknown.
  */
 export interface BulkAvailabilityEntry {
   /** The place's location key, `makeLocationKey(providerId, externalId)`. */
@@ -400,15 +401,18 @@ export interface BulkAvailabilityEntry {
   availableUnits: number;
   /**
    * How many units can be booked online for the stay's dates at all, free or not: the place's
-   * total, or 0 when none can be (not released yet, closed, or past the booking window).
+   * total, or 0 when none can be (not released yet, closed, or past the booking window). Left
+   * out when the provider has no unit total (RAC counts free units only); 0 still means none
+   * can be booked.
    */
-  bookableUnits: number;
+  bookableUnits?: number;
   /**
    * The same two counts for each kind of unit the place has, so a filter on what people sleep
    * in can count only those units. Set it at a place with more than one kind; a kind left out
-   * has no count. Passed through as the provider gives it.
+   * has no count. Its `bookableUnits` is left out, as above, when the provider has no total.
+   * Passed through as the provider gives it.
    */
-  byKind?: Partial<Record<UnitKind, { availableUnits: number; bookableUnits: number }>>;
+  byKind?: Partial<Record<UnitKind, { availableUnits: number; bookableUnits?: number }>>;
 }
 
 /** The state of a provider's waiting room or queue. */

@@ -125,7 +125,8 @@ export const BROWSE_ONLY_MANIFEST: ProviderManifest = {
 
 /**
  * RAC Parks & Resorts as main registers it (tests/unit/renderer/mock-manifests.test.ts pins it
- * to the real manifest): watches with no holds, the pets stay field, and its terms' limits.
+ * to the real manifest): free counts on Explore, watches with no holds, the pets stay field, and
+ * its terms' limits.
  */
 export const RAC_MANIFEST: ProviderManifest = {
   id: 'rac',
@@ -142,7 +143,7 @@ export const RAC_MANIFEST: ProviderManifest = {
     catalog: true,
     catalogMode: 'full',
     availability: true,
-    bulkAvailability: false,
+    bulkAvailability: true,
     watches: true,
     snipes: false,
     holds: false,
@@ -167,5 +168,13 @@ export const RAC_MANIFEST: ProviderManifest = {
       default: 0,
       appliesTo: ['availability', 'watch', 'snipe'],
     },
+  ],
+  bulkAvailabilityStayFields: [
+    'arrival',
+    'departure',
+    'adults',
+    'children',
+    'infants',
+    'params.pets',
   ],
 };

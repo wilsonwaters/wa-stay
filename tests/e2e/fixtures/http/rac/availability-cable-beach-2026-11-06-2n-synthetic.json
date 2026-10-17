@@ -1,0 +1,144 @@
+{
+  "_fixture": "Synthetic, written by hand for WA Stay's tests: an availability answer for RAC Cable Beach Holiday Park (blog 9), 6-8 Nov 2026, 2 adults, in the shape of RAC's trimmed answers. The categories are the park's own (from its book-now page); every count, code and amount is made up, and there is no cart address. (Written 17 Oct 2026.)",
+  "success": "true",
+  "message": "",
+  "timezone": "Australia/West",
+  "api_key": "<redacted>",
+  "data": {
+    "2": {
+      "category_id": 2,
+      "category_type_id": "4",
+      "category_name": "Powered Caravan Site",
+      "sort": 1,
+      "sites_available": {
+        "2026-11-06": 12,
+        "2026-11-07": 14
+      },
+      "sites_code": {
+        "2026-11-06": 0,
+        "2026-11-07": 0
+      },
+      "sites_message": {
+        "2026-11-06": "",
+        "2026-11-07": ""
+      },
+      "stay_through_sites_available": 11,
+      "stay_through_sites_code": 0,
+      "stay_through_sites_message": "",
+      "online_booking_url": "https://parksandresorts.rac.com.au/cable-beach/booking/?available_from=2026-11-06&available_to=2026-11-08&force_category_id=2&adults=2&children=0&infants=0&animals=0",
+      "tariffs_available": [
+        {
+          "tariff_label": "Standard Rate",
+          "tariff_success": "true",
+          "tariff_code": 0,
+          "tariff_message": "",
+          "tariff_total": 136,
+          "tariffs_quoted": {
+            "2026-11-06": {
+              "amount": 68,
+              "minimum_periods": "1",
+              "close_arrival": "0",
+              "close_departure": "0"
+            },
+            "2026-11-07": {
+              "amount": 68,
+              "minimum_periods": "1",
+              "close_arrival": "0",
+              "close_departure": "0"
+            }
+          }
+        }
+      ]
+    },
+    "19": {
+      "category_id": 19,
+      "category_type_id": "2",
+      "category_name": "Studio Room",
+      "sort": 3,
+      "sites_available": {
+        "2026-11-06": 0,
+        "2026-11-07": 0
+      },
+      "sites_code": {
+        "2026-11-06": 3,
+        "2026-11-07": 3
+      },
+      "sites_message": {
+        "2026-11-06": "There is no availability for this date",
+        "2026-11-07": "There is no availability for this date"
+      },
+      "stay_through_sites_available": 0,
+      "stay_through_sites_code": 3,
+      "stay_through_sites_message": "There is no longer availability for the dates given (<strong>6 Nov 2026 14:00</strong> to <strong>8 Nov 2026 10:00</strong>)",
+      "online_booking_url": "https://parksandresorts.rac.com.au/cable-beach/booking/?available_from=2026-11-06&available_to=2026-11-08&force_category_id=19&adults=2&children=0&infants=0&animals=0",
+      "tariffs_available": [
+        {
+          "tariff_label": "Standard Rate",
+          "tariff_success": "true",
+          "tariff_code": 0,
+          "tariff_message": "",
+          "tariff_total": 378,
+          "tariffs_quoted": {
+            "2026-11-06": {
+              "amount": 189,
+              "minimum_periods": "1",
+              "close_arrival": "0",
+              "close_departure": "0"
+            },
+            "2026-11-07": {
+              "amount": 189,
+              "minimum_periods": "1",
+              "close_arrival": "0",
+              "close_departure": "0"
+            }
+          }
+        }
+      ]
+    },
+    "21": {
+      "category_id": 21,
+      "category_type_id": "2",
+      "category_name": "Two Bedroom Garden Cabin (Sleeps 4)",
+      "sort": 2,
+      "sites_available": {
+        "2026-11-06": 3,
+        "2026-11-07": 2
+      },
+      "sites_code": {
+        "2026-11-06": 0,
+        "2026-11-07": 0
+      },
+      "sites_message": {
+        "2026-11-06": "",
+        "2026-11-07": ""
+      },
+      "stay_through_sites_available": 2,
+      "stay_through_sites_code": 0,
+      "stay_through_sites_message": "",
+      "online_booking_url": "https://parksandresorts.rac.com.au/cable-beach/booking/?available_from=2026-11-06&available_to=2026-11-08&force_category_id=21&adults=2&children=0&infants=0&animals=0",
+      "tariffs_available": [
+        {
+          "tariff_label": "Standard Rate",
+          "tariff_success": "true",
+          "tariff_code": 0,
+          "tariff_message": "",
+          "tariff_total": 490,
+          "tariffs_quoted": {
+            "2026-11-06": {
+              "amount": 245,
+              "minimum_periods": "1",
+              "close_arrival": "0",
+              "close_departure": "0"
+            },
+            "2026-11-07": {
+              "amount": 245,
+              "minimum_periods": "1",
+              "close_arrival": "0",
+              "close_departure": "0"
+            }
+          }
+        }
+      ]
+    }
+  }
+}

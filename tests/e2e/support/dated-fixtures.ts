@@ -3,12 +3,14 @@
  * moved to a journey's own stay, so a journey that checks availability never goes stale as the
  * recorded dates pass.
  *
- * Every RAC route that answers an availability POST (`form.available_from`, RAC's `D MMM YYYY`)
- * is moved so its stay arrives `arrivalInDays` days after today in Perth: its answer's dates
- * (the night keys, the dates in `online_booking_url`, and the dates in RAC's messages, as
- * `YYYY-MM-DD` or `D MMM YYYY`) and the route's own `available_from` shift by the same number of
- * days. Every other file is copied as it is. The launch then passes the copy as
- * `env: { WA_STAY_E2E_FIXTURES_DIR: fixtures.dir }` (`support/wa-stay.ts`).
+ * Every RAC route that answers an availability POST is moved so its stay arrives `arrivalInDays`
+ * days after today in Perth: its answer's dates (the night keys, the dates in
+ * `online_booking_url`, and the dates in RAC's messages, as `YYYY-MM-DD` or `D MMM YYYY`) shift
+ * by the same number of days, from the arrival it was recorded for: the route's own
+ * `form.available_from` (RAC's `D MMM YYYY`), which moves too, or, for a route that matches any
+ * dates (`blog_id` only), the answer's first night. Every other file is copied as it is. The
+ * launch then passes the copy as `env: { WA_STAY_E2E_FIXTURES_DIR: fixtures.dir }`
+ * (`support/wa-stay.ts`).
  *
  *   const fixtures = writeDatedFixtures(tempDir('dated'));
  *   const wa = await launchWaStay({ env: { WA_STAY_E2E_FIXTURES_DIR: fixtures.dir }, … });
@@ -36,6 +38,11 @@ function fromRacDate(text: string): string | undefined {
   const month = match ? MONTHS.indexOf(match[2]) + 1 : 0;
   if (!match || month === 0) return undefined;
   return `${match[3]}-${String(month).padStart(2, '0')}-${match[1].padStart(2, '0')}`;
+}
+
+/** An availability answer's first night: its earliest night key (`"2026-11-06": …`). */
+function firstNight(text: string): string | undefined {
+  return [...text.matchAll(/"(\d{4}-\d{2}-\d{2})"\s*:/g)].map((match) => match[1]).sort()[0];
 }
 
 /** `text` with every date in it (`YYYY-MM-DD` or `D MMM YYYY`) moved by `days`. */
@@ -77,14 +84,17 @@ export function writeDatedFixtures(
   const manifest = JSON.parse(fs.readFileSync(manifestFile, 'utf8')) as { routes: Route[] };
   const moved = new Set<string>();
   for (const route of manifest.routes) {
-    const recorded = route.method === 'POST' && fromRacDate(route.form?.available_from ?? '');
-    if (!recorded || !route.form) continue;
-    const days = nightsBetween(recorded, arrival);
-    route.form.available_from = toRacDate(arrival);
+    if (route.method !== 'POST' || !route.form?.blog_id) continue;
+    const file = path.join(racDir, route.file);
+    const text = fs.readFileSync(file, 'utf8');
+    const recorded = route.form.available_from
+      ? fromRacDate(route.form.available_from)
+      : firstNight(text);
+    if (!recorded) continue;
+    if (route.form.available_from) route.form.available_from = toRacDate(arrival);
     if (moved.has(route.file)) continue;
     moved.add(route.file);
-    const file = path.join(racDir, route.file);
-    fs.writeFileSync(file, shiftDates(fs.readFileSync(file, 'utf8'), days));
+    fs.writeFileSync(file, shiftDates(text, nightsBetween(recorded, arrival)));
   }
   fs.writeFileSync(manifestFile, `${JSON.stringify(manifest, null, 2)}\n`);
   return { dir, arrival };

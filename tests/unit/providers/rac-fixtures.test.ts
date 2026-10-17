@@ -9,7 +9,9 @@
  *   deposits, fees or membership copy in an availability answer, `<redacted>` for every
  *   `api_key`, `rest_api_data_id` and `online_cart_url`, and no email address, phone number,
  *   IP address, Cloudflare cookie or `cf-ray` value, or script. Each availability answer says
- *   where it was trimmed from and when (`_fixture`).
+ *   where it was trimmed from and when (`_fixture`), or, for the synthetic ones Explore's free
+ *   counts use for parks with no recorded answer (`…-synthetic.json`), that it was written by
+ *   hand and that every count is made up.
  * - **Rule 1, the source.** Every URL in `src/main/providers/rac/` is on RAC's host; NewBook's
  *   image host is named only where photos are checked; and nothing names a cart address
  *   (`online_cart_url`, `/booking/?cart`).
@@ -45,6 +47,16 @@ const DROPPED_KEYS = [
 /** A notice's text is a booking rule, kept as a fact; every other description is RAC's copy. */
 const KEPT_DESCRIPTION_CLASS = 'booking-notification__description';
 const RAC_HOST = 'parksandresorts.rac.com.au';
+/** The parks with no recorded answer for 6–8 Nov 2026, whose answers are made up. */
+const SYNTHETIC_PARKS = [
+  'cable-beach',
+  'cervantes',
+  'esperance',
+  'margaret-river',
+  'exmouth',
+  'karri-valley',
+  'monkey-mia',
+];
 
 function filesIn(dir: string): string[] {
   const absolute = path.join(ROOT, dir);
@@ -171,6 +183,10 @@ describe('RAC fixtures (terms rule 7)', () => {
         'tests/e2e/fixtures/http/rac/book-now-busselton.html',
         'tests/e2e/fixtures/http/rac/book-now-margaret-river.html',
         'tests/e2e/fixtures/http/rac/availability-busselton-2026-11-06-2n.json',
+        ...SYNTHETIC_PARKS.flatMap((slug) => [
+          `tests/fixtures/providers/rac/availability-${slug}-2026-11-06-2n-synthetic.json`,
+          `tests/e2e/fixtures/http/rac/availability-${slug}-2026-11-06-2n-synthetic.json`,
+        ]),
       ])
     );
   });
@@ -179,7 +195,7 @@ describe('RAC fixtures (terms rule 7)', () => {
     expect(fixtureViolations(read(file))).toEqual([]);
   });
 
-  it('labels the recorded pages with their page and date, and the block pages as synthetic', () => {
+  it('labels the recorded pages with their page and date, and the block pages and made-up answers as synthetic', () => {
     for (const file of files.filter((f) => /book-now-[a-z-]+\.html$/.test(f))) {
       expect(read(file)).toMatch(
         /^<!-- Trimmed from https:\/\/parksandresorts\.rac\.com\.au\/[a-z-]+\/book-now\/ \(fetched \d{1,2} \w{3} \d{4}/
@@ -194,9 +210,13 @@ describe('RAC fixtures (terms rule 7)', () => {
       const note = (JSON.parse(read(file)) as { _fixture?: string })._fixture;
       expect([file, note]).toEqual([
         file,
-        expect.stringMatching(
-          /^Trimmed from RAC Parks & Resorts' availability answer for .+ \(blog \d+\), .+, fetched anonymously; .+\(Fetched \d{1,2} \w{3} \d{4}, \d{2}:\d{2} Perth\.\)$/
-        ),
+        file.endsWith('-synthetic.json')
+          ? expect.stringMatching(
+              /^Synthetic, written by hand for WA Stay's tests: an availability answer for .+ \(blog \d+\), .+; every count, code and amount is made up, and there is no cart address\. \(Written \d{1,2} \w{3} \d{4}\.\)$/
+            )
+          : expect.stringMatching(
+              /^Trimmed from RAC Parks & Resorts' availability answer for .+ \(blog \d+\), .+, fetched anonymously; .+\(Fetched \d{1,2} \w{3} \d{4}, \d{2}:\d{2} Perth\.\)$/
+            ),
       ]);
     }
   });

@@ -28,7 +28,8 @@
  *   priority (`withRequestPriority`: the person is waiting); syncs and searches stay
  *   background. A paced provider's deadline grows with the requests a call may wait for
  *   (`pacedDeadlineMs`): 2 for a detail or a check (its own and one in flight ahead of it),
- *   one per stored place for bulk availability and for a sync.
+ *   one per stored place for bulk availability and for a sync. A paced provider's bulk search
+ *   sends its requests one after another, so a check waits for one of them, not the search.
  *
  * - **Search-mode catalogues** (`catalogMode: 'search'`, §12.30) cannot list every location,
  *   so they are never synced. A `search` with a map area (`bbox`) asks each of them in scope
