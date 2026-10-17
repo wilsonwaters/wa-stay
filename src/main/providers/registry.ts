@@ -7,8 +7,8 @@
  * 2. the factory's manifest: `ProviderManifestSchema`, then the manifest-flag rules
  *    (`MANIFEST_RULES`), e.g. `snipes` needs `availability` and release modes (§12.35);
  * 3. the context, built from the parsed manifest when `context` is a function;
- * 4. the provider the factory builds: links, a valid `auth` definition, and a module behind
- *    every capability (`CONSISTENCY_RULES`).
+ * 4. the provider the factory builds: links, a valid `auth` definition, a module behind every
+ *    capability, and the hold release hooks with their flag (`CONSISTENCY_RULES`).
  *
  * A core service that checked a capability (or used `require`) can therefore rely on the
  * module being there. The registry hands out a frozen plain provider object carrying the
@@ -224,6 +224,29 @@ export const CONSISTENCY_RULES: readonly ConsistencyRule[] = [
     violation: (p) =>
       p.manifest.capabilities.holds && !(fn(p.holds?.create) && fn(p.holds?.paymentUrl))
         ? 'capability holds needs holds.create and holds.paymentUrl'
+        : undefined,
+  },
+  {
+    // The hold panel's "Let it go" needs a way to let go. With holds off (an experiment that is
+    // not on) the flag may stand alone: no hold is placed, so none is offered.
+    rule: 'holdRelease',
+    violation: (p) =>
+      p.manifest.holdRelease && p.manifest.capabilities.holds && !fn(p.holds?.release)
+        ? 'manifest holdRelease needs holds.release'
+        : undefined,
+  },
+  {
+    rule: 'holds.release',
+    violation: (p) =>
+      fn(p.holds?.release) && !p.manifest.holdRelease
+        ? 'holds.release needs manifest holdRelease'
+        : undefined,
+  },
+  {
+    rule: 'holds.releaseOnPaymentClose',
+    violation: (p) =>
+      p.holds?.releaseOnPaymentClose && !fn(p.holds.release)
+        ? 'holds.releaseOnPaymentClose needs holds.release'
         : undefined,
   },
   {

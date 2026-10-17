@@ -113,7 +113,10 @@ export function autoHoldLabel(
   const unit = unitNameOf(watch, watch.hold?.unitId, noun);
   if (state === 'held')
     return holdUntil ? `On: ${unit} held until ${holdUntil}` : `On: ${unit} held`;
-  if (state === 'hold-expired') return `On: the hold on ${unit} expired`;
+  // A hold that was let go has its message (`lastError`): it ended, not expired
+  if (state === 'hold-expired') {
+    return `On: the hold on ${unit} ${watch.lastError ? 'ended' : 'expired'}`;
+  }
   if (state === 'booked') return `On: ${unit} held, then booked`;
   return watch.autoHold ? `On: hold a ${noun.one} when found` : 'Off';
 }

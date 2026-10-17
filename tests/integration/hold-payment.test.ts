@@ -478,6 +478,27 @@ describe('hold payment over IPC', () => {
     });
   });
 
+  it("closing ParkStay's payment window changes nothing (R18): it cannot let a hold go, so the hold stays held and payable", async () => {
+    const { holds, manifest } = container.providers.get('parkstay');
+    expect(manifest.holdRelease).toBeUndefined();
+    expect(holds?.release).toBeUndefined();
+    expect(holds?.releaseOnPaymentClose).toBeUndefined();
+    const snipe = heldSnipe();
+    const watch = heldWatch();
+
+    await pay('snipes:open-payment', snipe.id);
+    lastWindow().close();
+    await pay('watches:open-payment', watch.id);
+    lastWindow().close();
+    for (let turn = 0; turn < 5; turn++) await settle();
+
+    expect(snipes().findById(snipe.id)).toEqual(snipe);
+    expect(watches().findById(watch.id)).toEqual(watch);
+    expect(sentNames()).not.toContain('snipe:updated');
+    expect(sentNames()).not.toContain('watch:updated');
+    await expect(pay('snipes:open-payment', snipe.id)).resolves.toMatchObject({ success: true });
+  });
+
   describe('watches.openPayment', () => {
     it('opens the same partitioned /booking/ window for a watch hold', async () => {
       const watch = heldWatch();

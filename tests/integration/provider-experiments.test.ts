@@ -6,7 +6,8 @@
  *
  * - a round trip of both methods and the stored row; `active` changes only with a restart;
  * - turning off is `ACCOUNT_BUSY` while a hold needs the provider (a HELD snipe, an unexpired
- *   watch hold), and once off, no new hold is placed before the restart;
+ *   watch hold, a hold being placed), and so is a sign-out while a hold is being placed; once
+ *   off, no new hold is placed before the restart;
  * - `UNKNOWN_PROVIDER`, `NOT_FOUND`, `VALIDATION`;
  * - the provider's own `ctx.state` (the real `provider_state` store) cannot reach the row;
  * - fixture mode applies the stored choice too, so e2e can seed it before launch.
@@ -312,6 +313,33 @@ describe('provider experiments over IPC', () => {
       expect((await running).hold).toEqual(expect.objectContaining({ reference: 'EXPSTAY-1' }));
       expect(await setCart(false)).toMatchObject({ success: false, code: 'ACCOUNT_BUSY' });
       expect(row()).toBe('{"autoCart":true}');
+    });
+
+    it('sign-out is ACCOUNT_BUSY while a watch auto-hold is being placed (the same isBusy)', async () => {
+      await start({ holdDelayMs: 200 });
+      const watch = await container!.watchService.create(userId, {
+        providerId: 'expstay',
+        name: 'Banksia watch',
+        location: { externalId: '1', name: 'Banksia Camp' },
+        stay: { arrival: '2026-12-01', departure: '2026-12-04', adults: 2 },
+        checkIntervalMinutes: 60,
+        autoHold: true,
+      });
+      const running = container!.watchService.execute(watch.id);
+      await holdStarted();
+
+      // Nothing is held yet, but `holds.create` is running on the provider's session
+      expect(container!.repositories.watches.countUnexpiredHolds('expstay', new Date())).toBe(0);
+      expect(await call('accounts:sign-out', { providerId: 'expstay' })).toMatchObject({
+        success: false,
+        code: 'ACCOUNT_BUSY',
+      });
+
+      expect((await running).hold).toEqual(expect.objectContaining({ reference: 'EXPSTAY-1' }));
+      expect(await call('accounts:sign-out', { providerId: 'expstay' })).toMatchObject({
+        success: false,
+        code: 'ACCOUNT_BUSY',
+      });
     });
 
     it('turning off is ACCOUNT_BUSY while a manual run of an armed snipe is placing its hold', async () => {

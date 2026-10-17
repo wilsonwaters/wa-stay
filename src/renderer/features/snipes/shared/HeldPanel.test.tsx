@@ -2,14 +2,26 @@ import { act, screen, waitFor } from '@testing-library/react';
 import { makeHeldSnipe } from '@tests/fixtures/renderer/snipes';
 import { createMockApi, fail, ok, PARKSTAY_MANIFEST } from '@tests/utils/renderer/createMockApi';
 import { renderWithProviders } from '@tests/utils/renderer/renderWithProviders';
+import type { ProviderManifest } from '../../../../shared/types/provider.types';
 import type { SiteSnipe } from '../../../../shared/types/site-sniper.types';
 import { HeldPanel } from './HeldPanel';
 import { useSnipeActions } from './useSnipeActions';
 
-function Held({ snipe }: { snipe: SiteSnipe }) {
-  const actions = useSnipeActions(snipe, PARKSTAY_MANIFEST);
-  return <HeldPanel snipe={snipe} manifest={PARKSTAY_MANIFEST} actions={actions} />;
+function Held({
+  snipe,
+  manifest = PARKSTAY_MANIFEST,
+  variant,
+}: {
+  snipe: SiteSnipe;
+  manifest?: ProviderManifest;
+  variant?: 'page' | 'card';
+}) {
+  const actions = useSnipeActions(snipe, manifest);
+  return <HeldPanel snipe={snipe} manifest={manifest} actions={actions} variant={variant} />;
 }
+
+/** A provider whose holds can be let go (`holdRelease`, R18). */
+const RELEASING: ProviderManifest = { ...PARKSTAY_MANIFEST, holdRelease: true };
 
 describe('HeldPanel', () => {
   afterEach(() => jest.useRealTimers());
@@ -81,6 +93,27 @@ describe('HeldPanel', () => {
     await user.click(screen.getByRole('button', { name: 'Pay now' }));
     expect(
       await screen.findByText("The payment page couldn't be opened. ParkStay did not answer")
+    ).toBeInTheDocument();
+  });
+
+  it('offers "Let it go" on the page for a provider that can let a hold go, never in a card, never for ParkStay', () => {
+    const snipe = makeHeldSnipe(23);
+    const { unmount } = renderWithProviders(<Held snipe={snipe} manifest={RELEASING} />);
+    expect(screen.getByRole('button', { name: 'Let it go' })).toBeInTheDocument();
+    unmount();
+    const card = renderWithProviders(<Held snipe={snipe} manifest={RELEASING} variant="card" />);
+    expect(screen.queryByRole('button', { name: 'Let it go' })).toBeNull();
+    expect(screen.getByRole('button', { name: 'Pay now' })).toBeInTheDocument();
+    card.unmount();
+    renderWithProviders(<Held snipe={snipe} />);
+    expect(screen.queryByRole('button', { name: 'Let it go' })).toBeNull();
+  });
+
+  it('an estimated expiry reads "about"', () => {
+    renderWithProviders(<Held snipe={makeHeldSnipe(23, { holdExpiresEstimated: true })} />);
+    expect(screen.getByText(/^Held until about /)).toBeInTheDocument();
+    expect(
+      screen.getByRole('timer', { name: /^About 2[23] minutes left to pay$/ })
     ).toBeInTheDocument();
   });
 });

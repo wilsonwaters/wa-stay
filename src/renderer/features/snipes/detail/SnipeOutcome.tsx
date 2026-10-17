@@ -22,8 +22,9 @@ export interface SnipeOutcomeProps {
 }
 
 /**
- * What a snipe has come to, under its page's header: the hold to pay for, the alert sent (what
- * was free and "Book on {shortName}"), the booking, or why it stopped; and, while a snipe that
+ * What a snipe has come to, under its page's header: the hold to pay for (or, let go here, how it
+ * ended), the alert sent (what was free and "Book on {shortName}"), the booking, or why it
+ * stopped; and, while a snipe that
  * holds runs, the provider's account (a hint where it is optional, §12.32). An alert needs no
  * account.
  */
@@ -32,7 +33,8 @@ export function SnipeOutcome({ snipe, manifest, actions, units, today, now }: Sn
   const terminal = timelineSteps(snipe).find((step) => step.terminal);
   return (
     <>
-      {snipe.status === SnipeStatus.HELD && (
+      {/* Let go here (R18): the hold panel stays, saying how the hold ended */}
+      {(snipe.status === SnipeStatus.HELD || actions.letGo) && (
         <HeldPanel snipe={snipe} manifest={manifest} actions={actions} place={units} />
       )}
       {snipe.status === SnipeStatus.ALERTED && (
@@ -53,7 +55,7 @@ export function SnipeOutcome({ snipe, manifest, actions, units, today, now }: Sn
           </Link>
         </Notice>
       )}
-      {terminal && (
+      {terminal && !actions.letGo && (
         <Notice
           tone={snipe.status === SnipeStatus.FAILED ? 'danger' : 'info'}
           title={terminal.label}

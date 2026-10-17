@@ -6,6 +6,7 @@
  */
 
 import { BUILT_IN_PROVIDERS, registerBuiltInProviders } from '@main/providers';
+import { withExperiments } from '@main/providers/experiments';
 import { parkstayFactory } from '@main/providers/parkstay';
 import {
   CONSISTENCY_RULES,
@@ -386,6 +387,24 @@ describe('ProviderRegistry.register', () => {
         /capability holds needs holds\.create and holds\.paymentUrl/,
       ],
       [
+        'holdRelease',
+        { holdRelease: {} },
+        (p) => delete p.holds!.release,
+        /manifest holdRelease needs holds\.release/,
+      ],
+      [
+        'holds.release',
+        { holdRelease: {} },
+        (p) => delete p.manifest.holdRelease,
+        /holds\.release needs manifest holdRelease/,
+      ],
+      [
+        'holds.releaseOnPaymentClose',
+        {},
+        (p) => ((p.holds as { releaseOnPaymentClose?: boolean }).releaseOnPaymentClose = true),
+        /holds\.releaseOnPaymentClose needs holds\.release/,
+      ],
+      [
         'holds payment origins',
         {},
         (p) => ((p.holds as { paymentOrigins?: string[] }).paymentOrigins = ['https://*.au']),
@@ -442,6 +461,58 @@ describe('ProviderRegistry.register', () => {
         throw new Error('boom');
       };
       expectRegistrationError(fake, /rejects release mode daily_rollover, scheduled, cancellation/);
+    });
+
+    describe('hold release hooks (R18)', () => {
+      it('holdRelease with holds.release, and releaseOnPaymentClose, register', () => {
+        const fake = createFakeProvider({ holdRelease: { onPaymentClose: true } });
+        const registered = register(new ProviderRegistry(), fake);
+        expect(registered.manifest.holdRelease).toBe(true);
+        expect(registered.holds?.release).toBe(fake.holds!.release);
+        expect(registered.holds?.releaseOnPaymentClose).toBe(true);
+      });
+
+      it('with holds off, holdRelease alone is fine (an experiment that turns holds on, off)', () => {
+        const alone = createFakeProvider({
+          capabilities: { holds: false, snipes: false },
+          holdRelease: {},
+        });
+        expect(alone.holds).toBeUndefined();
+        expect(register(new ProviderRegistry(), alone).manifest.holdRelease).toBe(true);
+
+        const experiment = {
+          id: 'autoCart',
+          label: 'Hold in the cart',
+          description: 'Holds a stay in the cart.',
+          turnsOn: ['holds' as const],
+        };
+        const off = createFakeProvider({ experiments: [experiment], holdRelease: {} });
+        const registeredOff = register(new ProviderRegistry(), off);
+        expect(registeredOff.manifest.capabilities.holds).toBe(false);
+        expect(registeredOff.holds).toBeUndefined();
+
+        const on = createFakeProvider({ experiments: [experiment], holdRelease: {} });
+        const registeredOn = new ProviderRegistry().register(
+          withExperiments(on.factory, ['autoCart']),
+          createTestProviderContext
+        );
+        expect(registeredOn.manifest.capabilities.holds).toBe(true);
+        expect(typeof registeredOn.holds?.release).toBe('function');
+      });
+
+      it('a provider without any of them (ParkStay) is unchanged', () => {
+        const fake = createFakeProvider();
+        const registered = register(new ProviderRegistry(), fake);
+        expect(registered.manifest.holdRelease).toBeUndefined();
+        expect(registered.holds?.release).toBeUndefined();
+        expect(parkstayFactory.manifest.holdRelease).toBeUndefined();
+      });
+
+      it('holdRelease must be a boolean', () => {
+        const fake = createFakeProvider({ holdRelease: {} });
+        (fake.manifest as unknown as { holdRelease: string }).holdRelease = 'yes';
+        expectRegistrationError(fake, /holdRelease/);
+      });
     });
 
     it('turning a capability off lets the module go', () => {

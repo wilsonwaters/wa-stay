@@ -56,6 +56,7 @@ interface SiteSnipeRow extends StayRow {
   // Migration v12
   action: string | null;
   alert: string | null;
+  hold_expires_estimated: number | null;
   created_at: string;
   updated_at: string;
 }
@@ -411,20 +412,22 @@ export class SiteSniperRepository extends BaseRepository<SiteSnipe> {
 
   /**
    * Record that a temporary hold was placed: the provider's hold reference, when it expires
-   * and the unit it is on.
+   * (and whether that is the provider's guess, v12's `hold_expires_estimated`) and the unit it
+   * is on.
    */
   setHeld(
     id: number,
     holdReference: string,
     expiresAt: Date,
     paymentUrl?: string,
-    holdUnitId?: string
+    holdUnitId?: string,
+    expiresEstimated = false
   ): void {
     this.db
       .prepare(
         `UPDATE site_snipes
          SET status = ?, last_result = ?, hold_reference = ?, hold_expires_at = ?,
-             hold_unit_id = ?, payment_url = ?, last_error = NULL
+             hold_expires_estimated = ?, hold_unit_id = ?, payment_url = ?, last_error = NULL
          WHERE id = ?`
       )
       .run(
@@ -432,6 +435,7 @@ export class SiteSniperRepository extends BaseRepository<SiteSnipe> {
         SnipeResult.HELD,
         holdReference,
         expiresAt.toISOString(),
+        expiresEstimated ? 1 : 0,
         holdUnitId ?? null,
         paymentUrl || null,
         id
@@ -447,12 +451,39 @@ export class SiteSniperRepository extends BaseRepository<SiteSnipe> {
     holdReference: string,
     expiresAt: Date,
     paymentUrl?: string,
-    holdUnitId?: string
+    holdUnitId?: string,
+    expiresEstimated = false
   ): void {
     this.db.transaction(() => {
-      this.setHeld(id, holdReference, expiresAt, paymentUrl, holdUnitId);
+      this.setHeld(id, holdReference, expiresAt, paymentUrl, holdUnitId, expiresEstimated);
       this.db.prepare('UPDATE site_snipes SET is_active = 0 WHERE id = ?').run(id);
     })();
+  }
+
+  /**
+   * The provider let the hold go, or no longer held it (R18): EXPIRED (result EXPIRED) with
+   * `message`, inactive, and the hold ends at `at` (an exact time now), so the night guard
+   * frees its nights. Only while it is HELD with `reference`: a snipe booked meanwhile, or
+   * holding another hold, is left as it is. Returns whether it changed.
+   */
+  endHold(id: number, reference: string, at: Date, message: string): boolean {
+    const result = this.db
+      .prepare(
+        `UPDATE site_snipes
+         SET status = ?, last_result = ?, last_error = ?, is_active = 0, hold_expires_at = ?,
+             hold_expires_estimated = 0
+         WHERE id = ? AND status = ? AND hold_reference = ?`
+      )
+      .run(
+        SnipeStatus.EXPIRED,
+        SnipeResult.EXPIRED,
+        message,
+        at.toISOString(),
+        id,
+        SnipeStatus.HELD,
+        reference
+      );
+    return result.changes > 0;
   }
 
   /**
@@ -589,6 +620,7 @@ export class SiteSniperRepository extends BaseRepository<SiteSnipe> {
       lastError: row.last_error || undefined,
       holdReference: row.hold_reference || undefined,
       holdExpiresAt: this.parseDate(row.hold_expires_at),
+      ...(row.hold_expires_estimated ? { holdExpiresEstimated: true } : {}),
       holdUnitId: row.hold_unit_id || undefined,
       paymentUrl: row.payment_url || undefined,
       bookedReference: row.booked_reference || undefined,

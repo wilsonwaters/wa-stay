@@ -8,6 +8,7 @@ import {
   useWatch,
   useWatchUpdates,
 } from '../../../api';
+import { WatchResult } from '../../../../shared/types/common.types';
 import type { ProviderManifest } from '../../../../shared/types/provider.types';
 import type { Watch } from '../../../../shared/types/watch.types';
 import { ROUTES } from '../../../app/routes';
@@ -96,7 +97,8 @@ function WatchDetailView({ watch, manifest, updating }: ViewProps) {
         }
       />
       <HoldNotice watch={watch} state={state} manifest={manifest} actions={actions} />
-      {watch.lastError && (
+      {/* A held watch's message is how its hold ended, which the hold panel says */}
+      {watch.lastError && watch.lastResult !== WatchResult.HELD && (
         <Notice tone="danger" title="Last check failed">
           {watch.lastError}
         </Notice>

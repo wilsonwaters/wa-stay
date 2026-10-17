@@ -94,6 +94,15 @@ on the first fully matching site, by the same path and safety rules as Site Snip
   until and a countdown of the time left to pay (ParkStay: 30 minutes);
 - **Pay now** in that panel opens the provider's payment page in its own window, on the session
   that holds the site;
+- for a provider that can let a hold go early, **Let it go** sits beside **Pay now**. It asks
+  first ("Let this hold go?"), then the provider lets the hold go and the panel says so: "You let
+  it go.", or, when the provider no longer held it, "{provider} no longer holds it. If you paid,
+  look for {provider}'s confirmation email." Such a provider may also let the hold go when its
+  payment window closes without a confirmed payment, and deleting the watch lets its hold go
+  first. WA Stay never takes a closed window as unpaid: the provider checks its own side.
+  ParkStay's holds run their 30 minutes as before;
+- when the provider can only guess how long a hold lasts, the panel and the alert say "about"
+  ("Held until about 10:42 am", "within about 10 minutes");
 - if a hold is not placed (the site went, the provider refused), the watch alerts as usual and
   shows why;
 - **never "any unit" across stay types**: a watch with no units chosen whose wanted units are of

@@ -79,6 +79,8 @@ export interface SiteSnipe {
   /** The provider's reference for the hold (ParkStay: the booking pk from create_booking). */
   holdReference?: string;
   holdExpiresAt?: Date;
+  /** `holdExpiresAt` is the provider's guess (`HoldSuccess.expiresAtEstimated`): "about". */
+  holdExpiresEstimated?: boolean;
   /** The unit the hold is on. */
   holdUnitId?: string;
   paymentUrl?: string;

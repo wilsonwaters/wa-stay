@@ -68,6 +68,8 @@ export interface WatchBookingLink {
 export interface WatchHoldState {
   reference: string;
   expiresAt: Date;
+  /** `expiresAt` is the provider's guess (`HoldSuccess.expiresAtEstimated`): "about". */
+  expiresEstimated?: boolean;
   unitId?: string;
   paymentUrl?: string;
 }
@@ -105,6 +107,8 @@ export interface WatchHold {
   reference: string;
   /** ISO instant. */
   expiresAt: string;
+  /** `expiresAt` is the provider's guess: the alert says "within about N minutes". */
+  expiresEstimated?: boolean;
   unitId: string;
   paymentUrl: string;
 }

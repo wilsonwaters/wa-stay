@@ -54,6 +54,7 @@ export function HoldLine({
       <HoldPanel
         unit={unit}
         expiresAt={watch.hold ? new Date(watch.hold.expiresAt) : undefined}
+        expiresEstimated={watch.hold?.expiresEstimated}
         manifest={manifest}
         label={holdRegionLabel(watch)}
         onPay={actions.payNow}
@@ -63,12 +64,9 @@ export function HoldLine({
     );
   }
   if (state === 'hold-expired') {
-    return (
-      <p className="text-sm text-fg-secondary">
-        {at ? `The hold expired at ${at}.` : 'The hold has expired.'} Create a new watch to look
-        again.
-      </p>
-    );
+    // A hold that was let go says why (main writes `lastError` on a held watch only then)
+    const ended = watch.lastError ?? (at ? `The hold expired at ${at}.` : 'The hold has expired.');
+    return <p className="text-sm text-fg-secondary">{ended} Create a new watch to look again.</p>;
   }
   if (state === 'booked') {
     return (
