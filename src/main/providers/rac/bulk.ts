@@ -9,7 +9,8 @@
  *   a priority, and nothing else calls `search`. The POSTs go one at a time, so a place page's
  *   detail or check opened meanwhile waits for one POST at most, never for the whole search.
  * - **Counts** (RS12: free units, no total), from the same mapping as `check`, category by
- *   category (`unitsOf`):
+ *   category (`unitsOf`, which also marks the nights a school-holiday release still holds back
+ *   `not-released`, as `check` does):
  *   - `availableUnits`: the sum of `stay_through_sites_available` over the categories free for
  *     the whole stay (`fullyAvailable`); the others add nothing;
  *   - `bookableUnits`: left out while any category can be booked online for these dates at
@@ -200,9 +201,9 @@ export function createRacBulkSearch({
           signal?.removeEventListener('abort', onAbort);
           run.cancelUnsent = undefined;
         }
-        entries.push(
-          parkEntry(ctx.id, park, categories, availability.unitsOf(park, stay, categories))
-        );
+        // Nights held back for a school-holiday release are not open here either, as in `check`
+        const units = await availability.unitsOf(park, stay, categories);
+        entries.push(parkEntry(ctx.id, park, categories, units));
       }
     } finally {
       if (current === run) current = undefined;

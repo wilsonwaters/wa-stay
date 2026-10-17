@@ -144,8 +144,16 @@ export interface RacAvailability extends AvailabilityModule {
     signal?: AbortSignal,
     onSend?: () => void
   ): Promise<RawCategory[]>;
-  /** The categories as `check` gives them, one unit each, in their order (bulk counts them). */
-  unitsOf(park: RacPark, stay: StayQuery, categories: readonly RawCategory[]): UnitAvailability[];
+  /**
+   * The categories as `check` gives them, one unit each, in their order, with the nights a
+   * school-holiday release still holds back for this person marked `not-released`: the same
+   * function `check` uses, so Explore's counts (bulk) and the place page cannot disagree.
+   */
+  unitsOf(
+    park: RacPark,
+    stay: StayQuery,
+    categories: readonly RawCategory[]
+  ): Promise<UnitAvailability[]>;
 }
 
 export function createRacAvailability({
@@ -213,10 +221,33 @@ export function createRacAvailability({
     };
   }
 
+  /**
+   * The categories as units, nights held back marked (`withHeldBackNights`), and the stay's
+   * release for this person (one `isMember()`): what `check` and bulk both read.
+   */
+  async function unitsAndRelease(
+    park: RacPark,
+    stay: StayQuery,
+    answered: readonly RawCategory[],
+    options: { unitIds?: readonly string[]; signal?: AbortSignal } = {}
+  ): Promise<{ units: UnitAvailability[]; stayRelease: StayRelease }> {
+    const { unitIds, signal } = options;
+    const stayRelease = await release.forStay(park.slug, stay, {
+      unitIds,
+      now: ctx.clock(),
+      signal,
+    });
+    const wanted = unitIds?.length ? new Set(unitIds) : undefined;
+    const units = answered
+      .filter((category) => !wanted || wanted.has(categoryUnitId(category)))
+      .map((category) => withHeldBackNights(toUnit(park, stay, category), stayRelease));
+    return { units, stayRelease };
+  }
+
   return {
     categories,
 
-    unitsOf: (park, stay, answered) => answered.map((category) => toUnit(park, stay, category)),
+    unitsOf: async (park, stay, answered) => (await unitsAndRelease(park, stay, answered)).units,
 
     async check(
       externalId: string,
@@ -227,15 +258,10 @@ export function createRacAvailability({
       throwIfAborted(signal);
       const park = parkOf(externalId);
       const answered = await categories(park, stay, signal);
-      const wanted = unitIds?.length ? new Set(unitIds) : undefined;
-      const stayRelease = await release.forStay(park.slug, stay, {
+      const { units, stayRelease } = await unitsAndRelease(park, stay, answered, {
         unitIds,
-        now: ctx.clock(),
         signal,
       });
-      const units = answered
-        .filter((category) => !wanted || wanted.has(categoryUnitId(category)))
-        .map((category) => withHeldBackNights(toUnit(park, stay, category), stayRelease));
       const open = !units.some((unit) => unit.nights.some((n) => n.state === 'not-released'));
       const { opensAt } = stayRelease;
       const bookingUrl = links.booking(park.slug, stay);
