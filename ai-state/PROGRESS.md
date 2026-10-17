@@ -10,12 +10,12 @@ Branch `ccr-573ddb1d-hir0sq` (from `main` at `4bd5d62`, the v2.0.0 release). The
 Phase 3–4 (task specs, then execution). The stakeholder approved the 20-task plan and decided R6–R8 (alert clicks for every provider, a phone booking link in alert emails, interactive pacing).
 
 ## Currently in flight
-- **R11 (#58)** done on `lane/r11` (`c8d86ad`, `d03a952`; 5074 tests, e2e 25, preview with counts; seven parks' 6–8 Nov answers are synthetic and labelled). Review running.
 - **R17 (#64)**: review REQUEST_CHANGES (a hold in flight slipped past the turn-off guard); the implementer is fixing on `lane/r17`.
 - **R13 (#60)** and **R14 (#61)**: implementation agents in `/home/user/lanes/r13` and `r14` (at `348d6d2`).
 - Next: R16 (after R11, R13, R14, R15), R18 (after R12, R17), R19, R20.
 
 ## Completed
+- **R11 (#58) merged**: RAC bulk availability on Explore (one interactive POST per park; "51 spots free", no "of M"; `bookableUnits` optional end to end; "Still checking RAC…"; a newer search cancels the older one's waiting POSTs but lets a sent one finish, via a new SDK `HttpRequestOptions.onSend`); bulk agrees with the per-park check on every fixture; every park's fixture now a real recording (7 anonymous POSTs on 17 Oct 2026, ≥12 s apart). Review REQUEST_CHANGES (party refusals counted bookable; overlapping requests on RAC's server) → fixes `ba2e798`, `6e3e378` → APPROVE. Gate: 5161 tests, e2e 25, RAC preview passed.
 - **R12 (#59) merged** (`348d6d2`): snipes without holds; per-snipe `action` (`alert` | `hold`, default `hold`) and `alert` (v12, plus `hold_expires_estimated` for R18); `ALERTED` reserves no night; an alert notification and email with the public booking link; `maxWindowMinutes`; a 403/429 ends a snipe FAILED for every provider; §12.35 catch-up for R1–R9. Review APPROVE (minors routed to R13/R14). Gate: 5085 tests, e2e 24.
 - 2026-10-17 ~07:00–08:10 UTC: a second account usage limit stopped the R11 implementer, the R12 reviewer and the R17 fixer (R17 review: REQUEST_CHANGES — a hold in flight slipped past the turn-off guard); all resumed after the reset.
 - Integration gate on `cf154cb` (R1–R10, R15): lint 0 errors, format clean, 5002 tests + 6 skipped, test:tz 7, e2e 24 passed + 2 opt-in skipped (incl. the RAC watch journey).
