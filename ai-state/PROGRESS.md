@@ -11,10 +11,10 @@ Phase 3–4 (task specs, then execution). The stakeholder approved the 20-task p
 
 ## Currently in flight
 - **R11 (#58)**, **R12 (#59, L)** and **R17 (#64)**: implementation agents in `/home/user/lanes/r11`, `r12` (both at `cf154cb`) and `r17` (at `bd45904`).
-- Integration gate running on `cf154cb` (R1–R10, R15).
 - Next: R13 (after R12), R14 (after R10, R12), R16 (after R11, R13, R14, R15), R18 (after R12, R17), R19, R20.
 
 ## Completed
+- Integration gate on `cf154cb` (R1–R10, R15): lint 0 errors, format clean, 5002 tests + 6 skipped, test:tz 7, e2e 24 passed + 2 opt-in skipped (incl. the RAC watch journey).
 - **R9 (#56) merged** (`cf154cb`): one noun helper (`src/shared/utils/unit-noun.ts`) for sites, cabins, rooms, dorm beds, glamping and "spots" at mixed places; no hard-coded "site" in notifications, services or flows (a guard test); copy fixes routed from the R3, R5 and R6 reviews (provider-neutral empty states, hold-rule wording, link notices). Review APPROVE; fixes `5c199e9`, `cd0c598`; merged R10 cleanly. ParkStay copy unchanged. Gate: 4947 tests, e2e 24.
 - **R15 (#62) merged** (`d6e36af`): the `credentials` sign-in kind — write-only `accounts.saveCredentials` with confirmations checked in main, `accounts.copyCredential` (main writes the clipboard), values sealed in the provider's vault, a generic Settings → Accounts form, `onCredentialsChanged`, and `signIn` may return normalised values (digits only for RAC). §12.35 created. Security review APPROVE; fix `4918f04` (payload caps, no close while saving, leak test before sign-out, normalised values). Gate: 4817 tests, e2e 23.
 - **R10 (#57) merged** (`5d61de1`): RAC availability per park (one paced POST), category units with per-night prices, codes mapped to available/booked/closed/split/not-released, stay rules from tariffs on every night, member tariffs ignored until R16, `bookingUrl` = RAC's `online_booking_url` (verified live with one anonymous GET: empty cart), watches on, block cool-down honouring `Retry-After` and doubling to 24 h, a hardened fixture guard, an RAC watch e2e journey (24). Live: 1 GET + 3 availability POSTs. Review REQUEST_CHANGES (code 2 marked sold-out categories "closed as of 2010") → fix `87904fb` → APPROVE. **RAC cancellation watches work end to end in fixture mode.**
