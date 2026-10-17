@@ -20,6 +20,7 @@
 
 import { BookingService } from '@main/core/bookings/booking.service';
 import {
+  HOLD_RELEASING_MESSAGE,
   HoldPaymentService,
   RELEASED_MESSAGE,
   RELEASED_ON_CLOSE_MESSAGE,
@@ -130,6 +131,17 @@ describe('HoldPaymentService: letting a hold go', () => {
   }
 
   const releases = () => h.fake.calls.filter((c) => c.module === 'holds' && c.method === 'release');
+  /**
+   * The last window reads its pages slowly: `hasText` answers after `ms`, as a confirmation page
+   * being read does.
+   */
+  function slowReading(ms = 30): void {
+    const window = windows.last;
+    window.hasText = (text) => {
+      const shows = window.pageText.includes(text);
+      return new Promise((resolve) => setTimeout(() => resolve(shows), ms));
+    };
+  }
   const emitted = () => h.events.emit.mock.calls.map(([name]) => name);
   const warnings = () => logger.lines.filter((line) => line.level === 'warn');
   /** Waits for the release a close started, and for it to be recorded. */
@@ -259,6 +271,24 @@ describe('HoldPaymentService: letting a hold go', () => {
       expect(releases()).toEqual([]);
       expect(h.snipeRepo.findById(snipe.id)).toEqual(snipe);
       await expect(service.openForSnipe(snipe.id)).resolves.toBeUndefined();
+    });
+
+    it('Pay now opened again while the closed window was still being read: no release', async () => {
+      setUp();
+      const snipe = heldSnipe();
+      await service.openForSnipe(snipe.id);
+      slowReading();
+      windows.last.showPage('https://fake.example/pay/FAKE-1/step-2', { text: 'Checkout' });
+      windows.last.close();
+
+      // The person opens Pay now again before the page check settled
+      await service.openForSnipe(snipe.id);
+      await drain();
+
+      expect(windows.windows).toHaveLength(2);
+      expect(windows.last.closed).toBe(false);
+      expect(releases()).toEqual([]);
+      expect(h.snipeRepo.findById(snipe.id)).toEqual(snipe);
     });
 
     it('a hold that expired while the window was open: no release, and the existing expired state', async () => {
@@ -429,6 +459,77 @@ describe('HoldPaymentService: letting a hold go', () => {
       expect(window.closed).toBe(true);
       expect(releases()).toHaveLength(1);
       expect(answer.lastError).toBe(RELEASED_MESSAGE);
+    });
+
+    it('a confirmation being read as the person declines wins: booked, and no release', async () => {
+      setUp();
+      const snipe = heldSnipe();
+      await service.openForSnipe(snipe.id);
+      slowReading();
+      windows.last.showPage('https://fake.example/paid/FAKE-1', { text: 'BK-FAKE-1' });
+
+      const error = await service.releaseSnipeHold(snipe.id).catch((e: unknown) => e);
+
+      expect(error).toMatchObject({
+        code: 'HOLD_EXPIRED',
+        message: 'This hold was paid for, so there is nothing to let go',
+      });
+      expect(h.snipeRepo.findById(snipe.id)).toMatchObject({
+        status: SnipeStatus.BOOKED,
+        bookedReference: 'BK-FAKE-1',
+      });
+      expect(releases()).toEqual([]);
+      await drain();
+      expect(releases()).toEqual([]);
+    });
+
+    it('a decline waits for a confirmation being read at most confirmationWaitMs, then lets go', async () => {
+      setUp({ holdRelease: {} });
+      service.dispose();
+      service = new HoldPaymentService({
+        providers: h.registry,
+        snipes: h.snipeRepo,
+        watches: h.watchRepo,
+        bookings: { recordConfirmed: jest.fn(), announce: jest.fn() },
+        notifications,
+        windows,
+        events: h.events,
+        transaction: (fn) => h.db.transaction(fn)(),
+        logger,
+        clock: () => new Date(now),
+        timings: { accessGateWaitMs: 5_000, firstPageWaitMs: 5_000, confirmationWaitMs: 20 },
+      });
+      const snipe = heldSnipe();
+      await service.openForSnipe(snipe.id);
+      // A page check that never settles
+      windows.last.hasText = () => new Promise(() => undefined);
+      windows.last.showPage('https://fake.example/pay/FAKE-1/step-2');
+
+      await expect(service.releaseSnipeHold(snipe.id)).resolves.toMatchObject({
+        status: SnipeStatus.EXPIRED,
+        lastError: RELEASED_MESSAGE,
+      });
+      expect(releases()).toHaveLength(1);
+      expect(windows.last.closed).toBe(true);
+    });
+
+    it('Pay now while a release runs answers VALIDATION "The hold is being let go."; once it fails, Pay now opens', async () => {
+      setUp({ holdRelease: {}, delays: { holds: 30 } });
+      const snipe = heldSnipe();
+      h.fake.failNext('holds', new Error('offline'));
+      const declining = service.releaseSnipeHold(snipe.id).catch((e: unknown) => e);
+      await until(() => releases().length === 1);
+
+      await expect(service.openForSnipe(snipe.id)).rejects.toMatchObject({
+        code: 'VALIDATION',
+        message: HOLD_RELEASING_MESSAGE,
+      });
+      expect(HOLD_RELEASING_MESSAGE).toBe('The hold is being let go.');
+      expect(windows.requests).toEqual([]);
+
+      expect(toApiError(await declining).code).toBe('PROVIDER_ERROR');
+      await expect(service.openForSnipe(snipe.id)).resolves.toBeUndefined();
+      expect(windows.requests).toHaveLength(1);
     });
 
     it('a decline while a close is letting the hold go joins it: one call', async () => {

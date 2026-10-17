@@ -34,7 +34,7 @@ export interface HoldPanelProps {
   paying: boolean;
   /**
    * "Let it go", beside "Pay now" while the hold has not run out, for a provider that can let a
-   * hold go (`manifest.holdRelease`): it asks first, then calls this. Resolves with why the hold
+   * hold go (`manifest.holdRelease`, with its holds on): it asks first, then calls this. Resolves with why the hold
    * ended, which is announced; a rejection keeps the question open with its message.
    */
   onRelease?: () => Promise<string | undefined>;
@@ -81,7 +81,12 @@ export function HoldPanel({
   endedRef.current = ended;
   const provider = manifest?.shortName ?? 'the provider';
   const page = variant === 'page';
-  const canRelease = onRelease !== undefined && manifest?.holdRelease === true;
+  // `holdRelease` may stand alone with holds off (an experiment not on, or turned off before a
+  // restart): then nothing can be let go, and main would answer CAPABILITY
+  const canRelease =
+    onRelease !== undefined &&
+    manifest?.holdRelease === true &&
+    manifest.capabilities.holds === true;
   const Heading = page ? 'h2' : 'h3';
   const frame = cx(
     'flex flex-col gap-3 rounded-lg border p-4',

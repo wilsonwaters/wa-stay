@@ -39,9 +39,11 @@
  *   deletes its watch or snipe (`releaseBeforeDelete`, before the row goes), or closes its
  *   payment window with `releaseOnPaymentClose`. A close calls `release` only when the window
  *   closed normally (not on quit, not a first page that failed), after any confirmation being
- *   read (a recorded payment wins, and then nothing is let go), and while the row still holds
- *   that hold, unexpired. A decline closes the hold's payment window first; its close then
- *   starts no release of its own.
+ *   read (at most `confirmationWaitMs`; a recorded payment wins, and then nothing is let go),
+ *   while the row still holds that hold, unexpired, and no new payment window for it opened
+ *   meanwhile. A decline settles the open window's confirmation the same way, then closes the
+ *   window (whose close starts no release of its own). "Pay now" while a release runs answers
+ *   `VALIDATION`, "The hold is being let go."
  * - **How:** `holds.release({ reference, unitId, expiresAt })` at interactive priority, within
  *   `releaseTimeoutMs` (grown for a paced provider, `pacedDeadlineMs`), at most one at a time
  *   per hold: a second request joins the first.
@@ -136,12 +138,18 @@ export interface HoldPaymentTimings {
    * request timeout); a paced provider's grows with its gaps (`pacedDeadlineMs`).
    */
   releaseTimeoutMs: number;
+  /**
+   * The most a decline or a close waits for a confirmation page the payment window is reading
+   * (a recorded payment wins) before it lets the hold go.
+   */
+  confirmationWaitMs: number;
 }
 
 export const DEFAULT_HOLD_PAYMENT_TIMINGS: Readonly<HoldPaymentTimings> = Object.freeze({
   accessGateWaitMs: 60_000,
   firstPageWaitMs: 30_000,
   releaseTimeoutMs: 30_000,
+  confirmationWaitMs: 10_000,
 });
 
 /** The requests a release is allowed for on a paced provider (look at the hold, let it go). */
@@ -176,6 +184,9 @@ interface ReleasableHold {
 type ReleaseTrigger = 'decline' | 'close' | 'delete';
 
 export const PAYMENT_WINDOW_BUSY_MESSAGE = 'Finish or close the open payment window first';
+
+/** "Pay now" while the hold is being let go: it may yet stay, if the provider cannot be asked. */
+export const HOLD_RELEASING_MESSAGE = 'The hold is being let go.';
 
 /** A released hold's message: the person let it go ("Let it go", or deleting its row). */
 export const RELEASED_MESSAGE = 'You let it go.';
@@ -295,6 +306,11 @@ export class HoldPaymentService {
    * is logged and the delete goes ahead.
    */
   async releaseBeforeDelete(kind: PaymentSubject['kind'], id: number): Promise<void> {
+    const found = this.tryReleasable(kind, id);
+    if (!found) return;
+    // As a decline: a confirmation being read wins
+    const payment = this.payments.get(found.subject.providerId);
+    if (payment && sameSubject(payment.subject, found.subject)) await this.settleChecks(payment);
     const held = this.tryReleasable(kind, id);
     if (!held) return;
     this.closePaymentOf(held.subject);
@@ -355,10 +371,11 @@ export class HoldPaymentService {
     const promise = (async () => {
       await this.passAccessGate(provider);
       if (this.disposed) return;
-      // Let go (or being let go) while the queue was passed: nothing left to pay for
-      if (holds.release && (this.releases.has(releaseKey(subject)) || !this.stillHeld(subject))) {
-        throw this.expired();
+      // Being let go, or let go, while the queue was passed: nothing to pay for (yet)
+      if (holds.release && this.releases.has(releaseKey(subject))) {
+        throw new AppError('VALIDATION', HOLD_RELEASING_MESSAGE);
       }
+      if (holds.release && !this.stillHeld(subject)) throw this.expired();
       const window = this.deps.windows.open({
         providerId,
         providerName: manifest.shortName,
@@ -570,9 +587,13 @@ export class HoldPaymentService {
     }
     const hold = this.currentHold(row);
     if (!hold) {
+      const booked =
+        'status' in row ? row.status === SnipeStatus.BOOKED : row.lastResult === WatchResult.BOOKED;
       throw new AppError(
         'HOLD_EXPIRED',
-        'This hold has already ended, so there is nothing to let go'
+        booked
+          ? 'This hold was paid for, so there is nothing to let go'
+          : 'This hold has already ended, so there is nothing to let go'
       );
     }
     return {
@@ -632,21 +653,52 @@ export class HoldPaymentService {
     payment.window.close();
   }
 
-  /** The person declines the hold: its payment window closes, then one release runs. */
+  /**
+   * The person declines the hold. A confirmation its payment window is reading is settled first
+   * (bounded): a recorded payment wins, and then nothing is let go (`HOLD_EXPIRED`, "paid for").
+   * Then the window closes, and one release runs.
+   */
   private async decline(held: ReleasableHold): Promise<void> {
-    this.closePaymentOf(held.subject);
-    await this.release(held, 'decline');
+    const { subject } = held;
+    const payment = this.payments.get(subject.providerId);
+    if (payment && sameSubject(payment.subject, subject)) await this.settleChecks(payment);
+    const current = this.releasable(subject.kind, subject.id);
+    this.closePaymentOf(subject);
+    await this.release(current, 'decline');
+  }
+
+  /** The window's page checks, settled or given up on after `confirmationWaitMs`. */
+  private settleChecks(payment: OpenPayment): Promise<void> {
+    return new Promise((resolve) => {
+      const timer = setTimeout(resolve, this.timings.confirmationWaitMs);
+      timer.unref?.();
+      payment.checks
+        .catch(() => undefined)
+        .then(() => {
+          clearTimeout(timer);
+          resolve();
+        });
+    });
+  }
+
+  /** Whether a payment window for `subject` is open, or on its way, again. */
+  private payingAgain(subject: PaymentSubject): boolean {
+    const open = this.payments.get(subject.providerId);
+    if (open && sameSubject(open.subject, subject) && !open.window.isClosed()) return true;
+    const opening = this.opening.get(subject.providerId);
+    return !!opening && sameSubject(opening.subject, subject);
   }
 
   /**
    * A payment window closed normally: for a provider with `releaseOnPaymentClose`, once any
-   * confirmation being read is settled (a recorded payment wins), the hold is let go while the
-   * row still holds it, unexpired. Never rejects.
+   * confirmation being read is settled (bounded; a recorded payment wins), the hold is let go
+   * while the row still holds it, unexpired, unless the person opened Pay now again meanwhile.
+   * Never rejects.
    */
   private async releaseOnClose(payment: OpenPayment): Promise<void> {
-    await payment.checks.catch(() => undefined);
-    if (this.disposed || payment.done) return;
+    await this.settleChecks(payment);
     const { subject } = payment;
+    if (this.disposed || payment.done || this.payingAgain(subject)) return;
     if (this.deps.providers.tryGet(subject.providerId)?.holds?.releaseOnPaymentClose !== true) {
       return;
     }

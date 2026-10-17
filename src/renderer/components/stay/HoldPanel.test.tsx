@@ -5,8 +5,12 @@ import { politeAnnouncement } from '@tests/utils/renderer/renderWithProviders';
 import { AnnouncerProvider } from '../ui';
 import { HoldPanel, type HoldPanelProps } from './HoldPanel';
 
-/** A provider that can let a hold go (`holdRelease`, R18). */
-const RELEASING = { ...FAKE_MANIFEST, holdRelease: true };
+/** A provider that can let a hold go (`holdRelease`, with its holds on, R18). */
+const RELEASING = {
+  ...FAKE_MANIFEST,
+  capabilities: { ...FAKE_MANIFEST.capabilities, holds: true },
+  holdRelease: true,
+};
 
 function renderPanel(
   props: Partial<HoldPanelProps> = {},
@@ -124,7 +128,7 @@ describe('HoldPanel', () => {
   describe('Let it go (R18)', () => {
     const letGo = () => screen.queryByRole('button', { name: 'Let it go' });
 
-    it('is offered only for a provider that can let a hold go, with an action, while the hold lasts', () => {
+    it('is offered only for a provider that can let a hold go, its holds on, with an action, while the hold lasts', () => {
       const onRelease = jest.fn();
       const { rerender } = renderPanel({ onRelease, manifest: PARKSTAY_MANIFEST });
       // ParkStay: no holdRelease
@@ -132,6 +136,12 @@ describe('HoldPanel', () => {
       rerender({ manifest: RELEASING, onRelease: undefined });
       expect(letGo()).toBeNull();
       rerender({ manifest: RELEASING, onRelease, expiresAt: new Date(Date.now() - 1000) });
+      expect(letGo()).toBeNull();
+      // holdRelease standing alone, its holds off (after a restart without them): none
+      rerender({
+        manifest: { ...RELEASING, capabilities: { ...RELEASING.capabilities, holds: false } },
+        onRelease,
+      });
       expect(letGo()).toBeNull();
       rerender({ manifest: RELEASING, onRelease });
       expect(letGo()).toBeInTheDocument();
