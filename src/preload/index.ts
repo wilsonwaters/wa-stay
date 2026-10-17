@@ -118,6 +118,8 @@ const api: WindowApi = {
   providers: bind('providers', {
     list: none,
     accessStatus: (providerId) => ({ providerId }),
+    experiments: (providerId) => ({ providerId }),
+    setExperiment: (providerId, experimentId, enabled) => ({ providerId, experimentId, enabled }),
   }),
 
   catalog: bind('catalog', {

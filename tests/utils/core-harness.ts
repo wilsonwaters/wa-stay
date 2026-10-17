@@ -47,6 +47,8 @@ export interface CoreHarnessOptions {
   accountState?: (providerId: string) => AccountStatus['state'];
   /** The snipe service's account gate (default: none). */
   accounts?: AccountGate;
+  /** Whether a provider's holds are turning off (an experiment turned off; default: never). */
+  holdsTurningOff?: (providerId: string) => boolean;
   notifications?: WatchNotifications & SnipeNotifications;
   stopGraceMs?: number;
 }
@@ -114,6 +116,7 @@ export function createCoreHarness(options: CoreHarnessOptions = {}): CoreHarness
     nightGuard,
     events,
     accountState: options.accountState,
+    holdsTurningOff: options.holdsTurningOff,
     random: options.random ?? (() => 0),
   });
   const snipes = new SiteSniperService({
@@ -123,6 +126,7 @@ export function createCoreHarness(options: CoreHarnessOptions = {}): CoreHarness
     nightGuard,
     events,
     accounts: options.accounts,
+    holdsTurningOff: options.holdsTurningOff,
   });
   const power = new EventEmitter();
   const scheduler = new JobScheduler({

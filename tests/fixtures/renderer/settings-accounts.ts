@@ -41,6 +41,8 @@ export function setupAccounts({
   openSignInLink = jest.fn().mockResolvedValue(ok(undefined)),
   saveCredentials = () => Promise.resolve(fail('not stubbed')),
   copyCredential = jest.fn().mockResolvedValue(ok(undefined)),
+  experiments,
+  setExperiment,
 }: {
   /** The registered providers, in order. Default: ParkStay, FakeStay and OpenStay. */
   providers?: ProviderManifest[];
@@ -56,6 +58,10 @@ export function setupAccounts({
     confirmed: string[]
   ) => Promise<unknown>;
   copyCredential?: jest.Mock;
+  /** `providers.experiments` (R17); un-stubbed it rejects, as any call the test did not expect. */
+  experiments?: jest.Mock;
+  /** `providers.setExperiment` (R17). */
+  setExperiment?: jest.Mock;
 } = {}) {
   let stored = accounts;
   const remember = async (answer: Promise<unknown>) => {
@@ -67,7 +73,11 @@ export function setupAccounts({
     return response;
   };
   const mock = createMockApi({
-    providers: { list: jest.fn().mockResolvedValue(ok(providers)) },
+    providers: {
+      list: jest.fn().mockResolvedValue(ok(providers)),
+      ...(experiments ? { experiments } : {}),
+      ...(setExperiment ? { setExperiment } : {}),
+    },
     accounts: {
       list: jest.fn(() => Promise.resolve(ok(stored))),
       status: jest.fn((id: string) =>

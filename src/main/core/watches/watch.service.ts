@@ -10,7 +10,8 @@
  * one hold on the first matching unit through `provider.holds`, behind the same
  * one-booking-per-night guard as snipes, and stops. Payment stays a human step. It never
  * picks between stay types: a watch with no units named whose wanted units are of more than
- * one kind (`kindsAmbiguous`) notifies with a note instead.
+ * one kind (`kindsAmbiguous`) notifies with a note instead. Nor does it hold while the
+ * provider's holds are turning off (an experiment turned off, until the restart: §12.35).
  *
  * Booking links (brief R6, R7; `booking-link.ts`): each alert carries the provider's booking
  * page for what it found (the first full match, or the longest partial run with its dates),
@@ -76,6 +77,11 @@ export interface WatchServiceDeps {
   events?: EventSink;
   /** The provider account's sign-in state (`provider_accounts.status` until V6). */
   accountState?: (providerId: string) => AccountStatus['state'];
+  /**
+   * The provider's holds are on through an experiment the person has turned off: they go when
+   * WA Stay restarts, and until then no automatic hold is placed (default: never).
+   */
+  holdsTurningOff?: (providerId: string) => boolean;
   clock?: () => Date;
   /** For the jitter; returns [0, 1). */
   random?: () => number;
@@ -114,6 +120,7 @@ export class WatchService {
   private readonly nightGuard: NightGuard;
   private readonly events?: EventSink;
   private readonly accountState: (providerId: string) => AccountStatus['state'];
+  private readonly holdsTurningOff: (providerId: string) => boolean;
   private readonly clock: () => Date;
   private readonly random: () => number;
 
@@ -124,6 +131,7 @@ export class WatchService {
     this.nightGuard = deps.nightGuard;
     this.events = deps.events;
     this.accountState = deps.accountState ?? (() => 'unknown');
+    this.holdsTurningOff = deps.holdsTurningOff ?? (() => false);
     this.clock = deps.clock ?? (() => new Date());
     this.random = deps.random ?? Math.random;
   }
@@ -517,6 +525,14 @@ export class WatchService {
     const signInNote = `Sign in to ${manifest.shortName} to enable automatic holds`;
     if (!provider.holds || manifest.capabilities.holds !== true) {
       return { note: `${manifest.shortName} cannot hold automatically` };
+    }
+    if (this.holdsTurningOff(watch.providerId)) {
+      log.info(
+        `Watch ${watch.id}: no automatic hold, holds on ${watch.providerId} are turning off`
+      );
+      return {
+        note: `Automatic holds on ${manifest.shortName} are turning off. Restart WA Stay.`,
+      };
     }
     if (mixedKinds) {
       log.info(`Watch ${watch.id}: no automatic hold, more than one stay type`);

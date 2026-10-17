@@ -23,6 +23,7 @@ describe('queryKeys', () => {
   it('starts every key with its namespace prefix, so invalidating `all` reaches it', () => {
     const keys = [
       [queryKeys.providers.all, queryKeys.providers.list()],
+      [queryKeys.providers.all, queryKeys.providers.experiments('rac')],
       [queryKeys.catalog.all, queryKeys.catalog.search({ text: 'bay' })],
       [queryKeys.catalog.all, queryKeys.catalog.area('8/112,-40,136,-8', ['search'])],
       [queryKeys.catalog.all, queryKeys.catalog.detail('parkstay:1')],
