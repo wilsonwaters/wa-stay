@@ -10,7 +10,8 @@ Branch `ccr-573ddb1d-hir0sq` (from `main` at `4bd5d62`, the v2.0.0 release). The
 Phase 3–4 (task specs, then execution). The stakeholder approved the 20-task plan and decided R6–R8 (alert clicks for every provider, a phone booking link in alert emails, interactive pacing).
 
 ## Currently in flight
-- **R9 (#56)** and **R10 (#57)**: implementation agents in `/home/user/lanes/r9` and `/home/user/lanes/r10`, cut from `lane/r8` (`c2060e8`). R9 also carries the copy notes routed from the R3, R5 and R6 reviews; R10 the RAC notes from the R5 review (block cool-down with `Retry-After`, fixture guard, wheelchair test). Both need R8's review fixes (`82a98f1`, `a6ecf76`) merged in before their review.
+- **R10 (#57)** done on `lane/r10` (`8a97452`, `81f41b8`; merged the tip with R8's fixes; 4876 tests, e2e 24, RAC preview passed; live: 1 GET of an `online_booking_url` (no cart) + 3 availability POSTs). Review running.
+- **R9 (#56)** and R10: implementation agents in `/home/user/lanes/r9` and `/home/user/lanes/r10`, cut from `lane/r8` (`c2060e8`). R9 also carries the copy notes routed from the R3, R5 and R6 reviews; R10 the RAC notes from the R5 review (block cool-down with `Retry-After`, fixture guard, wheelchair test). Both need R8's review fixes (`82a98f1`, `a6ecf76`) merged in before their review.
 - **R15 (#62)**: implementation agent in `/home/user/lanes/r15` (at `f063929`), started beside R9/R10 because its R12 dependency is lane order only.
 
 ## Completed
