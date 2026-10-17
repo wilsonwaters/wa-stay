@@ -19,8 +19,17 @@
  * RAC's own member number sign-in (R16) goes through the same channels: typed with hyphens, it
  * is stored and copied as its digits, and is in no answer, event, log line, request or plain
  * row either (its sign-in sends no request at all).
+ *
+ * With RAC's auto-cart on (R19), a member's automatic hold (`holds.create`: the cart page, the
+ * availability POST, the member rate's cart address) and its release (the cart page and the
+ * removal) send the number nowhere: not in a request's address, form or headers, the hold's
+ * reference, a log line, a notification or an answer; nor is the cart address (the synthetic
+ * fixtures' made-up token) in any of those.
  */
 
+import fs from 'fs';
+import os from 'os';
+import path from 'path';
 import { Writable } from 'stream';
 import winston from 'winston';
 import { createContainer, type AppContainer } from '@main/app/container';
@@ -28,12 +37,21 @@ import { openDatabase } from '@main/database/connection';
 import { SqliteKeyValueStore } from '@main/database/repositories';
 import { registerIpcHandlers } from '@main/ipc';
 import { parkstayFactory } from '@main/providers/parkstay';
+import { withExperiments } from '@main/providers/experiments';
 import { racFactory } from '@main/providers/rac';
-import { createProviderContext } from '@main/providers/sdk';
+import { RAC_AVAILABILITY_PATH } from '@main/providers/rac/availability';
+import {
+  createProviderContext,
+  type HttpMethod,
+  type HttpRequestOptions,
+  type HttpResponse,
+} from '@main/providers/sdk';
+import { FixtureHttpClient } from '@main/testing/fixture-http-client';
 import { logger } from '@main/utils/logger';
-import type { APIResponse } from '@shared/types';
+import type { APIResponse, Watch } from '@shared/types';
 import type { ProviderAccount } from '@shared/types/provider.types';
 import { RecordingHttpClient } from '@tests/utils/fake-paced-provider';
+import { fakeDateOnly } from '@tests/utils/core-harness';
 import {
   createFakeProvider,
   TEST_PROVIDERS_DIR,
@@ -56,6 +74,28 @@ jest.mock('electron-updater', () =>
 jest.mock('node-machine-id', () => ({ machineIdSync: () => 'test-machine-id' }));
 
 const { clipboard } = jest.requireMock('electron') as { clipboard: { writeText: jest.Mock } };
+
+const CART_FIXTURES = path.join(__dirname, '../fixtures/providers/rac/cart');
+/** Anything of a cart address: its token, its `cart` key, a tariff's `rand`. */
+const CART_ADDRESS = /rest_api_data_id|0{32}|\?cart|cart&|rand=100/;
+
+/** A FixtureHttpClient that records every request: address, form and headers. */
+class RecordingFixtureClient extends FixtureHttpClient {
+  readonly sent: Array<{ method: string; url: string; body?: string; headers?: unknown }> = [];
+  override async request(
+    method: HttpMethod,
+    url: string,
+    options: HttpRequestOptions = {}
+  ): Promise<HttpResponse> {
+    this.sent.push({
+      method,
+      url,
+      ...(options.body === undefined ? {} : { body: String(options.body) }),
+      headers: options.headers,
+    });
+    return super.request(method, url, options);
+  }
+}
 
 /** Made-up sentinels: a member number in the documented test format, and a password. */
 const NUMBER = '1234567890123';
@@ -314,6 +354,131 @@ describe('credentials values never leak', () => {
       expect(logs).not.toContain(sentinel);
       expect(savedDatabase).not.toContain(sentinel);
       expect(plainDatabase()).not.toContain(sentinel);
+    }
+  });
+
+  it("RAC's auto-cart: a member's hold and its release send the number nowhere, and the cart address is in no answer, log line, notification or row", async () => {
+    fakeDateOnly(new Date('2026-10-17T02:00:00.000Z'));
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'rac-cart-leak-'));
+    try {
+      // The synthetic cart fixtures: the cart page (empty, then holding the stay), the
+      // availability answer with cart addresses, the member rate's cart address, the removal
+      fs.mkdirSync(path.join(dir, 'rac'));
+      for (const file of fs.readdirSync(CART_FIXTURES)) {
+        fs.copyFileSync(path.join(CART_FIXTURES, file), path.join(dir, 'rac', file));
+      }
+      const cartShows = (file: string) =>
+        fs.copyFileSync(path.join(CART_FIXTURES, file), path.join(dir, 'rac', 'cart-now.html'));
+      cartShows('cart-page-empty.html');
+      fs.writeFileSync(
+        path.join(dir, 'rac', 'manifest.json'),
+        JSON.stringify({
+          routes: [
+            {
+              method: 'GET',
+              path: '/busselton/booking/',
+              query: { rand: '1002' },
+              file: 'cart-page-one-stay.html',
+            },
+            { method: 'GET', path: '/busselton/booking/', file: 'cart-now.html' },
+            {
+              method: 'POST',
+              path: RAC_AVAILABILITY_PATH,
+              form: { blog_id: '6', available_from: '6 Nov 2026' },
+              file: 'availability-busselton-2026-11-06-2n.json',
+            },
+            {
+              method: 'POST',
+              path: '/busselton/wp-content/themes/parks-and-resorts/inc/newbook/api/rac-busselton-holiday-park.php',
+              query: { query: 'remove_item_from_cart' },
+              file: 'remove-item-from-cart.json',
+            },
+          ],
+        })
+      );
+      const racHttp = new RecordingFixtureClient({
+        providerId: 'rac',
+        fixturesDir: dir,
+        logFile: path.join(dir, 'unexpected.log'),
+      });
+      container.providers.register(withExperiments(racFactory, ['autoCart']), (manifest) =>
+        createProviderContext(manifest, {
+          createHttp: () => racHttp,
+          createState: (id) => new SqliteKeyValueStore(container.repositories.providerState, id),
+          vault: container.vault,
+          logger,
+          providersDir: TEST_PROVIDERS_DIR,
+          unpaced: true,
+        })
+      );
+      const responses: Array<APIResponse<unknown>> = [];
+      const record = async <T>(pending: Promise<APIResponse<T>>) => {
+        const response = await pending;
+        responses.push(response);
+        return response;
+      };
+      await expect(
+        record(
+          call('accounts:save-credentials', {
+            providerId: 'rac',
+            values: { memberNumber: NUMBER },
+            confirmed: ['ownNumber', 'willStay', 'nameOnCard'],
+          })
+        )
+      ).resolves.toMatchObject({ success: true });
+
+      // A member's automatic hold on Busselton's powered site
+      const created = await record(
+        call<Watch>('watches:create', {
+          providerId: 'rac',
+          name: 'Busselton',
+          location: { externalId: 'busselton', name: 'RAC Busselton Holiday Park' },
+          stay: { arrival: '2026-11-06', departure: '2026-11-08', adults: 2 },
+          unitKinds: ['campsite'],
+          checkIntervalMinutes: 15,
+          autoHold: true,
+          stayParams: { equipmentType: '1', equipmentLength: '6.5', equipmentWidth: '2.5' },
+        })
+      );
+      const id = (created as { data: Watch }).data.id;
+      await record(call('watches:run-now', { id }));
+      const held = await record(call<Watch>('watches:get', { id }));
+      expect(held).toMatchObject({
+        success: true,
+        data: {
+          lastResult: 'held',
+          hold: { paymentUrl: 'https://parksandresorts.rac.com.au/busselton/booking/' },
+        },
+      });
+      // The member rate's cart address, the only one opened
+      expect(racHttp.sent.filter((r) => CART_ADDRESS.test(r.url)).map((r) => r.url)).toEqual([
+        expect.stringMatching(/rand=1002$/),
+      ]);
+
+      // "Let it go": the cart still holds the stay
+      cartShows('cart-page-one-stay.html');
+      const released = await record(call<Watch>('watches:release-hold', { id }));
+      expect(released).toMatchObject({ success: true, data: { lastError: 'You let it go.' } });
+      expect(racHttp.sent.filter((r) => r.url.includes('remove_item_from_cart'))).toHaveLength(1);
+
+      const logs = logLines.join('\n');
+      const notifications = JSON.stringify(
+        container.db.prepare('SELECT * FROM notifications').all()
+      );
+      const rows = JSON.stringify([
+        container.db.prepare('SELECT * FROM watches').all(),
+        container.db.prepare('SELECT * FROM provider_state').all(),
+      ]);
+      const events = JSON.stringify(renderer.sent);
+      expect(JSON.stringify(racHttp.sent)).not.toContain(NUMBER);
+      for (const text of [JSON.stringify(responses), logs, notifications, rows, events]) {
+        expect(text).not.toContain(NUMBER);
+        expect(text).not.toMatch(CART_ADDRESS);
+      }
+      expect(String((held as { data: Watch }).data.hold?.reference)).not.toContain(NUMBER);
+    } finally {
+      jest.useRealTimers();
+      fs.rmSync(dir, { recursive: true, force: true });
     }
   });
 });
