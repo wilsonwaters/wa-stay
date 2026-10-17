@@ -15,6 +15,10 @@
  * - `alert-snipe`: `{ dbPath, snipe }` opens (and migrates) the WA Stay database and creates an
  *   armed snipe that alerts (`action: 'alert'`), and nothing else: the app's own scheduler runs
  *   it, and its alert and notification are the app's. Result: `{ snipeId }`.
+ * - `held-watch`: `{ dbPath, watch, hold, experiments? }` opens (and migrates) the WA Stay
+ *   database, stores the provider's experiment choices first when given (`core.experiments`, as
+ *   Settings → Accounts does), creates the watch and records its automatic hold (`markHeld`, as
+ *   a placed hold does). Result: `{ watchId }`.
  *
  * Nothing here talks to a provider: no hold is ever placed (architecture-notes §12.33).
  */
@@ -81,7 +85,41 @@ function alertSnipe(job) {
   }
 }
 
-const OPS = { 'legacy-v5': legacyV5, 'held-snipe': heldSnipe, 'alert-snipe': alertSnipe };
+function heldWatch(job) {
+  const { openDatabase, closeDatabase } = require(path.join(MAIN, 'database', 'connection'));
+  const repositories = require(path.join(MAIN, 'database', 'repositories'));
+  const db = openDatabase(job.dbPath);
+  try {
+    const userId = new repositories.UserRepository(db).createLocalProfileIfMissing().id;
+    if (job.experiments) {
+      new repositories.ProviderStateRepository(db).set(
+        job.watch.providerId,
+        'core.experiments',
+        job.experiments
+      );
+    }
+    const watches = new repositories.WatchRepository(db);
+    const watch = watches.create(userId, job.watch);
+    const { reference, expiresAt, expiresEstimated, unitId, paymentUrl } = job.hold;
+    watches.markHeld(watch.id, {
+      reference,
+      expiresAt: new Date(expiresAt),
+      expiresEstimated: Boolean(expiresEstimated),
+      unitId,
+      paymentUrl,
+    });
+    return { watchId: watch.id };
+  } finally {
+    closeDatabase(db);
+  }
+}
+
+const OPS = {
+  'legacy-v5': legacyV5,
+  'held-snipe': heldSnipe,
+  'alert-snipe': alertSnipe,
+  'held-watch': heldWatch,
+};
 
 const job = JSON.parse(fs.readFileSync(process.argv[2], 'utf8'));
 const run = OPS[job.op];
