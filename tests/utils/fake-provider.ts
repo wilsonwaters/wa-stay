@@ -25,6 +25,7 @@
  *   each unit's minimum stay (`UnitAvailability.minNights`): a shorter stay is refused, its
  *   nights with room answered `min-stay` and never `fullyAvailable`;
  * - `scriptHold(...results)`: the next `holds.create` calls answer these;
+ * - `maxWindowMinutes`: every release mode's window limit;
  * - `account` / `setAccount(state)`: what `auth.isSignedIn` answers; `auth` replaces its
  *   sign-in URL, origins or completion pages;
  * - `credentials`: a `credentials` sign-in instead of `browser-session` (R15), with
@@ -167,6 +168,8 @@ export interface FakeProviderOptions {
   searchPageSize?: number;
   /** A search-mode catalogue also has `catalog.searchText`. */
   textSearch?: boolean;
+  /** Every release mode's `maxWindowMinutes` (none by default). */
+  maxWindowMinutes?: number;
 }
 
 /** A `credentials` sign-in for the fake. Values here are made up; never a real number. */
@@ -347,7 +350,11 @@ export function createFakeProvider(options: FakeProviderOptions = {}): FakeProvi
             description: 'Polls for a freed unit.',
             usesAccessGate: false,
           },
-        ]
+        ].map((mode) =>
+          options.maxWindowMinutes === undefined
+            ? mode
+            : { ...mode, maxWindowMinutes: options.maxWindowMinutes }
+        )
       : undefined,
   };
 

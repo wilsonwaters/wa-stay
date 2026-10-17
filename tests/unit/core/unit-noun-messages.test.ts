@@ -72,7 +72,9 @@ describe('core messages without a unit noun', () => {
 
     expect(h.notifications.notifySnipeHeld).toHaveBeenCalledWith(
       expect.objectContaining({ id: snipe.id, holdUnitId: 'c1' }),
-      'cabin'
+      'cabin',
+      // The public booking page, for the email (R12)
+      expect.stringMatching(/^https:\/\/fake\.example\/book\/1\?/)
     );
   });
 

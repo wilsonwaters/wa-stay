@@ -156,6 +156,15 @@ export class ProviderHttpError extends ProviderError {
   }
 }
 
+/**
+ * True for a provider turning WA Stay away: a `ProviderHttpError` with status 403 or 429
+ * (a provider's challenge or block cool-down is one too). Whatever asked stops and shows why;
+ * nothing tries again by itself (§12.35; a snipe ends FAILED).
+ */
+export function isProviderBlock(error: unknown): error is ProviderHttpError {
+  return error instanceof ProviderHttpError && (error.status === 403 || error.status === 429);
+}
+
 export class ProviderTimeoutError extends ProviderError {
   readonly url: string;
   readonly timeoutMs: number;

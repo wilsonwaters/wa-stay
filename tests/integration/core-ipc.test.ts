@@ -142,6 +142,48 @@ describe('watches / snipes / bookings over IPC', () => {
     expect(container.repositories.snipes.findAll()).toEqual([]);
   });
 
+  it('snipes carry their action (R12): defaults, an alert, VALIDATION for hold without holds or an unknown one', async () => {
+    container.providers.register(
+      createFakeProvider({ id: 'alerts', capabilities: { holds: false } }).factory,
+      (manifest) => createTestProviderContext(manifest)
+    );
+
+    // Defaults: hold where the provider has holds, alert where it has none
+    await expect(call<SiteSnipe>('snipes:create', snipeInput())).resolves.toMatchObject({
+      success: true,
+      data: { action: 'hold' },
+    });
+    const alert = await call<SiteSnipe>('snipes:create', snipeInput({ providerId: 'alerts' }));
+    expect(alert).toMatchObject({ success: true, data: { action: 'alert' } });
+    await expect(call('snipes:get', { id: alert.data!.id })).resolves.toMatchObject({
+      data: { action: 'alert' },
+    });
+
+    await expect(
+      call('snipes:create', snipeInput({ providerId: 'alerts', action: 'hold' }))
+    ).resolves.toMatchObject({
+      success: false,
+      code: 'VALIDATION',
+      issues: ['action'],
+      error: "alerts can't hold automatically, so choose an alert",
+    });
+    await expect(
+      call('snipes:update', { id: alert.data!.id, updates: { action: 'hold' } })
+    ).resolves.toMatchObject({ success: false, code: 'VALIDATION', issues: ['action'] });
+    await expect(call('snipes:create', snipeInput({ action: 'cart' }))).resolves.toMatchObject({
+      success: false,
+      code: 'VALIDATION',
+      issues: ['action'],
+    });
+    await expect(
+      call('snipes:update', { id: alert.data!.id, updates: { action: 'cart' } })
+    ).resolves.toMatchObject({ success: false, code: 'VALIDATION', issues: ['updates.action'] });
+    expect((await call<SiteSnipe[]>('snipes:list')).data?.map((s) => s.action)).toEqual([
+      'alert',
+      'hold',
+    ]);
+  });
+
   describe.each([
     ['watches', () => watchInput('fake')],
     ['snipes', () => snipeInput()],

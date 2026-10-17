@@ -296,6 +296,21 @@ describe('ProviderManifestSchema', () => {
   ])('rejects %s', (_label, change, path) => {
     expect(issuesAt(ProviderManifestSchema.safeParse(withChange(change)))).toContain(path);
   });
+
+  it.each([1, 30, 1440])("accepts a release mode's maxWindowMinutes of %s (R12)", (minutes) => {
+    const capped = withChange((m) => (m.releaseModes![0].maxWindowMinutes = minutes));
+    expect(issuesAt(ProviderManifestSchema.safeParse(capped))).toEqual([]);
+  });
+
+  it.each([0, -5, 1441, 1.5])(
+    "rejects a release mode's maxWindowMinutes of %s (R12)",
+    (minutes) => {
+      const capped = withChange((m) => (m.releaseModes![0].maxWindowMinutes = minutes));
+      expect(issuesAt(ProviderManifestSchema.safeParse(capped))).toEqual([
+        'releaseModes.0.maxWindowMinutes',
+      ]);
+    }
+  );
 });
 
 describe('provider limits', () => {

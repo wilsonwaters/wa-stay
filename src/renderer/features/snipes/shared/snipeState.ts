@@ -42,6 +42,7 @@ export function isFinished(snipe: Pick<SiteSnipe, 'status'>): boolean {
   return (
     snipe.status === SnipeStatus.HELD ||
     snipe.status === SnipeStatus.BOOKED ||
+    snipe.status === SnipeStatus.ALERTED ||
     snipe.status === SnipeStatus.EXPIRED ||
     snipe.status === SnipeStatus.FAILED
   );
@@ -86,7 +87,8 @@ export interface TimelineStep {
 /**
  * The steps in order (the state machine in tech-review): Armed → … → Held → Booked. Booked is
  * always there, still to come until the hold is paid for, so a snipe counts the same steps in
- * every state ("Step 4 of 5: Held", then "Step 5 of 5: Booked").
+ * every state ("Step 4 of 5: Held", then "Step 5 of 5: Booked"). A snipe that alerts (its
+ * action, or a hold snipe that alerted instead) ends at "Alert sent" instead of Held and Booked.
  */
 function stepsFor(snipe: SiteSnipe): { id: string; label: string }[] {
   const continuous = snipe.releaseMode === SnipeReleaseMode.CANCELLATION;
@@ -99,8 +101,12 @@ function stepsFor(snipe: SiteSnipe): { id: string; label: string }[] {
       ? []
       : [{ id: 'waiting', label: 'Waiting for release' }]),
     { id: 'sniping', label: 'Sniping' },
-    { id: 'held', label: 'Held' },
-    { id: 'booked', label: 'Booked' },
+    ...(snipe.action === 'alert' || snipe.status === SnipeStatus.ALERTED
+      ? [{ id: 'alerted', label: 'Alert sent' }]
+      : [
+          { id: 'held', label: 'Held' },
+          { id: 'booked', label: 'Booked' },
+        ]),
   ];
 }
 
@@ -111,14 +117,15 @@ const CURRENT_STEP: Partial<Record<string, string>> = {
   [SnipeStatus.SNIPING]: 'sniping',
   [SnipeStatus.HELD]: 'held',
   [SnipeStatus.BOOKED]: 'booked',
+  [SnipeStatus.ALERTED]: 'alerted',
 };
 
 /**
  * The timeline: each step done, current, still to come, or (once the snipe has stopped) not
- * reached. A paused or unknown status has no current step. Expired and Failed take Booked's
- * place as the current, terminal step, so the count stays the same; only steps known to have
- * happened are marked done (an expired hold was held; an expired window was spent sniping; a
- * failure only says it was armed).
+ * reached. A paused or unknown status has no current step. Expired and Failed take the last
+ * step's place (Booked, or an alert's "Alert sent") as the current, terminal step, so the count
+ * stays the same; only steps known to have happened are marked done (an expired hold was held;
+ * an expired window was spent sniping; a failure only says it was armed).
  */
 export function timelineSteps(snipe: SiteSnipe): TimelineStep[] {
   const steps = stepsFor(snipe);
@@ -138,7 +145,7 @@ export function timelineSteps(snipe: SiteSnipe): TimelineStep[] {
       snipe.status === SnipeStatus.FAILED ? 'Failed' : wasHeld ? 'Hold expired' : 'Expired';
     return [
       ...steps
-        .filter((step) => step.id !== 'booked')
+        .filter((step) => step.id !== 'booked' && step.id !== 'alerted')
         .map((step, i): TimelineStep => ({ ...step, state: i <= reached ? 'done' : 'missed' })),
       { id: snipe.status, label: terminalLabel, state: 'current', terminal: true },
     ];
@@ -195,7 +202,10 @@ export function unitLabel(
   return `${capitalise(noun.one)} ${unitId}`;
 }
 
-/** Most urgent first: a hold to pay for, then running snipes, paused, ended, booked. */
+/**
+ * Most urgent first: a hold to pay for, then running snipes, paused, ended (an alert sent is
+ * one), booked.
+ */
 const URGENCY: Partial<Record<string, number>> = {
   [SnipeStatus.HELD]: 0,
   [SnipeStatus.SNIPING]: 1,
@@ -205,6 +215,7 @@ const URGENCY: Partial<Record<string, number>> = {
   [SnipeStatus.DISABLED]: 3,
   [SnipeStatus.FAILED]: 4,
   [SnipeStatus.EXPIRED]: 4,
+  [SnipeStatus.ALERTED]: 4,
   [SnipeStatus.BOOKED]: 5,
 };
 
