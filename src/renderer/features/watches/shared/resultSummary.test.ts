@@ -154,4 +154,23 @@ describe('runResultMessage', () => {
       )
     ).toBe('Site 12 held at Osprey Bay. Pay before Tue 1 Dec, 3:42 pm AWST.');
   });
+
+  it("a first check that holds names the unit from the check's own matches, never by its id (R19 review)", () => {
+    const hold = {
+      reference: 'rac-cart:busselton:2099-12-11:0a1b2c',
+      unitId: 'cat:4',
+      paymentUrl: 'https://parksandresorts.rac.com.au/busselton/booking/',
+      expiresAt: '2099-12-01T07:42:00Z',
+      expiresEstimated: true,
+    };
+    const powered = { ...match('cat:4', '2099-12-11', '2099-12-13'), unitName: 'Powered Site' };
+    // The watch is the one from before the check: no units yet
+    expect(
+      runResultMessage({ ...base, found: true, matches: [powered], hold }, watch, SITES, undefined)
+    ).toBe('Powered Site held at Osprey Bay.');
+    // With no match naming it, the noun, never `cat:4`
+    expect(runResultMessage({ ...base, found: true, hold }, watch, SITES, undefined)).toBe(
+      'A site held at Osprey Bay.'
+    );
+  });
 });
