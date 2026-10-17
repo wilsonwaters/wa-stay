@@ -4,12 +4,14 @@
  * no other code in the app names it.
  *
  * The parks are on Explore with their categories (the catalogue), each park's availability for
- * a stay is checked per category, and watches run on it. Free counts on Explore, release alerts
- * and the member number come later; until then every other capability is off. RAC's terms
- * (`index.ts`) set the limits: one request at a time, 10 s apart in the background, watches
- * every 15 minutes at most, and at most two pets.
+ * a stay is checked per category, watches run on it, and Site Sniper alerts when a stay's dates
+ * open (snipes without holds). Free counts on Explore and the member number come later; until
+ * then every other capability is off. RAC's terms (`index.ts`) set the limits: one request at a
+ * time, 10 s apart in the background, watches every 15 minutes at most, a snipe's checks 10 s
+ * apart for at most 30 minutes after the release, and at most two pets.
  */
 
+import { SnipeReleaseMode } from '@shared/types/common.types';
 import type { ProviderManifest } from '@shared/types/provider.types';
 import { RAC_SITE_URL } from './client';
 
@@ -39,7 +41,9 @@ export const racManifest: ProviderManifest = {
     // Explore's free counts come later.
     bulkAvailability: false,
     watches: true,
-    snipes: false,
+    // Release alerts: a snipe checks when the dates open and alerts with RAC's booking page.
+    snipes: true,
+    // Never holds or carts (no live cart): every RAC snipe is an alert.
     holds: false,
     // Never: the app does not cancel or change an RAC booking (terms rule 10).
     bookingImport: false,
@@ -67,6 +71,29 @@ export const racManifest: ProviderManifest = {
       max: 2,
       default: 0,
       appliesTo: ['availability', 'watch', 'snipe'],
+    },
+  ],
+  // Both timed: a snipe checks every 10 s from the release for at most 30 minutes (terms rules
+  // 2 and 3; `release-policy.ts`). No cancellation mode: watches cover cancellations, every 15
+  // minutes at most.
+  releaseModes: [
+    {
+      id: SnipeReleaseMode.DAILY_ROLLOVER,
+      label: 'When these dates open',
+      description:
+        'New dates open each midnight, 364 days ahead, and school holidays on their own release ' +
+        'days. Site Sniper works out when yours open and checks then.',
+      usesAccessGate: false,
+      maxWindowMinutes: 30,
+    },
+    {
+      id: SnipeReleaseMode.SCHEDULED,
+      label: 'At a time you set',
+      description:
+        'For dates released on a day you know, such as seasonal dates at Cable Beach. ' +
+        'Site Sniper checks from the time you set.',
+      usesAccessGate: false,
+      maxWindowMinutes: 30,
     },
   ],
 };

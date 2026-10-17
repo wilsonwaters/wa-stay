@@ -39,6 +39,7 @@ import {
 } from '@tests/utils/fake-provider';
 import { RecordingHttpClient } from '@tests/utils/fake-paced-provider';
 import { describeProviderContract } from '@tests/utils/provider-contract';
+import { fakeDateOnly } from '@tests/utils/core-harness';
 
 /** Holds `rac/manifest.json`, which lists the recorded pages by request path. */
 const FIXTURES_DIR = path.join(__dirname, '../fixtures/providers');
@@ -48,7 +49,6 @@ const UNEXPECTED_LOG = path.join(os.tmpdir(), `rac-unexpected-${process.pid}.log
 const RAC = 'https://parksandresorts.rac.com.au';
 /** The day after the pages were recorded, 10 am in Perth. */
 const NOW = new Date('2026-10-17T02:00:00.000Z');
-const STAY: StayQuery = { arrival: '2026-11-06', departure: '2026-11-08', adults: 2 };
 const placeholder = (n: number) =>
   `https://driveau.newbook.cloud/crop_800_450/instances_00000000000000000000000000000000_${n}.jpg`;
 
@@ -91,11 +91,24 @@ const page = (name: string) => fs.readFileSync(path.join(RAC_FIXTURES, name), 'u
 
 afterAll(() => fs.rmSync(UNEXPECTED_LOG, { force: true }));
 
-describeProviderContract('rac', () => ({
-  provider: racFactory(fixtureContext()),
-  sample: { externalId: 'busselton', stay: STAY },
-  unknownExternalId: 'ningaloo',
-}));
+/**
+ * The contract suite asks for each release mode's instant at the time it runs. RAC refuses a
+ * `daily_rollover` stay that is already open (a watch suits it), so the suite runs at NOW, on a
+ * stay whose release is still ahead then: the window edge, whose last night (18 Oct 2027) opens
+ * at midnight on 19 Oct 2026, Perth time.
+ */
+const UNRELEASED_STAY: StayQuery = { arrival: '2027-10-13', departure: '2027-10-19', adults: 2 };
+
+describe('at NOW', () => {
+  beforeAll(() => fakeDateOnly(NOW));
+  afterAll(() => jest.useRealTimers());
+
+  describeProviderContract('rac', () => ({
+    provider: racFactory(fixtureContext()),
+    sample: { externalId: 'busselton', stay: UNRELEASED_STAY },
+    unknownExternalId: 'ningaloo',
+  }));
+});
 
 describe('RAC Parks & Resorts', () => {
   // Registered in a fresh registry, as the app registers it.

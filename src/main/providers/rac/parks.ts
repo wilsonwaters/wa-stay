@@ -19,8 +19,12 @@
  *   by park (type 2 is cabins at Cable Beach but sites at Busselton). A category's name decides
  *   first (`unit-kinds.ts`); the type is the fallback.
  * - **schoolHolidays** is the park's part in RAC's school-holiday releases: the hour (Perth)
- *   they open, and the unit kinds left out of the 48-hour member pre-sale. `null` for Cable
- *   Beach, which is not in them (only the rolling 364-day window applies).
+ *   they open; whether the park is in the 48-hour member pre-sale before each one, which opens
+ *   at the same hour, 48 hours earlier (decided on 16 Oct 2026; terms rule 14); and what is left
+ *   out of the pre-sale, as unit kinds and as the same categories' NewBook ids (a snipe may name
+ *   categories rather than kinds, and the release policy sends no request to look one up).
+ *   `null` for Cable Beach, which is in neither: only the rolling 364-day window applies there
+ *   (decided on 16 Oct 2026). The release days themselves are in `release-calendar.ts`.
  *
  * The NewBook-native parks' categories, from the research's availability captures of
  * 16–17 Oct 2026 (type id: names), kept for their units later:
@@ -40,10 +44,20 @@ export type BookNowPage = 'widget' | 'native';
 
 /** A park's part in RAC's school-holiday releases. */
 export interface SchoolHolidayRelease {
-  /** The hour, Perth time, the park's releases open: 7, 8 or 9 am. */
+  /**
+   * The hour, Perth time, the park's releases open: 7, 8 or 9 am. Its member pre-sale opens at
+   * the same hour, 48 hours earlier.
+   */
   hour: 7 | 8 | 9;
+  /** Whether the park is in the 48-hour member pre-sale before each release. */
+  memberPreSale: boolean;
   /** Unit kinds that are not in the member pre-sale (Margaret River's dorms). */
   presaleExcludes: readonly UnitKind[];
+  /**
+   * NewBook category ids (`data-cat-id`, a unit `cat:<id>`) that are not in the member
+   * pre-sale: the same categories as `presaleExcludes`, for a snipe that names categories.
+   */
+  presaleExcludedCategoryIds: readonly string[];
 }
 
 export interface RacPark {
@@ -63,7 +77,13 @@ export interface RacPark {
   schoolHolidays: SchoolHolidayRelease | null;
 }
 
-const noExclusions: readonly UnitKind[] = [];
+/** A park in the school-holiday releases and the member pre-sale, with nothing left out. */
+const inPreSale = (hour: 7 | 8 | 9): SchoolHolidayRelease => ({
+  hour,
+  memberPreSale: true,
+  presaleExcludes: [],
+  presaleExcludedCategoryIds: [],
+});
 
 export const RAC_PARKS: readonly RacPark[] = [
   {
@@ -77,7 +97,7 @@ export const RAC_PARKS: readonly RacPark[] = [
     lng: 115.2487607,
     unitKinds: ['campsite', 'cabin'],
     categoryTypes: { '2': 'campsite', '5': 'cabin' },
-    schoolHolidays: { hour: 8, presaleExcludes: noExclusions },
+    schoolHolidays: inPreSale(8),
   },
   {
     slug: 'cable-beach',
@@ -103,7 +123,7 @@ export const RAC_PARKS: readonly RacPark[] = [
     lng: 115.0669404,
     unitKinds: ['campsite', 'cabin'],
     categoryTypes: { '1': 'cabin', '2': 'campsite' },
-    schoolHolidays: { hour: 9, presaleExcludes: noExclusions },
+    schoolHolidays: inPreSale(9),
   },
   {
     slug: 'esperance',
@@ -116,7 +136,7 @@ export const RAC_PARKS: readonly RacPark[] = [
     lng: 121.9017562,
     unitKinds: ['campsite', 'cabin'],
     categoryTypes: { '2': 'campsite', '5': 'cabin' },
-    schoolHolidays: { hour: 7, presaleExcludes: noExclusions },
+    schoolHolidays: inPreSale(7),
   },
   {
     slug: 'margaret-river',
@@ -129,7 +149,14 @@ export const RAC_PARKS: readonly RacPark[] = [
     lng: 115.077829,
     unitKinds: ['campsite', 'cabin', 'dorm', 'glamping'],
     categoryTypes: { '2': 'cabin', '4': 'dorm', '5': 'campsite' },
-    schoolHolidays: { hour: 7, presaleExcludes: ['dorm'] },
+    // Its dorms (category type 4: "Dorm Room - Sleeps 26", "- Sleeps 14" and "- Sleeps 5") are
+    // not in the member pre-sale (research §5, book-now page of 16 Oct 2026).
+    schoolHolidays: {
+      hour: 7,
+      memberPreSale: true,
+      presaleExcludes: ['dorm'],
+      presaleExcludedCategoryIds: ['2', '3', '4'],
+    },
   },
   {
     slug: 'exmouth',
@@ -143,7 +170,7 @@ export const RAC_PARKS: readonly RacPark[] = [
     unitKinds: ['campsite', 'cabin', 'room'],
     // Type 1 holds the cabins and the Blue Reef motel rooms; a cabin says so in its name.
     categoryTypes: { '1': 'room', '2': 'campsite' },
-    schoolHolidays: { hour: 9, presaleExcludes: noExclusions },
+    schoolHolidays: inPreSale(9),
   },
   {
     slug: 'karri-valley',
@@ -156,7 +183,7 @@ export const RAC_PARKS: readonly RacPark[] = [
     lng: 115.850881,
     unitKinds: ['campsite', 'cabin', 'room'],
     categoryTypes: { '2': 'cabin', '7': 'campsite' },
-    schoolHolidays: { hour: 8, presaleExcludes: noExclusions },
+    schoolHolidays: inPreSale(8),
   },
   {
     slug: 'monkey-mia',
@@ -169,7 +196,7 @@ export const RAC_PARKS: readonly RacPark[] = [
     lng: 113.7183656,
     unitKinds: ['campsite', 'cabin', 'room', 'dorm'],
     categoryTypes: { '1': 'room', '2': 'campsite', '7': 'dorm' },
-    schoolHolidays: { hour: 8, presaleExcludes: noExclusions },
+    schoolHolidays: inPreSale(8),
   },
 ];
 

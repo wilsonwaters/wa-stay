@@ -11,7 +11,9 @@ import path from 'path';
 import { RAC_PARKS, racFactory, racLinks, racManifest } from '@main/providers/rac';
 import { effectiveIntervalMinutes } from '@main/core/watches/next-check';
 import { resolveStayParams } from '@main/core/stay-params';
+import { readBookNowPage } from '@main/providers/rac/book-now';
 import { categoryIdOf, racBookingPage } from '@main/providers/rac/links';
+import { racPark } from '@main/providers/rac/parks';
 import { ProviderRegistry } from '@main/providers/registry';
 import { AppError } from '@main/utils/app-error';
 import { contrastRatio } from '@renderer/styles/contrast';
@@ -41,14 +43,14 @@ describe('racManifest', () => {
     });
   });
 
-  it('has a catalogue, availability and watches, and no account', () => {
+  it('has a catalogue, availability, watches and release alerts (snipes without holds), and no account', () => {
     expect(racManifest.capabilities).toEqual({
       catalog: true,
       catalogMode: 'full',
       availability: true,
       bulkAvailability: false,
       watches: true,
-      snipes: false,
+      snipes: true,
       holds: false,
       bookingImport: false,
       accessGate: false,
@@ -115,10 +117,38 @@ describe('racManifest', () => {
     expect(error).toMatchObject({ code: 'VALIDATION', issues: ['stayParams.pets'] });
   });
 
-  it('registers with links, a catalogue and availability: no bookings module, so it can never change a booking (rule 10)', () => {
+  it('declares two timed release modes, each checked for at most 30 minutes, and no cancellation mode', () => {
+    expect(racManifest.releaseModes).toEqual([
+      {
+        id: 'daily_rollover',
+        label: 'When these dates open',
+        description: expect.any(String),
+        usesAccessGate: false,
+        maxWindowMinutes: 30,
+      },
+      {
+        id: 'scheduled',
+        label: 'At a time you set',
+        description: expect.any(String),
+        usesAccessGate: false,
+        maxWindowMinutes: 30,
+      },
+    ]);
+    expect(racManifest.releaseModes?.map((mode) => mode.id)).not.toContain('cancellation');
+  });
+
+  it('registers with links, a catalogue, availability and a release policy: no holds, and no bookings module, so it can never change a booking (rule 10)', () => {
     const registry = new ProviderRegistry();
     const provider = registry.register(racFactory, createTestProviderContext);
-    expect(Object.keys(provider).sort()).toEqual(['availability', 'catalog', 'links', 'manifest']);
+    expect(Object.keys(provider).sort()).toEqual([
+      'availability',
+      'catalog',
+      'links',
+      'manifest',
+      'release',
+    ]);
+    expect(registry.require('rac', 'snipes').release).toBe(provider.release);
+    expect(provider.holds).toBeUndefined();
     expect(provider.bookings).toBeUndefined();
     expect(provider.manifest.capabilities.bookingImport).toBe(false);
   });
@@ -218,16 +248,48 @@ describe('RAC_PARKS', () => {
   });
 
   it("keeps each park's school-holiday release hour and its part in the member pre-sale", () => {
-    expect(Object.fromEntries(RAC_PARKS.map((park) => [park.slug, park.schoolHolidays]))).toEqual({
-      busselton: { hour: 8, presaleExcludes: [] },
-      'cable-beach': null,
-      cervantes: { hour: 9, presaleExcludes: [] },
-      esperance: { hour: 7, presaleExcludes: [] },
-      'margaret-river': { hour: 7, presaleExcludes: ['dorm'] },
-      exmouth: { hour: 9, presaleExcludes: [] },
-      'karri-valley': { hour: 8, presaleExcludes: [] },
-      'monkey-mia': { hour: 8, presaleExcludes: [] },
+    const all = (hour: number) => ({
+      hour,
+      memberPreSale: true,
+      presaleExcludes: [],
+      presaleExcludedCategoryIds: [],
     });
+    expect(Object.fromEntries(RAC_PARKS.map((park) => [park.slug, park.schoolHolidays]))).toEqual({
+      busselton: all(8),
+      // Neither in the school-holiday releases nor in the pre-sale: the rolling window only
+      'cable-beach': null,
+      cervantes: all(9),
+      esperance: all(7),
+      // Its dorms (category type 4) are left out of the pre-sale
+      'margaret-river': {
+        hour: 7,
+        memberPreSale: true,
+        presaleExcludes: ['dorm'],
+        presaleExcludedCategoryIds: ['2', '3', '4'],
+      },
+      exmouth: all(9),
+      'karri-valley': all(8),
+      'monkey-mia': all(8),
+    });
+  });
+
+  it("leaves out of the pre-sale exactly Margaret River's dorm categories on its book-now page", () => {
+    const page = readBookNowPage(
+      fs.readFileSync(
+        path.join(__dirname, '../../../fixtures/providers/rac/book-now-margaret-river.html'),
+        'utf8'
+      )
+    )!;
+    const dorms = page.categories.filter((category) => category.typeId === '4');
+    expect(dorms.map((category) => category.title)).toEqual([
+      'Dorm Room - Sleeps 26',
+      'Dorm Room - Sleeps 5',
+    ]);
+    const excluded = racPark('margaret-river')!.schoolHolidays!.presaleExcludedCategoryIds;
+    // The trimmed page keeps two of the three dorms; the 14-bed one is category 2
+    for (const dorm of dorms) expect(excluded).toContain(dorm.catId);
+    const others = page.categories.filter((category) => category.typeId !== '4');
+    for (const other of others) expect(excluded).not.toContain(other.catId);
   });
 
   it("is facts only: no photo, description, summary or amenity of RAC's (rule 6)", () => {
