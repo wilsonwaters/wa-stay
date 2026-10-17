@@ -157,7 +157,7 @@ With no `window.api` (the renderer opened in a plain browser with `npm run dev:r
 | App error | heading, buttons | WA Stay hit a problem · Reload WA Stay · Copy error details |
 | Explore page title | heading level 1 (visually hidden) | Explore places to stay |
 | Explore search | search, combobox, button | Search places · Where · Search |
-| Explore filters | group, buttons | Filters · Provider · Type · Region · Facilities · Book online · Available only · Clear all (a chip with choices: "Region, 1 selected") |
+| Explore filters | group, buttons | Filters · Provider · Stay type · Region · Facilities · Book online · Available only · Clear all (a chip with choices: "Region, 1 selected") |
 | Explore results | region, heading level 2 | Results · "169 places", or "12 places in map area" once the person has moved the map; with dates "169 places · 8 available for 6–8 Nov", or "… · checking availability…" |
 | Explore availability | button, list | Retry {shortName} availability · Map key |
 | Explore map | region, switch | Map of places · Search as I move the map |

@@ -3,8 +3,9 @@
  *
  * Explore (E1): the search pill, the filters, the list-only notice (the e2e build has no
  * Mapbox token, so there is no map), and the campgrounds from the ParkStay catalogue fixture
- * (tests/e2e/fixtures/http/parkstay/campground_map.json). With dates (E3): each campground's
- * availability from the bulk fixture (campground_availabilty_view.json) and "Available only".
+ * (tests/e2e/fixtures/http/parkstay/campground_map.json), filtered by stay type and region.
+ * With dates (E3): each campground's availability from the bulk fixture
+ * (campground_availabilty_view.json) and "Available only".
  */
 
 import { stayRangeLabel } from '../../src/renderer/components/nightGridModel';
@@ -73,11 +74,25 @@ test('Explore lists the ParkStay campgrounds from the catalogue fixture', async 
   // Provider photos are not loaded in fixture mode: the placeholder stands in.
   await expect(results.getByRole('img', { name: 'No photo available for Bungarra' })).toBeVisible();
 
+  // Stay type → Dorms: the hut alone. The fixture has camping, a holiday park's cabins and a hut.
+  const filters = window.getByRole('group', { name: 'Filters' });
+  await filters.getByRole('button', { name: 'Stay type' }).click();
+  const stayType = window.getByRole('dialog', { name: 'Stay type' });
+  await expect(stayType.getByRole('checkbox')).toHaveCount(3);
+  await stayType.getByRole('checkbox', { name: 'Dorms, 1 place' }).click();
+  await stayType.getByRole('button', { name: 'Done' }).click();
+  await expect(filters.getByRole('button', { name: 'Stay type, 1 selected' })).toBeFocused();
+  await expectRoute(window, '/?stay=dorm');
+  await expect(results.getByRole('heading', { level: 2, name: '1 place' })).toBeVisible();
+  await expect(results.getByRole('link')).toHaveCount(1);
+  await expect(results.getByRole('link', { name: 'Yeagarup Hut' })).toBeVisible();
+  await window.getByRole('button', { name: 'Clear all' }).click();
+  await expect(
+    results.getByRole('heading', { level: 2, name: `${FIXTURE_CAMPGROUNDS} places` })
+  ).toBeVisible();
+
   // Filter by region, then open a place.
-  await window
-    .getByRole('group', { name: 'Filters' })
-    .getByRole('button', { name: 'Region' })
-    .click();
+  await filters.getByRole('button', { name: 'Region' }).click();
   const region = window.getByRole('dialog', { name: 'Region' });
   await region.getByRole('checkbox', { name: 'Pilbara, 3 places' }).click();
   await region.getByRole('button', { name: 'Done' }).click();

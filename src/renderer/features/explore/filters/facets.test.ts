@@ -47,6 +47,86 @@ describe('matchesFilters', () => {
   });
 });
 
+describe('stay types', () => {
+  const park = place({ key: 'parkstay:2', kind: 'holiday-park', name: 'Woodman Point' });
+  const hut = place({ key: 'parkstay:3', kind: 'hut', name: 'Yeagarup Hut' });
+  const homestead = place({ key: 'parkstay:4', kind: 'farm-stay', name: 'Mount Hart' });
+  const villas = place({
+    key: 'rott:1',
+    providerId: 'rott',
+    kind: 'other',
+    unitKinds: ['cabin', 'room'],
+  });
+
+  it('passes a place with any chosen kind: its own unit kinds, or those its kind gives', () => {
+    const cabins = filters({ stayTypes: ['cabin'] });
+    expect(matchesFilters(park, cabins)).toBe(true);
+    expect(matchesFilters(villas, cabins)).toBe(true);
+    expect(matchesFilters(place({}), cabins)).toBe(false);
+    expect(matchesFilters(hut, filters({ stayTypes: ['cabin', 'dorm'] }))).toBe(true);
+    expect(matchesFilters(homestead, filters({ stayTypes: ['campsite', 'cabin'] }))).toBe(false);
+    expect(matchesFilters(place({}), filters({ stayTypes: [] }))).toBe(true);
+    // Its own list wins over its kind: an "other" place with rooms is not "other".
+    expect(matchesFilters(villas, filters({ stayTypes: ['room'] }))).toBe(true);
+  });
+
+  it('counts a place once for each of its kinds, with the other chips applied', () => {
+    const items = [place({}), park, hut, homestead, villas];
+    const counts = facetCounts(items, NO_FILTERS, 'stayTypes');
+    expect(Object.fromEntries(counts)).toEqual({
+      campsite: 2,
+      cabin: 2,
+      dorm: 1,
+      room: 1,
+      other: 1,
+    });
+    // Its own choice is left out of its counts (OR within a chip)…
+    expect(facetCounts(items, filters({ stayTypes: ['dorm'] }), 'stayTypes')).toEqual(counts);
+    // …but another chip applies.
+    expect(
+      Object.fromEntries(facetCounts(items, filters({ providerIds: ['rott'] }), 'stayTypes'))
+    ).toEqual({ cabin: 1, room: 1 });
+  });
+
+  it('lists only the groups the catalogue has, in group order, never "other"', () => {
+    const facets = buildFacets([villas, hut, homestead], [villas, hut], NO_FILTERS, PROVIDERS);
+    expect(facets.stayTypes).toEqual([
+      { value: 'cabin', label: 'Cabins & villas', count: 1 },
+      { value: 'room', label: 'Rooms', count: 1 },
+      { value: 'dorm', label: 'Dorms', count: 1 },
+    ]);
+  });
+
+  it('keeps a chosen stay type no place has, with no places', () => {
+    const facets = buildFacets(
+      [place({}), park],
+      [place({}), park],
+      filters({ stayTypes: ['glamping'] }),
+      PROVIDERS
+    );
+    expect(facets.stayTypes).toEqual([
+      { value: 'campsite', label: 'Camping', count: 2 },
+      { value: 'cabin', label: 'Cabins & villas', count: 1 },
+      { value: 'glamping', label: 'Glamping', count: 0 },
+    ]);
+  });
+
+  it('has no options while the catalogue is empty (still loading), even with one chosen', () => {
+    expect(buildFacets([], [], filters({ stayTypes: ['cabin'] }), PROVIDERS).stayTypes).toEqual([]);
+  });
+
+  it('counts the stay types over the ParkStay catalogue, as many places as each gives', () => {
+    const counts = facetCounts(PARKSTAY_LOCATIONS, NO_FILTERS, 'stayTypes');
+    for (const kind of ['campsite', 'cabin', 'dorm', 'glamping'] as const) {
+      const matching = PARKSTAY_LOCATIONS.filter((p) =>
+        matchesFilters(p, filters({ stayTypes: [kind] }))
+      );
+      expect(counts.get(kind)).toBe(matching.length);
+    }
+    expect(counts.get('room')).toBeUndefined();
+  });
+});
+
 describe('facet counts over the ParkStay catalogue', () => {
   it('counts each region with the other filters applied (39 in the Pilbara)', () => {
     const regions = facetCounts(PARKSTAY_LOCATIONS, NO_FILTERS, 'regions');
@@ -75,19 +155,17 @@ describe('facet counts over the ParkStay catalogue', () => {
     expect(withDogs.get('Toilet')).toBe(23);
   });
 
-  it('builds every chip: providers always, kinds, regions and amenities sorted, online count', () => {
+  it('builds every chip: providers always, stay types in group order, regions and amenities sorted, online count', () => {
     const facets = buildFacets(PARKSTAY_LOCATIONS, PARKSTAY_LOCATIONS, NO_FILTERS, PROVIDERS);
     expect(facets.providers).toEqual([{ value: 'parkstay', label: 'ParkStay WA', count: 169 }]);
-    expect(facets.kinds.map((k) => `${k.label} ${k.count}`)).toEqual([
-      'Cabin 2',
-      'Campground 139',
-      'Caravan park 1',
-      'Farm stay 4',
+    // Group order, not A to Z; no Rooms (no place has one) and never "other".
+    expect(facets.stayTypes.map((t) => `${t.label} ${t.count}`)).toEqual([
+      'Camping 145',
+      'Cabins & villas 7',
+      'Dorms 1',
       'Glamping 2',
-      'Holiday park 5',
-      'Hut 1',
-      'Place to stay 15',
     ]);
+    expect(facets.stayTypes.map((t) => t.value)).toEqual(['campsite', 'cabin', 'dorm', 'glamping']);
     expect(facets.regions.map((r) => r.label)).toEqual([
       'Goldfields',
       'Kimberley',

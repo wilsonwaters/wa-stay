@@ -7,13 +7,19 @@
  * stay, `bookableUnits` the units that can be booked online at all. A unit that is free on
  * some nights only is not available, and nothing here reads a night the provider did not
  * report as booked: with no entry for a place, its state is `unknown`.
+ *
+ * With stay types chosen, a place that has other kinds too counts only the chosen kinds'
+ * units (`byKind`), or says "check dates" when its provider does not count them apart: a
+ * figure about cabins is never one that may include sites.
  */
 
 import type { LocationSummary } from '../../../../shared/types/catalog.types';
 import type {
   BulkAvailabilityEntry,
   ProviderCapabilities,
+  UnitKind,
 } from '../../../../shared/types/provider.types';
+import { unitKindsOf } from '../../../../shared/utils/unit-kinds';
 import { unitNoun } from '../../../components/locationFormat';
 
 /** The states, in the order they take precedence (see `deriveAvailability`). */
@@ -57,11 +63,49 @@ export interface AvailabilityInput {
   errorCode?: string;
   /** The provider's entry for this place, when it gave one. */
   entry?: BulkAvailabilityEntry;
+  /** The stay types chosen on Explore; none means every kind. */
+  stayTypes?: readonly UnitKind[];
 }
 
 /** A provider count as a whole number of units: anything else counts as none. */
 function units(value: unknown): number {
   return typeof value === 'number' && Number.isFinite(value) ? Math.max(0, Math.floor(value)) : 0;
+}
+
+interface UnitCounts {
+  available: number;
+  bookable: number;
+}
+
+/**
+ * The counts that answer for the stay types chosen: the entry's totals when none is chosen or
+ * the place has no kind that is not chosen; else the chosen kinds' counts from `byKind`
+ * summed (a chosen kind it leaves out counts none), or null when it counts none of them.
+ */
+function chosenCounts(
+  location: Pick<LocationSummary, 'kind' | 'unitKinds'>,
+  entry: BulkAvailabilityEntry,
+  stayTypes: readonly UnitKind[]
+): UnitCounts | null {
+  const totals = { available: units(entry.availableUnits), bookable: units(entry.bookableUnits) };
+  if (stayTypes.length === 0) return totals;
+  const kinds = unitKindsOf(location);
+  const chosen = kinds.filter((kind) => stayTypes.includes(kind));
+  if (chosen.length === kinds.length) return totals;
+  // Passed through as the provider gives it: anything but an object counts as no entry.
+  const { byKind } = entry;
+  const countsOf = (kind: UnitKind) => {
+    const counts = byKind && typeof byKind === 'object' ? byKind[kind] : undefined;
+    return counts && typeof counts === 'object' ? counts : undefined;
+  };
+  if (!chosen.some((kind) => countsOf(kind))) return null;
+  return chosen.reduce(
+    (sum, kind) => ({
+      available: sum.available + units(countsOf(kind)?.availableUnits),
+      bookable: sum.bookable + units(countsOf(kind)?.bookableUnits),
+    }),
+    { available: 0, bookable: 0 }
+  );
 }
 
 /**
@@ -71,9 +115,13 @@ function units(value: unknown): number {
  * from the provider's entry `available` (a unit free every night), `full` (no unit free every
  * night, some bookable) or `none-open` (none bookable: not released, closed or too far ahead), and
  * `unknown` when the provider answered without this place.
+ *
+ * With `stayTypes` chosen and the place having a kind not chosen, the entry's counts for the
+ * chosen kinds it has (`byKind`) decide instead of its totals, and without any it is
+ * `check-dates`.
  */
 export function deriveAvailability(
-  location: Pick<LocationSummary, 'bookingMode'>,
+  location: Pick<LocationSummary, 'bookingMode' | 'kind' | 'unitKinds'>,
   input: AvailabilityInput
 ): PlaceAvailability {
   if (!input.staySet) return { state: 'no-dates' };
@@ -100,8 +148,9 @@ export function deriveAvailability(
   }
   const { entry } = input;
   if (!entry) return { state: 'unknown' };
-  const available = units(entry.availableUnits);
-  const bookable = units(entry.bookableUnits);
+  const counts = chosenCounts(location, entry, input.stayTypes ?? []);
+  if (!counts) return { state: 'check-dates' };
+  const { available, bookable } = counts;
   if (available > 0)
     return { state: 'available', availableUnits: available, bookableUnits: bookable };
   if (bookable > 0) return { state: 'full', bookableUnits: bookable };

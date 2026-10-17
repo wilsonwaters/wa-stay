@@ -15,8 +15,7 @@ import {
 } from '../../../components/ui';
 import { buttonClassName } from '../../../components/ui/Button';
 import { cx } from '../../../components/ui/cx';
-import { ROUTES } from '../../../app/routes';
-import type { StayParams } from '../../../app/stayParams';
+import { ROUTES, type PlaceLinkQuery } from '../../../app/routes';
 import { cardId } from '../results/cardId';
 import { useHighlightStore } from '../state/highlight';
 import { PULSE_INTERVAL_MS, PULSE_OPACITY } from './layers';
@@ -63,7 +62,7 @@ export interface MapViewProps {
   /** The map could not load, or stopped working; Explore falls back to the list. */
   onFailed: (error: Error) => void;
   /** The stay the preview's "View details" opens the place with. */
-  detailStay?: Partial<StayParams>;
+  detailStay?: PlaceLinkQuery;
   /** The history state "View details" carries (where the place was opened from). */
   detailState?: unknown;
   /**

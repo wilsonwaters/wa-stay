@@ -5,7 +5,7 @@
  */
 
 import type { LocationDetail, UnitSummary } from '../../../shared/types/catalog.types';
-import type { ProviderManifest, StayQuery } from '../../../shared/types/provider.types';
+import type { ProviderManifest, StayQuery, UnitKind } from '../../../shared/types/provider.types';
 import { makeLocationKey } from '../../../shared/utils/location-key';
 import type { CreatePrefill } from '../../app/routes';
 import type { StayParams } from '../../app/stayParams';
@@ -105,18 +105,21 @@ export function guestRangeLabel(
 
 /**
  * The create-flow prefill for this place and stay (architecture-notes §12.10): the external
- * id (not the key), the dates, adults and children. Infants are not part of the contract.
+ * id (not the key), the dates, adults and children, and the stay types chosen on Explore.
+ * Infants are not part of the contract.
  */
 export function handoffPrefill(
   providerId: string,
   externalId: string,
-  stay: Partial<StayParams>
+  stay: Partial<StayParams>,
+  stayTypes: readonly UnitKind[] = []
 ): CreatePrefill {
   const prefill: CreatePrefill = { provider: providerId, location: externalId };
   if (stay.arrival) prefill.arrival = stay.arrival;
   if (stay.arrival && stay.departure) prefill.departure = stay.departure;
   if (stay.adults) prefill.adults = stay.adults;
   if (stay.children) prefill.children = stay.children;
+  if (stayTypes.length > 0) prefill.stay = [...stayTypes];
   return prefill;
 }
 

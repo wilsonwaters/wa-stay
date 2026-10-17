@@ -12,7 +12,7 @@ import {
   useProviders,
 } from '../../api';
 import { buildPath, PATTERNS, placeLinkState, ROUTES } from '../../app/routes';
-import { stayParamsQuery, type StayParams } from '../../app/stayParams';
+import { parseStayTypes, stayParamsQuery, type StayParams } from '../../app/stayParams';
 import { areaLine, kindLabel, unitNoun } from '../../components/locationFormat';
 import {
   BackLink,
@@ -197,6 +197,12 @@ export default function PlaceDetailPage() {
   const minDate = todayIn(manifest?.timezone ?? FALLBACK_TIME_ZONE);
   const { stay, setStay } = usePlaceStay({ minDate, maxNights: MAX_NIGHTS });
   const currentStay = useMemo(() => stayQueryOf(stay), [stay]);
+  // The stay types chosen on Explore (`stay=cabin`), handed on to the create flows.
+  const { search } = useLocation();
+  const stayTypes = useMemo(
+    () => parseStayTypes(new URLSearchParams(search).get('stay')),
+    [search]
+  );
 
   // ---- Check availability ---------------------------------------------------------------
   // A provider may leave the units out altogether; that reads as none.
@@ -320,7 +326,7 @@ export default function PlaceDetailPage() {
   const onGuestsChange = (next: Guests) =>
     setStay({ adults: next.adults, children: next.children, infants: next.infants });
 
-  const prefill = handoffPrefill(providerId, externalId, stay);
+  const prefill = handoffPrefill(providerId, externalId, stay, stayTypes);
   const area = detail ? areaLine(detail) : '';
   const online = detail?.bookingMode === 'online';
 

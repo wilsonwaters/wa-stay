@@ -49,6 +49,7 @@ export function normaliseCatalogQuery(query: CatalogQuery): CatalogQuery {
   if (text) out.text = text;
   if (query.providerIds?.length) out.providerIds = [...query.providerIds].sort();
   if (query.kinds?.length) out.kinds = [...query.kinds].sort();
+  if (query.unitKinds?.length) out.unitKinds = [...query.unitKinds].sort();
   if (query.regions?.length) out.regions = [...query.regions].sort();
   if (query.amenities?.length) out.amenities = [...query.amenities].sort();
   if (query.bookingModes?.length) out.bookingModes = [...query.bookingModes].sort();

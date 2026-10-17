@@ -1,4 +1,4 @@
-import type { LocationKind } from '../../../../shared/types/provider.types';
+import type { UnitKind } from '../../../../shared/types/provider.types';
 import { Button } from '../../../components/ui';
 import type { ExploreParams } from '../state/exploreParams';
 import { hasActiveFilters } from '../state/exploreParams';
@@ -8,8 +8,11 @@ import { FilterChip, ToggleChip } from './FilterChip';
 export interface FilterRowProps {
   params: ExploreParams;
   facets: ExploreFacets;
-  /** False when the whole catalogue holds one kind of place: the Type chip is then left out. */
-  showKinds: boolean;
+  /**
+   * False when fewer than two stay types are offered (the catalogue's, and any chosen that it
+   * lacks): the Stay type chip is then left out.
+   */
+  showStayTypes: boolean;
   onChange: (patch: Partial<ExploreParams>) => void;
   onClearAll: () => void;
   /**
@@ -21,14 +24,14 @@ export interface FilterRowProps {
 }
 
 /**
- * Explore's filters: Provider (always shown, §12.9), Type, Region, Facilities, a "Book online"
- * toggle, an "Available only" toggle for the dates chosen, and "Clear all" while any is on.
- * Options within a chip are OR-ed; chips are AND-ed.
+ * Explore's filters: Provider (always shown, §12.9), Stay type, Region, Facilities, a "Book
+ * online" toggle, an "Available only" toggle for the dates chosen, and "Clear all" while any is
+ * on. Options within a chip are OR-ed; chips are AND-ed.
  */
 export function FilterRow({
   params,
   facets,
-  showKinds,
+  showStayTypes,
   onChange,
   onClearAll,
   availableOnlyUnavailable,
@@ -43,12 +46,13 @@ export function FilterRow({
         selected={params.providers}
         onChange={(providers) => onChange({ providers })}
       />
-      {showKinds && (
+      {showStayTypes && (
         <FilterChip
-          label="Type"
-          options={facets.kinds}
-          selected={params.kinds}
-          onChange={(kinds) => onChange({ kinds: kinds as LocationKind[] })}
+          label="Stay type"
+          options={facets.stayTypes}
+          selected={params.stayTypes}
+          onChange={(stayTypes) => onChange({ stayTypes: stayTypes as UnitKind[] })}
+          hint="Places with any of these"
         />
       )}
       <FilterChip

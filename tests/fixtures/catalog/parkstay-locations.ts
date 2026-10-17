@@ -16,6 +16,7 @@ import type {
   CatalogSearchResult,
   LocationSummary,
 } from '../../../src/shared/types/catalog.types';
+import { unitKindsOf } from '../../../src/shared/utils/unit-kinds';
 import raw from './parkstay-locations.json';
 
 export const PARKSTAY_LOCATIONS = raw as LocationSummary[];
@@ -24,14 +25,16 @@ const lower = (text: string | undefined) => (text ?? '').toLowerCase();
 
 /**
  * `catalog.search` as the catalogue service answers it, over `items`: the text matches the
- * name, area or region; options within a filter are OR-ed, filters AND-ed, and every chosen
- * amenity must be present.
+ * name, area or region; options within a filter are OR-ed, filters AND-ed, every chosen
+ * amenity must be present, and `unitKinds` matches a place with any of them (its own, or those
+ * its kind gives, as main stores them).
  */
 export function searchLocations(
   query: CatalogQuery,
   items: readonly LocationSummary[] = PARKSTAY_LOCATIONS
 ): CatalogSearchResult {
   const text = lower(query.text).trim();
+  const unitKinds = query.unitKinds ?? [];
   const matches = items.filter((item) => {
     if (
       text &&
@@ -40,6 +43,7 @@ export function searchLocations(
       return false;
     if (query.providerIds?.length && !query.providerIds.includes(item.providerId)) return false;
     if (query.kinds?.length && !query.kinds.includes(item.kind)) return false;
+    if (unitKinds.length && !unitKindsOf(item).some((k) => unitKinds.includes(k))) return false;
     if (query.regions?.length && !query.regions.includes(item.area?.region ?? '')) return false;
     if (query.bookingModes?.length && !query.bookingModes.includes(item.bookingMode)) return false;
     if (query.amenities?.some((a) => !item.amenities.includes(a))) return false;

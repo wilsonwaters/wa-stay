@@ -6,6 +6,7 @@
 
 import type { LocationSummary } from '../../../../shared/types/catalog.types';
 import type { BookingMode, LocationKind } from '../../../../shared/types/provider.types';
+import { deriveUnitKinds } from '../../../../shared/utils/unit-kinds';
 
 /** A small, fast, seeded PRNG (mulberry32): the same seed gives the same places. */
 function random(seed: number): () => number {
@@ -71,6 +72,8 @@ export function syntheticLocations(count: number, seed = 20261004): LocationSumm
       externalId,
       name: `${pick(FIRST)} ${pick(SECOND)} ${i + 1}`,
       kind,
+      // As main fills them for a provider that leaves them out (no extra draw: same places)
+      unitKinds: deriveUnitKinds(kind),
       bookingMode: pick(MODES),
       lat: Number((south + next() * (north - south)).toFixed(5)),
       lng: Number((west + next() * (east - west)).toFixed(5)),

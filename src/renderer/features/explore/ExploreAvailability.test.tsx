@@ -681,3 +681,107 @@ describe('Explore with dates: the map', () => {
     expect(card('Bungarra')).toHaveAttribute('href', `#/places/parkstay/20?${STAY}`);
   });
 });
+
+describe('Explore with dates: stay types', () => {
+  /** A provider with holiday parks: sites and cabins at each. */
+  const PARKS = {
+    ...PARKSTAY_MANIFEST,
+    id: 'parks',
+    name: 'Holiday Parks WA',
+    shortName: 'Parks',
+    capabilities: { ...PARKSTAY_MANIFEST.capabilities, accessGate: false },
+  };
+  const park = (externalId: string, name: string, lng: number): LocationSummary => ({
+    ...KINGSTOWN,
+    key: `parks:${externalId}`,
+    providerId: 'parks',
+    externalId,
+    name,
+    kind: 'holiday-park',
+    lng,
+  });
+  /** Counts its sites and cabins apart (`byKind`). */
+  const COUNTED = park('1', 'Counted Cove Holiday Park', 115.6);
+  /** Gives only its totals. */
+  const TOTALS = park('2', 'Totals Bay Holiday Park', 115.7);
+  const ENTRIES: BulkAvailabilityEntry[] = [
+    ...bulkAvailabilityFor([BUNGARRA]),
+    {
+      key: COUNTED.key,
+      availableUnits: 7,
+      bookableUnits: 26,
+      byKind: {
+        campsite: { availableUnits: 5, bookableUnits: 20 },
+        cabin: { availableUnits: 2, bookableUnits: 6 },
+      },
+    },
+    { key: TOTALS.key, availableUnits: 4, bookableUnits: 12 },
+  ];
+  const stubs = () =>
+    api(
+      jest.fn(async (stay, options) => answering(ENTRIES)(stay, options)),
+      [PARKSTAY_MANIFEST, PARKS],
+      [BUNGARRA, COUNTED, TOTALS]
+    ).stubs;
+
+  it('counts every unit with no stay type chosen, or with every kind of the place chosen', async () => {
+    const { unmount } = await renderExplore(
+      `/?${STAY}`,
+      stubs(),
+      '3 places · 3 available for 6–8 Nov'
+    );
+    expect(within(card(COUNTED.name)).getByText('7 of 26 sites available')).toBeInTheDocument();
+    expect(within(card(TOTALS.name)).getByText('4 of 12 sites available')).toBeInTheDocument();
+    unmount();
+
+    // Camping and Cabins & villas: everything these places have, so their totals.
+    await renderExplore(
+      `/?stay=campsite,cabin&${STAY}`,
+      stubs(),
+      '3 places · 3 available for 6–8 Nov'
+    );
+    expect(within(card(COUNTED.name)).getByText('7 of 26 sites available')).toBeInTheDocument();
+    expect(within(card(TOTALS.name)).getByText('4 of 12 sites available')).toBeInTheDocument();
+    expect(within(card('Bungarra')).getByText('3 of 5 sites available')).toBeInTheDocument();
+  });
+
+  it('counts only the cabins with Cabins & villas chosen, or says "Check dates" in words', async () => {
+    const { user } = await renderExplore(
+      `/?stay=cabin&${STAY}`,
+      stubs(),
+      '2 places · 1 available for 6–8 Nov'
+    );
+    expect(within(card(COUNTED.name)).getByText('2 of 6 sites available')).toBeInTheDocument();
+    // No count of cabins alone: never its totals, which include sites, and never "not open".
+    const totals = card(TOTALS.name);
+    expect(within(totals).getByText('Check dates on the place page')).toBeInTheDocument();
+    expect(totals).toHaveAccessibleDescription(
+      expect.stringContaining('Check dates on the place page')
+    );
+    expect(within(totals).queryByText(/available|not open|No sites/i)).toBeNull();
+    expect(cardNames()).toEqual([COUNTED.name, TOTALS.name]);
+
+    // "Available only" hides the place that says "Check dates".
+    await user.click(availableOnly());
+    expect(cardNames()).toEqual([COUNTED.name]);
+  });
+
+  describe('on the map', () => {
+    beforeEach(() => {
+      mockMapAvailable = true;
+    });
+
+    it('says "Check dates" on the pill of a place that cannot count the stay types chosen', async () => {
+      await renderExplore(`/?stay=cabin&${STAY}`, stubs(), '2 places · 1 available for 6–8 Nov');
+      const map = maps.current;
+      expect([map.pin(COUNTED.key)?.avail, map.pin(COUNTED.key)?.availLabel]).toEqual([
+        'available',
+        '2 available',
+      ]);
+      expect([map.pin(TOTALS.key)?.avail, map.pin(TOTALS.key)?.availLabel]).toEqual([
+        'check-dates',
+        'Check dates',
+      ]);
+    });
+  });
+});

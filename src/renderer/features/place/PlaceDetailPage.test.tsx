@@ -739,6 +739,20 @@ describe('Place detail page', () => {
       );
     });
 
+    it("hands on Explore's stay types: the watch and snipe links carry stay=cabin", async () => {
+      await renderPlace(`/places/parkstay/20${STAY}&stay=cabin,castle`);
+      expect(within(card()).getByRole('link', { name: 'Watch for availability' })).toHaveAttribute(
+        'href',
+        '#/watches/new?provider=parkstay&location=20&arrival=2099-11-06&departure=2099-11-08&adults=2&stay=cabin'
+      );
+      expect(
+        within(card()).getByRole('link', { name: 'Snipe a site, coming soon' })
+      ).toHaveAttribute(
+        'href',
+        '#/site-sniper/new?provider=parkstay&location=20&arrival=2099-11-06&departure=2099-11-08&adults=2&stay=cabin'
+      );
+    });
+
     it('snipes with the same prefill, and says it is coming soon', async () => {
       await renderPlace();
       const snipe = within(card()).getByRole('link', { name: 'Snipe a site, coming soon' });

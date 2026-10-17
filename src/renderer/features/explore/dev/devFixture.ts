@@ -22,7 +22,7 @@ export async function searchDevFixture(
   const text = normalise(query.text ?? '');
   const filters = {
     providerIds: query.providerIds ?? [],
-    kinds: query.kinds ?? [],
+    stayTypes: query.unitKinds ?? [],
     regions: query.regions ?? [],
     amenities: query.amenities ?? [],
     bookingModes: query.bookingModes ?? [],
