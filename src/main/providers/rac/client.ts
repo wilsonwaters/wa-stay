@@ -30,14 +30,19 @@
  *   day in Perth names the day ("until 9:15 am on Sun 18 Oct").
  * - **Other failures.** Any other non-2xx answer is a `ProviderHttpError` with its status:
  *   retryable for a 5xx (a 520 included), with no cool-down. The core never retries in a loop.
+ * - **The cart guard** (`cart-guard.ts`, terms rule 8) is asked about every request, and every
+ *   redirect, before it is sent: checkout, payment and NewBook calls are always refused, and a
+ *   cart address or a cart removal unless `cartEnabled` (the `autoCart` experiment is on). A
+ *   refusal is a `ProviderError`, logged by its path only (a cart address's query is a token).
  */
 
 import type { ProviderId } from '@shared/types/provider.types';
 import { createLimiter, type Limiter } from '../sdk/concurrency';
 import type { ProviderLogger } from '../sdk/context';
-import { createAbortError, ProviderHttpError, throwIfAborted } from '../sdk/errors';
+import { createAbortError, ProviderError, ProviderHttpError, throwIfAborted } from '../sdk/errors';
 import type { FormFields, HttpClient, HttpMethod, HttpResponse, QueryValue } from '../sdk/http';
 import type { KeyValueStore } from '../sdk/kv-store';
+import { cartGuardRefusal, loggablePath } from './cart-guard';
 
 /** RAC Parks & Resorts' site: the only host the module asks. */
 export const RAC_SITE_URL = 'https://parksandresorts.rac.com.au';
@@ -69,6 +74,8 @@ export interface RacPage {
 export interface RacRequestOptions {
   query?: Record<string, QueryValue>;
   signal?: AbortSignal;
+  /** Called once the request is sent (`HttpRequestOptions.onSend`), not while it waits its turn. */
+  onSend?: () => void;
 }
 
 export interface RacAjaxOptions {
@@ -91,6 +98,11 @@ export interface RacClientDeps {
   timezone: string;
   /** `limits.maxConcurrentRequests`. */
   maxConcurrent: number;
+  /**
+   * Whether a cart address and a cart removal may be sent (`cart-guard.ts`): only while RAC's
+   * `autoCart` experiment is on. Default false.
+   */
+  cartEnabled?: boolean;
 }
 
 /** What turned a request away: a status (403, 429) or Cloudflare's challenge. */
@@ -141,6 +153,16 @@ function describeDuration(ms: number): string {
   if (minutes < 120 && minutes % 60 !== 0) return `${minutes} minutes`;
   const hours = Math.ceil(minutes / 60);
   return hours === 1 ? '1 hour' : `${hours} hours`;
+}
+
+/** `url` with `query` added, as the HTTP client will send it. */
+function withQueryOf(url: string, query: Record<string, QueryValue> | undefined): string {
+  if (!query) return url;
+  const full = new URL(url);
+  for (const [name, value] of Object.entries(query)) {
+    if (value !== undefined && value !== null) full.searchParams.append(name, String(value));
+  }
+  return full.href;
 }
 
 function withoutQuery(url: string): string {
@@ -202,6 +224,7 @@ export class RacClient {
     return this.send('GET', path, {
       query: options.query,
       signal: options.signal,
+      onSend: options.onSend,
       headers: { Accept: 'text/html' },
     });
   }
@@ -248,6 +271,7 @@ export class RacClient {
     const { signal } = request;
     throwIfAborted(signal);
     const url = this.racUrl(path);
+    this.guard(method, withQueryOf(url, request.query), request.body);
     const queued = this.limit(async () => {
       throwIfAborted(signal);
       const block = await this.currentBlock();
@@ -294,10 +318,26 @@ export class RacClient {
             Object.entries(headers).filter(([name]) => name.toLowerCase() !== 'content-type')
           );
         }
+        // A redirect is a request too: never to checkout, and to the cart only while it is on
+        this.guard(currentMethod, target, body);
       }
     });
     // A caller that gives up while its request waits for the one before it hears so at once.
     return raceAbort(queued, signal);
+  }
+
+  /**
+   * Throws a `ProviderError` when the cart guard refuses the request (`cart-guard.ts`), with one
+   * warning that names its path only, never its query.
+   */
+  private guard(method: HttpMethod, url: string, body?: string): void {
+    const why = cartGuardRefusal({ method, url, body }, this.deps.cartEnabled === true);
+    if (why === undefined) return;
+    this.deps.logger.warn(`Refused ${method} ${loggablePath(url)}: ${why}; nothing sent`);
+    throw new ProviderError({
+      providerId: this.deps.providerId,
+      message: `${this.deps.providerName}: WA Stay never sends that request (${why})`,
+    });
   }
 
   /** `path` (or a redirect's `Location`) as an absolute URL on RAC's host, or a blocked error. */
