@@ -341,7 +341,10 @@ change; `HttpRequestOptions.priority` (`'interactive'` or `'background'`) overri
 for one request. Long-lived work your module starts during an interactive call (a timer, a
 keep-alive) inherits the interactive priority, so pass `priority: 'background'` for its
 requests. A request's `timeoutMs` counts from when it is sent, not while it waits, and an
-aborted `signal` takes a waiting request out of the queue at once. A module's own
+aborted `signal` takes a waiting request out of the queue at once. `HttpRequestOptions.onSend`
+is called when the request is sent (when its turn comes), never for one aborted while it
+waits: a module that calls off stale work (RAC's bulk search, when the dates change) can then
+call off what is still waiting and let what the site is already answering finish. A module's own
 `createLimiter` honours priorities as well: it starts a waiting interactive task before waiting
 background ones (first in, first out within each), and the task keeps its caller's priority,
 so the person's request still goes next. Pacing covers `ctx.http` only, not `ctx.browser`'s

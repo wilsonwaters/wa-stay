@@ -740,7 +740,7 @@ describe('RAC bulk availability', () => {
       expect(entry.byKind?.campsite).toStrictEqual({ availableUnits: 0 });
     });
 
-    it('too many guests on every tariff (code 3) is not free but bookable, though check reads it closed', async () => {
+    it('too many guests on every tariff (code 3): check reads the nights closed, so bulk reads "Not open" too', async () => {
       const json = JSON.parse(page(ANSWER_FILES.busselton)) as {
         data: Record<string, { tariffs_available: Array<Record<string, unknown>> }>;
       };
@@ -753,15 +753,17 @@ describe('RAC bulk availability', () => {
         });
       }
       const body = JSON.stringify(json);
-      const entry = await entryFor('busselton', body, STAY);
-      expect(entry).toStrictEqual({
-        key: 'rac:busselton',
-        availableUnits: 0,
-        byKind: { campsite: { availableUnits: 0 }, cabin: { availableUnits: 0, bookableUnits: 0 } },
-      });
       const { provider } = recordingBulk(() => ({ body }));
       const check = await provider.availability!.check('busselton', STAY);
       expect(check.units[0].nights.map((night) => night.state)).toEqual(['closed', 'closed']);
+      // Explore agrees with the place page: nothing open
+      const entry = await entryFor('busselton', body, STAY);
+      const none = { availableUnits: 0, bookableUnits: 0 };
+      expect(entry).toStrictEqual({
+        key: 'rac:busselton',
+        ...none,
+        byKind: { campsite: none, cabin: none },
+      });
     });
 
     it('a night missing from the answer is not free, but the category stays bookable', async () => {
@@ -967,10 +969,12 @@ describe('RAC bulk availability', () => {
       expect(posts()).toHaveLength(0);
     });
 
-    it('a superseded search stops sending and resolves with what it has; only one sends at a time', async () => {
+    const NEXT_WEEK: StayQuery = { arrival: '2026-11-13', departure: '2026-11-15', adults: 2 };
+    const stayOf = (body?: string) => new URLSearchParams(body).get('available_from');
+
+    it('a superseded search sends nothing more and resolves with what it has; its POST already sent finishes first', async () => {
       jest.useFakeTimers({ now: NOW });
       const { search, http, posts } = recordingBulk(byPark, 5 * SECOND);
-      const NEXT_WEEK: StayQuery = { arrival: '2026-11-13', departure: '2026-11-15', adults: 2 };
       let older: BulkAvailabilityEntry[] | undefined;
       void search(STAY).then((entries) => (older = entries));
       // Busselton answered; Cable Beach is on the wire when the dates change
@@ -979,13 +983,43 @@ describe('RAC bulk availability', () => {
       let newer: BulkAvailabilityEntry[] | undefined;
       void search(NEXT_WEEK).then((entries) => (newer = entries));
       await jest.advanceTimersByTimeAsync(SECOND);
-      expect(older?.map((entry) => entry.key)).toEqual(['rac:busselton']);
+      // Cable Beach is still RAC's to answer: nothing else is sent meanwhile
+      expect(posts()).toHaveLength(2);
+      expect(older).toBeUndefined();
+      await jest.advanceTimersByTimeAsync(2 * SECOND);
+      expect(older?.map((entry) => entry.key)).toEqual(['rac:busselton', 'rac:cable-beach']);
       await jest.advanceTimersByTimeAsync(60 * SECOND);
       expect(newer).toHaveLength(8);
 
-      const stayOf = (body?: string) => new URLSearchParams(body).get('available_from');
+      const [, cableBeach, firstNewer] = posts();
+      // Not called off: it took its whole 5 s, and the newer search's first POST went after it
+      expect(cableBeach.endedAt! - cableBeach.sentAt).toBe(5 * SECOND);
+      expect(firstNewer.sentAt).toBeGreaterThanOrEqual(cableBeach.endedAt!);
       expect(posts().filter((r) => stayOf(r.body) === '6 Nov 2026')).toHaveLength(2);
       expect(slugsOf(posts().filter((r) => stayOf(r.body) === '13 Nov 2026'))).toEqual(SEED);
+      expect(http.peakInFlight).toBe(1);
+    });
+
+    it('a superseded search calls off its POST still waiting for its turn: it is never sent', async () => {
+      jest.useFakeTimers({ now: NOW });
+      const { search, http, posts, provider } = recordingBulk(byPark, 5 * SECOND);
+      // A place page's check is on the wire; the search's first POST waits behind it
+      void provider.availability!.check('exmouth', STAY);
+      await jest.advanceTimersByTimeAsync(SECOND);
+      let older: BulkAvailabilityEntry[] | undefined;
+      void search(STAY).then((entries) => (older = entries));
+      await jest.advanceTimersByTimeAsync(SECOND);
+      expect(http.requests).toHaveLength(1);
+      let newer: BulkAvailabilityEntry[] | undefined;
+      void search(NEXT_WEEK).then((entries) => (newer = entries));
+      await jest.advanceTimersByTimeAsync(SECOND);
+      expect(older).toEqual([]);
+      await jest.advanceTimersByTimeAsync(60 * SECOND);
+      expect(newer).toHaveLength(8);
+      // The check, then only the newer search's POSTs: the older one's Busselton never went
+      const searches = posts().slice(1);
+      expect(searches.every((r) => stayOf(r.body) === '13 Nov 2026')).toBe(true);
+      expect(slugsOf(searches)).toEqual(SEED);
       expect(http.peakInFlight).toBe(1);
     });
   });
@@ -1211,21 +1245,43 @@ describe('RAC bulk availability', () => {
       const newer = track(catalog.availability(NEXT_WEEK));
       await settle(older, newer);
 
-      // The older one keeps the parks it had, with no error, and sent nothing after Cervantes
+      // The older one lets Cervantes, already sent, finish, keeps the parks it had, with no
+      // error, and sends nothing after it
       expect(older.value?.errors).toEqual([]);
       expect(older.value?.entries.map((entry) => entry.key)).toEqual([
         'rac:busselton',
         'rac:cable-beach',
+        'rac:cervantes',
       ]);
-      expect(
-        inner.requests.filter(
-          (r) => new URLSearchParams(r.body).get('available_from') === '6 Nov 2026'
-        )
-      ).toHaveLength(3);
-      // The newer one starts 1 s after Cervantes was called off: 8 × 8 s and 8 gaps
+      const olderPosts = inner.requests.filter(
+        (r) => new URLSearchParams(r.body).get('available_from') === '6 Nov 2026'
+      );
+      expect(olderPosts).toHaveLength(3);
+      expect(olderPosts[2].endedAt! - olderPosts[2].sentAt).toBe(8 * SECOND);
+      // The newer one waits for Cervantes (6 s more) and its gap: 6 s + 8 × 8 s + 8 gaps
       expect(newer.value?.errors).toEqual([]);
       expect(newer.value?.entries).toHaveLength(8);
-      expect(Math.round(newer.ms!)).toBe(72 * SECOND);
+      expect(Math.round(newer.ms!)).toBe(78 * SECOND);
+      expect(newer.ms).toBeLessThan(BULK_DEADLINE_MS);
+      expect(inner.peakInFlight).toBe(1);
+    });
+
+    it('a date change while a POST waits for its 1 s gap calls that POST off: it is never sent', async () => {
+      const { inner, catalog } = await pacedRac(8 * SECOND);
+      const NEXT_WEEK: StayQuery = { arrival: '2026-11-13', departure: '2026-11-15', adults: 2 };
+      const older = track(catalog.availability(STAY));
+      // Busselton ended at 8 s; Cable Beach waits for its turn at 9 s
+      await jest.advanceTimersByTimeAsync(8.5 * SECOND);
+      expect(inner.requests).toHaveLength(1);
+      const newer = track(catalog.availability(NEXT_WEEK));
+      await settle(older, newer);
+
+      expect(older.value?.entries.map((entry) => entry.key)).toEqual(['rac:busselton']);
+      const stays = inner.requests.map((r) => new URLSearchParams(r.body).get('available_from'));
+      expect(stays).toEqual(['6 Nov 2026', ...Array(8).fill('13 Nov 2026')]);
+      // The newer one's first POST takes Cable Beach's turn, at 9 s
+      expect(inner.requests[1].sentAt - inner.requests[0].endedAt!).toBe(SECOND);
+      expect(newer.value?.entries).toHaveLength(8);
       expect(newer.ms).toBeLessThan(BULK_DEADLINE_MS);
       expect(inner.peakInFlight).toBe(1);
     });

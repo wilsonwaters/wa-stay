@@ -13,9 +13,10 @@
  *   - `availableUnits`: the sum of `stay_through_sites_available` over the categories free for
  *     the whole stay (`fullyAvailable`); the others add nothing;
  *   - `bookableUnits`: left out while any category can be booked online for these dates at
- *     all, free or not (`isBookable`), because RAC gives no total of physical sites; 0 when
- *     none can: every category closed, not released (beyond the 364-day window), or refused
- *     by every tariff for a special date or a stop-sell;
+ *     all, free or not (`isBookable`: a night `check` gives it that is neither closed nor not
+ *     released), because RAC gives no total of physical sites; 0 when none can: every category
+ *     closed or not released (beyond the 364-day window, a special date, a stop-sell), so
+ *     Explore and the place page agree;
  *   - `byKind`: both, per unit kind (each category's `unitKind`, as `check` gives it), by the
  *     same rules, for every kind the park has (its seed's kinds and any its answer adds), with
  *     `availableUnits: 0` when none is free.
@@ -28,9 +29,11 @@
  *   client's typed error. Nothing retries (terms rule 5).
  * - **An abort** (`signal`) stops it too: no further POST starts, and it rejects with an
  *   AbortError.
- * - **A newer search** (the person changed the dates or the party) stops the one before it:
- *   that one's waiting or running POST is called off, it sends nothing more, and it resolves
- *   with the parks it has. Only one search sends at a time (terms rule 4).
+ * - **A newer search** (the person changed the dates or the party) stops the one before it,
+ *   which sends nothing more and resolves with the parks it has. Its POST still waiting for
+ *   its turn is called off; one already sent is left to finish (RAC is already working on it),
+ *   so the newer search's first POST goes after it: never two at once on RAC's side (terms
+ *   rule 4). The core's own abort (a deadline, quitting) still calls off a POST in flight.
  * - **A stay RAC's form cannot carry** (`stayRefusal`) rejects with a `ProviderError`, and
  *   nothing is sent.
  */
@@ -54,7 +57,7 @@ import {
   throwIfAborted,
 } from '../sdk/errors';
 import { stayRefusal, type RacAvailability } from './availability';
-import { decidingTariffOf, priceTariffOf, type RawCategory } from './mapping';
+import type { RawCategory } from './mapping';
 import { RAC_PARKS, type RacPark } from './parks';
 
 export interface RacBulkDeps {
@@ -62,33 +65,17 @@ export interface RacBulkDeps {
   availability: Pick<RacAvailability, 'categories' | 'unitsOf'>;
 }
 
-/** Tariff codes for a party RAC will not take: too few guests (2) or too many (3). */
-const PARTY_TARIFF_CODES: ReadonlySet<number> = new Set([2, 3]);
-
 /** A count from RAC as whole units: anything else is none. */
 function wholeUnits(value: number | undefined): number {
   return value !== undefined && Number.isFinite(value) && value > 0 ? Math.floor(value) : 0;
 }
 
 /**
- * Whether a category can be booked online for the stay's dates at all, free or not: one of its
- * nights (as `check` gives them) is neither closed nor not released, or RAC turned the stay
- * down only for the party (every night has room, and the tariff that decides refused too few
- * or too many guests), which another party could book.
+ * Whether a category, as `check` gives it, can be booked online for the stay's dates at all,
+ * free or not: one of its nights is neither closed nor not released.
  */
-export function isBookable(category: RawCategory, unit: UnitAvailability): boolean {
-  if (unit.nights.some((night) => night.state !== 'closed' && night.state !== 'not-released')) {
-    return true;
-  }
-  const tariffs = category.tariffs_available ?? [];
-  const code = decidingTariffOf(tariffs)?.tariff_code;
-  return (
-    priceTariffOf(tariffs) === undefined &&
-    code !== undefined &&
-    PARTY_TARIFF_CODES.has(code) &&
-    unit.nights.length > 0 &&
-    unit.nights.every((night) => category.sites_code[night.date] === 0)
-  );
+export function isBookable(unit: UnitAvailability): boolean {
+  return unit.nights.some((night) => night.state !== 'closed' && night.state !== 'not-released');
 }
 
 interface Tally {
@@ -118,7 +105,7 @@ export function parkEntry(
   categories.forEach((category, i) => {
     const unit = units[i];
     const free = unit.fullyAvailable ? wholeUnits(category.stay_through_sites_available) : 0;
-    const bookable = isBookable(category, unit);
+    const bookable = isBookable(unit);
     const kind = unit.unitKind ?? 'other';
     const tally = kinds.get(kind) ?? { free: 0, bookable: false };
     kinds.set(kind, { free: tally.free + free, bookable: tally.bookable || bookable });
@@ -149,10 +136,11 @@ function failureOf(error: ProviderError): string {
   return error.code;
 }
 
-/** A search in progress: its own abort, and whether a newer one stopped it. */
+/** A search in progress: whether a newer one stopped it, and how to call off its unsent POST. */
 interface Run {
-  readonly controller: AbortController;
   superseded: boolean;
+  /** Calls off the POST in hand if it has not been sent yet; one already sent is left alone. */
+  cancelUnsent?: () => void;
 }
 
 /** RAC's `availability.search`. */
@@ -171,12 +159,10 @@ export function createRacBulkSearch({
     // A newer search stops the one before it: one RAC search sends at a time (terms rule 4)
     if (current) {
       current.superseded = true;
-      current.controller.abort();
+      current.cancelUnsent?.();
     }
-    const run: Run = { controller: new AbortController(), superseded: false };
+    const run: Run = { superseded: false };
     current = run;
-    const onAbort = (): void => run.controller.abort(signal?.reason);
-    signal?.addEventListener('abort', onAbort, { once: true });
 
     const entries: BulkAvailabilityEntry[] = [];
     let failures = 0;
@@ -185,11 +171,21 @@ export function createRacBulkSearch({
       for (const park of RAC_PARKS) {
         if (run.superseded) break;
         throwIfAborted(signal);
+        // The POST's own abort: the caller's always, a newer search's only until it is sent
+        const post = new AbortController();
+        const onAbort = (): void => post.abort(signal?.reason);
+        signal?.addEventListener('abort', onAbort, { once: true });
+        let sent = false;
+        run.cancelUnsent = () => {
+          if (!sent) post.abort();
+        };
         let categories: RawCategory[];
         try {
-          categories = await availability.categories(park, stay, run.controller.signal);
+          categories = await availability.categories(park, stay, post.signal, () => {
+            sent = true;
+          });
         } catch (error) {
-          if (run.superseded) break;
+          if (run.superseded && !signal?.aborted) break;
           if (signal?.aborted) throw createAbortError(signal);
           if (isAbortError(error) || isBlock(error) || !(error instanceof ProviderError)) {
             throw error;
@@ -200,13 +196,15 @@ export function createRacBulkSearch({
             `Bulk availability: no answer for ${park.slug} (${failureOf(error)}); it reads as unknown`
           );
           continue;
+        } finally {
+          signal?.removeEventListener('abort', onAbort);
+          run.cancelUnsent = undefined;
         }
         entries.push(
           parkEntry(ctx.id, park, categories, availability.unitsOf(park, stay, categories))
         );
       }
     } finally {
-      signal?.removeEventListener('abort', onAbort);
       if (current === run) current = undefined;
     }
     if (lastError && failures === RAC_PARKS.length) throw lastError;

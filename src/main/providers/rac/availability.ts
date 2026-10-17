@@ -103,8 +103,16 @@ export function categoryUnitId(category: Pick<RawCategory, 'category_id'>): stri
 }
 
 export interface RacAvailability extends AvailabilityModule {
-  /** The categories RAC lists for the stay at the park, from one POST (a native park's units). */
-  categories(park: RacPark, stay: StayQuery, signal?: AbortSignal): Promise<RawCategory[]>;
+  /**
+   * The categories RAC lists for the stay at the park, from one POST (a native park's units).
+   * `onSend` is called once the POST is sent, not while it waits its turn.
+   */
+  categories(
+    park: RacPark,
+    stay: StayQuery,
+    signal?: AbortSignal,
+    onSend?: () => void
+  ): Promise<RawCategory[]>;
   /** The categories as `check` gives them, one unit each, in their order (bulk counts them). */
   unitsOf(park: RacPark, stay: StayQuery, categories: readonly RawCategory[]): UnitAvailability[];
 }
@@ -127,7 +135,8 @@ export function createRacAvailability({
   async function categories(
     park: RacPark,
     stay: StayQuery,
-    signal?: AbortSignal
+    signal?: AbortSignal,
+    onSend?: () => void
   ): Promise<RawCategory[]> {
     throwIfAborted(signal);
     const refusal = stayRefusal(stay);
@@ -136,7 +145,7 @@ export function createRacAvailability({
     const response = await client.postAjax(
       RAC_AVAILABILITY_PATH,
       availabilityForm(park, stay, pets),
-      { referer: `${ctx.manifest.website}/${park.slug}/book-now/`, signal }
+      { referer: `${ctx.manifest.website}/${park.slug}/book-now/`, signal, onSend }
     );
     throwIfAborted(signal);
     const reading = readAvailability(response.body);
