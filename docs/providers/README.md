@@ -9,8 +9,8 @@ do from its manifest.
 
 | Provider | Status | Explore | Availability | Watches | Site Sniper | Holds and payment | Booking import | Account |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| [ParkStay WA](parkstay/README.md) (DBCA national-park campgrounds) | Built in | Yes, 169 campgrounds | Yes, per night with prices, and bulk for map pins | Yes | Coming soon | Yes, 30-minute holds paid on ParkStay | No | Optional |
-| RAC Parks & Resorts (holiday parks and resorts) | In progress: Explore, watches | Yes, 8 parks and their categories | Yes, per category and night, with prices and stay rules, and free counts on Explore | Yes | Not yet | No | No | None |
+| [ParkStay WA](parkstay/README.md) (DBCA national-park campgrounds) | Built in | Yes, 169 campgrounds, by stay type | Yes, per night with prices, and bulk for map pins | Yes; an alert opens ParkStay with the campground and dates | Coming soon: alert or hold | Yes, 30-minute holds paid on ParkStay | No | Optional |
+| [RAC Parks & Resorts](rac/README.md) (holiday parks and resorts) | Built in | Yes, 8 parks and their categories, by stay type | Yes, per category and night, with prices (members' rates with a saved member number) and stay rules, and free counts on Explore | Yes, no more often than every 15 minutes; an alert opens RAC's booking page | Coming soon: release alerts (or holds, with the cart experiment on) | Off by default: an experimental cart, paid on RAC's cart page | No | Optional (the person's member number) |
 
 Other providers (Hipcamp, holiday-park chains, Airbnb) are possible with the SDK, including
 ones with no API, but none is planned in this release.
@@ -42,4 +42,7 @@ ones with no API, but none is planned in this release.
 - [Browser providers](browser-providers.md): providers with no API, read through Playwright.
 - [ParkStay WA](parkstay/README.md): the reference provider, its [endpoints](parkstay/endpoints.md)
   and its [sign-in](parkstay/authentication.md).
+- [RAC Parks & Resorts](rac/README.md): an API provider with paced requests, saved account
+  details (a member number) and a release calendar; its [endpoints](rac/endpoints.md) and
+  [release calendar](rac/release-calendar.md).
 - [Architecture overview](../architecture/overview.md): how providers sit in the app.

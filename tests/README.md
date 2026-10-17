@@ -135,7 +135,7 @@ tests/
 │   ├── core/                # Provider-agnostic services (watches, snipes, accounts, holds)
 │   ├── database/
 │   ├── providers/           # The provider SDK, registry, and the ParkStay and RAC modules
-│   ├── docs/                # The docs: links, the provider guide's examples, ParkStay endpoints
+│   ├── docs/                # The docs: links, the provider guide's examples, ParkStay and RAC endpoints
 │   └── …                    # app, ipc, security, scheduler, renderer guards, brand, design
 ├── integration/             # Integration tests (main project)
 ├── scripts/                 # Tests for Node scripts in scripts/ (main project), new-provider.test.ts

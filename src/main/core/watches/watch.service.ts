@@ -39,13 +39,18 @@ import {
 } from '@shared/types';
 import type { EventSink } from '@shared/contracts/events';
 import { WatchResult } from '@shared/types/common.types';
-import type { StayFieldUse } from '@shared/types/provider.types';
+import type { ProviderManifest, StayFieldUse } from '@shared/types/provider.types';
 import { toStayQuery, type StayInput } from '@shared/types/stay.types';
 import { compareDates, eachNight, isCalendarDate, todayIn } from '@shared/utils/calendar-date';
 import { cleanUnitKinds } from '@shared/utils/unit-kinds';
 import type { WatchRepository } from '../../database/repositories';
 import type { ProviderRegistry, ProviderWith } from '../../providers/registry';
-import { isAbortError, ProviderCapabilityError, toApiError } from '../../providers/sdk/errors';
+import {
+  isAbortError,
+  isProviderBlock,
+  ProviderCapabilityError,
+  toApiError,
+} from '../../providers/sdk/errors';
 import { withRequestPriority } from '../../providers/sdk/pacing';
 import type { HoldSuccess } from '../../providers/sdk/provider';
 import { matchedStayLink } from '../booking-link';
@@ -58,6 +63,37 @@ import { fullMatches, kindsAmbiguous, longestRun, partialMatches, wantedUnits } 
 import { effectiveIntervalMinutes, nextCheckAt } from './next-check';
 
 const log = logger.child({ module: 'watches' });
+
+/**
+ * A check's answer, or failure, that was about the watch before an edit: nothing of it is
+ * kept (a provider's block aside), and the watch is due again since the edit.
+ */
+export const WATCH_EDITED_DURING_CHECK =
+  'The watch was changed while it was being checked. It checks again now.';
+
+/**
+ * What a check asks about: the place, the stay, the units, the stay types and the stay fields
+ * a check uses (every one but a field only for holds or snipes, which turning automatic holds
+ * on may fill in with its default), in a stable order. An edit to any of them makes the watch
+ * due at once (`update`).
+ */
+function checkedKey(watch: Watch, manifest: Pick<ProviderManifest, 'stayFields'>): string {
+  const notChecked = new Set(
+    (manifest.stayFields ?? [])
+      .filter((field) => !field.appliesTo.some((use) => use === 'watch' || use === 'availability'))
+      .map((field) => field.key)
+  );
+  const params = Object.entries(watch.stayParams)
+    .filter(([key]) => !notChecked.has(key))
+    .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0));
+  return JSON.stringify([
+    watch.location.externalId,
+    watch.stay,
+    watch.unitIds,
+    watch.unitKinds,
+    params,
+  ]);
+}
 
 /** Why an automatic hold was not placed at a place with more than one stay type. */
 const MIXED_KINDS_NOTE =
@@ -330,6 +366,10 @@ export class WatchService {
         { signal, ...(watch.unitIds.length > 0 ? { knownUnitIds: [...watch.unitIds] } : {}) }
       );
       if (signal?.aborted) return result({ error: 'The check was stopped' });
+      // Edited while the provider answered (another place, stay, units, stay types or stay
+      // fields): the answer is about what the watch was, so nothing of it is kept or sent.
+      // The edit made the watch due at once, so the next check asks about what it is now.
+      if (this.editedSince(watch, manifest)) return result({ error: WATCH_EDITED_DURING_CHECK });
 
       const units = wantedUnits(watch, availability.units);
       const full = fullMatches(watch, units);
@@ -389,6 +429,13 @@ export class WatchService {
       if (signal?.aborted || isAbortError(error)) {
         return result({ error: 'The check was stopped' });
       }
+      // Edited while the provider answered: the failure was about what the watch was, so it
+      // is not kept, and the watch (due again since the edit) checks what it is now. A block
+      // (HTTP 403 or 429) is the provider's whatever was asked, so it is kept, and the next
+      // check waits the watch's interval rather than asking again at once.
+      if (!isProviderBlock(error) && this.editedSince(watch, manifest)) {
+        return result({ error: WATCH_EDITED_DURING_CHECK });
+      }
       const { code, message } = toApiError(error);
       // A provider behind its queue is an error for this run: watches never wait in a queue.
       log.warn(`Watch ${watchId} check failed: ${code} ${message}`);
@@ -405,6 +452,15 @@ export class WatchService {
   }
 
   // ---- internal helpers -------------------------------------------------------
+
+  /**
+   * Whether what a check asks about (`checkedKey`) has changed since `before` was read, or the
+   * watch is gone.
+   */
+  private editedSince(before: Watch, manifest: Pick<ProviderManifest, 'stayFields'>): boolean {
+    const now = this.repo.findById(before.id);
+    return !now || checkedKey(now, manifest) !== checkedKey(before, manifest);
+  }
 
   private require(id: number): Watch {
     const watch = this.repo.findById(id);

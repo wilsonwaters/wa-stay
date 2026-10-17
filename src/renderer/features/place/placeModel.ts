@@ -192,3 +192,11 @@ export function checkFailure(
   if (error?.code === 'RATE_LIMITED') return 'rate-limit';
   return 'other';
 }
+
+/**
+ * What a rate-limited check says: true whatever the provider's pause (a minute for ParkStay,
+ * 30 minutes or more for RAC), so it names no length of time.
+ */
+export function rateLimitedMessage(shortName: string): string {
+  return `${shortName} asked WA Stay to slow down. Try again later.`;
+}

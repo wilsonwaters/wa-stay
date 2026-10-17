@@ -592,7 +592,7 @@ describe('Place detail page', () => {
         fail('parkstay: HTTP 429 from https://parkstay.dbca.wa.gov.au/api', 'RATE_LIMITED')
       );
       expect(
-        await within(card()).findByText('Too many checks in a short time. Try again in a minute.')
+        await within(card()).findByText('ParkStay asked WA Stay to slow down. Try again later.')
       ).toBeInTheDocument();
     });
 

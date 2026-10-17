@@ -43,13 +43,14 @@ const GUIDE = 'docs/providers/adding-a-provider.md';
 
 /**
  * Internal references: plan sections (§12.30), stages (V7), the brief (D5), issues (#24), open
- * questions (PQ1, UQ1, O8).
+ * questions (PQ1, UQ1, O8), and a stream's tasks, decisions and questions (R16, RS12, RQ2, RO5).
  */
 const INTERNAL = [
   /§\s?\d/,
   /\b[A-Z]?Q\d+\b/,
   /\bO\d+\b/,
   /\bV\d+\b/,
+  /\bR[OSQ]?\d+\b/,
   /\bbrief [A-Z]\d+\b/i,
   /architecture-notes/,
   /\(#\d+\)/,
@@ -76,13 +77,16 @@ function section(text: string, heading: string): string {
 describe('provider-facing docs', () => {
   const docs = docFiles().filter((file) => file.startsWith('docs/providers/'));
 
-  it('cover the guide, the browser guide and ParkStay', () => {
+  it('cover the guide, the browser guide, ParkStay and RAC', () => {
     expect(docs).toEqual(
       expect.arrayContaining([
         GUIDE,
         'docs/providers/browser-providers.md',
         'docs/providers/README.md',
         'docs/providers/parkstay/README.md',
+        'docs/providers/rac/README.md',
+        'docs/providers/rac/endpoints.md',
+        'docs/providers/rac/release-calendar.md',
       ])
     );
   });

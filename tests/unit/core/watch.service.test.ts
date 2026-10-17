@@ -8,8 +8,11 @@
 import {
   AccessGateError,
   ProviderCapabilityError,
+  ProviderHttpError,
   UnknownProviderError,
 } from '@main/providers/sdk';
+import { WATCH_EDITED_DURING_CHECK } from '@main/core/watches/watch.service';
+import type { WatchUpdate } from '@shared/types';
 import { WatchResult } from '@shared/types/common.types';
 import { createCoreHarness, fakeDateOnly, type CoreHarness } from '@tests/utils/core-harness';
 import { createFakeProvider, FAKE_PRICE } from '@tests/utils/fake-provider';
@@ -510,6 +513,156 @@ describe('WatchService', () => {
         'https://fake.example/book/2?arrival=2026-12-01&departure=2026-12-04'
       );
     });
+
+    it('a check in flight when the watch moves to another place keeps nothing and alerts on nothing', async () => {
+      const watch = await h.watches.create(h.userId, h.watchInput());
+      h.fake.delayMs = 20;
+      const running = h.watches.execute(watch.id, { manual: true });
+      // The provider is answering about place 1 when the watch moves to place 2
+      await new Promise((resolve) => setTimeout(resolve, 5));
+      await h.watches.update(watch.id, { location: { externalId: '2', name: 'Karri Grove' } });
+      const result = await running;
+
+      expect(result).toMatchObject({ success: false, found: false, matches: [] });
+      expect(result.error).toBe(WATCH_EDITED_DURING_CHECK);
+      const moved = (await h.watches.get(watch.id))!;
+      expect(moved.lastResult).toBeUndefined();
+      expect(moved.lastAvailability).toBeUndefined();
+      expect(moved.lastCheckedAt).toBeUndefined();
+      expect(moved.bookingLink).toBeUndefined();
+      expect(h.notifications.notifyWatchFound).not.toHaveBeenCalled();
+      // The edit made it due at once: the next check is of the new place
+      expect(h.watches.findDue(NOW, ['fake']).map((w) => w.id)).toEqual([watch.id]);
+      h.fake.delayMs = 0;
+      await h.watches.execute(watch.id);
+      expect((await h.watches.get(watch.id))?.bookingLink?.url).toBe(
+        'https://fake.example/book/2?arrival=2026-12-01&departure=2026-12-04'
+      );
+    });
+
+    it("a check in flight keeps its answer when only the place's name or the interval changes", async () => {
+      const watch = await h.watches.create(h.userId, h.watchInput());
+      h.fake.delayMs = 20;
+      const running = h.watches.execute(watch.id, { manual: true });
+      await new Promise((resolve) => setTimeout(resolve, 5));
+      await h.watches.update(watch.id, {
+        location: { externalId: '1', name: 'Banksia (north)' },
+        checkIntervalMinutes: 60,
+      });
+
+      await expect(running).resolves.toMatchObject({ success: true, found: true });
+      expect(h.watchRepo.findById(watch.id)?.lastResult).toBe(WatchResult.FOUND);
+      expect(h.notifications.notifyWatchFound).toHaveBeenCalledTimes(1);
+    });
+
+    it.each<[string, WatchUpdate]>([
+      ['dates', { stay: { arrival: '2026-12-02', departure: '2026-12-04', adults: 2 } }],
+      ['units', { unitIds: ['u1'] }],
+      ['stay types', { unitKinds: ['cabin'] }],
+      ['stay fields', { stayParams: { gearType: 'caravan' } }],
+    ])(
+      'a check in flight when its %s change keeps nothing and alerts on nothing',
+      async (_what, edit) => {
+        const watch = await h.watches.create(h.userId, h.watchInput());
+        h.fake.delayMs = 20;
+        const running = h.watches.execute(watch.id, { manual: true });
+        await new Promise((resolve) => setTimeout(resolve, 5));
+        await h.watches.update(watch.id, edit);
+
+        await expect(running).resolves.toMatchObject({
+          success: false,
+          error: WATCH_EDITED_DURING_CHECK,
+        });
+        const stored = h.watchRepo.findById(watch.id)!;
+        expect(stored.lastResult).toBeUndefined();
+        expect(stored.lastAvailability).toBeUndefined();
+        expect(h.notifications.notifyWatchFound).not.toHaveBeenCalled();
+        expect(h.watches.findDue(NOW, ['fake']).map((w) => w.id)).toEqual([watch.id]);
+      }
+    );
+
+    it('a check in flight keeps its answer when automatic holds fill in a stay field only holds use', async () => {
+      await h.close();
+      h = createCoreHarness({
+        providers: [
+          createFakeProvider({
+            stayFields: [
+              {
+                key: 'vehicles',
+                label: 'Vehicles',
+                type: 'number',
+                min: 0,
+                max: 3,
+                default: 1,
+                appliesTo: ['hold'],
+              },
+            ],
+          }),
+        ],
+      });
+      const watch = await h.watches.create(h.userId, h.watchInput());
+      h.fake.delayMs = 20;
+      const running = h.watches.execute(watch.id, { manual: true });
+      await new Promise((resolve) => setTimeout(resolve, 5));
+      await h.watches.update(watch.id, { autoHold: true });
+      expect(h.watchRepo.findById(watch.id)?.stayParams).toEqual({ gearType: 'tent', vehicles: 1 });
+
+      await expect(running).resolves.toMatchObject({ success: true, found: true });
+      expect(h.watchRepo.findById(watch.id)?.lastResult).toBe(WatchResult.FOUND);
+      expect(h.notifications.notifyWatchFound).toHaveBeenCalledTimes(1);
+    });
+
+    it('a check that fails while the watch moves keeps nothing of the failure, and is due again', async () => {
+      const watch = await h.watches.create(h.userId, h.watchInput());
+      h.fake.delayMs = 20;
+      h.fake.failNext(
+        'availability',
+        new ProviderHttpError({ providerId: 'fake', status: 500, url: 'https://fake.example/a' })
+      );
+      const running = h.watches.execute(watch.id, { manual: true });
+      await new Promise((resolve) => setTimeout(resolve, 5));
+      await h.watches.update(watch.id, { location: { externalId: '2', name: 'Karri Grove' } });
+
+      await expect(running).resolves.toMatchObject({
+        success: false,
+        error: WATCH_EDITED_DURING_CHECK,
+      });
+      const moved = h.watchRepo.findById(watch.id)!;
+      expect(moved.lastResult).toBeUndefined();
+      expect(moved.lastError).toBeUndefined();
+      expect(moved.lastCheckedAt).toBeUndefined();
+      expect(h.watches.findDue(NOW, ['fake']).map((w) => w.id)).toEqual([watch.id]);
+    });
+
+    it.each([403, 429])(
+      "keeps a provider's block (HTTP %i) met while the watch moves, and the next check waits its interval",
+      async (status) => {
+        const watch = await h.watches.create(h.userId, h.watchInput());
+        h.fake.delayMs = 20;
+        h.fake.failNext(
+          'availability',
+          new ProviderHttpError({
+            providerId: 'fake',
+            status,
+            url: 'https://fake.example/a',
+            retryable: false,
+            message: `Fake turned the request away (HTTP ${status}).`,
+          })
+        );
+        const running = h.watches.execute(watch.id, { manual: true });
+        await new Promise((resolve) => setTimeout(resolve, 5));
+        await h.watches.update(watch.id, { location: { externalId: '2', name: 'Karri Grove' } });
+
+        const result = await running;
+        expect(result).toMatchObject({ success: false });
+        expect(result.error).not.toBe(WATCH_EDITED_DURING_CHECK);
+        const moved = h.watchRepo.findById(watch.id)!;
+        expect(moved.lastResult).toBe(WatchResult.ERROR);
+        expect(moved.lastError).toBe(`Fake turned the request away (HTTP ${status}).`);
+        expect(h.watches.findDue(NOW, ['fake'])).toEqual([]);
+        expect(moved.nextCheckAt!.getTime()).toBeGreaterThanOrEqual(NOW.getTime() + 60 * 60_000);
+      }
+    );
 
     it('a held watch moved to another place keeps its hold and the held unit, and gets no link', async () => {
       const watch = await h.watches.create(h.userId, h.watchInput({ autoHold: true }));

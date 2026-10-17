@@ -4,8 +4,8 @@
  * Unit nouns (R9): copy names units by their kinds (`nounForKinds`, `src/shared/utils/unit-noun.ts`),
  * so an RAC cabin is never called a "site". This guard reads the string literals, template
  * text and JSX text (comments removed by `stripComments`) of the core, the scheduler, the
- * renderer's components and the features that show units, and fails on "site" or "sites" in
- * any case, except:
+ * renderer's components, the features that show units and Settings (whose notification copy
+ * names what a watch finds), and fails on "site" or "sites" in any case, except:
  * - "Site Sniper", the feature's name, and `site-sniper`, its route;
  * - a line marked `unit-noun-ok` with a reason (`// unit-noun-ok: …`).
  *
@@ -28,7 +28,7 @@ const SCANNED_DIRS = [
   'src/main/core',
   'src/main/scheduler',
   'src/renderer/components',
-  ...['watches', 'snipes', 'place', 'explore', 'bookings', 'notifications'].map(
+  ...['watches', 'snipes', 'place', 'explore', 'bookings', 'notifications', 'settings'].map(
     (feature) => `src/renderer/features/${feature}`
   ),
 ];
@@ -95,7 +95,7 @@ function unmarkedSiteCopy(file: string, content = fs.readFileSync(file, 'utf8'))
 const SCANNED = SCANNED_DIRS.flatMap(sourcesUnder);
 
 describe('unit noun guard', () => {
-  it('scans the core, the scheduler, the components and the features that show units', () => {
+  it('scans the core, the scheduler, the components, the features that show units and Settings', () => {
     const scanned = SCANNED.map(rel);
     expect(scanned).toEqual(
       expect.arrayContaining([
@@ -106,6 +106,8 @@ describe('unit noun guard', () => {
         'src/renderer/components/stay/UnitPicker.tsx',
         'src/renderer/features/snipes/create/steps/ReleaseStep.tsx',
         'src/renderer/features/explore/availability/deriveAvailability.ts',
+        'src/renderer/features/settings/notifications/DesktopSwitches.tsx',
+        'src/renderer/features/settings/notifications/email/EmailNotifierCard.tsx',
       ])
     );
     expect(scanned.some((file) => /\.test\.tsx?$/.test(file))).toBe(false);

@@ -1,6 +1,6 @@
 # Browser-driven providers
 
-These notes are for authors of providers that have no API, such as holiday-park chains, Airbnb and RAC Parks & Resorts. Such a provider reads the provider's own website in a real browser through `ctx.browser`. Everything else (the manifest, registering the provider, the conformance suite) works as it does for any other provider: see [Adding a provider](adding-a-provider.md). `npm run provider:new -- <id> --browser` generates a browser provider to start from.
+These notes are for authors of providers that have no API, such as holiday-park chains or Airbnb. (RAC Parks & Resorts, built in, is not one: its booking pages answer availability as JSON, so it is an API provider, [described here](rac/README.md).) Such a provider reads the provider's own website in a real browser through `ctx.browser`. Everything else (the manifest, registering the provider, the conformance suite) works as it does for any other provider: see [Adding a provider](adding-a-provider.md). `npm run provider:new -- <id> --browser` generates a browser provider to start from.
 
 `ctx.browser` is a `PlaywrightBrowserAutomation` (`src/main/providers/sdk/browser-automation.ts`). It drives the **Microsoft Edge or Google Chrome already installed** on the person's computer through `playwright-core`. WA Stay never bundles or downloads a browser.
 

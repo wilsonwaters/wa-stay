@@ -93,7 +93,9 @@ The screenshots in `site/assets/screens/` come from the built app in fixture mod
 recorded catalogue and example availability for 10–12 Nov 2026 stand in for live data. The map is
 Mapbox's, and the places' photos are the providers' own; both are loaded live, anonymously, while
 the screenshots are taken. Every other request is answered from the fixtures. They show no
-provider documents, such as campground maps.
+provider documents, such as campground maps. They show ParkStay WA only (the run registers no
+other provider), so they never show RAC Parks & Resorts' places or photos: RAC's terms limit
+its photos and copy to a person's own use, so they appear only in the app.
 
 `npm run site:screenshots` rebuilds and retakes them; it needs a Mapbox token. Retake them when a
 screen they show changes, then update each image's size and alt text in `site/index.html`.
@@ -130,8 +132,10 @@ gone stale: read the page against the change.
 - **Provider-neutral copy.** WA Stay brings different providers into one app, so the copy speaks
   of places, sites and providers. A provider is named only in its providers row and in the
   independence notice: WA Stay is not made by or affiliated with the providers it shows
-  (including DBCA, which runs ParkStay WA) or with Tourism WA, and it is not a government
-  service.
+  (including DBCA, which runs ParkStay WA, and RAC, which runs RAC Parks & Resorts) or with
+  Tourism WA, and it is not a government service. Nothing of a provider's own goes on the page
+  but what the screenshots show: no logo (a provider's badge is its monogram on its colour) and
+  no marketing copy.
 - **Nothing from another site.** Fonts, images and the script are files in `site/`, and the
   page sets no cookies and has no analytics. The only outside request is the script's call to
   GitHub for the latest release, which the page's Content-Security-Policy allows and nothing

@@ -41,6 +41,7 @@
 
   /* Providers' badge colours: each manifest's brand colour (the site test checks them). */
   --provider-parkstay: #2f5d50;
+  --provider-rac: #3a3f47;
 
   --canvas: var(--ws-sand-50);
   --surface: var(--ws-sand-0);
@@ -600,6 +601,10 @@ h3 {
 
 [data-provider='parkstay'] .provider__badge {
   background: var(--provider-parkstay);
+}
+
+[data-provider='rac'] .provider__badge {
+  background: var(--provider-rac);
 }
 
 .provider__body p {

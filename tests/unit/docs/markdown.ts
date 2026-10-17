@@ -139,4 +139,36 @@ export function anchorsIn(text: string): Set<string> {
   return anchors;
 }
 
+/** A data row of a Markdown table, with the `##` section it is in. */
+export interface TableRow {
+  section: string;
+  cells: string[];
+}
+
+/** Every data row of every table in `text` (the header and divider rows left out). */
+export function tableRows(text: string): TableRow[] {
+  const rows: TableRow[] = [];
+  let section = '';
+  let header: string[] | null = null;
+  for (const line of text.split('\n')) {
+    const heading = /^##\s+(.+)$/.exec(line);
+    if (heading) section = heading[1].trim();
+    if (!line.startsWith('|')) {
+      header = null;
+      continue;
+    }
+    const cells = line
+      .slice(1, line.endsWith('|') ? -1 : undefined)
+      .split('|')
+      .map((cell) => cell.trim());
+    if (!header) header = cells;
+    else if (!cells.every((cell) => /^:?-+:?$/.test(cell))) rows.push({ section, cells });
+  }
+  return rows;
+}
+
+/** The backticked text in a table cell: its paths. */
+export const pathsIn = (cell: string): string[] =>
+  [...cell.matchAll(/`([^`]+)`/g)].map((m) => m[1]);
+
 export { rel };

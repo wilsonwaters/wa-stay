@@ -11,11 +11,12 @@ This page is the deep dive; the [user guide](user-guide.md#watches) has the shor
 **Watches → New watch**, or **Watch for availability** on a place's page (which fills in the
 provider, the place and your dates, and opens on "Your stay"). Five steps:
 
-1. **Provider.** Only providers that support watches are listed; with one (ParkStay WA), it is
+1. **Provider.** Only providers that support watches are listed; when only one does, it is
    chosen for you but still shown.
 2. **Location.** Search the provider's synced catalogue.
 3. **Your stay.** Dates and guests, the provider's own fields (ParkStay: **Camping with**:
-   Any, Tent, Campervan or Caravan), **Stay type** at a place whose units are of more than one
+   Any, Tent, Campervan or Caravan; RAC: **Pets**, up to 2, where pets are allowed), **Stay
+   type** at a place whose units are of more than one
    kind ([below](#stay-types)), **Preferred sites** (leave all unticked to hear about any
    site) and **Max price per night** (optional; in dollars, applied only when the provider
    shows a price for every night). A warning says when the stay is shorter than the sites
@@ -82,14 +83,36 @@ interval plus a little jitter, so watches do not all hit a provider at once. Aft
 wakes, due watches run. **WA Stay checks watches only while it is running**; turn on
 **Start WA Stay when you sign in** in Settings → App to keep them going.
 
+### A provider that asks for a pause
+
+A provider can ask for a pause between requests (`limits.minRequestIntervalMs`). RAC Parks &
+Resorts asks for 10 seconds, so its requests go one at a time:
+
+- a watch's check is background work: it waits its turn, at least 10 seconds after RAC's last
+  request ended;
+- what you start yourself goes first, a second after the request before it: a watch's **Check
+  now**, a place's **Check availability**, and your dates on Explore (RAC's eight parks then
+  take about 40 to 60 seconds together, with "Still checking RAC…" meanwhile);
+- if RAC turns a request away (HTTP 403 or 429, or a security check), WA Stay sends RAC nothing
+  for 30 minutes, longer for blocks in a row, and the watch shows "RAC Parks & Resorts turned
+  the request away (HTTP 429). WA Stay won't ask again until 3:45 pm." It checks again at its
+  next check after that.
+
+ParkStay asks for no pause. [How RAC is paced](providers/rac/README.md#pacing).
+
 ### Automatic holds
 
-For a provider with holds (ParkStay), **Hold a site automatically when found** places a hold
-on the first fully matching site, by the same path and safety rules as Site Sniper:
+For a provider with holds (ParkStay; RAC only with its auto-cart experiment turned on,
+[below](#rac-the-auto-cart)), **Hold a site automatically when found** places a hold on the
+first fully matching site, by the same path and safety rules as Site Sniper:
 
 - one booking per night: a night already held by a snipe or another watch's hold blocks it;
 - the hold is recorded on the watch with its reference and expiry, and a notification says
-  "Site held at <place>";
+  "Site held at <place>" (or "Cabin held at …") and asks you to complete payment within the
+  time left ("within 30 minutes" on ParkStay). Its email says "This hold is in WA Stay on the
+  computer that placed it. Open WA Stay there to pay before it expires.", and gives the
+  provider's public booking page for when you are away from that computer, warning that what
+  WA Stay held may show as taken there until the hold ends;
 - the watch shows the same hold panel as a snipe: "<site> is held for you", the time it is held
   until and a countdown of the time left to pay (ParkStay: 30 minutes);
 - **Pay now** in that panel opens the provider's payment page in its own window, on the session
@@ -114,6 +137,31 @@ on the first fully matching site, by the same path and safety rules as Site Snip
 
 Hold only what you will use ([Book responsibly](site-sniper.md#book-responsibly)).
 
+### RAC: the auto-cart
+
+RAC's holds are an experiment, off by default: **Put stays in my RAC cart automatically**, under
+Experimental on RAC's row in Settings → Accounts, which takes effect when WA Stay restarts.
+Until then an RAC watch only alerts. With it on, RAC's automatic hold is its cart:
+
+- **A stay in your RAC cart.** WA Stay adds the stay to your RAC cart in the app, and **Pay
+  now** opens RAC's cart page, where you check out and pay. WA Stay never marks it booked: look
+  for RAC's confirmation email.
+- **Your equipment, for a site.** Ticking **Hold a site automatically when found** at an RAC park
+  asks for your equipment (its type, length and width in metres), which RAC's cart needs for a
+  site. Without it a site is not held, and the watch says why. A cabin or a room needs none.
+- **"About" expiries.** The hold runs until RAC's cart says, or, when the cart page gives no
+  countdown, for about 10 minutes: the panel and the alert say "about".
+- **Let it go, or close the window.** **Let it go**, closing the payment window without paying,
+  and deleting the watch all take the stay out of the cart, but only while RAC's cart still
+  holds it: one you paid for has left the cart, and is never touched.
+- **One cart at a time.** RAC's cart holds one stay from WA Stay at a time: while it does, no
+  other is added ("Your RAC cart already holds a stay. Pay for it or let it go first."). Another
+  watch alerts as usual, with that note; a snipe keeps trying while its window lasts.
+- **Never past the cart.** WA Stay never checks out, agrees to RAC's terms, types your card or
+  fills in your member number: **Copy RAC member number** sits beside **Pay now** for that.
+
+[How the auto-cart works](providers/rac/README.md#the-auto-cart-experiment).
+
 ## Notifications
 
 Alerts name units by what they are: "Sites available at Bungarra" for ParkStay's campsites,
@@ -127,7 +175,7 @@ held, else the watch's or snipe's stay types, else the provider's usual kind of 
 | --- | --- |
 | **The bell** (top right) | Every notification, newest first, with an unread count. Click one to open what it is about (a watch, a snipe, a booking). Mark read, mark all read, delete, clear all. |
 | **The desktop** | An OS notification for each one, titled with the provider, e.g. "ParkStay · Sites available at Bungarra". Clicking it brings WA Stay forward on that page. Clicking an alert that a watch found something, or that a snipe found the dates free ("A site is free at …"), also opens the provider's booking page for those dates in your browser, for every provider; an alert that a site is held opens only the watch or snipe, where you pay. Settings → Notifications: **Desktop notifications** and **Play a sound**. |
-| **Email** | Each notification, sent through your own email account (below). An alert that a watch found something, or that a snipe found the dates free, has a **Book on {provider}** link to the provider's public booking page for those dates (the nights it found, for some nights), so you can book from your phone. An alert that a site is held says the hold is in WA Stay on the computer that placed it, and still gives the link. |
+| **Email** | Each notification, sent through your own email account (below). An alert that a watch found something, or that a snipe found the dates free, has a **Book on {provider}** link to the provider's public booking page for those dates (the nights it found, for some nights), so you can book from your phone. The link is never a cart or a checkout. An alert that a site is held says the hold is in WA Stay on the computer that placed it, and still gives the link. |
 
 What creates a notification: a watch finding sites (or some nights), a snipe finding the dates
 free (an alert, [Site Sniper](site-sniper.md#when-a-snipe-alerts)), a hold placed by a snipe or
@@ -160,12 +208,19 @@ When a watch finds a stay, the alert carries the provider's booking page for it
 (`core/booking-link.ts`): for a whole stay, the first matching unit's own page
 (`UnitAvailability.bookingUrl`) if the provider gives one, else `links.booking` with the stay's
 dates and the unit; for some nights, the longest run with its own dates. ParkStay's is its
-public search page with the campground and the dates. The core keeps a link only when it is
+public search page with the campground and the dates; RAC's is the category's own booking page
+with the stay filled in, which adds nothing to a cart until you press its book button. The
+core keeps a link only when it is
 https on the provider's own site (its website's host, or a subdomain of it); a link that adds to
 a cart is never one (the provider's rule). It is never stored: the watch's page works out the
 same link from the last check ("Book on {provider}" under the result, while the stay has not
 begun), and logs name only a link's origin. Moving a watch to another place forgets what its
-last check saw, so the page shows no link (and no result) until the new place is checked.
+last check saw, so the page shows no link (and no result) until the new place is checked. A
+check that was already running when the watch was moved, or its stay, units, stay types or
+stay fields changed, keeps nothing of its answer or its failure and alerts on nothing: the
+change makes the watch due again, and the next check asks about what it is now. A provider
+turning that check away (HTTP 403 or 429) is the one thing kept: the watch shows it, and its
+next check waits its interval rather than asking again at once.
 
 ### For developers
 

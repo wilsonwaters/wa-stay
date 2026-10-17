@@ -36,7 +36,7 @@ src/
 │   │                 # provider sign-in/payment windows, launch at login, quit hold, local profile
 │   ├── core/         # provider-agnostic services: catalog, watches, snipes, bookings, holds,
 │   │                 # accounts, notifications (+ notifiers/), stay-param rules
-│   ├── providers/    # sdk/ (the provider SDK), registry.ts, index.ts (built-ins), parkstay/
+│   ├── providers/    # sdk/ (the provider SDK), registry.ts, index.ts (built-ins), parkstay/, rac/
 │   ├── database/     # connection.ts (schema and every migration), repositories/
 │   ├── ipc/          # handle.ts, sender guard, renderer events, handlers/ (one per namespace)
 │   ├── scheduler/    # job scheduler: watch loop, snipe timer chains, retention job
@@ -101,6 +101,7 @@ flowchart TD
     core["Core services<br/>catalog · watches · snipes · bookings · holds · accounts · notifications"]
     registry["ProviderRegistry<br/>manifests, capability checks"]
     parkstay["ParkStay WA provider<br/>providers/parkstay/"]
+    rac["RAC Parks & Resorts provider<br/>providers/rac/"]
     next["Next provider<br/>providers/your-id/"]
     subgraph ctx["ProviderContext (one per provider)"]
       http["HttpClient<br/>ElectronSessionHttpClient (app)<br/>NodeHttpClient (tests)"]
@@ -114,8 +115,10 @@ flowchart TD
   ipc --> core
   core --> registry
   registry --> parkstay
+  registry --> rac
   registry --> next
   parkstay --> ctx
+  rac --> ctx
   next --> ctx
 ```
 
@@ -124,10 +127,12 @@ namespace method. The preload sends it over IPC to main, where `ipc/handle.ts` c
 sender is the app's own window, validates the payload with the method's zod schema and calls
 the handler. The handler calls a core service, which never names a provider: it asks the
 `ProviderRegistry` for one by id or by capability, and calls the module the capability
-guarantees. Each provider (ParkStay today) is built by its factory from a `ProviderContext`
-that gives it everything it may use: an `HttpClient` on its own Electron session partition (a
-Node client with an in-memory cookie jar in tests), browser automation on the installed Edge or
-Chrome, its own key-value state, its own encrypted secrets, a logger and a clock. Answers flow
+guarantees. Each provider (ParkStay WA and RAC Parks & Resorts today) is built by its factory
+from a `ProviderContext` that gives it everything it may use: an `HttpClient` on its own
+Electron session partition (a Node client with an in-memory cookie jar in tests; paced, one
+request at a time, for a provider that asks for a pause, such as RAC), browser automation on the
+installed Edge or Chrome, its own key-value state, its own encrypted secrets, a logger and a
+clock. Answers flow
 back the same way as an `APIResponse`; events (a watch updated, a notification, the queue
 state) go from main to the window through `rendererEvents`.
 

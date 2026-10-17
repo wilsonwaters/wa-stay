@@ -1,7 +1,7 @@
 # Adding a provider
 
-A **provider** is a module that brings one accommodation source into WA Stay: ParkStay WA
-today, RAC Parks & Resorts next, perhaps Hipcamp or a holiday-park chain later. This guide
+A **provider** is a module that brings one accommodation source into WA Stay: ParkStay WA and
+RAC Parks & Resorts are built in, and Hipcamp or a holiday-park chain could follow. This guide
 takes you from nothing to a provider that shows up on Explore, in the create flows and in
 Settings, with tests. You change nothing in the core services, the IPC contract or the
 renderer: they find providers through the registry and read what each one can do from its

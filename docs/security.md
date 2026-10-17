@@ -1,8 +1,9 @@
 # Security
 
 This document describes how WA Stay protects data on the user's machine: [secret
-storage](#secret-storage), [provider windows](#provider-sign-in-and-payment-windows), [the main
-window's permissions](#the-main-windows-permissions) and [the packaged app's Electron
+storage](#secret-storage), [experiments](#experiments), [provider
+windows](#provider-sign-in-and-payment-windows), [the main window's
+permissions](#the-main-windows-permissions) and [the packaged app's Electron
 fuses](#the-packaged-app-electron-fuses). The overall baseline (sandboxing, CSP, IPC checks) is
 in the [architecture overview](architecture/overview.md#security).
 
@@ -12,15 +13,16 @@ in the [architecture overview](architecture/overview.md#security).
 
 The app keeps these secrets on disk:
 
-| Secret | Where it is stored |
-| --- | --- |
-| Email (SMTP) notifier settings, including the app password | `notifiers.config` in the database |
-| Provider secrets (`ProviderContext.secrets`) | the provider's own state (`provider_state`), under `secret:<key>` |
+| Secret                                                                                 | Where it is stored                                                                     |
+| -------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------- |
+| Email (SMTP) notifier settings, including the app password                             | `notifiers.config` in the database                                                     |
+| Provider secrets (`ProviderContext.secrets`)                                           | the provider's own state (`provider_state`), under `secret:<key>`                      |
 | Account details a provider asks for (a `credentials` sign-in, such as a member number) | the provider's secrets, as `account.<key>`: `secret:account.<key>` in `provider_state` |
 
-No built-in provider stores a secret yet. The email password is write-only over IPC: the
-window gets the notifier settings without it (`hasPassword` instead), and saving without a
-password keeps the stored one only for the same server, port and account.
+ParkStay stores no secret of its own; RAC's only one is the person's member number, an account
+detail (below). The email password is write-only over IPC: the window gets the notifier
+settings without it (`hasPassword` instead), and saving without a password keeps the stored one
+only for the same server, port and account.
 
 Account details are write-only over IPC too (`src/main/core/accounts/provider-account.service.ts`):
 
@@ -33,7 +35,13 @@ Account details are write-only over IPC too (`src/main/core/accounts/provider-ac
   save is not a React Query mutation, so its cache never holds the values).
 - "Copy" (`accounts.copyCredential`, only for fields the provider marks `copyable`) has main
   write the value to the system clipboard. The clipboard is not cleared afterwards: copying is
-  the person's own action.
+  the person's own action, and clearing it later could wipe something they copied since. The
+  value then lives where the operating system keeps clipboard contents: on Windows, with
+  clipboard history on (Windows key + V), it stays in that history until it is cleared there or
+  the computer restarts (unless pinned), and with clipboard sync across devices on, Windows sends
+  it to the person's other devices through their Microsoft account. WA Stay does not ask Windows
+  to leave it out of either. The [user guide](user-guide.md#settings) says how to clear the
+  history or turn these off, for a shared computer.
 - They are never logged, never quoted in an error message (a provider's own error is reduced to
   its name), and never sent by the core. Removing them (`accounts.signOut`) deletes them and
   touches no session.
@@ -74,11 +82,11 @@ The vault encrypts new secrets with one of two backends.
 **`os`: Electron `safeStorage`.** This is the normal case. The operating system protects
 the key:
 
-| Platform | Key protection | Where the key lives |
-| --- | --- | --- |
-| Windows | DPAPI, bound to the Windows user account | Wrapped with DPAPI in Chromium's `Local State` file inside userData (`os_crypt.encrypted_key`) |
-| macOS | Keychain | A Keychain item for the app |
-| Linux | Secret Service (GNOME Keyring, KWallet) | An item in the user's keyring. Nothing is written to userData. |
+| Platform | Key protection                           | Where the key lives                                                                            |
+| -------- | ---------------------------------------- | ---------------------------------------------------------------------------------------------- |
+| Windows  | DPAPI, bound to the Windows user account | Wrapped with DPAPI in Chromium's `Local State` file inside userData (`os_crypt.encrypted_key`) |
+| macOS    | Keychain                                 | A Keychain item for the app                                                                    |
+| Linux    | Secret Service (GNOME Keyring, KWallet)  | An item in the user's keyring. Nothing is written to userData.                                 |
 
 On Windows, `safeStorage` encrypts with AES-256-GCM, which detects any change to a
 ciphertext. On macOS and Linux it is Chromium's OSCrypt, which uses AES-128-CBC with no
@@ -141,11 +149,11 @@ Windows, because the `Local State` key no longer matches.
 v1.x used three schemes. Their keys came from constants in the source code, so they were
 obfuscation, not protection:
 
-| Secret | v1.x scheme |
-| --- | --- |
-| ParkStay password | AES-256-GCM, key `PBKDF2(machineId + app constant, constant salt)`, stored as hex in three columns. Not migrated: see below |
-| Notifier config | The same scheme with other constants, stored as `iv:authTag:ciphertext` |
-| `gmail-oauth.json` (Gmail OTP) | electron-store's AES-256-CBC with a hard-coded `encryptionKey`. Not migrated: see below |
+| Secret                         | v1.x scheme                                                                                                                 |
+| ------------------------------ | --------------------------------------------------------------------------------------------------------------------------- |
+| ParkStay password              | AES-256-GCM, key `PBKDF2(machineId + app constant, constant salt)`, stored as hex in three columns. Not migrated: see below |
+| Notifier config                | The same scheme with other constants, stored as `iv:authTag:ciphertext`                                                     |
+| `gmail-oauth.json` (Gmail OTP) | electron-store's AES-256-CBC with a hard-coded `encryptionKey`. Not migrated: see below                                     |
 
 `migrateLegacySecrets` (`src/main/security/legacy-migration.ts`) runs at every start,
 after the database migrations and before anything reads a secret. It:
@@ -213,10 +221,10 @@ keep the v1.x originals, so they are the only backup of the secrets as v1.x stor
 
 Every stored secret has a state (`SecretState`):
 
-| State | Meaning |
-| --- | --- |
-| `ok` | A secret is stored and the app can decrypt it. |
-| `missing` | Nothing is stored. |
+| State        | Meaning                                          |
+| ------------ | ------------------------------------------------ |
+| `ok`         | A secret is stored and the app can decrypt it.   |
+| `missing`    | Nothing is stored.                               |
 | `unreadable` | Something is stored, but it cannot be decrypted. |
 
 A secret becomes `unreadable` when:
@@ -234,10 +242,10 @@ a tampered one may decrypt to wrong data instead of reading as `unreadable`.
 An unreadable secret is never treated as empty, and it is never overwritten except by the
 user saving a new one. What the user sees:
 
-| Secret | When unreadable |
-| --- | --- |
-| Email notifier | The notifier shows `secretState: 'unreadable'`, status `error` and "Saved password could not be decrypted; re-enter it". Nothing is sent through it, and the skip is logged once. Saving the email settings again fixes it. |
-| Account details | The account reads as not saved ("Not added"), with one warning that names the field's key. "Copy" says "Couldn't read your saved {label}. Add it again." Adding the details again fixes it. |
+| Secret          | When unreadable                                                                                                                                                                                                             |
+| --------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Email notifier  | The notifier shows `secretState: 'unreadable'`, status `error` and "Saved password could not be decrypted; re-enter it". Nothing is sent through it, and the skip is logged once. Saving the email settings again fixes it. |
+| Account details | The account reads as not saved ("Not added"), with one warning that names the field's key. "Copy" says "Couldn't read your saved {label}. Add it again." Adding the details again fixes it.                                 |
 
 A locked keyring is usually temporary: unlock it and restart the app, and the secrets read
 again. Nothing was overwritten in the meantime.
@@ -254,6 +262,19 @@ and a warning is logged that secrets saved under the earlier key cannot be read.
   Linux, start Electron directly with `--password-store=gnome-libsecret` in a session that
   has an unlocked GNOME Keyring.
 
+## Experiments
+
+What a provider ships switched off (its manifest's `experiments`) is the person's choice, kept
+by main: the `provider_state` row `('<provider id>', 'core.experiments')`, under the app's own
+`core.*` keys, which a provider's `ctx.state` can neither read nor write
+(`src/main/providers/experiments.ts`). The window only asks main to change it
+(`providers.setExperiment`, after a confirmation); nothing a page or a provider sends turns one
+on. A choice takes effect when WA Stay next starts: the provider is registered with the
+capabilities the experiment turns on, so no code path of an experiment that is off can run.
+Turning off one that turns on holds is refused while one of the provider's snipes set to hold is running or
+one of its holds is unexpired, being placed or being let go (`ACCOUNT_BUSY`); once it is off, no
+new hold is placed for that provider until the restart.
+
 ## Provider sign-in and payment windows
 
 A provider's sign-in window (and, with holds, its payment window) shows the provider's own
@@ -264,8 +285,9 @@ pages, so it gets nothing of the app (`src/main/app/provider-windows.ts`):
   the app injected. Its webContents is never a trusted IPC sender.
 - Top-level navigations and main-frame redirects may only go to the provider's allow-list
   (ParkStay: its own site, the DBCA SSO gateway, Azure AD B2C and the DBCA queue; a payment
-  window also allows DBCA's own hosts, `*.dbca.wa.gov.au`, for the payment ledger). Anything
-  else is cancelled and logged by origin only; a sign-in window opens it in the system
+  window also allows DBCA's own hosts, `*.dbca.wa.gov.au`, for the payment ledger; RAC, with
+  its auto-cart experiment on: RAC Parks & Resorts' own origin only, for the park's cart page).
+  Anything else is cancelled and logged by origin only; a sign-in window opens it in the system
   browser instead. Sub-frames are not restricted (payment pages use them).
 - Every permission request and check is refused, certificate errors are rejected, and no
   client certificate or HTTP credentials are offered.
@@ -275,8 +297,35 @@ pages, so it gets nothing of the app (`src/main/app/provider-windows.ts`):
   confirmation's `checkouthash`.
 - A payment is recorded only from the provider's own confirmation page for that hold
   (ParkStay: `/success/` with `checkouthash = sha256(hold reference)`); any other page,
-  including another booking's confirmation, records nothing. The app never sees card
-  details: they are typed into the provider's own payment pages.
+  including another booking's confirmation, records nothing. RAC records none: its
+  confirmation page has not been seen, so a stay paid in its cart is never marked booked. The
+  app never sees card details: they are typed into the provider's own payment pages.
+
+### RAC's cart guard
+
+RAC's auto-cart (an experiment, off by default) adds a stay to the person's RAC cart, which the
+payment window then shows. The RAC client asks its cart guard
+(`src/main/providers/rac/cart-guard.ts`) about every request and every redirect before sending
+it, so neither a bug nor a page RAC sends back can take the app past the cart:
+
+- **An allow-list.** A GET of RAC's own pages (never NewBook's proxy), a POST of RAC's
+  availability form, and, only while the experiment is on, the cart address (a GET of the
+  park's `/booking/` page with exactly one empty `cart` and one token) and the cart removal (the
+  park's NewBook proxy with exactly `remove_item_from_cart`, and a form of exactly `item_offset`
+  and `cart_type`). Everything else is refused before anything is sent: other hosts (NewBook's
+  card store is one), other methods, checkout's form and post, card fields, extending a hold, a
+  membership check, and any other NewBook call, whatever is on.
+- **Read as the server reads it.** Paths are decoded (twice-encoded ones too), compared in lower
+  case with dot segments and repeated slashes resolved, and query and form names are read as PHP
+  reads them (`cart[]` is `cart`), so no spelling slips past.
+- **The token is never kept.** A cart address carries a token (`rest_api_data_id`). It lives
+  only in the hold's memory while it is sent: never stored, returned, logged (refusals and
+  errors name the path only), put in an error, a notification or an email. An abort after it
+  was sent clears RAC's cookies in the app.
+- **Payment stays the person's.** The payment window opens the park's cart page, never the cart
+  address, on RAC's own origin only; WA Stay never checks out, ticks RAC's terms, fills in the
+  member number or sends card details. `tests/unit/providers/rac/cart-guard.test.ts`,
+  `no-checkout.test.ts` and `tests/integration/credentials-leak.test.ts` check it.
 
 Signing out clears the partition (cookies, storage, HTTP auth cache) and nothing else: the
 local profile, watches, snipes and bookings stay. It is refused while a snipe or hold needs
@@ -353,14 +402,14 @@ it packages the app (`electronFuses` in `electron-builder.json`), just before si
 apply to the installed `WA Stay.exe` (changing one means modifying the executable, which breaks
 its signature when the build is signed):
 
-| Fuse | Set to | Effect |
-| --- | --- | --- |
-| `RunAsNode` | off | `ELECTRON_RUN_AS_NODE` is ignored: the executable cannot be used as a plain Node.js runtime. Nothing in the app forks a Node process. |
-| `EnableNodeOptionsEnvironmentVariable` | off | `NODE_OPTIONS` and `NODE_EXTRA_CA_CERTS` are ignored, so no environment variable can load code (`--require`) into the main process. A TLS-inspecting proxy's certificate cannot be added that way; provider traffic goes through Chromium's network stack, which uses the system's certificates. |
-| `EnableNodeCliInspectArguments` | off | `--inspect`, `--inspect-brk` and `SIGUSR1` do not open Node's inspector on the main process. |
-| `OnlyLoadAppFromAsar` | on | The app is loaded only from `resources/app.asar`, never from a `resources/app` folder. |
-| `EnableEmbeddedAsarIntegrityValidation` | on | electron-builder records the SHA-256 of `app.asar`'s header in the executable (a Windows resource; `Info.plist` on macOS), and every file packed in the archive carries its own block hashes. Electron checks both as it reads, so a modified `app.asar` does not run. Windows and macOS only: Linux has no such check. Only the files kept outside the archive (`app.asar.unpacked`) are not covered: playwright-core, and better-sqlite3's one native binary (`prebuilds/<platform>-<arch>.node`, which cannot load from inside an archive). better-sqlite3's JavaScript is inside the archive and checked, and its C sources and other platforms' binaries are not packaged. |
-| `EnableCookieEncryption` | on | Cookie values on disk, such as a provider session's (`persist:provider-<id>`), are encrypted with the operating system's key (DPAPI on Windows), as Chrome does. It is one-way: cookies saved before are encrypted the next time they are written, and turning the fuse off again would make the stored cookies unreadable. |
+| Fuse                                    | Set to | Effect                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| --------------------------------------- | ------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `RunAsNode`                             | off    | `ELECTRON_RUN_AS_NODE` is ignored: the executable cannot be used as a plain Node.js runtime. Nothing in the app forks a Node process.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| `EnableNodeOptionsEnvironmentVariable`  | off    | `NODE_OPTIONS` and `NODE_EXTRA_CA_CERTS` are ignored, so no environment variable can load code (`--require`) into the main process. A TLS-inspecting proxy's certificate cannot be added that way; provider traffic goes through Chromium's network stack, which uses the system's certificates.                                                                                                                                                                                                                                                                                                                                                                                |
+| `EnableNodeCliInspectArguments`         | off    | `--inspect`, `--inspect-brk` and `SIGUSR1` do not open Node's inspector on the main process.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| `OnlyLoadAppFromAsar`                   | on     | The app is loaded only from `resources/app.asar`, never from a `resources/app` folder.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| `EnableEmbeddedAsarIntegrityValidation` | on     | electron-builder records the SHA-256 of `app.asar`'s header in the executable (a Windows resource; `Info.plist` on macOS), and every file packed in the archive carries its own block hashes. Electron checks both as it reads, so a modified `app.asar` does not run. Windows and macOS only: Linux has no such check. Only the files kept outside the archive (`app.asar.unpacked`) are not covered: playwright-core, and better-sqlite3's one native binary (`prebuilds/<platform>-<arch>.node`, which cannot load from inside an archive). better-sqlite3's JavaScript is inside the archive and checked, and its C sources and other platforms' binaries are not packaged. |
+| `EnableCookieEncryption`                | on     | Cookie values on disk, such as a provider session's (`persist:provider-<id>`), are encrypted with the operating system's key (DPAPI on Windows), as Chrome does. It is one-way: cookies saved before are encrypted the next time they are written, and turning the fuse off again would make the stored cookies unreadable.                                                                                                                                                                                                                                                                                                                                                     |
 
 The other fuses keep Electron's defaults; `GrantFileProtocolExtraPrivileges` stays on because
 the window loads its page from `file://`.
