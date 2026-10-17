@@ -247,19 +247,28 @@ export function createContainer({
   };
   // One booking per night across snipes and auto-hold watches; it also knows the holds in flight
   const nightGuard = new NightGuard(repositories.snipes, repositories.watches);
-  // Turning off a provider's holds, or signing out, would lose a queue place, a hold being
-  // placed (a snipe sniping, or any hold whose `holds.create` is still running), a hold
-  // awaiting payment, or a hold being let go (`holds.release` running: R18).
+  // Turning off a provider's holds, or signing out, would lose:
+  // - a queue place: any snipe in the queue, and any snipe sniping through it (its checks carry
+  //   the queue session on the provider's partition), alert snipes included;
+  // - a hold being placed: a hold snipe sniping, or any hold whose `holds.create` still runs;
+  // - a hold awaiting payment;
+  // - a hold being let go (`holds.release` running: R18).
+  // An alert snipe that uses no queue needs no session while it checks. A snipe through the
+  // queue and waiting for its release (WAITING_RELEASE) is not counted, as before R13.
   let releasingHold: (providerId: string) => boolean = () => false;
-  const isBusy = (providerId: string, now: Date): boolean =>
-    nightGuard.reserving(providerId) ||
-    releasingHold(providerId) ||
-    repositories.snipes.countByStatus(providerId, [
-      SnipeStatus.QUEUEING,
-      SnipeStatus.SNIPING,
-      SnipeStatus.HELD,
-    ]) > 0 ||
-    repositories.watches.countUnexpiredHolds(providerId, now) > 0;
+  const isBusy = (providerId: string, now: Date): boolean => {
+    const snipes = repositories.snipes;
+    return (
+      nightGuard.reserving(providerId) ||
+      releasingHold(providerId) ||
+      snipes.countByStatus(providerId, [SnipeStatus.QUEUEING]) > 0 ||
+      snipes.countByStatus(providerId, [SnipeStatus.SNIPING], { accessGateEnabled: true }) > 0 ||
+      snipes.countByStatus(providerId, [SnipeStatus.SNIPING, SnipeStatus.HELD], {
+        action: 'hold',
+      }) > 0 ||
+      repositories.watches.countUnexpiredHolds(providerId, now) > 0
+    );
+  };
   const providers = new ProviderRegistry({ logger });
   // The person's experiment choices apply here, as each provider registers: after a restart
   const experiments = new ProviderExperiments({ state: providerState, providers, isBusy, logger });

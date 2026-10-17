@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import { useProvidersWith, type ProviderCapability } from '../../api/providers';
+import type { ProviderManifest } from '../../../shared/types/provider.types';
 import {
   Button,
   Notice,
@@ -23,6 +24,11 @@ export interface ProviderPickerProps {
   /** Shown when no provider offers the capability, e.g. "No provider supports watches yet". */
   emptyMessage: string;
   hint?: string;
+  /**
+   * A short line under a provider's name, before its description, where the flow needs one
+   * (Site Sniper: "Alerts only" for a provider without holds). Part of the card's description.
+   */
+  note?: (provider: ProviderManifest) => string | undefined;
 }
 
 /**
@@ -37,6 +43,7 @@ export function ProviderPicker({
   onChange,
   emptyMessage,
   hint,
+  note,
 }: ProviderPickerProps) {
   const providers = useProvidersWith(capability);
   const list = providers.data;
@@ -76,15 +83,30 @@ export function ProviderPicker({
 
   return (
     <RadioCardGroup label={label} hint={hint} value={value ?? ''} onValueChange={onChange}>
-      {list.map((provider) => (
-        <RadioCard
-          key={provider.id}
-          value={provider.id}
-          title={provider.name}
-          description={provider.description}
-          trailing={<ProviderBadge providerId={provider.id} info={provider} variant="compact" />}
-        />
-      ))}
+      {list.map((provider) => {
+        const line = note?.(provider);
+        return (
+          <RadioCard
+            key={provider.id}
+            value={provider.id}
+            title={provider.name}
+            description={
+              line ? (
+                <>
+                  <span className="block font-semibold">
+                    {line}
+                    <VisuallyHidden>.</VisuallyHidden>
+                  </span>{' '}
+                  <span className="block">{provider.description}</span>
+                </>
+              ) : (
+                provider.description
+              )
+            }
+            trailing={<ProviderBadge providerId={provider.id} info={provider} variant="compact" />}
+          />
+        );
+      })}
     </RadioCardGroup>
   );
 }

@@ -103,7 +103,7 @@ describe('create a snipe, end to end', () => {
 });
 
 describe('create a snipe at a place with sites and cabins, end to end', () => {
-  it('needs a stay type there, and sends "Camping" as unitKinds', async () => {
+  it('needs a stay type there to hold (asked on the Release step), and sends "Camping" as unitKinds', async () => {
     const create = jest.fn((input: SiteSnipeInput) =>
       Promise.resolve(ok(makeSnipe({ id: 9, name: input.name })))
     );
@@ -121,7 +121,7 @@ describe('create a snipe at a place with sites and cabins, end to end', () => {
     await user.click(await screen.findByRole('option', { name: /Osprey Bay/ }));
     await user.click(screen.getByRole('button', { name: 'Continue' }));
 
-    // Your stay: dates, then Continue without a stay type or a site is refused.
+    // Your stay: dates; the stay type is offered, and Continue goes on without one (R13).
     await screen.findByRole('heading', { level: 2, name: /Your stay$/ });
     await user.click(screen.getByRole('button', { name: /^Dates/ }));
     await user.keyboard('{ArrowRight}{Enter}{ArrowRight}{ArrowRight}{Enter}');
@@ -130,12 +130,20 @@ describe('create a snipe at a place with sites and cabins, end to end', () => {
         name: 'Done',
       })
     );
-    const stayTypes = await screen.findByRole('group', { name: 'Stay type' });
-    await user.click(screen.getByRole('button', { name: 'Continue' }));
-    await waitFor(() => expect(stayTypes).toHaveFocus());
-    await user.click(within(stayTypes).getByRole('button', { name: 'Camping' }));
+    await screen.findByRole('group', { name: 'Stay type' });
     await user.click(screen.getByRole('button', { name: 'Continue' }));
 
+    // Release: "Hold it for me" (ParkStay's default) is refused without a stay type or a site
+    await screen.findByRole('heading', { level: 2, name: /Release and timing$/ });
+    const choice = screen.getByRole('radiogroup', { name: 'When the dates are free' });
+    await user.click(screen.getByRole('button', { name: 'Continue' }));
+    await waitFor(() => expect(choice).toHaveFocus());
+
+    // Back under "Your stay", "Camping" meets it
+    await user.click(screen.getByRole('button', { name: /^Your stay/ }));
+    const stayTypes = await screen.findByRole('group', { name: 'Stay type' });
+    await user.click(within(stayTypes).getByRole('button', { name: 'Camping' }));
+    await user.click(screen.getByRole('button', { name: 'Continue' }));
     await screen.findByRole('heading', { level: 2, name: /Release and timing$/ });
     await user.click(screen.getByRole('button', { name: 'Continue' }));
     await screen.findByRole('heading', { level: 2, name: /Review$/ });
@@ -148,6 +156,7 @@ describe('create a snipe at a place with sites and cabins, end to end', () => {
       providerId: 'parkstay',
       location: { externalId: '20', name: 'Osprey Bay' },
       unitKinds: ['campsite'],
+      action: 'hold',
     });
     expect(create.mock.calls[0][0]).not.toHaveProperty('unitIds');
   });

@@ -108,7 +108,8 @@ to add.
 - **ParkStay, E2 and U1**: `campsite_availablity_view_20.json` is the Jest fixture
   `tests/fixtures/parkstay/campsite_availablity_view_20.json` (the public per-campground view
   for Bungarra, campground 20), copied unchanged; it answers Bungarra's detail page and a new
-  watch's first check, for any dates. `profile-signed-out.json` is Django REST Framework's standard 403
+  watch's first check, for any dates. `alert-snipe.spec.ts` launches on a copy moved to its own
+  dates (`support/dated-fixtures.ts`), where sites 3 to 5 are free for both nights. `profile-signed-out.json` is Django REST Framework's standard 403
   body for `GET /api/profile` without a session, which the account service's startup check (V6)
   sends 5 s after launch; it is written by hand, not recorded, and holds no personal data.
 - **ParkStay, the campground page** (PD2): `campground_page_20.html` is the Jest fixture

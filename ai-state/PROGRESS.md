@@ -1,6 +1,6 @@
 # Project Progress — WA Stay
 
-_Last updated: 2026-10-16 (orchestrator)_
+_Last updated: 2026-10-17 (orchestrator)_
 
 # Project 2 — RAC Parks & Resorts provider
 
@@ -10,11 +10,12 @@ Branch `ccr-573ddb1d-hir0sq` (from `main` at `4bd5d62`, the v2.0.0 release). The
 Phase 3–4 (task specs, then execution). The stakeholder approved the 20-task plan and decided R6–R8 (alert clicks for every provider, a phone booking link in alert emails, interactive pacing).
 
 ## Currently in flight
-- **R18 (#65)**: implementation agent in `/home/user/lanes/r18`.
-- **R13 (#60)** and **R14 (#61)**: implementation agents in `/home/user/lanes/r13` and `r14` (at `348d6d2`).
-- Next: R16 (after R11, R13, R14, R15), R18 (after R12, R17), R19, R20.
+- **R18 (#65)**: implemented on `lane/r18` (`5c0eb80`; 5318 tests, e2e 25); review APPROVE-WITH-MINORS (7/7 mutations caught); the implementer is fixing the minors (HoldPanel needs `capabilities.holds`; decline waits for a confirmation being read; no release after a new Pay now).
+- **R14 (#61)**: fixes `ea7437d`, `4d5a65f`, `a01d1c4` (Explore's counts share check's hold-back); the original reviewer is verifying (with e2e).
+- Next: R16 (after R14), R19 (after R16, R18), R20.
 
 ## Completed
+- **R13 (#60) merged** (`ba48709`): alert snipes on screen (action choice on the Release step, ALERTED card and panel with the booking link, Arm again, no "Hold it for me" while holds are turning off). Review APPROVE; minors fixed in `8ae596e` (the hold rule points to "Your stay"; queued alert snipes keep sign-out busy; Run now names the alerted unit). Gate on the lane: 5294 tests; e2e 25.
 - **R17 (#64) merged** (`9cf103b`): `manifest.experiments` applied at registration (after a restart), state in `provider_state` (`core.*` keys refused to providers), `providers.experiments`/`setExperiment`, an "Experimental" switch with a warning and confirm dialog on the provider's Accounts row (shown to everyone, off); turning holds off acts at once (`holdsTurningOff`: watches note it, hold snipes alert instead) and is `ACCOUNT_BUSY` while a hold is held or being placed (`NightGuard.reserving`). Review REQUEST_CHANGES (in-flight hold) → fixes `67cc164`, `9958c49`, `e113a57`, merged R12 and replaced the stand-in with the alert (`4891e91`) → APPROVE. Gate: 5164 tests, e2e 24.
 - **R11 (#58) merged**: RAC bulk availability on Explore (one interactive POST per park; "51 spots free", no "of M"; `bookableUnits` optional end to end; "Still checking RAC…"; a newer search cancels the older one's waiting POSTs but lets a sent one finish, via a new SDK `HttpRequestOptions.onSend`); bulk agrees with the per-park check on every fixture; every park's fixture now a real recording (7 anonymous POSTs on 17 Oct 2026, ≥12 s apart). Review REQUEST_CHANGES (party refusals counted bookable; overlapping requests on RAC's server) → fixes `ba2e798`, `6e3e378` → APPROVE. Gate: 5161 tests, e2e 25, RAC preview passed.
 - **R12 (#59) merged** (`348d6d2`): snipes without holds; per-snipe `action` (`alert` | `hold`, default `hold`) and `alert` (v12, plus `hold_expires_estimated` for R18); `ALERTED` reserves no night; an alert notification and email with the public booking link; `maxWindowMinutes`; a 403/429 ends a snipe FAILED for every provider; §12.35 catch-up for R1–R9. Review APPROVE (minors routed to R13/R14). Gate: 5085 tests, e2e 24.

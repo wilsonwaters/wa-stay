@@ -308,6 +308,56 @@ describe('accounts over IPC', () => {
       expect(partition().clearAuthCache).toHaveBeenCalledTimes(1);
     });
 
+    it('a sniping alert snipe needs no session, so sign-out goes ahead; one in the queue keeps it busy', async () => {
+      const userId = container.profile.requireUserId();
+      const snipes = container.repositories.snipes;
+      const alert = snipes.create(
+        userId,
+        createMockSiteSnipeInput({ providerId: 'parkstay', action: 'alert' })
+      );
+      snipes.updateStatus(alert.id, SnipeStatus.QUEUEING);
+
+      // Its queue place is on the session, like a hold snipe's
+      await expect(call('accounts:sign-out', { providerId: 'parkstay' })).resolves.toMatchObject({
+        success: false,
+        code: 'ACCOUNT_BUSY',
+      });
+      expect(partition().clearStorageData).not.toHaveBeenCalled();
+
+      snipes.updateStatus(alert.id, SnipeStatus.SNIPING);
+      await expect(call('accounts:sign-out', { providerId: 'parkstay' })).resolves.toMatchObject({
+        success: true,
+        data: { status: 'signed-out' },
+      });
+      expect(partition().clearStorageData).toHaveBeenCalledTimes(1);
+    });
+
+    it('an alert snipe sniping through the queue keeps sign-out busy: its checks carry the queue session', async () => {
+      const userId = container.profile.requireUserId();
+      const snipes = container.repositories.snipes;
+      const queued = snipes.create(
+        userId,
+        createMockSiteSnipeInput({
+          providerId: 'parkstay',
+          action: 'alert',
+          accessGateEnabled: true,
+        })
+      );
+      snipes.updateStatus(queued.id, SnipeStatus.SNIPING);
+
+      await expect(call('accounts:sign-out', { providerId: 'parkstay' })).resolves.toMatchObject({
+        success: false,
+        code: 'ACCOUNT_BUSY',
+      });
+      expect(partition().clearStorageData).not.toHaveBeenCalled();
+
+      // Through with the queue: its alert sent
+      snipes.updateStatus(queued.id, SnipeStatus.ALERTED);
+      await expect(call('accounts:sign-out', { providerId: 'parkstay' })).resolves.toMatchObject({
+        success: true,
+      });
+    });
+
     it('sign-out keeps the profile row and its data', async () => {
       container.repositories.providerAccounts.upsert({
         providerId: 'parkstay',

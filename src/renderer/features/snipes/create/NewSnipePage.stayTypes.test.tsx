@@ -11,9 +11,9 @@ const button = (name: string) => screen.getByRole('button', { name });
 const step = (name: RegExp) => screen.findByRole('heading', { level: 2, name });
 const sent = (mock: jest.Mock): SiteSnipeInput => mock.mock.calls[0][0];
 const stayTypes = () => screen.findByRole('group', { name: 'Stay type' });
-// R9: "one stay type", and the mixed place's noun
+// Where to fix it (R13 review), with the mixed place's noun (R9)
 const MESSAGE =
-  'Choose one stay type or a spot. At a place with more than one stay type, Site Sniper holds only what you choose.';
+  'Osprey Bay has more than one stay type. To hold one, choose a stay type or a spot under "Your stay", or choose Alert me.';
 
 describe('NewSnipePage at a place with sites and cabins', () => {
   it('offers its stay types; "Cabins & villas" narrows the units and is sent as unitKinds', async () => {
@@ -47,33 +47,67 @@ describe('NewSnipePage at a place with sites and cabins', () => {
     expect(sent(mock.snipes.create)).not.toHaveProperty('unitIds');
   });
 
-  it('will not go on without a stay type or a site, focusing the stay types with why', async () => {
+  it('the Stay step goes on without a stay type or a spot; "Hold it for me" then refuses on the Release step, focusing the choice with why', async () => {
     const { user } = renderWithApp({ route: PREFILL, api: api() });
     const group = await stayTypes();
     await user.click(button('Continue'));
-    await waitFor(() => expect(group).toHaveFocus());
-    expect(group).toHaveAttribute('aria-invalid', 'true');
-    expect(group).toHaveAccessibleDescription(`Leave all off for any stay type. ${MESSAGE}`);
-    expect(screen.getByRole('heading', { level: 2, name: /Your stay$/ })).toBeInTheDocument();
+    await step(/Release and timing$/);
+    expect(group).not.toBeInTheDocument();
 
-    // A site meets it as well as a stay type, and the error goes.
-    await user.click(button('Choose spots'));
-    await user.click(screen.getByRole('checkbox', { name: 'Site 3' }));
-    await waitFor(() => expect(screen.queryByText(MESSAGE)).toBeNull());
-    expect(group).not.toHaveAttribute('aria-invalid');
+    // ParkStay holds by default, so the choice refuses Continue with R6's message
+    const choice = screen.getByRole('radiogroup', { name: 'When the dates are free' });
+    expect(within(choice).getByRole('radio', { name: 'Hold it for me' })).toBeChecked();
     await user.click(button('Continue'));
-    expect(await step(/Release and timing$/)).toBeInTheDocument();
+    await waitFor(() => expect(choice).toHaveFocus());
+    expect(choice).toHaveAttribute('aria-invalid', 'true');
+    expect(choice).toHaveAccessibleDescription(MESSAGE);
+    expect(
+      screen.getByRole('heading', { level: 2, name: /Release and timing$/ })
+    ).toBeInTheDocument();
+
+    // "Alert me" needs neither: the message goes, and it goes on
+    await user.click(within(choice).getByRole('radio', { name: 'Alert me' }));
+    await waitFor(() => expect(screen.queryByText(MESSAGE)).toBeNull());
+    expect(choice).not.toHaveAttribute('aria-invalid');
+    await user.click(button('Continue'));
+    expect(await step(/Review$/)).toBeInTheDocument();
   });
 
-  it('goes on once a stay type is chosen', async () => {
+  it('switching to "Hold it for me" shows the message at once; a spot chosen under "Your stay" meets it', async () => {
+    const mock = api();
+    const { user } = renderWithApp({ route: PREFILL, api: mock });
+    await stayTypes();
+    await user.click(button('Continue'));
+    await step(/Release and timing$/);
+    const choice = screen.getByRole('radiogroup', { name: 'When the dates are free' });
+    await user.click(within(choice).getByRole('radio', { name: 'Alert me' }));
+    await user.click(within(choice).getByRole('radio', { name: 'Hold it for me' }));
+    expect(await screen.findByText(MESSAGE)).toBeInTheDocument();
+
+    // Back to the stay: a site meets the rule as well as a stay type, and the message goes
+    await user.click(screen.getByRole('button', { name: /^Your stay/ }));
+    await step(/Your stay$/);
+    await user.click(button('Choose spots'));
+    await user.click(screen.getByRole('checkbox', { name: 'Site 3' }));
+    await user.click(button('Continue'));
+    await step(/Release and timing$/);
+    expect(screen.queryByText(MESSAGE)).toBeNull();
+    await user.click(button('Continue'));
+    await step(/Review$/);
+    await user.click(button('Create snipe'));
+    await waitFor(() => expect(mock.snipes.create).toHaveBeenCalledTimes(1));
+    expect(sent(mock.snipes.create)).toMatchObject({ action: 'hold', unitIds: ['3'] });
+  });
+
+  it('a stay type chosen meets the hold rule too', async () => {
     const { user } = renderWithApp({ route: PREFILL, api: api() });
     const group = await stayTypes();
-    await user.click(button('Continue'));
-    expect(await screen.findByText(MESSAGE)).toBeInTheDocument();
     await user.click(within(group).getByRole('button', { name: 'Camping' }));
-    await waitFor(() => expect(screen.queryByText(MESSAGE)).toBeNull());
     await user.click(button('Continue'));
-    expect(await step(/Release and timing$/)).toBeInTheDocument();
+    await step(/Release and timing$/);
+    await user.click(button('Continue'));
+    expect(await step(/Review$/)).toBeInTheDocument();
+    expect(screen.queryByText(MESSAGE)).toBeNull();
   });
 
   it('asks for nothing at a place with sites only, as before', async () => {

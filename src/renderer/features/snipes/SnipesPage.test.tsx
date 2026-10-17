@@ -1,7 +1,17 @@
 import { act, screen, waitFor, within } from '@testing-library/react';
 import { SnipeStatus } from '../../../shared/types/common.types';
-import { makeHeldSnipe, makeSnipe } from '@tests/fixtures/renderer/snipes';
-import { createMockApi, FAKE_MANIFEST, ok } from '@tests/utils/renderer/createMockApi';
+import {
+  ALERT_ONLY_MANIFEST,
+  makeAlertedSnipe,
+  makeHeldSnipe,
+  makeSnipe,
+} from '@tests/fixtures/renderer/snipes';
+import {
+  createMockApi,
+  FAKE_MANIFEST,
+  ok,
+  PARKSTAY_MANIFEST,
+} from '@tests/utils/renderer/createMockApi';
 import { renderWithApp } from '@tests/utils/renderer/renderWithApp';
 import { politeAnnouncement, renderWithProviders } from '@tests/utils/renderer/renderWithProviders';
 import { SnipesPage } from './SnipesPage';
@@ -128,6 +138,61 @@ describe('SnipesPage', () => {
     expect(politeAnnouncement()).toBe(`${snipe.name}: Waiting for release`);
   });
 
+  it('announces an alert once, politely: what is free and where to book it', async () => {
+    const snipe = makeSnipe({ action: 'alert', status: SnipeStatus.SNIPING });
+    const list = jest.fn().mockResolvedValue(ok([snipe]));
+    const mock = createMockApi({ snipes: { list } });
+    renderWithProviders(<SnipesPage />, { api: mock });
+    await screen.findByRole('article', { name: snipe.name });
+
+    const alerted = makeAlertedSnipe({ name: snipe.name });
+    list.mockResolvedValue(ok([alerted]));
+    mock.emit('snipe:updated', alerted);
+    const said = `${snipe.name}: CAMPSITE 03 is free. Book on ParkStay.`;
+    await waitFor(() => expect(politeAnnouncement()).toBe(said));
+    // Polite, never the urgent region a hold uses
+    expect(screen.getByRole('alert')).toBeEmptyDOMElement();
+
+    // Once: the same status again (a refetch, an unrelated change) says nothing more. The
+    // announcer marks every message it is given, so a second one would change the region.
+    const region = () => document.querySelector('[aria-live="polite"]')?.textContent;
+    const first = region();
+    const renamed = { ...alerted, notes: 'Booked it' };
+    list.mockResolvedValue(ok([renamed]));
+    mock.emit('snipe:updated', renamed);
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    });
+    expect(region()).toBe(first);
+  });
+
+  it('says what Site Sniper does in the providers’ words for their units', async () => {
+    const { unmount } = renderWithProviders(<SnipesPage />);
+    expect(
+      await screen.findByText(
+        'Catch a hard-to-get site the moment it is released: Site Sniper alerts you or, where the provider allows it, tries to hold it for you to pay for.'
+      )
+    ).toBeInTheDocument();
+    expect(
+      await screen.findByText(
+        'A snipe waits for a place’s sites to be released, then alerts you the moment they open or, where the provider allows it, tries to hold one for you.'
+      )
+    ).toBeInTheDocument();
+    unmount();
+
+    // Providers whose units are of different kinds: "spots"
+    renderWithProviders(<SnipesPage />, {
+      api: {
+        providers: {
+          list: jest.fn().mockResolvedValue(ok([PARKSTAY_MANIFEST, ALERT_ONLY_MANIFEST])),
+        },
+      },
+    });
+    expect(
+      await screen.findByText(/^Catch a hard-to-get spot the moment it is released/)
+    ).toBeInTheDocument();
+  });
+
   it('offers a first snipe when there are none, and none at all without a provider for it', async () => {
     const { unmount } = renderWithProviders(<SnipesPage />);
     expect(await screen.findByRole('heading', { name: 'No snipes yet' })).toBeInTheDocument();
@@ -144,6 +209,11 @@ describe('SnipesPage', () => {
     expect(screen.getByRole('button', { name: 'New snipe' })).toHaveAccessibleDescription(
       'No provider supports Site Sniper yet'
     );
+    expect(
+      screen.getByText(
+        'When a provider that releases its dates on a schedule is added, you can create a snipe here.'
+      )
+    ).toBeInTheDocument();
   });
 
   it('refreshes the accounts once for one account:updated, however many cards listen', async () => {

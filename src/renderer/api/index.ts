@@ -118,6 +118,7 @@ export {
   useOpenSnipePayment,
   useReleaseSnipeHold,
   useRunSnipeNow,
+  useCachedSnipe,
   useSetSnipeActive,
   useSnipe,
   useSnipes,

@@ -389,6 +389,51 @@ describe('release-alert snipes', () => {
         code: 'AUTH_REQUIRED',
       });
     });
+
+    it('an armed alert snipe switched to hold while signed out is saved paused, as create saves one', async () => {
+      const gate = signedOutGate();
+      setUp({ capabilities: { account: 'required-for-holds' }, account: 'signed-out' }, gate);
+      const snipe = await h.snipes.create(h.userId, h.snipeInput({ action: 'alert' }));
+      expect(snipe).toMatchObject({ isActive: true, status: SnipeStatus.ARMED });
+      h.events.emit.mockClear();
+
+      const updated = await h.snipes.update(snipe.id, { action: 'hold', name: 'Renamed' });
+
+      expect(updated).toMatchObject({
+        action: 'hold',
+        name: 'Renamed',
+        isActive: false,
+        status: SnipeStatus.DISABLED,
+        lastResult: SnipeResult.PENDING,
+        lastError: 'Sign in to Fake to arm this snipe',
+      });
+      expect(stored(snipe.id)).toEqual(updated);
+      expect(h.events.emit).toHaveBeenCalledWith('snipe:updated', updated);
+      expect(toApiError(await rejectsWith(h.snipes.activate(snipe.id)))).toMatchObject({
+        code: 'AUTH_REQUIRED',
+      });
+    });
+
+    it('a switch to hold stays armed once signed in, and a switch to alert never asks', async () => {
+      const gate = signedOutGate();
+      setUp({ capabilities: { account: 'required-for-holds' }, account: 'signed-out' }, gate);
+      const alert = await h.snipes.create(h.userId, h.snipeInput({ action: 'alert' }));
+      gate.ensureForHolds.mockResolvedValue(undefined);
+
+      await expect(h.snipes.update(alert.id, { action: 'hold' })).resolves.toMatchObject({
+        action: 'hold',
+        isActive: true,
+        status: SnipeStatus.ARMED,
+      });
+      expect(stored(alert.id).lastError).toBeUndefined();
+
+      gate.ensureForHolds.mockClear();
+      await expect(h.snipes.update(alert.id, { action: 'alert' })).resolves.toMatchObject({
+        action: 'alert',
+        isActive: true,
+      });
+      expect(gate.ensureForHolds).not.toHaveBeenCalled();
+    });
   });
 
   describe('the window', () => {
