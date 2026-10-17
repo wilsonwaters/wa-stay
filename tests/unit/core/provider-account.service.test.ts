@@ -930,6 +930,56 @@ describe('ProviderAccountService', () => {
       expect(everything()).not.toContain(NUMBER);
     });
 
+    it.each<[string, Record<string, string>, string]>([
+      ['the last digits', VALUES, 'No member ending 0123'],
+      ['the first digits, cut short', VALUES, '12345678… is not a member number'],
+      ['the digits with dots', VALUES, '1.234.567.890.123 is not a member number'],
+      ['the digits with underscores', VALUES, '1234_5678_90123 is not a member number'],
+      ['full-width digits (NFKC)', VALUES, 'No member starting \uFF11\uFF12\uFF13\uFF14'],
+      [
+        'the number without its leading zero',
+        { memberNumber: '012345678', password: PASSWORD },
+        '12345678 is not a member number',
+      ],
+      ['four letters of the password', VALUES, 'The password MADE… is wrong'],
+      ['a short value, whole', { memberNumber: NUMBER, password: 'Zq7' }, 'zq7 is wrong'],
+      ['a value it returned', VALUES, 'Not found: 5550199'],
+    ])(
+      'a refusal that repeats any part of a value (%s) is never shown: the core says its own words (R16 review)',
+      async (_, values, message) => {
+        registry = new ProviderRegistry();
+        keystay = registerKeyStay({
+          signIn: () => ({ state: 'signed-out', message, values: { memberNumber: '5550199' } }),
+        });
+        build();
+
+        await expect(refusal(service.saveCredentials('keystay', values, ['own']))).resolves.toEqual(
+          {
+            code: 'VALIDATION',
+            message: "KeyStay didn't accept these details",
+            issues: ['values.memberNumber', 'values.password'],
+          }
+        );
+      }
+    );
+
+    it('a refusal that repeats no part of a value is shown, short values included (R16 review)', async () => {
+      registry = new ProviderRegistry();
+      keystay = registerKeyStay({
+        signIn: () => ({
+          state: 'signed-out',
+          message: "That doesn't look like a Key Stay member number",
+        }),
+      });
+      build();
+
+      await expect(
+        refusal(
+          service.saveCredentials('keystay', { memberNumber: NUMBER, password: 'Zq7' }, ['own'])
+        )
+      ).resolves.toMatchObject({ message: "That doesn't look like a Key Stay member number" });
+    });
+
     it('a signIn that throws is PROVIDER_ERROR, and its message (which quotes the value) is never logged', async () => {
       registry = new ProviderRegistry();
       keystay = registerKeyStay({

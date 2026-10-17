@@ -51,8 +51,8 @@
  *   `confirmed`), then asks the provider's `signIn` (15 s, at interactive priority). Only a
  *   `signed-in` answer stores the values, each as `account.<key>` in the provider's scoped
  *   secret vault (`registry.secretsOf`), all or nothing. A `signed-out` one is `VALIDATION`, in
- *   the provider's own words (`message`) when they quote nothing typed. Saving again replaces
- *   them; saves and removals for a provider run one after another.
+ *   the provider's own words (`message`) when they repeat no part of a value. Saving again
+ *   replaces them; saves and removals for a provider run one after another.
  * - The status is worked out from what is stored: signed in when every field has a readable
  *   value. `isSignedIn` is never called and no request is made; `refreshStale` skips them.
  * - `signOut(id)` deletes the values and stores `signed-out`: no session to clear, never
@@ -530,7 +530,7 @@ export class ProviderAccountService implements AccountGate {
     const answer = await this.askProvider(provider, auth, values);
     if (answer.state === 'signed-out') {
       const refusal =
-        refusalMessage(answer.message, values) ??
+        refusalMessage(answer.message, [values, answer.values]) ??
         `${manifest.shortName} didn't accept these details`;
       throw new AppError('VALIDATION', refusal, {
         issues: auth.fields.map((field) => `values.${field.key}`),
@@ -1034,26 +1034,53 @@ function checkCredentials(
   return checked;
 }
 
+/** How many characters in a row of a value a refusal may not repeat (`refusalMessage`). */
+const QUOTED_RUN = 4;
+
+/** Text as compared for quoting: NFKC, lower case, letters and digits only. */
+function comparable(text: string): string {
+  return text.normalize('NFKC').toLowerCase().replace(/[^\p{L}\p{N}]/gu, '');
+}
+
+/**
+ * Whether `message` repeats any of `value`: any run of `QUOTED_RUN` characters of it (the whole
+ * value when it is shorter), compared as letters and digits only (`comparable`), with and
+ * without its leading zeros. So "ending 0123", "12345678…" and "1.234.567.890.123" all quote
+ * `1234567890123`, and "12345678" quotes `012345678`.
+ */
+function quotesValue(message: string, value: string): boolean {
+  const haystack = comparable(message);
+  const plain = comparable(value);
+  for (const form of new Set([plain, plain.replace(/^0+/, '')])) {
+    if (!form) continue;
+    if (form.length < QUOTED_RUN) {
+      if (haystack.includes(form)) return true;
+      continue;
+    }
+    for (let at = 0; at + QUOTED_RUN <= form.length; at++) {
+      if (haystack.includes(form.slice(at, at + QUOTED_RUN))) return true;
+    }
+  }
+  return false;
+}
+
 /**
  * A refusal's own words (`CredentialsSignInResult.message`), or undefined when they cannot be
  * shown: not text, empty, over `CREDENTIALS_MESSAGE_MAX_LENGTH` characters once trimmed, or
- * containing a value that was typed (trimmed, or with its spaces and dashes left out), so a
- * provider's refusal never puts what was typed on screen.
+ * repeating any part of a value it was given, typed or returned (`quotesValue`), so a
+ * provider's refusal never puts what was typed on screen, whole or in part.
  */
 function refusalMessage(
   message: unknown,
-  typed: Readonly<Record<string, string>>
+  values: ReadonlyArray<Readonly<Record<string, unknown>> | undefined>
 ): string | undefined {
   if (typeof message !== 'string') return undefined;
   const text = message.trim();
   if (!text || [...text].length > CREDENTIALS_MESSAGE_MAX_LENGTH) return undefined;
-  const plain = text.toLowerCase();
-  const squeezed = plain.replace(/[\s-]/g, '');
-  const quotes = Object.values(typed).some((value) => {
-    const forms = [value.trim().toLowerCase(), value.replace(/[\s-]/g, '').toLowerCase()];
-    return forms.some((form) => form && (plain.includes(form) || squeezed.includes(form)));
-  });
-  return quotes ? undefined : text;
+  const given = values.flatMap((set) =>
+    Object.values(set ?? {}).filter((value): value is string => typeof value === 'string')
+  );
+  return given.some((value) => quotesValue(text, value)) ? undefined : text;
 }
 
 /**
