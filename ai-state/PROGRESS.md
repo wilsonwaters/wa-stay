@@ -10,10 +10,10 @@ Branch `ccr-573ddb1d-hir0sq` (from `main` at `4bd5d62`, the v2.0.0 release). The
 Phase 3–4 (task specs, then execution). The stakeholder approved the 20-task plan and decided R6–R8 (alert clicks for every provider, a phone booking link in alert emails, interactive pacing).
 
 ## Currently in flight
-- **R6 (#53)**: implementation agent in `/home/user/lanes/r6` (cut at `4d32817`).
 - **R5 (#52)** and **R7 (#54)**: implementation agents in `/home/user/lanes/r5` and `/home/user/lanes/r7` (cut at `3a28271`).
 
 ## Completed
+- **R6 (#53) merged** (`9328ab9`): stay-type chips on the watch and snipe stay steps at mixed places, UnitPicker grouped by kind, `stay=` prefill checked against the place, a stay type or unit needed to hold at a mixed place; `unitKindOfUnit` moved to `src/shared/utils/unit-kinds.ts`. Review APPROVE; fix `0940ce3` (Edit keeps stored stay types as chips so focus isn't lost). Copy notes forwarded to R9. Gate: 4350 tests.
 - **R2 (#49) merged** (`3a28271`): `limits.minRequestIntervalMs`, a paced client (one in flight; interactive 1 s gap, background at the provider's interval), core-set priority (place page, Explore, "Check now" interactive; due loop and sync background), deadlines grown with pacing, unpaced fixture mode, form-field fixture routes. Review REQUEST_CHANGES (a FIFO module limiter put interactive requests last) → fix `443629f` (limiters start interactive tasks first; sync-deadline tests; field names only in fixture errors) → APPROVE. Side effect accepted: ParkStay's limiter also lets person-triggered requests go first.
 - Cluster check after R1+R3+R4: full suite 4277 passed + 6 skipped.
 - **R4 (#51) merged** (`4d32817`): Explore "Stay type" chip replaces "Type", `stay=` param, free counts per stay type (`byKind`, else "Check dates"), prefill `&stay=`. Review APPROVE (nits: stale results briefly read "Check dates" while a new search loads; `%2C` re-encoding on the place page). Follow-ups: R20 retakes `docs/images/explore.png` with a Mapbox token; R11 must carry an unknown `bookableUnits` through `deriveAvailability`.
