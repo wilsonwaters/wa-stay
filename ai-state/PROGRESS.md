@@ -10,8 +10,10 @@ Branch `ccr-573ddb1d-hir0sq` (from `main` at `4bd5d62`, the v2.0.0 release). The
 Phase 3–4 (task specs, then execution). The stakeholder approved the 20-task plan and decided R6–R8 (alert clicks for every provider, a phone booking link in alert emails, interactive pacing).
 
 ## Currently in flight
-- **R2 (#49), R3 (#50), R4 (#51)**: implementation agents in `/home/user/lanes/r2|r3|r4`, cut from `lane/r1` (`d9da364`, which also merged the reconciled specs).
-- Spec-maintenance agent: applying RS1, RS10–RS13 (RS12 changed by the stakeholder: RAC places show "N free" with no total) to the plan, specs and issues.
+- **R2 (#49)** done on `lane/r2` (`4af59e9`, `b3bcd53`; 4262 tests, e2e 22). Review running.
+- **R3 (#50)** done on `lane/r3` (`b7e764c`, `e0e1aba`; 4237 tests, e2e 22). Review running.
+- **R4 (#51)** done on `lane/r4` (`d21d712`, rebased on `lane/r1` tip; 4243 tests, e2e 22; runtime screenshots in the scratchpad). Review running. Follow-up for R20: retake `docs/images/explore.png` with a Mapbox token.
+- Next wave once R2–R4 merge: R5 (RAC catalogue), R6 (stay type in flows), R7 (alerts open the booking page) in parallel.
 
 ## Completed
 - **R1 (#48) merged** (`8455c07`): unit kinds, five stay types, migration v11, catalogue filter and facet, ParkStay mapping. Commits `924ea34`, `d95b5ec`, review fix `6084c96` (bunk word boundary). Review APPROVE, nits only (read/filter mismatch on hand-edited rows; v11 backfill uses the live table). Gate: 4203 tests, test:tz 7, e2e 22.
