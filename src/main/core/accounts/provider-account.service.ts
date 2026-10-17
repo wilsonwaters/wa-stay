@@ -1039,7 +1039,10 @@ const QUOTED_RUN = 4;
 
 /** Text as compared for quoting: NFKC, lower case, letters and digits only. */
 function comparable(text: string): string {
-  return text.normalize('NFKC').toLowerCase().replace(/[^\p{L}\p{N}]/gu, '');
+  return text
+    .normalize('NFKC')
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}]/gu, '');
 }
 
 /**
