@@ -12,6 +12,9 @@
  * - `held-snipe`: `{ dbPath, snipe, hold, notification }` opens (and migrates) the WA Stay
  *   database, creates the snipe, records its hold (`markHeld`, as a placed hold does) and, if
  *   asked, the `snipe_held` notification. Result: `{ snipeId, notificationId }`.
+ * - `alert-snipe`: `{ dbPath, snipe }` opens (and migrates) the WA Stay database and creates an
+ *   armed snipe that alerts (`action: 'alert'`), and nothing else: the app's own scheduler runs
+ *   it, and its alert and notification are the app's. Result: `{ snipeId }`.
  *
  * Nothing here talks to a provider: no hold is ever placed (architecture-notes §12.33).
  */
@@ -65,7 +68,20 @@ function heldSnipe(job) {
   }
 }
 
-const OPS = { 'legacy-v5': legacyV5, 'held-snipe': heldSnipe };
+function alertSnipe(job) {
+  const { openDatabase, closeDatabase } = require(path.join(MAIN, 'database', 'connection'));
+  const repositories = require(path.join(MAIN, 'database', 'repositories'));
+  const db = openDatabase(job.dbPath);
+  try {
+    const userId = new repositories.UserRepository(db).createLocalProfileIfMissing().id;
+    const snipe = new repositories.SiteSniperRepository(db).create(userId, job.snipe);
+    return { snipeId: snipe.id };
+  } finally {
+    closeDatabase(db);
+  }
+}
+
+const OPS = { 'legacy-v5': legacyV5, 'held-snipe': heldSnipe, 'alert-snipe': alertSnipe };
 
 const job = JSON.parse(fs.readFileSync(process.argv[2], 'utf8'));
 const run = OPS[job.op];

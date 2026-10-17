@@ -340,6 +340,20 @@ export class SiteSniperRepository extends BaseRepository<SiteSnipe> {
   }
 
   /**
+   * Applies `updates` and pauses the snipe with `reason`, in one transaction, so it is never
+   * seen armed in between (`createPaused`'s counterpart: a snipe switched to hold whose
+   * provider needs a sign-in for holds).
+   */
+  updatePaused(id: number, updates: SiteSnipeUpdate, reason: string): SiteSnipe {
+    return this.transaction(() => {
+      this.update(id, updates);
+      this.deactivate(id);
+      this.setResult(id, SnipeResult.PENDING, reason);
+      return this.findById(id)!;
+    });
+  }
+
+  /**
    * Activate a snipe (arm it). An alert it sent before is cleared: an armed snipe has none.
    */
   activate(id: number): void {
@@ -514,16 +528,29 @@ export class SiteSniperRepository extends BaseRepository<SiteSnipe> {
 
   /**
    * How many of the provider's snipes are in one of `statuses`, active or not (a HELD snipe
-   * is inactive). The account service asks it before a sign-out.
+   * is inactive), and, with `filter`, do `action` when the dates are free or use the provider's
+   * access gate. The account service asks it before a sign-out.
    */
-  countByStatus(providerId: string, statuses: readonly SnipeStatus[]): number {
+  countByStatus(
+    providerId: string,
+    statuses: readonly SnipeStatus[],
+    filter: { action?: SnipeAction; accessGateEnabled?: boolean } = {}
+  ): number {
     if (statuses.length === 0) return 0;
     const placeholders = statuses.map(() => '?').join(', ');
+    const where = [`provider_id = ?`, `status IN (${placeholders})`];
+    const values: unknown[] = [providerId, ...statuses];
+    if (filter.action !== undefined) {
+      where.push('action = ?');
+      values.push(filter.action);
+    }
+    if (filter.accessGateEnabled !== undefined) {
+      where.push('access_gate_enabled = ?');
+      values.push(filter.accessGateEnabled ? 1 : 0);
+    }
     const row = this.db
-      .prepare(
-        `SELECT COUNT(*) AS n FROM site_snipes WHERE provider_id = ? AND status IN (${placeholders})`
-      )
-      .get(providerId, ...statuses) as { n: number };
+      .prepare(`SELECT COUNT(*) AS n FROM site_snipes WHERE ${where.join(' AND ')}`)
+      .get(...values) as { n: number };
     return row.n;
   }
 

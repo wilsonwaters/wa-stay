@@ -1,4 +1,5 @@
 import { Ellipsis, Eye, Play, Trash2 } from 'lucide-react';
+import { SnipeStatus } from '../../../../shared/types/common.types';
 import type { ProviderManifest } from '../../../../shared/types/provider.types';
 import type { SiteSnipe } from '../../../../shared/types/site-sniper.types';
 import { ROUTES } from '../../../app/routes';
@@ -19,10 +20,10 @@ export interface SnipeActionsBarProps {
 }
 
 /**
- * One visible action by status (Arm, Arm again, Disarm, View booking; a held site's "Pay now"
- * is in its hold panel), and a "More actions for {name}" menu with View details, Run now and
- * Delete (Run now only while it runs). A held or booked snipe is never offered Arm: main
- * refuses it (§12.31).
+ * One visible action by status (Arm, Arm again, Disarm, View booking; a held unit's "Pay now"
+ * is in its hold panel, and on the page an alerted snipe's "Arm again" is in its alert panel),
+ * and a "More actions for {name}" menu with View details, Run now and Delete (Run now only
+ * while it runs). A held or booked snipe is never offered Arm: main refuses it (§12.31).
  */
 export function SnipeActionsBar({
   snipe,
@@ -32,7 +33,9 @@ export function SnipeActionsBar({
   onPage = false,
 }: SnipeActionsBarProps) {
   const known = manifest !== undefined;
-  const action = primaryActionFor(snipe);
+  // On the page an alerted snipe's Arm again is in its alert panel, beside "Book on …"
+  const inPanel = onPage && snipe.status === SnipeStatus.ALERTED;
+  const action = inPanel ? null : primaryActionFor(snipe);
   // One attempt now only while it runs: main answers "not active" for a stopped snipe.
   const canRun = known && isRunning(snipe);
   const size = onPage ? 'md' : 'sm';

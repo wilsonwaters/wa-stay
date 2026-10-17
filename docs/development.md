@@ -191,9 +191,10 @@ npm run build:e2e            # no Mapbox token: Explore is list-only, determinis
 xvfb-run -a npm run test:e2e # or just npm run test:e2e with a display
 ```
 
-Playwright's `_electron` launcher drives the **built** app through 25 journeys in 14 specs
+Playwright's `_electron` launcher drives the **built** app through 26 journeys in 15 specs
 (`tests/e2e/*.spec.ts`): launch, navigation, Explore and its dates, resizing the window, a place
-to a watch, a place's campground map, creating a watch and a snipe, a held snipe paid from its notification, bookings, the
+to a watch, a place's campground map, creating a watch and a snipe, a held snipe paid from its notification,
+an alert snipe whose own alert opens "Book on ParkStay" (and a new snipe that alerts), bookings, the
 v1.x upgrade, RAC's parks on Explore, an RAC watch, RAC's free counts on Explore, and a
 lifecycle walk through every page and Settings section with a relaunch. One
 more check is opt-in: with a Mapbox token in the build and `E2E_MAP=1`, resizing the window must
@@ -207,7 +208,7 @@ not count as a map move (`explore-resize.spec.ts`). The harness
   launch passes `providers`, however many providers are built in;
 - a production renderer, Perth time, Australian English, and a window forced online
   (`forceOnline`), so the suite passes with no network at all;
-- seeding before launch (`support/seed.ts`: a held snipe, a v1.x data folder) and temp folders
+- seeding before launch (`support/seed.ts`: a held snipe, an alert snipe, a v1.x data folder) and temp folders
   (`tempDir`), removed after the apps close;
 - a trace, a screenshot and the main-process log for a failed test.
 

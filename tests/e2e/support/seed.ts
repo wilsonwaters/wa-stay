@@ -89,3 +89,26 @@ export function seedHeldSnipe(
     },
   });
 }
+
+export interface AlertSnipeSeed {
+  snipe: {
+    name: string;
+    location: { externalId: string; name: string; areaName?: string };
+    stay: { arrival: string; departure: string; adults: number };
+  };
+}
+
+/**
+ * A ParkStay snipe that alerts (`action: 'alert'`), armed and watching for cancellations, in the
+ * profile at `userDataDir` (its database is created and migrated if new). Only the snipe row is
+ * written: once the app starts, its scheduler checks the place at once and, when the fixtures
+ * have the stay free, the app itself records the alert and sends its `snipe_alert`
+ * notification. Nothing is ever held (architecture-notes §12.33).
+ */
+export function seedAlertSnipe(userDataDir: string, seed: AlertSnipeSeed): { snipeId: number } {
+  return runSeed({
+    op: 'alert-snipe',
+    dbPath: path.join(userDataDir, 'wa-stay.db'),
+    snipe: { providerId: 'parkstay', releaseMode: 'cancellation', action: 'alert', ...seed.snipe },
+  });
+}

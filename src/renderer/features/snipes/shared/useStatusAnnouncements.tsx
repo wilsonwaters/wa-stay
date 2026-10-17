@@ -7,6 +7,7 @@ import type { SiteSnipe } from '../../../../shared/types/site-sniper.types';
 import { useAnnounce } from '../../../components/ui';
 import { capitalise } from '../../../../shared/utils/unit-noun';
 import { heldUnitNoun } from './snipeNouns';
+import { alertedMessage } from './snipeAlert';
 import { statusPillFor } from './snipeState';
 
 /**
@@ -30,8 +31,9 @@ export function heldMessage(
 
 /**
  * Announces each status change once, as it arrives (not on the first load): politely ("Osprey
- * Bay weekend: Waiting for release"), except a hold, which is urgent and goes in the returned
- * alert text for a `role="alert"` region ("Site held at Osprey Bay. Pay within 23 minutes.").
+ * Bay weekend: Waiting for release"; an alert says what is free, `alertedMessage`), except a
+ * hold, which is urgent and goes in the returned alert text for a `role="alert"` region ("Site
+ * held at Osprey Bay. Pay within 23 minutes.").
  * The held unit is named as its pill and hold panel name it, from the place's units: at once
  * when they are cached; else the alert is said at once, and again if the units, once loaded,
  * name it otherwise.
@@ -72,6 +74,8 @@ export function useStatusAnnouncements(
             }
           });
         }
+      } else if (snipe.status === SnipeStatus.ALERTED) {
+        announce(alertedMessage(snipe, manifest));
       } else {
         announce(
           `${snipe.name}: ${statusPillFor(snipe.status, heldUnitNoun(snipe, manifest)).label}`

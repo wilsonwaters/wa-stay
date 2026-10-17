@@ -260,10 +260,13 @@ export class SiteSniperService {
    * Updates a snipe. A change to the release mode, location, stay, stay fields, units or stay
    * types, release time, queue choice, poll cadence or window is checked with the provider
    * again (as at create). The action cannot change once the snipe is HELD or BOOKED, and
-   * `hold` needs a provider with holds (`VALIDATION` on `action`).
+   * `hold` needs a provider with holds (`VALIDATION` on `action`). A snipe switched to `hold`
+   * while its provider's holds need a sign-in that is missing is saved paused, as `create` saves
+   * a new one.
    */
   async update(id: number, updates: SiteSnipeUpdate): Promise<SiteSnipe> {
     const snipe = this.requireSnipe(id);
+    let signIn: string | undefined;
     if (updates.action !== undefined && updates.action !== snipe.action) {
       if (snipe.status === SnipeStatus.HELD || snipe.status === SnipeStatus.BOOKED) {
         throw new AppError(
@@ -275,7 +278,9 @@ export class SiteSniperService {
         );
       }
       if (updates.action === 'hold') {
-        this.assertAction(this.providers.require(snipe.providerId, 'snipes'), 'hold');
+        const provider = this.providers.require(snipe.providerId, 'snipes');
+        this.assertAction(provider, 'hold');
+        signIn = await this.signInNeeded(provider);
       }
     }
     const affectsPlan =
@@ -310,11 +315,14 @@ export class SiteSniperService {
       const requestedAt = updates.releaseAt ?? snipe.releaseAt;
       prepared = await this.prepare(provider, merged, requestedAt);
     }
-    this.repo.update(id, {
+    const changes: SiteSnipeUpdate = {
       ...updates,
       ...(updates.unitKinds !== undefined ? { unitKinds: cleanUnitKinds(updates.unitKinds) } : {}),
       ...prepared,
-    });
+    };
+    // Saved paused, in one transaction: arming it waits for the sign-in (activate checks)
+    if (signIn) this.repo.updatePaused(id, changes, signIn);
+    else this.repo.update(id, changes);
     return this.changed(id);
   }
 

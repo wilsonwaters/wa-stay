@@ -16,8 +16,8 @@ the release instant, and then does what the snipe is set to do:
 Site Sniper never pays for you. A snipe holds when its provider can place holds, and alerts
 otherwise; a provider that places no holds offers alerts only.
 
-ParkStay WA is the only provider with Site Sniper today. Its snipes hold, and its hold lasts
-**30 minutes**.
+ParkStay WA is the only provider with Site Sniper today. Its snipes hold by default (you can
+choose an alert instead), and its hold lasts **30 minutes**.
 
 ## How ParkStay releases sites
 
@@ -40,24 +40,34 @@ to get around the queue's inactivity rules.
 and dates). The flow has five steps:
 
 1. **Provider**: whose sites to snipe. Only providers with Site Sniper are listed; with one,
-   it is chosen for you but still shown.
+   it is chosen for you but still shown. A provider that places no holds says **Alerts
+   only**.
 2. **Location**: the campground.
 3. **Your stay**: dates and guests, plus the provider's own fields (ParkStay: Camping with,
    Vehicles, Postcode), the **Stay type** at a place whose units are of more than one kind, and
-   the sites you want (any site, or a few). A snipe holds, so at such a place it needs one stay
-   type or a site before it goes on (the same chips and rules as a watch:
+   the sites you want (any site, or a few). A snipe that holds needs one stay type or a site at
+   such a place: the Release step asks for it when **Hold it for me** is chosen, and an alert
+   needs neither (the same chips and rules as a watch:
    [Stay types](watches-and-notifications.md#stay-types)). A warning says when the stay is
    shorter than the sites usually take.
 4. **Release**: **When are the sites released?** (or cabins, rooms…: the place's units as
    it calls them). For a scheduled release, the release date
-   and time (in the provider's time zone), which must be before your check-in day. **Advanced timing**: Start early (seconds, default
+   and time (in the provider's time zone), which must be before your check-in day. **When the
+   dates are free**: **Alert me** (a desktop alert and email with a link to book on the
+   provider's site; nothing is held) or **Hold it for me** (a hold you pay for on the provider's
+   page in WA Stay), where the provider places holds; ParkStay holds by default. For a provider
+   without holds, or one whose holds are turning off (an experiment switched off, until WA Stay
+   restarts), one line says the snipe alerts. **Advanced timing**: Start early (seconds, default
    120), Check every (seconds, default 1.5; never under 0.5), Keep trying for (minutes, default
-   15; a provider may set a limit for a release mode, `maxWindowMinutes`, and a longer choice is
-   cut to it), Most attempts (no limit by default).
-5. **Review**: the summary, the queue use, a name and notes, and **Book responsibly**. For an
-   optional account (ParkStay) it suggests connecting before the release so checkout is
-   quicker; for a provider whose holds need an account, the snipe is created paused until you
-   connect.
+   15; a provider may set a limit for a release mode, `maxWindowMinutes`: the field says it, "Up
+   to 30 minutes on {provider}", and refuses a longer window, and an older, longer one is cut to
+   it), Most attempts (no limit by default). When the provider cannot time the stay in the mode
+   chosen (dates already open, a release it has not announced), creating the snipe is refused,
+   and the mode's card and the Review say why instead of the preview.
+5. **Review**: the summary, the queue use, what happens when the dates are free, a name and
+   notes, and **Book responsibly**. For a snipe that holds, with an optional account (ParkStay)
+   it suggests connecting before the release so checkout is quicker; for a provider whose holds
+   need an account, the snipe is created paused until you connect. An alert needs no account.
 
 ## What a snipe does
 
@@ -104,7 +114,10 @@ units as it calls them), and an email if set up. Clicking the notification opens
 WA Stay and the provider's booking page, filled in with your stay, in your browser; the email has
 a **Book on {provider}** link to the same public page, so you can book from your phone. The
 link is only ever a page on the provider's own site, never a cart. Nothing is held, so book it
-before someone else does. The snipe keeps what was free and when, and can be started again.
+before someone else does. The snipe keeps what was free and when: its page shows "<site> was
+free", when the alert came, the stay and any note, with **Book on {provider}** (it opens in your
+browser) and **Arm again**; its card in the list shows when the alert was sent, the site and the
+link.
 
 ## When a site is held
 

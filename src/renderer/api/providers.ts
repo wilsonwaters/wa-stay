@@ -53,12 +53,13 @@ export function useProvidersWith(capability?: ProviderCapability) {
 /**
  * A provider's experiments (`providers.experiments`): each one's stored choice (`enabled`) and
  * whether it is on in this run (`active`); a change takes effect when WA Stay restarts. Ask
- * only for a provider whose manifest declares experiments.
+ * only for a provider whose manifest declares experiments (`enabled` false asks nothing).
  */
-export function useProviderExperiments(providerId: ProviderId) {
+export function useProviderExperiments(providerId: ProviderId, enabled = true) {
   return useQuery({
     queryKey: queryKeys.providers.experiments(providerId),
     queryFn: () => unwrap((api) => api.providers.experiments(providerId)),
+    enabled,
   });
 }
 

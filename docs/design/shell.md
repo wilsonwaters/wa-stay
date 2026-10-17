@@ -171,9 +171,10 @@ With no `window.api` (the renderer opened in a plain browser with `npm run dev:r
 | Booking card | article, link, button, menuitem | The place's name · More actions for {place} · Remove from WA Stay |
 | Booking page | heading level 1, link, button, region | The place's name · Manage on {shortName} (opens in your browser) · About {place} · Copy reference {ref} · Stay, Unit, Guests, Cost, Reference |
 | Site Sniper | heading level 1, link, list, article | Site Sniper · New snipe · Snipes · the snipe's name |
-| Snipe card | timer, button | "Opens in 2 days 4 hours" · Arm, Disarm, Arm again or View booking · More actions for {name} (View details · Run now · Delete) |
+| Snipe card | timer, button, link | "Opens in 2 days 4 hours" · Arm, Disarm, Arm again or View booking · Book on {shortName} (opens in your browser), once it has alerted · More actions for {name} (View details · Run now · Delete) |
 | Held snipe | region, timer, button, alert | Hold at {place} · "22 minutes left to pay" · Pay now · "Site held at {place}. Pay within {n} minutes." |
-| New snipe | navigation, radiogroup, button | New snipe steps · When are the sites released? (the place's own noun) · Advanced timing · Create snipe |
+| Alerted snipe | region, heading, link, button, status | "{unit} was free" (or "Dates were free") · Book on {shortName} (opens in your browser) · Arm again · "{name}: {unit} is free. Book on {shortName}." (polite); after Arm, Arm again or Disarm, focus moves to the status line ("Status Armed") |
+| New snipe | navigation, radiogroup, button | New snipe steps · When are the sites released? (the place's own noun) · When the dates are free (Alert me, Hold it for me; with a provider that places holds) · Advanced timing · Create snipe |
 
 ## Testing
 
