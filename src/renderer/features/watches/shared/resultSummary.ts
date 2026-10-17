@@ -11,6 +11,7 @@ import {
   unitCountLabel as count,
   type UnitNoun,
 } from '../../../../shared/utils/unit-noun';
+import { isFullyAvailable } from '../../../components/nightGridModel';
 import { timeInZone } from '../../../components/timeFormat';
 import { unitNameOf } from './watchState';
 
@@ -40,7 +41,9 @@ export function resultSummary(watch: Watch, noun: UnitNoun): string {
   const nights = eachNight(watch.stay.arrival, watch.stay.departure).length;
   switch (watch.lastResult) {
     case WatchResult.FOUND: {
-      const full = (watch.lastAvailability ?? []).filter((u) => u.fullyAvailable);
+      // Free every night as the night grid reads it (a night refused by stay rules is not)
+      const stay = eachNight(watch.stay.arrival, watch.stay.departure);
+      const full = (watch.lastAvailability ?? []).filter((u) => isFullyAvailable(u, stay));
       return full.length > 0
         ? `${count(full.length, nounOfUnits(full, noun))} available`
         : `${noun.many} available`;

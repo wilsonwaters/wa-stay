@@ -774,8 +774,9 @@ The rules the normalised types carry (`src/shared/types/provider.types.ts`,
   arriving on the asked arrival; a night's own comes first). Matching never counts a
   `min-stay` night, trims a partial run to days that take arrivals and departures, and drops
   it when shorter than its minimum, so a watch never alerts on a stay you would refuse; the
-  contract suite checks that no unit is `fullyAvailable` under its `minNights` and no
-  `min-stay` night is `available`. A unit's `priceNote` says which rate its prices are, in
+  contract suite checks that a stay under a unit's minimum (the arrival night's `minNights`,
+  else the unit's) is not `fullyAvailable` and has no `available` night without a reason, and
+  that no `min-stay` night is `available`. A unit's `priceNote` says which rate its prices are, in
   plain text ("RAC member rate"), shown under its name. A `UnitSummary`'s `minNights` is the
   unit's usual minimum, for the watch and snipe steps' warning; leave it out where the minimum
   depends on the dates (the night grid explains it after a check).
