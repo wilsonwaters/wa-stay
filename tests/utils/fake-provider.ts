@@ -22,7 +22,8 @@
  * - `availability`: a state per unit for every night, or a list of nights (state, price and
  *   the stay rules: `reason`, `minNights`, `noArrival`, `noDeparture`); `setAvailability`
  *   changes it later; `unitKinds`: what each unit id is (none by default); `unitMinNights`:
- *   each unit's minimum stay (`UnitAvailability.minNights`), which `fullyAvailable` honours;
+ *   each unit's minimum stay (`UnitAvailability.minNights`): a shorter stay is refused, its
+ *   nights with room answered `min-stay` and never `fullyAvailable`;
  * - `scriptHold(...results)`: the next `holds.create` calls answer these;
  * - `account` / `setAccount(state)`: what `auth.isSignedIn` answers; `auth` replaces its
  *   sign-in URL, origins or completion pages.
@@ -71,6 +72,7 @@ import type {
   StayQuery,
   UnitKind,
 } from '@shared/types/provider.types';
+import { minimumNights } from '@main/core/watches/matching';
 import type { LocationDetail, LocationSummary } from '@shared/types/catalog.types';
 import { SnipeReleaseMode } from '@shared/types/common.types';
 import { makeLocationKey } from '@shared/utils/location-key';
@@ -125,7 +127,8 @@ export interface FakeProviderOptions {
   unitKinds?: Record<string, UnitKind>;
   /**
    * Each unit's minimum stay, by unit id, at every location (`UnitAvailability.minNights`): a
-   * shorter stay is never `fullyAvailable`. Units left out have none.
+   * shorter stay (by the core's `minimumNights`) is refused, so its nights with room are
+   * `min-stay` and it is never `fullyAvailable`. Units left out have none.
    */
   unitMinNights?: Record<string, number>;
   /**
@@ -381,12 +384,25 @@ export function createFakeProvider(options: FakeProviderOptions = {}): FakeProvi
     });
   }
 
-  /** Every night available, and a stay its first night's (else the unit's) minimum allows. */
-  function freeForStay(nights: NightStatus[], minNights: number | undefined): boolean {
+  /**
+   * The nights as a provider with stay rules answers them: a stay under its minimum (the core's
+   * `minimumNights`: the first night's `minNights`, else the unit's) is refused, so each night
+   * with room is `unknown` with `reason: 'min-stay'`.
+   */
+  function underStayRules(nights: NightStatus[], minNights: number | undefined): NightStatus[] {
+    if (nights.length >= minimumNights({ minNights }, nights[0])) return nights;
+    return nights.map((night) =>
+      night.state === 'available' && night.reason === undefined
+        ? { ...night, state: 'unknown', reason: 'min-stay' }
+        : night
+    );
+  }
+
+  /** Every night available with no reason, arriving on a day that takes arrivals. */
+  function freeForStay(nights: NightStatus[]): boolean {
     if (nights.length === 0) return false;
     if (nights.some((night) => night.state !== 'available' || night.reason)) return false;
-    if (nights[0].noArrival) return false;
-    return nights.length >= (nights[0].minNights ?? minNights ?? 1);
+    return !nights[0].noArrival;
   }
 
   function checkNow(externalId: string, stay: StayQuery, unitIds?: string[]): LocationAvailability {
@@ -395,9 +411,9 @@ export function createFakeProvider(options: FakeProviderOptions = {}): FakeProvi
     const units = Object.entries(unitStates(externalId))
       .filter(([unitId]) => !unitIds || unitIds.includes(unitId))
       .map(([unitId, spec]) => {
-        const nights = nightsOf(spec, dates);
         const minNights = options.unitMinNights?.[unitId];
-        const fullyAvailable = freeForStay(nights, minNights);
+        const nights = underStayRules(nightsOf(spec, dates), minNights);
+        const fullyAvailable = freeForStay(nights);
         const priced = nights.every((night) => night.price !== undefined);
         const unitKind = options.unitKinds?.[unitId];
         return {
