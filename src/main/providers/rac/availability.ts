@@ -50,6 +50,7 @@ import { makeLocationKey } from '@shared/utils/location-key';
 import type { ProviderContext } from '../sdk/context';
 import { ProviderError, ProviderParseError, throwIfAborted } from '../sdk/errors';
 import type { AvailabilityCheckOptions, AvailabilityModule } from '../sdk/provider';
+import { RAC_AVAILABILITY_PATH } from './cart-guard';
 import type { RacClient } from './client';
 import { racBookingPage, type RacLinks } from './links';
 import {
@@ -64,8 +65,7 @@ import type { RacReleasePolicy, StayRelease } from './release-policy';
 import { unitTypeOfKind, type RacCategoryMemo } from './unit-kinds';
 
 /** RAC's availability endpoint, at the site's root (the park is the form's `blog_id`). */
-export const RAC_AVAILABILITY_PATH =
-  '/wp-content/themes/parks-and-resorts/template-parts/components/booking-engine/availability-ajax.php';
+export { RAC_AVAILABILITY_PATH };
 
 /** A category's kind (`createKindResolver`). */
 export type CategoryKindOf = (

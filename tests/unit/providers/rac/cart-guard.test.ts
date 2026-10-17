@@ -7,10 +7,23 @@
  *   with the cart on;
  * - a cart address and the proxy's removal are refused with the cart off, and allowed with it on;
  * - a refusal is a `ProviderError`, nothing reaches the transport, a redirect is guarded too, and
- *   the log names the path only, never the query (the cart's token).
+ *   the log names the path only, never the query (the cart's token);
+ * - the R19 review's probes: the booking engine and NewBook's proxy however their paths are
+ *   spelled (case, repeated slashes, no trailing slash, `index.php`, encoded slashes), `cart` and
+ *   `query` once only, names as PHP reads them (`cart[]`, `rest.api.data.id`), no `query` field
+ *   in a form, POST only to the availability form and (cart on) the exact removal;
+ * - built through `racFactory` with auto-cart off, RAC redirecting a request to a cart address
+ *   stops after one request.
  */
 
-import { cartGuardRefusal, loggablePath } from '@main/providers/rac/cart-guard';
+import {
+  cartGuardRefusal,
+  loggablePath,
+  normalisedPath,
+  phpKey,
+  RAC_AVAILABILITY_PATH,
+} from '@main/providers/rac/cart-guard';
+import { racFactory, racManifest } from '@main/providers/rac';
 import { RacClient } from '@main/providers/rac/client';
 import {
   InMemoryKeyValueStore,
@@ -19,7 +32,11 @@ import {
   type HttpMethod,
   type HopRequest,
 } from '@main/providers/sdk';
-import { createMemoryLogger, type MemoryLogger } from '@tests/utils/fake-provider';
+import {
+  createMemoryLogger,
+  createTestProviderContext,
+  type MemoryLogger,
+} from '@tests/utils/fake-provider';
 import { RecordingHttpClient, type HopAnswer } from '@tests/utils/fake-paced-provider';
 
 const RAC = 'https://parksandresorts.rac.com.au';
@@ -28,6 +45,24 @@ const CART_ADDRESS = `${RAC}/busselton/booking/?cart&rest_api_data_id=${ZERO_TOK
 const PROXY = `${RAC}/busselton/wp-content/themes/parks-and-resorts/inc/newbook/api/rac-busselton-holiday-park.php`;
 const REMOVAL = `${PROXY}?newbook_api_action=data&query=remove_item_from_cart`;
 const PAGE = '<html><body>cart</body></html>';
+const AVAILABILITY = `${RAC}${RAC_AVAILABILITY_PATH}`;
+const REMOVAL_FORM = 'item_offset=0&cart_type=booking';
+/** The booking engine, spelled every way the review found that a server reads the same. */
+const BOOKING_SPELLINGS = [
+  `${RAC}/Busselton/Booking/`,
+  `${RAC}//busselton/booking/`,
+  `${RAC}/busselton/booking`,
+  `${RAC}/busselton/booking/index.php`,
+  `${RAC}/busselton%2Fbooking/`,
+  `${RAC}/busselton%252Fbooking/`,
+  `${RAC}/busselton/./booking/`,
+];
+/** NewBook's proxy, spelled other ways. */
+const PROXY_SPELLINGS = [
+  `${RAC}/busselton/wp-content/themes/parks-and-resorts/INC/newbook/api/rac-busselton-holiday-park.php`,
+  `${RAC}/busselton/wp-content/themes/parks-and-resorts/inc%2Fnewbook%2Fapi/rac-busselton-holiday-park.php`,
+  `${RAC}/busselton//wp-content/themes/parks-and-resorts/inc/NewBook/api/rac-busselton-holiday-park.php`,
+];
 
 /** Requests no switch lets through (rule 8). */
 const ALWAYS_REFUSED: Array<[string, HttpMethod, string, string?]> = [
@@ -81,6 +116,63 @@ const ALWAYS_REFUSED: Array<[string, HttpMethod, string, string?]> = [
     `${RAC}/busselton/?cart&rest_api_data_id=${ZERO_TOKEN}`,
   ],
   ['plain http', 'GET', 'http://parksandresorts.rac.com.au/busselton/booking/'],
+  // The review's probes: checkout however the booking engine is spelled
+  ...BOOKING_SPELLINGS.map((url): [string, HttpMethod, string, string?] => [
+    `a post to ${url}`,
+    'POST',
+    url,
+    'a=1',
+  ]),
+  // NewBook's proxy however it is spelled, for anything but the exact removal
+  ...PROXY_SPELLINGS.flatMap((proxy): Array<[string, HttpMethod, string, string?]> => [
+    [`a GET of ${proxy}`, 'GET', `${proxy}?newbook_api_action=data&query=state`],
+    [`a post of state to ${proxy}`, 'POST', `${proxy}?newbook_api_action=data&query=state`, 'a=1'],
+  ]),
+  // The removal, but not exactly
+  [
+    'the removal with a second query',
+    'POST',
+    `${REMOVAL}&query=remove_item_from_cart`,
+    REMOVAL_FORM,
+  ],
+  [
+    'the removal with another query too',
+    'POST',
+    `${PROXY}?newbook_api_action=data&query=remove_item_from_cart&query=state`,
+    REMOVAL_FORM,
+  ],
+  ['the removal with more in its form', 'POST', REMOVAL, `${REMOVAL_FORM}&extra=1`],
+  ['the removal with a form field twice', 'POST', REMOVAL, `${REMOVAL_FORM}&item_offset=1`],
+  ['the removal with a query field in its form', 'POST', REMOVAL, `${REMOVAL_FORM}&query=state`],
+  [
+    'the removal with a field spelled the PHP way',
+    'POST',
+    REMOVAL,
+    'item.offset=0&cart_type=booking',
+  ],
+  [
+    'the removal off a park',
+    'POST',
+    `${RAC}/wp-content/themes/parks-and-resorts/inc/newbook/api/rac.php?newbook_api_action=data&query=remove_item_from_cart`,
+    REMOVAL_FORM,
+  ],
+  // POST only to the availability form, as it is sent
+  ['a query field in the availability form', 'POST', AVAILABILITY, 'blog_id=6&query=state'],
+  ['a query field spelled the PHP way', 'POST', AVAILABILITY, 'blog_id=6&query[]=state'],
+  ['the availability form with a query string', 'POST', `${AVAILABILITY}?x=1`, 'blog_id=6'],
+  ['a post to a page', 'POST', `${RAC}/busselton/book-now/`, 'blog_id=6'],
+  ['another method', 'DELETE', `${RAC}/busselton/booking/`],
+];
+
+/** Cart addresses refused even with the cart on: `cart` once, as written, on the booking page. */
+const CART_ADDRESSES_REFUSED: Array<[string, string]> = [
+  ['a second cart value', `${RAC}/busselton/booking/?cart&cart=Pay&rest_api_data_id=${ZERO_TOKEN}`],
+  ['cart twice', `${RAC}/busselton/booking/?cart&cart&rest_api_data_id=${ZERO_TOKEN}`],
+  ['cart[]', `${RAC}/busselton/booking/?cart[]&rest_api_data_id=${ZERO_TOKEN}`],
+  ['rest.api.data.id', `${RAC}/busselton/booking/?cart&rest.api.data.id=${ZERO_TOKEN}`],
+  ['the token twice', `${RAC}/busselton/booking/?cart&rest_api_data_id=1&rest_api_data_id=2`],
+  ['the token only', `${RAC}/esperance/booking/?rest_api_data_id=${ZERO_TOKEN}`],
+  ['a booking page below the engine', `${RAC}/busselton/booking/x/?cart&rest_api_data_id=1`],
 ];
 
 describe('cartGuardRefusal', () => {
@@ -91,13 +183,26 @@ describe('cartGuardRefusal', () => {
     expect(cartGuardRefusal({ method, url, body }, false)).toEqual(expect.any(String));
   });
 
+  it.each(CART_ADDRESSES_REFUSED)('refuses a cart address with %s, cart on or off', (_n, url) => {
+    expect(cartGuardRefusal({ method: 'GET', url }, true)).toEqual(expect.any(String));
+    expect(cartGuardRefusal({ method: 'GET', url }, false)).toBe('the cart is off');
+  });
+
+  it.each([
+    ['?rest.api.data.id=', `${RAC}/busselton/booking/?rest.api.data.id=${ZERO_TOKEN}`],
+    [
+      '?cart[]&rest.api.data.id=',
+      `${RAC}/busselton/booking/?cart[]&rest.api.data.id=${ZERO_TOKEN}`,
+    ],
+    ['?cart%5B%5D=', `${RAC}/busselton/booking/?cart%5B%5D=&rand=1`],
+    ['?CART', `${RAC}/busselton/booking/?CART`],
+    ['?rest api data id=', `${RAC}/busselton/booking/?rest+api+data+id=1`],
+  ])('with the cart off, a cart address spelled %s is refused', (_spelling, url) => {
+    expect(cartGuardRefusal({ method: 'GET', url }, false)).toBe('the cart is off');
+  });
+
   it.each([
     ['a cart address', 'GET', CART_ADDRESS],
-    [
-      'a cart address with its token only',
-      'GET',
-      `${RAC}/esperance/booking/?rest_api_data_id=${ZERO_TOKEN}`,
-    ],
     ['the cart shown by `?cart`', 'GET', `${RAC}/busselton/booking/?cart`],
     ['the removal', 'POST', REMOVAL],
   ] as Array<[string, HttpMethod, string]>)(
@@ -130,6 +235,17 @@ describe('cartGuardRefusal', () => {
       expect(cartGuardRefusal({ method, url, body }, true)).toBeUndefined();
     }
   );
+
+  it('reads a path as a server does, and a name as PHP does', () => {
+    for (const url of BOOKING_SPELLINGS) {
+      expect([url, normalisedPath(new URL(url).pathname)]).toEqual([url, '/busselton/booking']);
+    }
+    expect(normalisedPath('/a/b/../c/%2e%2e/d')).toBe('/a/d');
+    expect(normalisedPath('/')).toBe('/');
+    expect(
+      ['cart[]', 'cart[x]', 'rest.api.data.id', 'rest api_data[id', 'Query'].map(phpKey)
+    ).toEqual(['cart', 'cart', 'rest_api_data_id', 'rest_api_data_id', 'query']);
+  });
 
   it('names a path for the log, never a query', () => {
     expect(loggablePath(CART_ADDRESS)).toBe('/busselton/booking/');
@@ -257,5 +373,36 @@ describe('the RAC client, guarded', () => {
       'Refused POST /busselton/wp-content/themes/parks-and-resorts/inc/newbook/api/rac-busselton-holiday-park.php: checkout, payment or a NewBook call; nothing sent',
     ]);
     expect(JSON.stringify(logger.lines)).not.toMatch(/\?|rest_api_data_id|0{32}|extend_multiple/);
+  });
+});
+
+describe('RAC built with auto-cart off (racFactory)', () => {
+  it('stops after one request when RAC redirects it to a cart address: a ProviderError, never followed', async () => {
+    const http = new RecordingHttpClient({
+      providerId: 'rac',
+      // RAC's availability answer sends the request to a cart address instead
+      respond: () => ({ status: 302, headers: { location: CART_ADDRESS } }),
+    });
+    const provider = racFactory(
+      createTestProviderContext(racManifest, {
+        http,
+        clock: () => new Date('2026-10-17T02:00:00Z'),
+      })
+    );
+    expect(provider.holds).toBeUndefined();
+    const error = await provider
+      .availability!.check('busselton', {
+        arrival: '2026-11-06',
+        departure: '2026-11-08',
+        adults: 2,
+      })
+      .then(
+        () => undefined,
+        (e: unknown) => e
+      );
+    expect(error).toBeInstanceOf(ProviderError);
+    expect(error).not.toBeInstanceOf(ProviderHttpError);
+    expect((error as Error).message).toMatch(/the cart is off/);
+    expect(http.requests.map((r) => [r.method, r.url])).toEqual([['POST', AVAILABILITY]]);
   });
 });

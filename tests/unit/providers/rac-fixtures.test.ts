@@ -96,14 +96,16 @@ function fixtureViolations(raw: string, { synthetic = false } = {}): string[] {
   const found: string[] = [];
   // Images: every address of a photo, and every img source
   for (const [url] of text.matchAll(/https?:\/\/[^\s"'<>)\\]+/g)) {
-    // On a NewBook host (its image host among them); RAC's own NewBook proxy path is no photo
-    let host = url;
+    // Anything naming NewBook (its image host among them), except RAC's own NewBook proxy
+    let racProxy = false;
     try {
-      host = new URL(url).host;
+      const parsed = new URL(url);
+      racProxy = parsed.host === RAC_HOST && /\/inc\/newbook\/api\//.test(parsed.pathname);
     } catch {
       // Not a URL: judged by its whole text
     }
-    const photo = /\.(?:jpe?g|png|gif|webp|avif)(?:[?#]|$)/i.test(url) || /newbook/i.test(host);
+    const photo =
+      /\.(?:jpe?g|png|gif|webp|avif)(?:[?#]|$)/i.test(url) || (/newbook/i.test(url) && !racProxy);
     if (photo && !PLACEHOLDER_IMAGE.test(url)) found.push(`image URL ${url}`);
   }
   for (const [, src] of text.matchAll(/\b(?:data-)?src(?:set)?\s*=\s*"([^"]*)"/gi)) {
@@ -277,6 +279,8 @@ describe('RAC fixtures (terms rule 7)', () => {
       '<img src="https://driveau.newbook.cloud/crop_800_450/instances_d895bd707965db25abb932aba767878f_6.jpg">',
       // A NewBook host's address, even with no image extension
       '{"photo":"https://driveau.newbook.cloud/crop_800_450/a-photo"}',
+      // An address on RAC's host naming NewBook anywhere but RAC's own proxy
+      '{"photo":"https://parksandresorts.rac.com.au/newbook/crop_800_450/a-photo"}',
       '<img data-src="https://example.com/photo.png">',
       '{"photo":"https:\\/\\/driveau.newbook.cloud\\/crop_800_450\\/instances_d895bd70_6.jpg"}',
       '<div class="accommodation-item__description">Wake up to birdsong.</div>',
