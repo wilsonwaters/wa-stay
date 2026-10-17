@@ -7,7 +7,8 @@
  *
  * The key reads over IPC (`providers.list`, `catalog.search`, `accounts.list`) answer for both
  * providers, and filtered to ParkStay they equal what a container with ParkStay alone answers.
- * Each provider's watch carries its own booking link (R7).
+ * Each provider's watch carries its own booking link (R7), and a provider's stay rules (R8)
+ * touch only its own watches.
  */
 
 import fs from 'fs';
@@ -231,5 +232,55 @@ describe('a container with ParkStay and a second provider', () => {
       ['bush-camps', bush.bookingLink?.url],
       ['parkstay', bungarra.bookingLink?.url],
     ]);
+  });
+
+  it("a watch over stay-rule refusals stays NOT_FOUND, and ParkStay's watch is unaffected", async () => {
+    fakeDateOnly(FIXED_NOW);
+    // Room every night, but a 2-night stay refused under a 3-night minimum
+    const refused = { state: 'unknown', reason: 'min-stay', minNights: 3 } as const;
+    second = createFakeProvider({
+      id: 'bush-camps',
+      name: 'Bush Camps WA',
+      shortName: 'Bush Camps',
+      account: 'signed-out',
+      availability: { '1': { u1: [refused, refused], u2: [refused, refused] } },
+    });
+    const stay = { arrival: '2026-11-10', departure: '2026-11-12', adults: 1 };
+    const bungarra: WatchInput = {
+      providerId: 'parkstay',
+      name: 'Bungarra',
+      location: { externalId: '20', name: 'Bungarra' },
+      stay,
+      stayParams: { gearType: 'all' },
+      allowPartialMatch: true,
+    };
+    const watchIn = async (w: World, input: WatchInput): Promise<Watch> => {
+      const watch = await w.read<Watch>('watches:create', input);
+      await w.read('watches:run-now', { id: watch.id });
+      return w.read<Watch>('watches:get', { id: watch.id });
+    };
+
+    const both = await world([parkstayFactory, second.factory]);
+    const bush = await watchIn(both, {
+      providerId: 'bush-camps',
+      name: 'Banksia',
+      location: { externalId: '1', name: 'Banksia Camp' },
+      stay,
+      allowPartialMatch: true,
+    });
+    expect(bush).toMatchObject({ lastResult: 'not_found', foundCount: 0 });
+    expect(bush.bookingLink).toBeUndefined();
+    expect(bush.lastAvailability?.flatMap((u) => u.nights.map((n) => n.reason))).toEqual([
+      'min-stay',
+      'min-stay',
+      'min-stay',
+      'min-stay',
+    ]);
+
+    const withBoth = await watchIn(both, bungarra);
+    const alone = await watchIn(await world([parkstayFactory]), bungarra);
+    const outcome = (w: Watch) => [w.lastResult, w.foundCount, w.bookingLink, w.lastAvailability];
+    expect(outcome(withBoth)).toEqual(outcome(alone));
+    expect(withBoth.lastResult).not.toBe('not_found');
   });
 });

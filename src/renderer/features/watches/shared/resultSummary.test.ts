@@ -26,6 +26,19 @@ describe('resultSummary', () => {
     expect(resultSummary(watch, SITES)).toBe('2 sites available');
   });
 
+  it('counts a unit as the night grid does, not by its fullyAvailable flag (R8)', () => {
+    const refused = makeUnit('2', NIGHTS, ['available', 'available'], {
+      nights: NIGHTS.map((date) => ({ date, state: 'available', reason: 'min-stay' })),
+    });
+    const watch = makeWatch({
+      ...checked,
+      lastResult: WatchResult.FOUND,
+      lastAvailability: [makeUnit('1', NIGHTS), refused],
+    });
+    expect(refused.fullyAvailable).toBe(true);
+    expect(resultSummary(watch, SITES)).toBe('1 site available');
+  });
+
   it('counts the nights with something free for a partial result', () => {
     const watch = makeWatch({
       ...checked,

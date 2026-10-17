@@ -60,6 +60,11 @@ export interface UnitSummary {
   amenities?: string[];
   /** Plain text, never HTML: shown as text. */
   description?: string;
+  /**
+   * The usual fewest nights a stay must have, for the watch and snipe stay steps' warning. Leave
+   * it out where the minimum depends on the dates: the night grid explains it after a check.
+   */
+  minNights?: number;
 }
 
 /**

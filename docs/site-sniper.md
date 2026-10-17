@@ -39,7 +39,8 @@ and dates). The flow has five steps:
    Vehicles, Postcode), the **Stay type** at a place whose units are of more than one kind, and
    the sites you want (any site, or a few). A snipe holds, so at such a place it needs one stay
    type or a site before it goes on (the same chips and rules as a watch:
-   [Stay types](watches-and-notifications.md#stay-types)).
+   [Stay types](watches-and-notifications.md#stay-types)). A warning says when the stay is
+   shorter than the sites usually take.
 4. **Release**: **When are the sites released?** For a scheduled release, the release date
    and time (in the provider's time zone), which must be before your check-in day. **Advanced timing**: Start early (seconds, default
    120), Check every (seconds, default 1.5; never under 0.5), Keep trying for (minutes, default
@@ -68,7 +69,9 @@ and dates). The flow has five steps:
   a clear message (`core/holds/night-guard.ts`).
 - **Which unit.** The first fully available unit of those you chose, or, with none chosen, of
   the stay types you chose (campsites, cabins and villas, rooms, dorms or glamping; none: any
-  kind; a unit the provider gives no kind counts as "other"). A snipe never takes "any unit"
+  kind; a unit the provider gives no kind counts as "other"), and only in a stay the
+  provider's stay rules allow (its minimum nights, and the days it takes arrivals and
+  departures), even when the provider says the unit is free. A snipe never takes "any unit"
   across stay types: with no units chosen, once one of its candidates comes free and they,
   booked or free, are of more than one kind, it holds nothing, reserves no night and ends **Failed** with "Free units of
   more than one stay type: choose a stay type or units for this snipe", and you get a

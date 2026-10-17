@@ -10,7 +10,10 @@
  * round-trip, every module honours `AbortSignal`, failures are `ProviderError`s, links are
  * absolute https URLs, and every booking link a check returns (the location's and each
  * unit's `bookingUrl`) is on the provider's own site (`bookingLinkViolations`, the core's
- * `isProviderBookingLink`). Modules the provider does not have are skipped. For a
+ * `isProviderBookingLink`), and that a stay under a unit's minimum is refused: the unit is
+ * not `fullyAvailable` and its nights with room are `min-stay`, never `available`
+ * (`stayRuleViolations`). Modules the
+ * provider does not have are skipped. For a
  * browser-driven provider, `openPages` lets it check that no call leaves a page open.
  *
  * A `search`-mode catalogue is also checked over `searchBbox` (`searchAreaViolations`): its
@@ -28,6 +31,7 @@ import {
   type ProviderContext,
 } from '@main/providers/sdk';
 import { isProviderBookingLink } from '@main/core/booking-link';
+import { minimumNights } from '@main/core/watches/matching';
 import { TEXT_SEARCH_MIN_CHARS } from '@main/core/catalog/location-catalog.service';
 import { providerViolations, ProviderRegistry } from '@main/providers/registry';
 import type { BoundingBox, LocationSummary } from '@shared/types/catalog.types';
@@ -37,6 +41,7 @@ import {
   type ProviderManifest,
   type StayQuery,
 } from '@shared/types/provider.types';
+import { nightsBetween } from '@shared/utils/calendar-date';
 import { makeLocationKey, parseLocationKey } from '@shared/utils/location-key';
 import { createTestProviderContext } from './fake-provider';
 
@@ -230,6 +235,50 @@ export function bookingLinkViolations(
   return links
     .filter(([, url]) => url !== undefined && !isProviderBookingLink(manifest, url))
     .map(([owner, url]) => `${owner}'s bookingUrl ${url} is not on ${manifest.website}`);
+}
+
+/**
+ * What is wrong with the stay rules of a check's answer for `stay`, as messages ([] when
+ * nothing). A unit whose minimum for the stay (the core's `minimumNights`: the arrival night's
+ * `minNights`, else the unit's) is more than the stay's nights must not be `fullyAvailable`,
+ * and must not have an `available` night with no reason: the stay is refused, so its nights
+ * with room are `unknown` with `reason: 'min-stay'`. Nor may a `min-stay` night be
+ * `available`. A watch must never alert on a stay the provider would refuse, and the night grid
+ * must not show it free.
+ */
+export function stayRuleViolations(
+  stay: Pick<StayQuery, 'arrival' | 'departure'>,
+  result: Pick<LocationAvailability, 'units'>
+): string[] {
+  const stayNights = nightsBetween(stay.arrival, stay.departure);
+  const violations: string[] = [];
+  for (const unit of result.units) {
+    const arrivalNight = unit.nights.find((night) => night.date === stay.arrival);
+    const minimum = minimumNights(unit, arrivalNight);
+    if (minimum > stayNights) {
+      if (unit.fullyAvailable) {
+        violations.push(
+          `unit ${unit.unitId} is fullyAvailable for ${stayNights} nights, under its minNights ${minimum}`
+        );
+      }
+      const free = unit.nights.filter(
+        (night) => night.state === 'available' && night.reason === undefined
+      );
+      if (free.length > 0) {
+        violations.push(
+          `unit ${unit.unitId}'s nights ${free.map((night) => night.date).join(', ')} are ` +
+            `available with no reason, under its ${minimum}-night minimum for ${stayNights} ` +
+            `nights (they are min-stay)`
+        );
+      }
+    }
+    for (const night of unit.nights) {
+      if (night.reason === 'min-stay' && night.state === 'available') {
+        violations.push(`unit ${unit.unitId}'s night ${night.date} is min-stay but available`);
+      }
+    }
+  }
+  return violations;
 }
 
 /** A promise that rejects with an AbortError (the caller aborted). */
@@ -438,6 +487,12 @@ export function describeProviderContract(
         if (!provider.availability) return;
         const result = await provider.availability.check(externalId, stay);
         expect(bookingLinkViolations(provider.manifest, result)).toEqual([]);
+      });
+
+      it('never offers a stay its own stay rules refuse', async () => {
+        if (!provider.availability) return;
+        const result = await provider.availability.check(externalId, stay);
+        expect(stayRuleViolations(stay, result)).toEqual([]);
       });
 
       it('searches with keys of this provider', async () => {

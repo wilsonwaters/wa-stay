@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 import { useFormContext } from 'react-hook-form';
 import type { UnitSummary } from '../../../../../shared/types/catalog.types';
 import type { ProviderManifest } from '../../../../../shared/types/provider.types';
+import { MinStayNotice } from '../../../../components/stay/MinStayNotice';
 import { ProviderStayFields } from '../../../../components/stay/ProviderStayFields';
 import { StayTypeChips } from '../../../../components/stay/StayTypeChips';
 import { placeUnitKinds, stayTypeOptions } from '../../../../components/stay/stayTypes';
@@ -36,23 +37,26 @@ export interface StayStepProps {
  * Step 3: the dates, who is coming, the provider's own snipe and hold fields (vehicles,
  * postcode…), the stay types at a place whose units are of more than one kind, and the
  * preferred units: none chosen means any unit. A snipe holds, so at such a place it needs a
- * stay type or a unit.
+ * stay type or a unit. Warnings say when the stay is shorter than the units take
+ * (`MinStayNotice`), or the party more than they hold.
  */
 export function StayStep({ manifest, today, units, noun }: StayStepProps) {
   const { watch, formState, getFieldState, trigger } = useFormContext<SnipeFormValues>();
   const set = useSetSnipeField();
   const setFields = useSetSnipeFields();
   const { errors } = formState;
-  const [arrival, departure, adults, children, infants, stayParams, unitIds, unitKinds] = watch([
-    'arrival',
-    'departure',
-    'adults',
-    'children',
-    'infants',
-    'stayParams',
-    'unitIds',
-    'unitKinds',
-  ]);
+  const [arrival, departure, adults, children, infants, stayParams, unitIds, unitKinds, location] =
+    watch([
+      'arrival',
+      'departure',
+      'adults',
+      'children',
+      'infants',
+      'stayParams',
+      'unitIds',
+      'unitKinds',
+      'location',
+    ]);
   const fields = snipeStayFields(manifest);
   const placeKinds = useMemo(() => (units ? placeUnitKinds(units) : undefined), [units]);
   const stayTypes = placeKinds ? stayTypeOptions(placeKinds, unitKinds) : [];
@@ -113,6 +117,17 @@ export function StayStep({ manifest, today, units, noun }: StayStepProps) {
           kinds={stayTypes.length > 0 ? unitKinds : undefined}
         />
       )}
+      <MinStayNotice
+        units={units}
+        unitIds={unitIds}
+        unitKinds={stayTypes.length > 0 ? unitKinds : undefined}
+        arrival={arrival}
+        departure={departure}
+        place={location?.name}
+        noun={noun}
+        shortName={manifest.shortName}
+        action="holds"
+      />
       {capacity !== undefined && party > capacity && (
         <Notice tone="warning">
           Your party of {party} is more than the chosen {noun.many} are known to hold (up to{' '}
