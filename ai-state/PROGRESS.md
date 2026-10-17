@@ -11,7 +11,8 @@ Phase 3–4 (task specs, then execution). The stakeholder approved the 20-task p
 
 ## Currently in flight
 - **R16 (#63)**: implemented on `lane/r16` (`5750238`, R18 merged in; 5582 tests, e2e 27); in independent review (security of the member number first). Member-number-like values in the diff are only sequential placeholders (`1234567890123`, `012345678`, `12345678`, `1234567890123456`, `01234567`).
-- Next: R19 (after R16), R20.
+- **R19 (#66)**: implementation agent in `/home/user/lanes/r19`, started early from `lane/r16` (`5750238`) to overlap with R16's review; it merges the integration branch once R16 is merged. No live request of any kind (synthetic cart fixtures only).
+- Next: R20 (docs, website, CHANGELOG, final gate), then system verification.
 
 ## Completed
 - **R18 (#65) merged** (`eb5a499`): hold release hooks (SDK `holds.release` answering `released`/`gone`, `releaseOnPaymentClose`, `expiresAtEstimated`, manifest `holdRelease` with registry rules); "Let it go" (confirm dialog) on the watch and snipe pages, delete lets a hold go first, a payment window closed unpaid lets it go where the provider says so; a confirmation being read always wins (bounded wait); "about" wording for estimated expiries; `watches.releaseHold`/`snipes.releaseHold`; holds placed and let go at interactive priority; `isBusy` counts a release in flight; timeline says "Hold let go"/"Hold ended"; R17 amendment: a new or edited auto-hold watch is refused while holds are turning off. ParkStay unchanged. Review APPROVE-WITH-MINORS → fixes `9881082`, R13 merged in `8ea1d26`, `d5aec40`, `017759f` → APPROVE. Integration gate on `eb5a499` (R13 + R14 + R18): 5488 tests, test:tz 8, e2e 26.
