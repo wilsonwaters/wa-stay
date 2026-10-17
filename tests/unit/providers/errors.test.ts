@@ -7,6 +7,7 @@ import {
   BrowserUnavailableError,
   createAbortError,
   isAbortError,
+  isProviderBlock,
   ProviderAuthRequiredError,
   ProviderCapabilityError,
   ProviderError,
@@ -171,5 +172,40 @@ describe('abort helpers', () => {
     );
     expect(isAbortError(new Error('x'))).toBe(false);
     expect(isAbortError(null)).toBe(false);
+  });
+});
+
+describe('isProviderBlock (§12.35)', () => {
+  const http = (status: number, reason?: 'status' | 'blocked' | 'network') =>
+    new ProviderHttpError({ providerId: 'fake', status, url: 'https://x.example/a', reason });
+
+  it('is true for a 403 or a 429, retryable or not (a provider cool-down is one too)', () => {
+    expect(isProviderBlock(http(403))).toBe(true);
+    expect(isProviderBlock(http(429))).toBe(true);
+    expect(http(429).retryable).toBe(true);
+    expect(
+      isProviderBlock(
+        new ProviderHttpError({
+          providerId: 'rac',
+          status: 403,
+          url: 'https://x.example/a',
+          retryable: false,
+          message: 'RAC turned the request away (a security check).',
+        })
+      )
+    ).toBe(true);
+  });
+
+  it('is false for any other status, no response, or any other error', () => {
+    for (const status of [0, 400, 401, 404, 408, 500, 503]) {
+      expect(isProviderBlock(http(status))).toBe(false);
+    }
+    expect(isProviderBlock(http(0, 'blocked'))).toBe(false);
+    expect(isProviderBlock(new AccessGateError('fake', 'waiting'))).toBe(false);
+    expect(isProviderBlock(new ProviderError({ providerId: 'fake', message: 'HTTP 403' }))).toBe(
+      false
+    );
+    expect(isProviderBlock(Object.assign(new Error('x'), { status: 429 }))).toBe(false);
+    expect(isProviderBlock(undefined)).toBe(false);
   });
 });

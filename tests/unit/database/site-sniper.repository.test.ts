@@ -7,6 +7,7 @@ import { SiteSniperRepository } from '@main/database/repositories';
 import { mockUserInput } from '@tests/fixtures/users';
 import { createMockSiteSnipeInput } from '@tests/fixtures/site-sniper';
 import { SnipeReleaseMode, SnipeResult, SnipeStatus } from '@shared/types/common.types';
+import { logger } from '@main/utils/logger';
 
 describe('SiteSniperRepository', () => {
   let dbHelper: TestDatabaseHelper;
@@ -302,6 +303,114 @@ describe('SiteSniperRepository', () => {
       expect(repo.findById(snipe.id)?.unitKinds).toEqual(['glamping']);
       db.prepare(`UPDATE site_snipes SET unit_kinds = '{' WHERE id = ?`).run(snipe.id);
       expect(repo.findById(snipe.id)?.unitKinds).toEqual([]);
+    });
+  });
+
+  describe('action and alert (v12)', () => {
+    const at = new Date('2026-10-04T16:00:20.000Z');
+
+    it('stores the action (default hold), and refuses an unknown one', () => {
+      expect(repo.create(userId, createMockSiteSnipeInput()).action).toBe('hold');
+      const alert = repo.create(userId, createMockSiteSnipeInput({ action: 'alert' }));
+      expect(alert.action).toBe('alert');
+      expect(repo.update(alert.id, { action: 'hold' }).action).toBe('hold');
+      expect(repo.update(alert.id, { notes: 'x' }).action).toBe('hold');
+
+      const bogus = { action: 'cart' } as unknown as Parameters<typeof repo.update>[1];
+      expect(() => repo.update(alert.id, bogus)).toThrow(/Unknown snipe action "cart"/);
+      expect(() =>
+        repo.create(userId, { ...createMockSiteSnipeInput(), ...bogus } as never)
+      ).toThrow(expect.objectContaining({ code: 'VALIDATION', issues: ['action'] }));
+      expect(repo.findById(alert.id)?.action).toBe('hold');
+    });
+
+    it('reads an action it does not know as alert, which never holds, with a warning', () => {
+      const warn = jest.spyOn(logger, 'warn');
+      const snipe = repo.create(userId, createMockSiteSnipeInput());
+      dbHelper.getDb().prepare(`UPDATE site_snipes SET action = 'cart' WHERE id = ?`).run(snipe.id);
+      expect(repo.findById(snipe.id)?.action).toBe('alert');
+      expect(warn).toHaveBeenCalledWith(
+        `site_snipes ${snipe.id}: action is not "hold" or "alert"; read as "alert"`
+      );
+      warn.mockRestore();
+    });
+
+    it('markAlerted stores the alert, ALERTED, counted and inactive; activate clears it', () => {
+      const snipe = repo.create(userId, createMockSiteSnipeInput({ action: 'alert' }));
+      repo.markAlerted(snipe.id, {
+        at,
+        unitId: '136',
+        unitName: 'Site 12',
+        bookingUrl: 'https://parkstay.dbca.wa.gov.au/campsite-availability/?site_id=34',
+        note: 'A note.',
+      });
+
+      expect(repo.findById(snipe.id)).toMatchObject({
+        status: SnipeStatus.ALERTED,
+        lastResult: SnipeResult.ALERTED,
+        isActive: false,
+        attemptsCount: 1,
+        alert: {
+          at,
+          unitId: '136',
+          unitName: 'Site 12',
+          bookingUrl: 'https://parkstay.dbca.wa.gov.au/campsite-availability/?site_id=34',
+          note: 'A note.',
+        },
+      });
+      expect(
+        dbHelper.getDb().prepare('SELECT alert FROM site_snipes WHERE id = ?').get(snipe.id)
+      ).toEqual({
+        alert: expect.stringContaining('"at":"2026-10-04T16:00:20.000Z"'),
+      });
+
+      // Stopping keeps ALERTED; arming again clears the alert
+      repo.deactivate(snipe.id);
+      expect(repo.findById(snipe.id)).toMatchObject({ status: SnipeStatus.ALERTED });
+      repo.activate(snipe.id);
+      expect(repo.findById(snipe.id)).toMatchObject({ status: SnipeStatus.ARMED, isActive: true });
+      expect(repo.findById(snipe.id)?.alert).toBeUndefined();
+    });
+
+    it('an ALERTED snipe holds no night: findHeldOverlapping leaves it out', () => {
+      const snipe = repo.create(userId, createMockSiteSnipeInput({ action: 'alert' }));
+      repo.markAlerted(snipe.id, { at, unitId: '136' });
+      expect(repo.findHeldOverlapping('parkstay', userId, '2026-07-19', '2026-07-21', at)).toEqual(
+        []
+      );
+    });
+
+    it.each([
+      ['not JSON', '{'],
+      ['not an object', '[1]'],
+      ['no unitId', '{"at":"2026-10-04T16:00:20.000Z"}'],
+      ['no readable at', '{"at":"soon","unitId":"136"}'],
+    ])('an alert that is %s reads as none', (_what, json) => {
+      const snipe = repo.create(userId, createMockSiteSnipeInput());
+      repo.markAlerted(snipe.id, { at, unitId: '136' });
+      dbHelper.getDb().prepare('UPDATE site_snipes SET alert = ? WHERE id = ?').run(json, snipe.id);
+      const warn = jest.spyOn(logger, 'warn');
+
+      const read = repo.findById(snipe.id);
+      expect(read?.status).toBe(SnipeStatus.ALERTED);
+      expect(read?.alert).toBeUndefined();
+      expect(warn).toHaveBeenCalledTimes(1);
+      expect(warn).toHaveBeenCalledWith(
+        `site_snipes ${snipe.id}: alert is not a readable alert; read as none`
+      );
+      warn.mockRestore();
+    });
+
+    it('drops optional alert members that are not text', () => {
+      const snipe = repo.create(userId, createMockSiteSnipeInput());
+      dbHelper
+        .getDb()
+        .prepare('UPDATE site_snipes SET alert = ? WHERE id = ?')
+        .run(
+          '{"at":"2026-10-04T16:00:20.000Z","unitId":"136","unitName":7,"bookingUrl":"","note":null}',
+          snipe.id
+        );
+      expect(repo.findById(snipe.id)?.alert).toEqual({ at, unitId: '136' });
     });
   });
 });

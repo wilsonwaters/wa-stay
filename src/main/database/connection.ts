@@ -23,7 +23,7 @@ import type { LocationKind } from '@shared/types/provider.types';
 import { logger } from '../utils/logger';
 
 /** Schema version this build creates and understands. */
-export const LATEST_SCHEMA_VERSION = 11;
+export const LATEST_SCHEMA_VERSION = 12;
 
 /** A migration step failed. Its transaction was rolled back, so the database is still at the previous version. */
 export class MigrationError extends Error {
@@ -1060,6 +1060,27 @@ function v11BackfillLocationUnitKinds(db: Database.Database): void {
   if (rows > 0) logger.info(`Migration 011: derived unit kinds for ${rows} location(s)`);
 }
 
+/** The tables v12 adds columns to. */
+const V12_TABLES = ['site_snipes', 'watches'] as const;
+
+/**
+ * Release-alert snipes and estimated hold expiries (R12, §12.35), added in place:
+ * - `site_snipes.action`: what a snipe does when the dates are free, `'hold'` or `'alert'`. Every
+ *   existing snipe holds, as before. No CHECK constraint: `SiteSniperRepository` validates it
+ *   (as v7 left notification types to `NotificationRepository`).
+ * - `site_snipes.alert`: what an ALERTED snipe found, as JSON (NULL until it alerts).
+ * - `hold_expires_estimated` on `watches` and `site_snipes`: 1 when a hold's expiry is the
+ *   app's estimate rather than the provider's (written and read from R18 on).
+ */
+function v12AddSnipeActionAndAlert(db: Database.Database): void {
+  addColumns(db, 'site_snipes', [
+    ['action', "TEXT NOT NULL DEFAULT 'hold'"],
+    ['alert', 'JSON'],
+    ['hold_expires_estimated', 'INTEGER NOT NULL DEFAULT 0'],
+  ]);
+  addColumns(db, 'watches', [['hold_expires_estimated', 'INTEGER NOT NULL DEFAULT 0']]);
+}
+
 /**
  * Brings the database up to `targetVersion`, LATEST_SCHEMA_VERSION unless given. A lower
  * target stops after that version (tests use it to build a database of an older shape).
@@ -1540,6 +1561,15 @@ export function runMigrations(
         logger.info('Running migration 011: Unit kinds');
         v11AddUnitKinds(database);
         v11BackfillLocationUnitKinds(database);
+      });
+    }
+
+    // Migration 012 (R12): release-alert snipes. `site_snipes.action` ('hold' for every existing
+    // snipe) and `site_snipes.alert`; `hold_expires_estimated` on watches and site_snipes (R18).
+    if (pending(12)) {
+      applyMigration(database, 12, [...V12_TABLES], () => {
+        logger.info('Running migration 012: Snipe actions and alerts');
+        v12AddSnipeActionAndAlert(database);
       });
     }
   } finally {

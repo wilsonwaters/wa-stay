@@ -2,11 +2,12 @@
  * One snipe attempt (`SiteSniperService.execute`): check → one-booking-per-night guard →
  * hold, and what each outcome does to the snipe and to the next tick; which unit it holds
  * (the named units, or the first free one of its stay types), and a snipe for "any unit" at a
- * place with more than one stay type, which holds nothing.
+ * place with more than one stay type, which holds nothing and alerts instead (R12; the alert
+ * itself: `snipe-alert.test.ts`).
  */
 
 import { AccessGateError } from '@main/providers/sdk';
-import { RelatedType, SnipeResult, SnipeStatus } from '@shared/types/common.types';
+import { SnipeResult, SnipeStatus } from '@shared/types/common.types';
 import type { SiteSnipe, SiteSnipeInput } from '@shared/types';
 import { createCoreHarness, fakeDateOnly, type CoreHarness } from '@tests/utils/core-harness';
 import { createFakeProvider } from '@tests/utils/fake-provider';
@@ -153,8 +154,8 @@ describe('snipe attempt', () => {
       availability: { '1': { s1: 'available', c1: 'available', d1: 'booked' } },
       unitKinds: { s1: 'campsite', c1: 'cabin', d1: 'dorm' },
     };
-    const MIXED_ERROR =
-      'The units this snipe could hold are of more than one stay type: choose one stay type or units for it';
+    const MIXED_NOTE =
+      'The units this snipe could hold are of more than one stay type: choose one stay type or units for it.';
 
     it("with unitKinds ['cabin'] it holds a cabin, even when a free site is listed first", async () => {
       const snipe = await sniping(mixedPlace, { unitKinds: ['cabin'] });
@@ -168,8 +169,9 @@ describe('snipe attempt', () => {
       expect(stored(snipe.id)).toMatchObject({ status: SnipeStatus.HELD, holdUnitId: 'c1' });
     });
 
-    it('an ambiguous snipe ends FAILED, with no hold, no night reserved and one warning', async () => {
+    it('an ambiguous hold snipe alerts with the note instead: no hold, no night reserved, no warning (R12)', async () => {
       const snipe = await sniping(mixedPlace);
+      expect(snipe.action).toBe('hold');
       const create = jest.spyOn(h.registry.get('fake').holds!, 'create');
       const reserve = jest.spyOn(h.nightGuard, 'tryReserve');
       h.events.emit.mockClear();
@@ -177,32 +179,31 @@ describe('snipe attempt', () => {
 
       expect(outcome).toMatchObject({
         next: 'done',
-        result: { result: SnipeResult.ERROR, held: false, error: MIXED_ERROR },
+        result: { result: SnipeResult.ALERTED, held: false, matchedSiteId: 's1' },
       });
       expect(create).not.toHaveBeenCalled();
       expect(reserve).not.toHaveBeenCalled();
       expect(stored(snipe.id)).toMatchObject({
-        status: SnipeStatus.FAILED,
-        lastResult: SnipeResult.ERROR,
-        lastError: MIXED_ERROR,
+        status: SnipeStatus.ALERTED,
+        lastResult: SnipeResult.ALERTED,
         isActive: false,
         attemptsCount: 1,
+        alert: { at: NOW, unitId: 's1', unitName: 'Site s1', note: MIXED_NOTE },
       });
+      expect(stored(snipe.id).lastError).toBeUndefined();
       expect(h.events.emit).toHaveBeenCalledWith(
         'snipe:updated',
-        expect.objectContaining({ id: snipe.id, status: SnipeStatus.FAILED })
+        expect.objectContaining({ id: snipe.id, status: SnipeStatus.ALERTED })
       );
-      expect(h.notifications.notifyWarning).toHaveBeenCalledTimes(1);
-      expect(h.notifications.notifyWarning).toHaveBeenCalledWith(
-        h.userId,
-        'Snipe stopped at Banksia Camp',
-        `${MIXED_ERROR}.`,
-        {
-          providerId: 'fake',
-          relatedType: RelatedType.SNIPE,
-          relatedId: snipe.id,
-          locationName: 'Banksia Camp',
-        }
+      // The alert replaces R3's warning
+      expect(h.notifications.notifyWarning).not.toHaveBeenCalled();
+      expect(h.notifications.notifySnipeAlert).toHaveBeenCalledTimes(1);
+      expect(h.notifications.notifySnipeAlert).toHaveBeenCalledWith(
+        expect.objectContaining({
+          id: snipe.id,
+          alert: expect.objectContaining({ note: MIXED_NOTE }),
+        }),
+        'campsite'
       );
       expect(h.notifications.notifySnipeHeld).not.toHaveBeenCalled();
     });
@@ -211,9 +212,10 @@ describe('snipe attempt', () => {
       const twoKinds = await sniping(mixedPlace, { unitKinds: ['campsite', 'cabin'] });
       await h.snipes.execute(twoKinds.id);
       expect(stored(twoKinds.id)).toMatchObject({
-        status: SnipeStatus.FAILED,
-        lastError: MIXED_ERROR,
+        status: SnipeStatus.ALERTED,
+        alert: expect.objectContaining({ note: MIXED_NOTE }),
       });
+      expect(h.fake.calls.filter((c) => c.module === 'holds')).toHaveLength(0);
       await h.close();
 
       const named = await sniping(mixedPlace, { unitIds: ['d1', 's1'], unitKinds: ['cabin'] });

@@ -24,6 +24,7 @@ import type {
   ProviderManifest,
   StayParams,
   StayQuery,
+  UnitKind,
 } from '@shared/types/provider.types';
 import type {
   BoundingBox,
@@ -181,6 +182,12 @@ export interface ReleaseComputeInput {
   params?: StayParams;
   /** The release time a person entered, for modes such as `scheduled`. */
   requestedAt?: Date;
+  /**
+   * The snipe's unit choice (§12.35): the units it names, or else its stay types (none: any).
+   * A policy may time a unit or category differently (a category left out of a pre-sale).
+   */
+  unitIds?: string[];
+  unitKinds?: UnitKind[];
   now: Date;
   signal?: AbortSignal;
 }

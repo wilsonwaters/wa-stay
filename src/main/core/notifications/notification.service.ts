@@ -357,9 +357,11 @@ export class NotificationService {
 
   /**
    * Notify when a Site Snipe places a temporary hold (payment still required). `unitKind` is
-   * the held unit's kind, when the provider gave one: what the alert calls it.
+   * the held unit's kind, when the provider gave one: what the alert calls it. A desktop click
+   * opens only the snipe, where the person pays; the email says the hold is in WA Stay and
+   * gives `bookingUrl`, the public booking page, for booking away from it (brief R7).
    */
-  async notifySnipeHeld(snipe: SiteSnipe, unitKind?: UnitKind): Promise<void> {
+  async notifySnipeHeld(snipe: SiteSnipe, unitKind?: UnitKind, bookingUrl?: string): Promise<void> {
     const arrival = formatCalendarDate(snipe.stay.arrival);
     const departure = formatCalendarDate(snipe.stay.departure);
     const where = snipe.location.name || snipe.location.externalId;
@@ -382,7 +384,39 @@ export class NotificationService {
         relatedType: RelatedType.SNIPE,
         actionUrl: relatedPath(RelatedType.SNIPE, snipe.id),
       },
-      { locationName: snipe.location.name || undefined }
+      { locationName: snipe.location.name || undefined, bookingUrl, heldInApp: true }
+    );
+  }
+
+  /**
+   * Notify when a Site Snipe found the dates free and alerts instead of holding (its `alert`:
+   * the unit, the note and the booking page). `unitKind` is the free unit's kind, when the
+   * provider gave one: what the alert calls it ("A cabin is free at …"; "A spot is free at …"
+   * when no kind is known). A desktop click opens the booking page in the browser and the
+   * snipe in the app; the email has "Book on {shortName}". Nothing is held, and the copy never
+   * says so.
+   */
+  async notifySnipeAlert(snipe: SiteSnipe, unitKind?: UnitKind): Promise<void> {
+    const arrival = formatCalendarDate(snipe.stay.arrival);
+    const departure = formatCalendarDate(snipe.stay.departure);
+    const where = snipe.location.name || snipe.location.externalId;
+    const noun = this.nounFor(snipe, [{ unitKind }]);
+    const unit = snipe.alert?.unitName || `A ${noun.one}`;
+    const note = snipe.alert?.note ? ` ${snipe.alert.note}` : '';
+    const message = `${unit} is free at ${where} for ${arrival}–${departure}.${note}`;
+
+    await this.notify(
+      {
+        userId: snipe.userId,
+        providerId: snipe.providerId,
+        type: NotificationType.SNIPE_ALERT,
+        title: `A ${noun.one} is free at ${where}`,
+        message,
+        relatedId: snipe.id,
+        relatedType: RelatedType.SNIPE,
+        actionUrl: relatedPath(RelatedType.SNIPE, snipe.id),
+      },
+      { locationName: snipe.location.name || undefined, bookingUrl: snipe.alert?.bookingUrl }
     );
   }
 

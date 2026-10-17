@@ -35,6 +35,7 @@ export function makeSnipe(overrides: Partial<SiteSnipe> = {}): SiteSnipe {
     unitKinds: [],
     stayParams: {},
     releaseMode: SnipeReleaseMode.DAILY_ROLLOVER,
+    action: 'hold',
     releaseAt: new Date(Date.now() + 26 * 3_600_000),
     accessGateEnabled: false,
     leadTimeSeconds: 120,

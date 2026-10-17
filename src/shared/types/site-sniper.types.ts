@@ -3,10 +3,40 @@ import type { ProviderId, StayParams, UnitKind } from './provider.types';
 import type { LocationRef, Stay, StayInput } from './stay.types';
 
 /**
- * A Site Snipe: an automated attempt to hold a high-demand unit at the earliest legal
- * moment it becomes available (daily rollover, scheduled release, or continuous
- * cancellation watch). Stops at placing the provider's temporary hold; payment stays a
- * human step. Instants are `Date`s; stay dates are calendar dates `YYYY-MM-DD`.
+ * What a snipe does when the dates are free (architecture-notes §12.35):
+ * - `hold`: places the provider's temporary hold (needs `capabilities.holds`); the person pays;
+ * - `alert`: a desktop alert and email with the provider's booking page; nothing is held.
+ */
+export type SnipeAction = 'alert' | 'hold';
+
+/** Every `SnipeAction`, for validation. */
+export const SNIPE_ACTIONS = ['alert', 'hold'] as const satisfies readonly SnipeAction[];
+
+/**
+ * What an ALERTED snipe found: what was free, when, and where to book it. Stored with the
+ * snipe, so its page can show it long after the alert.
+ */
+export interface SnipeAlert {
+  /** When the dates were found free. */
+  at: Date;
+  /** The free unit the alert names. */
+  unitId: string;
+  unitName?: string;
+  /**
+   * The provider's public booking page for the stay (https on its own site, never a cart);
+   * absent when the provider gave none that passed the check.
+   */
+  bookingUrl?: string;
+  /** Why it alerted although it was asked to hold, when it was. */
+  note?: string;
+}
+
+/**
+ * A Site Snipe: an automated attempt to catch a high-demand unit at the earliest legal moment
+ * it becomes available (daily rollover, scheduled release, or continuous cancellation watch).
+ * A `hold` snipe stops at placing the provider's temporary hold, and payment stays a human
+ * step; an `alert` snipe alerts with the booking page and holds nothing. Instants are `Date`s;
+ * stay dates are calendar dates `YYYY-MM-DD`.
  */
 export interface SiteSnipe {
   id: number;
@@ -28,6 +58,8 @@ export interface SiteSnipe {
   /** The provider's own stay fields (ParkStay: `gearType`, `numVehicles`, `postcode`). */
   stayParams: StayParams;
   releaseMode: SnipeReleaseMode;
+  /** What it does when the dates are free (stored rows from before v12 read `hold`). */
+  action: SnipeAction;
   // exact release instant (UTC). Required for SCHEDULED; computed for
   // DAILY_ROLLOVER; null for CANCELLATION
   releaseAt?: Date;
@@ -51,6 +83,8 @@ export interface SiteSnipe {
   holdUnitId?: string;
   paymentUrl?: string;
   bookedReference?: string;
+  /** What an ALERTED snipe found (cleared when it is armed again). */
+  alert?: SnipeAlert;
   notes?: string;
   createdAt: Date;
   updatedAt: Date;
@@ -69,6 +103,8 @@ export interface SiteSnipeInput {
   unitKinds?: UnitKind[];
   stayParams?: StayParams;
   releaseMode: SnipeReleaseMode;
+  /** Default: `hold` when the provider has holds, otherwise `alert`. */
+  action?: SnipeAction;
   releaseAt?: Date;
   accessGateEnabled?: boolean;
   leadTimeSeconds?: number;
