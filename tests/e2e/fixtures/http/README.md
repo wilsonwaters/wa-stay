@@ -22,7 +22,8 @@ http/
 └── rac/
     ├── manifest.json
     ├── book-now-busselton.html       # RAC Busselton Holiday Park's categories, for its page
-    └── book-now-margaret-river.html  # RAC Margaret River Nature Park's categories (dorms, a safari tent)
+    ├── book-now-margaret-river.html  # RAC Margaret River Nature Park's categories (dorms, a safari tent)
+    └── availability-busselton-2026-11-06-2n.json  # Busselton's availability, 6–8 Nov 2026 (the RAC watch journey)
 ```
 
 A provider with no folder, or no routes, answers every request with an error.
@@ -133,6 +134,15 @@ to add.
   `tests/unit/providers/rac-fixtures.test.ts` checks every file here). The other parks' pages
   have no route: the Explore journey (`rac-catalogue.spec.ts`) opens Margaret River, and the
   preview opens the first park, Busselton.
+- **RAC, availability**: `availability-busselton-2026-11-06-2n.json` is the Jest fixture
+  `tests/fixtures/providers/rac/availability-busselton-2026-11-06-2n.json`, copied unchanged:
+  RAC's answer to the availability POST its own book-now page sends (`availability-ajax.php`,
+  `blog_id` 6, 6–8 Nov 2026, 2 adults), fetched anonymously on 16 Oct 2026 and trimmed to the
+  fields WA Stay reads (codes, counts, amounts, rates' labels, minimums and closed days, and
+  `online_booking_url`), with the NewBook key and every cart address `<redacted>`. Its route
+  matches `blog_id` and `available_from` (`form`). `rac-watch.spec.ts` launches on a copy moved
+  to its own dates (`support/dated-fixtures.ts`); the preview answers it with
+  `PREVIEW_ARRIVAL=2026-11-06`.
 
 ## Refreshing a fixture
 

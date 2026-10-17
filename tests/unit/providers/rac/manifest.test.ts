@@ -1,14 +1,19 @@
 /**
  * RAC's manifest (`src/main/providers/rac/manifest.ts`), links (`links.ts`) and seed
- * (`parks.ts`): who RAC is and its limits (terms rules 2–4), its badge (a text monogram whose
- * white text passes WCAG AA), what it does not do (no bookings module, rule 10), links to RAC's
- * own pages and never its cart (rule 6), and a seed of facts with no photo or copy (rule 6).
+ * (`parks.ts`): who RAC is and its limits (terms rules 2–4), its pets stay field (rule 16), its
+ * badge (a text monogram whose white text passes WCAG AA), what it does not do (no bookings
+ * module, rule 10), links to RAC's own pages and never its cart (rule 6), and a seed of facts
+ * with no photo or copy (rule 6).
  */
 
 import fs from 'fs';
 import path from 'path';
 import { RAC_PARKS, racFactory, racLinks, racManifest } from '@main/providers/rac';
+import { effectiveIntervalMinutes } from '@main/core/watches/next-check';
+import { resolveStayParams } from '@main/core/stay-params';
+import { categoryIdOf, racBookingPage } from '@main/providers/rac/links';
 import { ProviderRegistry } from '@main/providers/registry';
+import { AppError } from '@main/utils/app-error';
 import { contrastRatio } from '@renderer/styles/contrast';
 import type { StayQuery } from '@shared/types/provider.types';
 import { createTestProviderContext } from '@tests/utils/fake-provider';
@@ -36,13 +41,13 @@ describe('racManifest', () => {
     });
   });
 
-  it('has a catalogue and nothing else yet, and no account', () => {
+  it('has a catalogue, availability and watches, and no account', () => {
     expect(racManifest.capabilities).toEqual({
       catalog: true,
       catalogMode: 'full',
-      availability: false,
+      availability: true,
       bulkAvailability: false,
-      watches: false,
+      watches: true,
       snipes: false,
       holds: false,
       bookingImport: false,
@@ -77,10 +82,43 @@ describe('racManifest', () => {
     expect(racManifest.brand.color).not.toBe(parkstayManifest.brand.color);
   });
 
-  it('registers with only links and a catalogue: no bookings module, so it can never change a booking (rule 10)', () => {
+  it('runs watches every 15 minutes at most, whatever a watch asks (rule 3)', () => {
+    expect(effectiveIntervalMinutes(5, racManifest)).toBe(15);
+    expect(effectiveIntervalMinutes(15, racManifest)).toBe(15);
+    expect(effectiveIntervalMinutes(60, racManifest)).toBe(60);
+  });
+
+  it('has a pets stay field, 0 to 2, 0 by default, for checks, watches and snipes (rule 16)', () => {
+    expect(racManifest.stayFields).toEqual([
+      expect.objectContaining({
+        key: 'pets',
+        label: 'Pets',
+        type: 'number',
+        min: 0,
+        max: 2,
+        default: 0,
+        appliesTo: ['availability', 'watch', 'snipe'],
+      }),
+    ]);
+    expect(resolveStayParams(racManifest, ['watch'], {})).toEqual({ pets: 0 });
+    expect(resolveStayParams(racManifest, ['watch'], { pets: 2 })).toEqual({ pets: 2 });
+  });
+
+  it.each([3, -1, '1'])('refuses pets %p with VALIDATION on stayParams.pets (rule 16)', (pets) => {
+    let error: unknown;
+    try {
+      resolveStayParams(racManifest, ['watch'], { pets });
+    } catch (e) {
+      error = e;
+    }
+    expect(error).toBeInstanceOf(AppError);
+    expect(error).toMatchObject({ code: 'VALIDATION', issues: ['stayParams.pets'] });
+  });
+
+  it('registers with links, a catalogue and availability: no bookings module, so it can never change a booking (rule 10)', () => {
     const registry = new ProviderRegistry();
     const provider = registry.register(racFactory, createTestProviderContext);
-    expect(Object.keys(provider).sort()).toEqual(['catalog', 'links', 'manifest']);
+    expect(Object.keys(provider).sort()).toEqual(['availability', 'catalog', 'links', 'manifest']);
     expect(provider.bookings).toBeUndefined();
     expect(provider.manifest.capabilities.bookingImport).toBe(false);
   });
@@ -115,13 +153,37 @@ describe('racLinks', () => {
     expect(racLinks.manageBooking).toBeUndefined();
   });
 
-  it('takes a unit and leaves it out: the book-now page lists every category for the stay', () => {
-    const booking = racLinks.booking as (
-      externalId: string,
-      stay?: StayQuery,
-      unitId?: string
-    ) => string | null;
-    expect(booking('busselton', STAY, 'cat:4')).toBe(racLinks.booking('busselton', STAY));
+  it("links a category (cat:<id>) to the park's booking page for it, in online_booking_url's form", () => {
+    const url = racLinks.booking('busselton', STAY, 'cat:4');
+    expect(url).toBe(
+      `${RAC}/busselton/booking/?available_from=2026-11-06&available_to=2026-11-08` +
+        '&force_category_id=4&adults=2&children=1&infants=1&animals=0'
+    );
+    expect(url).not.toMatch(/cart|rest_api_data_id/);
+    expect(racBookingPage(url!, 'busselton')).toBe(url);
+  });
+
+  it("takes the stay's pets, 0 when it has none or one no stay can have", () => {
+    const withPets = { ...STAY, params: { pets: 2 } };
+    expect(new URL(racLinks.booking('busselton', withPets)!).searchParams.get('pets')).toBe('2');
+    expect(
+      new URL(racLinks.booking('busselton', withPets, 'cat:4')!).searchParams.get('animals')
+    ).toBe('2');
+    for (const pets of [3, -1, 'two']) {
+      const url = racLinks.booking('busselton', { ...STAY, params: { pets } }, 'cat:4');
+      expect(new URL(url!).searchParams.get('animals')).toBe('0');
+    }
+  });
+
+  it('links to the book-now page for a unit that is not a category, or with no stay', () => {
+    expect(racLinks.booking('busselton', STAY, 'site-4')).toBe(racLinks.booking('busselton', STAY));
+    expect(racLinks.booking('busselton', undefined, 'cat:4')).toBe(`${RAC}/busselton/book-now/`);
+    expect(racLinks.booking('ningaloo', STAY, 'cat:4')).toBeNull();
+    expect([categoryIdOf('cat:30'), categoryIdOf('cat:'), categoryIdOf('30')]).toEqual([
+      '30',
+      undefined,
+      undefined,
+    ]);
   });
 
   it("links every seeded park to RAC's own pages only, on the manifest's website (rule 6)", () => {
@@ -132,6 +194,7 @@ describe('racLinks', () => {
         racLinks.location(park.slug),
         racLinks.booking(park.slug),
         racLinks.booking(park.slug, STAY),
+        racLinks.booking(park.slug, STAY, 'cat:4'),
       ]) {
         expect(new URL(url!).origin).toBe(website);
         expect(url).not.toMatch(/cart|rest_api_data_id/);

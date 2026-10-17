@@ -1,0 +1,142 @@
+{
+  "_fixture": "Trimmed from RAC Parks & Resorts' availability answer for RAC Busselton Holiday Park (blog 6), 25-27 Sep 2027 (school holidays), 2 adults, fetched anonymously; only the fields WA Stay reads, the NewBook key and cart addresses redacted. (Fetched 16 Oct 2026, 23:43 Perth.)",
+  "success": "true",
+  "message": "",
+  "timestamp": "2026-10-16 23:43:44",
+  "timezone": "Australia/West",
+  "api_key": "<redacted>",
+  "data": {
+    "4": {
+      "category_id": 4,
+      "category_type_id": "2",
+      "category_name": "Powered Site",
+      "sort": 5,
+      "sites_available": {
+        "2027-09-25": 103,
+        "2027-09-26": 103
+      },
+      "sites_code": {
+        "2027-09-25": 0,
+        "2027-09-26": 0
+      },
+      "sites_message": {
+        "2027-09-25": "",
+        "2027-09-26": ""
+      },
+      "stay_through_sites_available": 103,
+      "stay_through_sites_code": 0,
+      "stay_through_sites_message": "",
+      "online_booking_url": "https://parksandresorts.rac.com.au/busselton/booking/?available_from=2027-09-25&available_to=2027-09-27&force_category_id=4&adults=2&children=0&infants=0&animals=0",
+      "tariffs_available": [
+        {
+          "tariff_label": "Standard Rate",
+          "tariff_success": "false",
+          "tariff_code": 6,
+          "tariff_message": "This Rate has a 3 Night Minimum; Bookings are not allowed to Arrive on 25 Sep 2027 using this Rate",
+          "tariff_total": 224,
+          "tariffs_quoted": {
+            "2027-09-25": {
+              "amount": 112,
+              "minimum_periods": "3",
+              "close_arrival": "1",
+              "close_departure": "1"
+            },
+            "2027-09-26": {
+              "amount": 112,
+              "minimum_periods": "3",
+              "close_arrival": "1",
+              "close_departure": "1"
+            }
+          }
+        },
+        {
+          "tariff_label": "RAC Member Rate",
+          "tariff_success": "false",
+          "tariff_code": 6,
+          "tariff_message": "This Rate has a 3 Night Minimum; Bookings are not allowed to Arrive on 25 Sep 2027 using this Rate",
+          "tariff_total": 202,
+          "tariffs_quoted": {
+            "2027-09-25": {
+              "amount": 101,
+              "minimum_periods": "3",
+              "close_arrival": "1",
+              "close_departure": "1"
+            },
+            "2027-09-26": {
+              "amount": 101,
+              "minimum_periods": "3",
+              "close_arrival": "1",
+              "close_departure": "1"
+            }
+          }
+        }
+      ]
+    },
+    "30": {
+      "category_id": 30,
+      "category_type_id": "2",
+      "category_name": "Pet Friendly Powered Site",
+      "sort": 3,
+      "sites_available": {
+        "2027-09-25": 0,
+        "2027-09-26": 0
+      },
+      "sites_code": {
+        "2027-09-25": 3,
+        "2027-09-26": 3
+      },
+      "sites_message": {
+        "2027-09-25": "There is no availability for this date",
+        "2027-09-26": "There is no availability for this date"
+      },
+      "stay_through_sites_available": 0,
+      "stay_through_sites_code": 3,
+      "stay_through_sites_message": "There is no availability for this date",
+      "online_booking_url": "https://parksandresorts.rac.com.au/busselton/booking/?available_from=2027-09-25&available_to=2027-09-27&force_category_id=30&adults=2&children=0&infants=0&animals=0",
+      "tariffs_available": [
+        {
+          "tariff_label": "Standard Rate",
+          "tariff_success": "false",
+          "tariff_code": 6,
+          "tariff_message": "This Rate has a 3 Night Minimum; Bookings are not allowed to Arrive on 25 Sep 2027 using this Rate",
+          "tariff_total": 224,
+          "tariffs_quoted": {
+            "2027-09-25": {
+              "amount": 112,
+              "minimum_periods": "3",
+              "close_arrival": "1",
+              "close_departure": "1"
+            },
+            "2027-09-26": {
+              "amount": 112,
+              "minimum_periods": "3",
+              "close_arrival": "1",
+              "close_departure": "1"
+            }
+          }
+        },
+        {
+          "tariff_label": "RAC Member Rate",
+          "tariff_success": "false",
+          "tariff_code": 6,
+          "tariff_message": "This Rate has a 3 Night Minimum; Bookings are not allowed to Arrive on 25 Sep 2027 using this Rate",
+          "tariff_total": 202,
+          "tariffs_quoted": {
+            "2027-09-25": {
+              "amount": 101,
+              "minimum_periods": "3",
+              "close_arrival": "1",
+              "close_departure": "1"
+            },
+            "2027-09-26": {
+              "amount": 101,
+              "minimum_periods": "3",
+              "close_arrival": "1",
+              "close_departure": "1"
+            }
+          }
+        }
+      ]
+    }
+  }
+}

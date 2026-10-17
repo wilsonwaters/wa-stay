@@ -3,7 +3,8 @@
  * sends anything: RAC's host only, redirects by hand on that host only, the headers RAC's own
  * pages send and never a User-Agent, one request at a time, and the block: a 403, a 429 or
  * Cloudflare's challenge rejects with a non-retryable `ProviderHttpError` (403 or 429) and stops
- * every request for 30 minutes, kept in the provider's state; a 5xx does not.
+ * every request for 30 minutes, kept in the provider's state; a 5xx does not. Blocks in a row
+ * double the cool-down up to a day, and a longer `Retry-After` is honoured, up to a day.
  */
 
 import {
@@ -16,8 +17,10 @@ import {
   isChallengePage,
   RAC_BLOCK_COOLDOWN_MS,
   RAC_BLOCK_STATE_KEY,
+  RAC_MAX_BLOCK_COOLDOWN_MS,
   RAC_MAX_REDIRECTS,
   RacClient,
+  retryAfterMs,
 } from '@main/providers/rac/client';
 import { createMemoryLogger, type MemoryLogger } from '@tests/utils/fake-provider';
 import { RecordingHttpClient, type HopAnswer } from '@tests/utils/fake-paced-provider';
@@ -330,5 +333,157 @@ describe('RacClient: a block', () => {
     await expect(makeClient().getPage('/busselton/book-now/')).resolves.toMatchObject({
       status: 200,
     });
+  });
+});
+
+describe('RacClient: blocks in a row and Retry-After', () => {
+  const HOUR = 60 * 60_000;
+
+  /** Moves the clock to `at` ms after START, sends one page request, and returns its error. */
+  async function blockedAt(client: RacClient, at: number): Promise<ProviderHttpError> {
+    now = new Date(START.getTime() + at);
+    return failure(client.getPage('/busselton/book-now/'));
+  }
+
+  it('doubles the cool-down for each block after the last one ends, up to a day', async () => {
+    const client = makeClient(() => ({ status: 403 }));
+    let at = 0;
+    const lengths: number[] = [];
+    for (let block = 0; block < 8; block++) {
+      await blockedAt(client, at);
+      const stored = (await state.get(RAC_BLOCK_STATE_KEY)) as { until: string };
+      const length = Date.parse(stored.until) - (START.getTime() + at);
+      lengths.push(length / 60_000);
+      // Nothing is sent a minute before it ends
+      const sent = http.requests.length;
+      await blockedAt(client, at + length - 60_000);
+      expect(http.requests).toHaveLength(sent);
+      at += length;
+    }
+    expect(lengths).toEqual([30, 60, 120, 240, 480, 960, 1440, 1440]);
+    expect(http.requests).toHaveLength(8);
+  });
+
+  it('a successful answer ends the run: the next block is 30 minutes again', async () => {
+    let answer: HopAnswer = { status: 429 };
+    const client = makeClient(() => answer);
+    await blockedAt(client, 0);
+    await blockedAt(client, RAC_BLOCK_COOLDOWN_MS);
+    expect((await state.get(RAC_BLOCK_STATE_KEY)) as object).toMatchObject({ strikes: 2 });
+    answer = { body: PAGE };
+    now = new Date(START.getTime() + RAC_BLOCK_COOLDOWN_MS + HOUR);
+    await expect(client.getPage('/busselton/book-now/')).resolves.toMatchObject({ status: 200 });
+    expect(await state.get(RAC_BLOCK_STATE_KEY)).toBeUndefined();
+    answer = { status: 429 };
+    const error = await blockedAt(client, RAC_BLOCK_COOLDOWN_MS + HOUR + 60_000);
+    // 3:15 pm + 1 h 31 min = 4:46 pm, then 30 minutes
+    expect(error.message).toMatch(/until 5:16 pm\.$/);
+  });
+
+  it('a 5xx between blocks does not end the run', async () => {
+    let answer: HopAnswer = { status: 403 };
+    const client = makeClient(() => answer);
+    await blockedAt(client, 0);
+    answer = { status: 520 };
+    now = new Date(START.getTime() + RAC_BLOCK_COOLDOWN_MS);
+    await failure(client.getPage('/busselton/book-now/'));
+    answer = { status: 403 };
+    await blockedAt(client, RAC_BLOCK_COOLDOWN_MS + 60_000);
+    expect((await state.get(RAC_BLOCK_STATE_KEY)) as object).toMatchObject({
+      strikes: 2,
+      durationMs: HOUR,
+    });
+  });
+
+  it('a block more than a day after the last one ended starts a new run', async () => {
+    const client = makeClient(() => ({ status: 403 }));
+    await blockedAt(client, 0);
+    await blockedAt(client, RAC_BLOCK_COOLDOWN_MS + RAC_MAX_BLOCK_COOLDOWN_MS + 60_000);
+    expect((await state.get(RAC_BLOCK_STATE_KEY)) as object).toMatchObject({
+      strikes: 1,
+      durationMs: RAC_BLOCK_COOLDOWN_MS,
+    });
+  });
+
+  it.each<[string, string, number]>([
+    ['seconds', '7200', 2 * HOUR],
+    ['an HTTP date', 'Sat, 17 Oct 2026 12:15:00 GMT', 5 * HOUR],
+    ['more than a day', String(3 * 24 * 3600), RAC_MAX_BLOCK_COOLDOWN_MS],
+    ['less than the cool-down', '120', RAC_BLOCK_COOLDOWN_MS],
+    ['nothing it can read', 'soon', RAC_BLOCK_COOLDOWN_MS],
+  ])('honours a Retry-After of %s when it asks for longer, up to a day', async (_, value, ms) => {
+    const client = makeClient(() => ({ status: 429, headers: { 'retry-after': value } }));
+    await failure(client.getPage('/busselton/book-now/'));
+    const stored = (await state.get(RAC_BLOCK_STATE_KEY)) as { until: string };
+    expect(Date.parse(stored.until) - START.getTime()).toBe(ms);
+    // Nothing is sent until it ends
+    now = new Date(START.getTime() + ms - 1_000);
+    await failure(client.getPage('/busselton/book-now/'));
+    expect(http.requests).toHaveLength(1);
+  });
+
+  it('names the day when a longer cool-down ends on another day in Perth', async () => {
+    const client = makeClient(() => ({ status: 429, headers: { 'retry-after': '64800' } }));
+    const error = await failure(client.getPage('/busselton/book-now/'));
+    // 3:15 pm + 18 hours: 9:15 am the next day
+    expect(error.message).toBe(
+      "RAC Parks & Resorts turned the request away (HTTP 429). WA Stay won't ask again until 9:15 am on Sun 18 Oct."
+    );
+    expect(logger.lines.filter((line) => line.level === 'warn')[0].message).toBe(
+      'Turned away (HTTP 429); no requests for 18 hours'
+    );
+  });
+
+  it('cuts a longer cool-down that ends further ahead than its length (the clock went back) to its length', async () => {
+    const client = makeClient(() => ({ status: 403 }));
+    await blockedAt(client, 0);
+    await blockedAt(client, RAC_BLOCK_COOLDOWN_MS);
+    // A 1-hour cool-down from 3:45 pm; the clock goes back 3 hours
+    const error = await blockedAt(client, -3 * HOUR);
+    expect(error.message).toMatch(/until 1:15 pm\.$/);
+  });
+
+  it('reads Retry-After as seconds or a date, and nothing else', () => {
+    const at = START.getTime();
+    expect(retryAfterMs('30', at)).toBe(30_000);
+    expect(retryAfterMs(' 0 ', at)).toBe(0);
+    expect(retryAfterMs('Sat, 17 Oct 2026 07:16:00 GMT', at)).toBe(60_000);
+    expect(retryAfterMs('Sat, 17 Oct 2026 07:00:00 GMT', at)).toBe(0);
+    expect(retryAfterMs(null, at)).toBeUndefined();
+    expect(retryAfterMs('', at)).toBeUndefined();
+    expect(retryAfterMs('-5', at)).toBeUndefined();
+    expect(retryAfterMs('later', at)).toBeUndefined();
+  });
+
+  it('reads a cool-down kept before its length was stored as 30 minutes', async () => {
+    await state.set(RAC_BLOCK_STATE_KEY, {
+      until: new Date(START.getTime() + 20 * 60_000).toISOString(),
+      status: 403,
+      cause: 'status',
+    });
+    const client = makeClient(() => ({ status: 403 }));
+    await failure(client.getPage('/busselton/book-now/'));
+    expect(http.requests).toHaveLength(0);
+    // After it, the next block is the second in a row
+    await blockedAt(client, 20 * 60_000);
+    expect((await state.get(RAC_BLOCK_STATE_KEY)) as object).toMatchObject({ strikes: 2 });
+  });
+
+  it('ignores a stored cool-down with a length or a count it cannot read', async () => {
+    for (const bad of [
+      { durationMs: -1 },
+      { durationMs: 2 * RAC_MAX_BLOCK_COOLDOWN_MS },
+      { strikes: 0 },
+    ]) {
+      await state.set(RAC_BLOCK_STATE_KEY, {
+        until: new Date(START.getTime() + 20 * 60_000).toISOString(),
+        status: 403,
+        cause: 'status',
+        ...bad,
+      });
+      await expect(makeClient().getPage('/busselton/book-now/')).resolves.toMatchObject({
+        status: 200,
+      });
+    }
   });
 });

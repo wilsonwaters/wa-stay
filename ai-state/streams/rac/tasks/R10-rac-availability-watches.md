@@ -91,9 +91,9 @@ R5, R6 (the e2e journey presses its "Camping" chip), R7, R8
 - [ ] `tests/integration/rac-availability.test.ts`, one case per sample:
   - Busselton, 6–8 Nov 2026:
     - the powered site is fully available at 75 and 75, total 150, with `force_category_id=4`; the refused "Stay & Save" tariff is ignored;
-    - the ensuite site's nights are `split`, and it is not `fullyAvailable`;
+    - the ensuite site's nights are `booked`, and it is not `fullyAvailable` (corrected 2026-10-17 from the sample data: both nights are site code 3 with 0 sites, and the stay-through count is 0 with code 3, so the site is sold out, not split; `split` is tested on a variant of this answer where every night has free sites but the whole stay has none);
   - school holidays, 25 Sep 2027: `min-stay`, `minNights` 3, `noArrival` on the 25th, not `fullyAvailable`;
-  - Exmouth: the closed category (site code 2) and stop-sold tariffs (code 11) give `closed` with RAC's words;
+  - Exmouth: the closed category (stay-through code 2) and stop-sold tariffs (code 11) give `closed` with RAC's words (corrected 2026-10-17 from the sample data: code 2 is the stay-through code, "This Site is closed as of Tue 9 Jun 2026"; the nights themselves are site code 3, then 9. A category is closed for the stay only when its tariffs agree, none counting and the deciding one refused as closed; otherwise the nights' own codes decide, so a sold-out category whose stay-through reason is one retired site stays `booked`);
   - Leavers, 20 Nov 2027: `not-released`, with no price despite the 999;
   - the window edge, 13–18 Oct 2027: 13–15 available, 16–18 `not-released`; likewise the after-midnight sample;
   - the guard text gives a `ProviderError`.
@@ -148,6 +148,7 @@ R5, R6 (the e2e journey presses its "Camping" chip), R7, R8
 - `docs/providers/adding-a-provider.md` (Availability)
 
 ## Notes
+- **Booking link, checked live (17 Oct 2026, 03:31 UTC):** one anonymous, read-only GET of `/busselton/booking/?available_from=2026-11-06&available_to=2026-11-08&force_category_id=4&adults=2&children=0&infants=0&animals=0` (the `online_booking_url` form, never the cart form) answered 200. The page (NewBook's booking step) showed arrival 6 Nov 2026, departure 8 Nov 2026, 2 nights, 2 adults and the forced category (`force_category_id[]` 4), with "Loading availability", which its own script fills on load. Its cart was empty: `cart_breakdown` amount 0 and 0 nights, no `hold_ids`, no `earliest_hold_expires_when`, no `rest_api_data_id`; nothing is added until a person submits its form (`?cart=Booking`). So each unit's `bookingUrl` is RAC's `online_booking_url` (when it is that page), and `links.booking` with a `cat:<id>` unit builds the same form. One of the three allowed GETs was used.
 - RAC's page treats a category as bookable for a tariff only when the tariff succeeds, every night has sites, and the whole-stay count is above 0 (`rac-booking-flow.md` §3). This mapping follows the page.
 - Inventory is per category: one unit stands for many sites. The "split" case is the per-category version of ParkStay's class nights.
 - R5 already records the native parks' responses. Any further live look is anonymous, read-only, at least 10 s apart, and a handful of requests at most.

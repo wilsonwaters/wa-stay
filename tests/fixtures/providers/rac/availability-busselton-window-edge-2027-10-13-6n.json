@@ -1,0 +1,136 @@
+{
+  "_fixture": "Trimmed from RAC Parks & Resorts' availability answer for RAC Busselton Holiday Park (blog 6), 13-19 Oct 2027 (the 364-day edge), 2 adults, fetched anonymously; only the fields WA Stay reads, the NewBook key and cart addresses redacted. (Fetched 16 Oct 2026, 23:36 Perth.)",
+  "success": "true",
+  "message": "",
+  "timestamp": "2026-10-16 23:36:57",
+  "timezone": "Australia/West",
+  "api_key": "<redacted>",
+  "data": {
+    "4": {
+      "category_id": 4,
+      "category_type_id": "2",
+      "category_name": "Powered Site",
+      "sort": 5,
+      "sites_available": {
+        "2027-10-13": 104,
+        "2027-10-14": 104,
+        "2027-10-15": 104,
+        "2027-10-16": 0,
+        "2027-10-17": 0,
+        "2027-10-18": 0
+      },
+      "sites_code": {
+        "2027-10-13": 0,
+        "2027-10-14": 0,
+        "2027-10-15": 0,
+        "2027-10-16": 9,
+        "2027-10-17": 9,
+        "2027-10-18": 9
+      },
+      "sites_message": {
+        "2027-10-13": "",
+        "2027-10-14": "",
+        "2027-10-15": "",
+        "2027-10-16": "Maximum Advance Days has been exceeded, so there are no Sites available",
+        "2027-10-17": "Maximum Advance Days has been exceeded, so there are no Sites available",
+        "2027-10-18": "Maximum Advance Days has been exceeded, so there are no Sites available"
+      },
+      "stay_through_sites_available": 0,
+      "stay_through_sites_code": 9,
+      "stay_through_sites_message": "Maximum Advance Days has been exceeded, so there are no Sites available",
+      "online_booking_url": "https://parksandresorts.rac.com.au/busselton/booking/?available_from=2027-10-13&available_to=2027-10-19&force_category_id=4&adults=2&children=0&infants=0&animals=0",
+      "tariffs_available": [
+        {
+          "tariff_label": "Standard Rate",
+          "tariff_success": "true",
+          "tariff_code": 0,
+          "tariff_message": "",
+          "tariff_total": 3210,
+          "tariffs_quoted": {
+            "2027-10-13": {
+              "amount": 70,
+              "minimum_periods": "1",
+              "close_arrival": 0,
+              "close_departure": 0
+            },
+            "2027-10-14": {
+              "amount": 70,
+              "minimum_periods": "1",
+              "close_arrival": 0,
+              "close_departure": 0
+            },
+            "2027-10-15": {
+              "amount": 73,
+              "minimum_periods": "1",
+              "close_arrival": 0,
+              "close_departure": 0
+            },
+            "2027-10-16": {
+              "amount": 999,
+              "minimum_periods": "1",
+              "close_arrival": 0,
+              "close_departure": 0
+            },
+            "2027-10-17": {
+              "amount": 999,
+              "minimum_periods": "1",
+              "close_arrival": 0,
+              "close_departure": 0
+            },
+            "2027-10-18": {
+              "amount": 999,
+              "minimum_periods": "1",
+              "close_arrival": 0,
+              "close_departure": 0
+            }
+          }
+        },
+        {
+          "tariff_label": "RAC Member Rate",
+          "tariff_success": "true",
+          "tariff_code": 0,
+          "tariff_message": "",
+          "tariff_total": 3189,
+          "tariffs_quoted": {
+            "2027-10-13": {
+              "amount": 63,
+              "minimum_periods": "1",
+              "close_arrival": 0,
+              "close_departure": 0
+            },
+            "2027-10-14": {
+              "amount": 63,
+              "minimum_periods": "1",
+              "close_arrival": 0,
+              "close_departure": 0
+            },
+            "2027-10-15": {
+              "amount": 66,
+              "minimum_periods": "1",
+              "close_arrival": 0,
+              "close_departure": 0
+            },
+            "2027-10-16": {
+              "amount": 999,
+              "minimum_periods": "1",
+              "close_arrival": 0,
+              "close_departure": 0
+            },
+            "2027-10-17": {
+              "amount": 999,
+              "minimum_periods": "1",
+              "close_arrival": 0,
+              "close_departure": 0
+            },
+            "2027-10-18": {
+              "amount": 999,
+              "minimum_periods": "1",
+              "close_arrival": 0,
+              "close_departure": 0
+            }
+          }
+        }
+      ]
+    }
+  }
+}

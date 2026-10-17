@@ -1,10 +1,12 @@
 /**
- * RAC Parks & Resorts (`src/main/providers/rac/`): the provider contract suite, the catalogue
- * (the seed, sent nothing), a park's detail from its trimmed book-now page in
- * `tests/fixtures/providers/rac/`, and the terms rules a request can break: RAC's host only
+ * RAC Parks & Resorts (`src/main/providers/rac/`): the provider contract suite (availability and
+ * watches on), the catalogue (the seed, sent nothing), a park's detail from its trimmed
+ * book-now page in `tests/fixtures/providers/rac/` (a native park's from one availability
+ * POST, cached by the core for 6 h), and the terms rules a request can break: RAC's host only
  * (rule 1), one request at a time 10 s apart (rules 2 and 4), the block cool-down on the
  * synthetic 403, 429 and challenge pages (rule 5). A FixtureHttpClient or a recording client
- * answers every request, so nothing is sent anywhere.
+ * answers every request, so nothing is sent anywhere. Availability itself is
+ * `rac-availability.test.ts`.
  */
 
 import fs from 'fs';
@@ -20,7 +22,11 @@ import {
   type ProviderContext,
 } from '@main/providers/sdk';
 import { ProviderRegistry } from '@main/providers/registry';
+import { LocationCatalogService } from '@main/core/catalog/location-catalog.service';
+import { openDatabase } from '@main/database/connection';
+import { LocationRepository, ProviderStateRepository } from '@main/database/repositories';
 import { RAC_PARKS, racFactory, racManifest } from '@main/providers/rac';
+import { RAC_AVAILABILITY_PATH } from '@main/providers/rac/availability';
 import { RAC_RELEASE_INFO, RAC_ROLLING_RELEASE_INFO } from '@main/providers/rac/catalog';
 import { RAC_BLOCK_STATE_KEY, RacClient } from '@main/providers/rac/client';
 import { FixtureHttpClient } from '@main/testing/fixture-http-client';
@@ -57,6 +63,22 @@ function fixtureContext(overrides: Partial<Omit<ProviderContext, 'id'>> = {}): P
     clock: () => NOW,
     ...overrides,
   });
+}
+
+/** A fixture context that also records each request it answers (method, URL and body). */
+function sendingContext(overrides: Partial<Omit<ProviderContext, 'id'>> = {}) {
+  const http = new FixtureHttpClient({
+    providerId: 'rac',
+    fixturesDir: FIXTURES_DIR,
+    logFile: UNEXPECTED_LOG,
+  });
+  const sent: Array<{ method: string; url: string; body?: string }> = [];
+  const request = http.request.bind(http);
+  http.request = (method, url, options) => {
+    sent.push({ method, url, body: typeof options?.body === 'string' ? options.body : undefined });
+    return request(method, url, options);
+  };
+  return { ctx: fixtureContext({ http, ...overrides }), sent };
 }
 
 /** A test context whose HTTP only records: every request answers `body`. */
@@ -218,9 +240,9 @@ describe('RAC Parks & Resorts', () => {
       const detail = await provider.catalog.getLocation('margaret-river');
       expect(detail.units.map((u) => [u.unitName, u.unitKind, u.unitType])).toEqual([
         ['4 Bedroom Eco Lodge', 'cabin', 'Cabins'],
-        ['Modern Safari Tent', 'glamping', 'Cabins'],
-        ['Dorm Room - Sleeps 26', 'dorm', 'Dorm'],
-        ['Dorm Room - Sleeps 5', 'dorm', 'Dorm'],
+        ['Modern Safari Tent', 'glamping', 'Glamping'],
+        ['Dorm Room - Sleeps 26', 'dorm', 'Dorms'],
+        ['Dorm Room - Sleeps 5', 'dorm', 'Dorms'],
         ['Powered Site', 'campsite', 'Sites'],
       ]);
       expect(detail.units[2].maxPeople).toBe(26);
@@ -252,27 +274,138 @@ describe('RAC Parks & Resorts', () => {
       ]);
     });
 
-    it.each(['exmouth', 'karri-valley', 'monkey-mia'])(
-      'gives the native park %s its seed facts and no units, and sends nothing',
-      async (slug) => {
-        const { http, ctx } = recordingContext();
+    it.each<[string, number, number, string[]]>([
+      ['exmouth', 3, 17, ['campsite', 'cabin', 'room']],
+      ['karri-valley', 7, 12, ['campsite', 'cabin', 'room']],
+      ['monkey-mia', 2, 16, ['campsite', 'cabin', 'room', 'dorm']],
+    ])(
+      'gives the native park %s its categories from one availability POST for a near stay (blog %d, %d units)',
+      async (slug, blogId, count, kinds) => {
+        const { ctx, sent } = sendingContext();
         const detail = await racFactory(ctx).catalog!.getLocation(slug);
         expect(detail).toMatchObject({
           key: `rac:${slug}`,
-          units: [],
           imageUrls: [],
           releaseInfo: RAC_RELEASE_INFO,
           infoUrl: `${RAC}/${slug}/`,
         });
-        expect(http.requests).toHaveLength(0);
+        expect(detail.units).toHaveLength(count);
+        expect(new Set(detail.units.map((u) => u.unitId)).size).toBe(count);
+        for (const unit of detail.units) {
+          expect(unit.unitId).toMatch(/^cat:\d+$/);
+          expect(Object.keys(unit).sort()).toEqual(['unitId', 'unitKind', 'unitName', 'unitType']);
+        }
+        // Every kind the seed has is listed, and nothing else
+        const listed = new Set(detail.units.map((u) => u.unitKind));
+        expect(UNIT_KINDS.filter((kind) => listed.has(kind))).toEqual(kinds);
+        expect(RAC_PARKS.find((park) => park.slug === slug)!.unitKinds).toEqual(kinds);
+        // One POST: 1 night, 14 days after today in Perth (17 Oct), for 2 adults
+        expect(sent).toHaveLength(1);
+        expect(sent[0].url).toBe(`${RAC}${RAC_AVAILABILITY_PATH}`);
+        expect(Object.fromEntries(new URLSearchParams(sent[0].body))).toMatchObject({
+          blog_id: String(blogId),
+          available_from: '31 Oct 2026',
+          available_to: '1 Nov 2026',
+          adults: '2',
+          children: '0',
+          infants: '0',
+          animals: '0',
+        });
       }
     );
 
-    it('says Cable Beach opens month by month, not on school-holiday days', async () => {
+    it("lists Exmouth's categories in RAC's order, with their kinds and types, and no prices", async () => {
+      const detail = await provider.catalog.getLocation('exmouth');
+      expect(detail.units.slice(0, 6)).toEqual([
+        { unitId: 'cat:25', unitName: 'Blue Reef Motel', unitType: 'Rooms', unitKind: 'room' },
+        { unitId: 'cat:35', unitName: 'Blue Reef Queen', unitType: 'Rooms', unitKind: 'room' },
+        { unitId: 'cat:44', unitName: 'Blue Reef Studio', unitType: 'Cabins', unitKind: 'cabin' },
+        {
+          unitId: 'cat:46',
+          unitName: 'Ensuite Site - Natural Ground - No Pets',
+          unitType: 'Sites',
+          unitKind: 'campsite',
+        },
+        {
+          unitId: 'cat:15',
+          unitName: 'Ensuite Site - Slab - No Pets',
+          unitType: 'Sites',
+          unitKind: 'campsite',
+        },
+        { unitId: 'cat:27', unitName: 'One Bedroom Cabin', unitType: 'Cabins', unitKind: 'cabin' },
+      ]);
+      expect(JSON.stringify(detail)).not.toMatch(/price|total|available|cart|<redacted>/i);
+    });
+
+    it("a native park's detail is fetched once: a second open within 6 h sends none (the core's cache)", async () => {
+      let now = NOW;
+      const { ctx, sent } = sendingContext({ clock: () => now });
+      const posts = () => sent.filter((request) => request.method === 'POST').length;
+      const registry = new ProviderRegistry();
+      registry.register(racFactory, () => ctx);
+      const db = openDatabase(':memory:');
+      const catalog = new LocationCatalogService({
+        registry,
+        locations: new LocationRepository(db),
+        providerState: new ProviderStateRepository(db),
+        events: { emit: () => undefined },
+        logger: createMemoryLogger(),
+        clock: () => now,
+      });
+      try {
+        await catalog.sync('rac');
+        // Syncing the seed sends nothing
+        expect(sent).toHaveLength(0);
+        const first = await catalog.get('rac:karri-valley');
+        expect(first.units).toHaveLength(12);
+        expect(posts()).toBe(1);
+        now = new Date(NOW.getTime() + 5 * 3_600_000);
+        const again = await catalog.get('rac:karri-valley');
+        expect(again.units).toEqual(first.units);
+        expect(sent).toHaveLength(1);
+      } finally {
+        catalog.stop();
+        db.close();
+      }
+    });
+
+    it('a native park whose answer lists no category is a ProviderParseError (the core serves the summary, stale)', async () => {
+      const { ctx } = recordingContext('{"success":"true","data":[]}');
+      await expect(racFactory(ctx).catalog!.getLocation('monkey-mia')).rejects.toBeInstanceOf(
+        ProviderParseError
+      );
+    });
+
+    it('says Cable Beach opens its seasonal dates on set days, not on school-holiday days', async () => {
       const { ctx } = recordingContext(page('book-now-busselton.html'));
       const detail = await racFactory(ctx).catalog!.getLocation('cable-beach');
       expect(detail.releaseInfo).toBe(RAC_ROLLING_RELEASE_INFO);
+      expect(RAC_ROLLING_RELEASE_INFO).toBe(
+        'Bookings open 364 days ahead, at midnight Perth time. Seasonal dates open on set days.'
+      );
     });
+
+    it.each<[string, string, string[]]>([
+      ['accessible, not listed', 'data-accessible="true"', ['Power', 'Wheelchair accessible']],
+      ['accessible, already listed', 'data-accessible="true"', ['Power', 'Wheelchair-Accessible']],
+      ['not accessible', 'data-accessible="false"', ['Power']],
+    ])(
+      'adds "Wheelchair accessible" to a category that is (%s) once',
+      async (_, attribute, amenities) => {
+        const listed = amenities.includes('Wheelchair-Accessible');
+        const html =
+          `<div class="accommodation-item" data-cat-id="11" data-cat-type-id="5" ${attribute} ` +
+          'data-title="Accessible Cabin" data-max-animals="0"><h2 class="accommodation-item__title">' +
+          'Accessible Cabin</h2><ul><li class="accommodation-item__features__item">Power</li>' +
+          (listed
+            ? '<li class="accommodation-item__features__item">Wheelchair-Accessible</li>'
+            : '') +
+          '</ul></div>';
+        const { ctx } = recordingContext(html);
+        const detail = await racFactory(ctx).catalog!.getLocation('busselton');
+        expect(detail.units[0].amenities).toEqual(amenities);
+      }
+    );
 
     it("asks only the park's book-now page on RAC, for HTML", async () => {
       const { http, ctx } = recordingContext(page('book-now-busselton.html'));

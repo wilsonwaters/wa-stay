@@ -1,0 +1,895 @@
+{
+  "_fixture": "Trimmed from RAC Parks & Resorts' availability answer for RAC Exmouth Cape Holiday Park (blog 3), 31 Oct-1 Nov 2026, 2 adults, fetched anonymously; only the fields WA Stay reads, the NewBook key and cart addresses redacted. (Fetched 17 Oct 2026, 11:34 Perth.)",
+  "success": "true",
+  "message": "",
+  "timestamp": "2026-10-17 11:34:57",
+  "timezone": "Australia/Perth",
+  "api_key": "<redacted>",
+  "data": {
+    "25": {
+      "category_id": 25,
+      "category_type_id": "1",
+      "category_name": "Blue Reef Motel",
+      "sort": 0,
+      "sites_available": {
+        "2026-10-31": 1
+      },
+      "sites_code": {
+        "2026-10-31": 0
+      },
+      "sites_message": {
+        "2026-10-31": ""
+      },
+      "stay_through_sites_available": 1,
+      "stay_through_sites_code": 0,
+      "stay_through_sites_message": "",
+      "online_booking_url": "https://parksandresorts.rac.com.au/exmouth/booking/?available_from=2026-10-31&available_to=2026-11-01&force_category_id=25&adults=2&children=0&infants=0&animals=0",
+      "tariffs_available": [
+        {
+          "tariff_label": "Standard Rate",
+          "tariff_success": "true",
+          "tariff_code": 0,
+          "tariff_message": "",
+          "tariff_total": 258,
+          "tariffs_quoted": {
+            "2026-10-31": {
+              "amount": 258,
+              "minimum_periods": "1",
+              "close_arrival": 0,
+              "close_departure": 0
+            }
+          },
+          "online_cart_url": "<redacted>"
+        },
+        {
+          "tariff_label": "RAC Member Rate",
+          "tariff_success": "true",
+          "tariff_code": 0,
+          "tariff_message": "",
+          "tariff_total": 238,
+          "tariffs_quoted": {
+            "2026-10-31": {
+              "amount": 238,
+              "minimum_periods": "1",
+              "close_arrival": 0,
+              "close_departure": 0
+            }
+          },
+          "online_cart_url": "<redacted>"
+        }
+      ]
+    },
+    "35": {
+      "category_id": 35,
+      "category_type_id": "1",
+      "category_name": "Blue Reef Queen",
+      "sort": 1,
+      "sites_available": {
+        "2026-10-31": 0
+      },
+      "sites_code": {
+        "2026-10-31": 3
+      },
+      "sites_message": {
+        "2026-10-31": "There is no availability for this date"
+      },
+      "stay_through_sites_available": 0,
+      "stay_through_sites_code": 3,
+      "stay_through_sites_message": "There is no availability for this date",
+      "online_booking_url": "https://parksandresorts.rac.com.au/exmouth/booking/?available_from=2026-10-31&available_to=2026-11-01&force_category_id=35&adults=2&children=0&infants=0&animals=0",
+      "tariffs_available": [
+        {
+          "tariff_label": "Standard Rate",
+          "tariff_success": "false",
+          "tariff_code": 11,
+          "tariff_message": "This Rate is Stop Sold",
+          "tariff_total": 203,
+          "tariffs_quoted": {
+            "2026-10-31": {
+              "amount": 203,
+              "minimum_periods": "1",
+              "close_arrival": 0,
+              "close_departure": 0
+            }
+          }
+        },
+        {
+          "tariff_label": "RAC Member Rate",
+          "tariff_success": "false",
+          "tariff_code": 11,
+          "tariff_message": "This Rate is Stop Sold",
+          "tariff_total": 187,
+          "tariffs_quoted": {
+            "2026-10-31": {
+              "amount": 187,
+              "minimum_periods": "1",
+              "close_arrival": 0,
+              "close_departure": 0
+            }
+          }
+        }
+      ]
+    },
+    "44": {
+      "category_id": 44,
+      "category_type_id": "1",
+      "category_name": "Blue Reef Studio",
+      "sort": 2,
+      "sites_available": {
+        "2026-10-31": 0
+      },
+      "sites_code": {
+        "2026-10-31": 3
+      },
+      "sites_message": {
+        "2026-10-31": "There is no availability for this date"
+      },
+      "stay_through_sites_available": 0,
+      "stay_through_sites_code": 3,
+      "stay_through_sites_message": "There is no availability for this date",
+      "online_booking_url": "https://parksandresorts.rac.com.au/exmouth/booking/?available_from=2026-10-31&available_to=2026-11-01&force_category_id=44&adults=2&children=0&infants=0&animals=0",
+      "tariffs_available": [
+        {
+          "tariff_label": "Standard Rate",
+          "tariff_success": "false",
+          "tariff_code": 11,
+          "tariff_message": "This Rate is Stop Sold",
+          "tariff_total": 308,
+          "tariffs_quoted": {
+            "2026-10-31": {
+              "amount": 308,
+              "minimum_periods": "1",
+              "close_arrival": 0,
+              "close_departure": 0
+            }
+          }
+        },
+        {
+          "tariff_label": "RAC Member Rate",
+          "tariff_success": "false",
+          "tariff_code": 11,
+          "tariff_message": "This Rate is Stop Sold",
+          "tariff_total": 284,
+          "tariffs_quoted": {
+            "2026-10-31": {
+              "amount": 284,
+              "minimum_periods": "1",
+              "close_arrival": 0,
+              "close_departure": 0
+            }
+          }
+        }
+      ]
+    },
+    "46": {
+      "category_id": 46,
+      "category_type_id": "2",
+      "category_name": "Ensuite Site - Natural Ground - No Pets",
+      "sort": 3,
+      "sites_available": {
+        "2026-10-31": 0
+      },
+      "sites_code": {
+        "2026-10-31": 3
+      },
+      "sites_message": {
+        "2026-10-31": "There is no availability for this date"
+      },
+      "stay_through_sites_available": 0,
+      "stay_through_sites_code": 3,
+      "stay_through_sites_message": "There is no longer availability for the dates given (<strong>Sat 31 Oct 2026 14:00</strong> to <strong>Sun 1 Nov 2026 10:00</strong>)",
+      "online_booking_url": "https://parksandresorts.rac.com.au/exmouth/booking/?available_from=2026-10-31&available_to=2026-11-01&force_category_id=46&adults=2&children=0&infants=0&animals=0",
+      "tariffs_available": [
+        {
+          "tariff_label": "Standard Rate",
+          "tariff_success": "true",
+          "tariff_code": 0,
+          "tariff_message": "",
+          "tariff_total": 118,
+          "tariffs_quoted": {
+            "2026-10-31": {
+              "amount": 118,
+              "minimum_periods": "1",
+              "close_arrival": 0,
+              "close_departure": 0
+            }
+          }
+        },
+        {
+          "tariff_label": "RAC Member Rate",
+          "tariff_success": "true",
+          "tariff_code": 0,
+          "tariff_message": "",
+          "tariff_total": 109,
+          "tariffs_quoted": {
+            "2026-10-31": {
+              "amount": 109,
+              "minimum_periods": "1",
+              "close_arrival": 0,
+              "close_departure": 0
+            }
+          }
+        }
+      ]
+    },
+    "15": {
+      "category_id": 15,
+      "category_type_id": "2",
+      "category_name": "Ensuite Site - Slab - No Pets",
+      "sort": 4,
+      "sites_available": {
+        "2026-10-31": 3
+      },
+      "sites_code": {
+        "2026-10-31": 0
+      },
+      "sites_message": {
+        "2026-10-31": ""
+      },
+      "stay_through_sites_available": 3,
+      "stay_through_sites_code": 0,
+      "stay_through_sites_message": "",
+      "online_booking_url": "https://parksandresorts.rac.com.au/exmouth/booking/?available_from=2026-10-31&available_to=2026-11-01&force_category_id=15&adults=2&children=0&infants=0&animals=0",
+      "tariffs_available": [
+        {
+          "tariff_label": "Standard Rate",
+          "tariff_success": "true",
+          "tariff_code": 0,
+          "tariff_message": "",
+          "tariff_total": 118,
+          "tariffs_quoted": {
+            "2026-10-31": {
+              "amount": 118,
+              "minimum_periods": "1",
+              "close_arrival": 0,
+              "close_departure": 0
+            }
+          },
+          "online_cart_url": "<redacted>"
+        },
+        {
+          "tariff_label": "RAC Member Rate",
+          "tariff_success": "true",
+          "tariff_code": 0,
+          "tariff_message": "",
+          "tariff_total": 109,
+          "tariffs_quoted": {
+            "2026-10-31": {
+              "amount": 109,
+              "minimum_periods": "1",
+              "close_arrival": 0,
+              "close_departure": 0
+            }
+          },
+          "online_cart_url": "<redacted>"
+        }
+      ]
+    },
+    "27": {
+      "category_id": 27,
+      "category_type_id": "1",
+      "category_name": "One Bedroom Cabin",
+      "sort": 5,
+      "sites_available": {
+        "2026-10-31": 1
+      },
+      "sites_code": {
+        "2026-10-31": 0
+      },
+      "sites_message": {
+        "2026-10-31": ""
+      },
+      "stay_through_sites_available": 1,
+      "stay_through_sites_code": 0,
+      "stay_through_sites_message": "",
+      "online_booking_url": "https://parksandresorts.rac.com.au/exmouth/booking/?available_from=2026-10-31&available_to=2026-11-01&force_category_id=27&adults=2&children=0&infants=0&animals=0",
+      "tariffs_available": [
+        {
+          "tariff_label": "Standard Rate",
+          "tariff_success": "true",
+          "tariff_code": 0,
+          "tariff_message": "",
+          "tariff_total": 338,
+          "tariffs_quoted": {
+            "2026-10-31": {
+              "amount": 338,
+              "minimum_periods": "1",
+              "close_arrival": 0,
+              "close_departure": 0
+            }
+          },
+          "online_cart_url": "<redacted>"
+        },
+        {
+          "tariff_label": "RAC Member Rate",
+          "tariff_success": "true",
+          "tariff_code": 0,
+          "tariff_message": "",
+          "tariff_total": 294,
+          "tariffs_quoted": {
+            "2026-10-31": {
+              "amount": 294,
+              "minimum_periods": "1",
+              "close_arrival": 0,
+              "close_departure": 0
+            }
+          },
+          "online_cart_url": "<redacted>"
+        }
+      ]
+    },
+    "4": {
+      "category_id": 4,
+      "category_type_id": "1",
+      "category_name": "One Bedroom Family Cabin with External Bathroom",
+      "sort": 6,
+      "sites_available": {
+        "2026-10-31": 0
+      },
+      "sites_code": {
+        "2026-10-31": 3
+      },
+      "sites_message": {
+        "2026-10-31": "There is no availability for this date"
+      },
+      "stay_through_sites_available": 0,
+      "stay_through_sites_code": 2,
+      "stay_through_sites_message": "This Site is closed as of Tue 9 Jun 2026",
+      "online_booking_url": "https://parksandresorts.rac.com.au/exmouth/booking/?available_from=2026-10-31&available_to=2026-11-01&force_category_id=4&adults=2&children=0&infants=0&animals=0",
+      "tariffs_available": [
+        {
+          "tariff_label": "Standard Rate",
+          "tariff_success": "false",
+          "tariff_code": 11,
+          "tariff_message": "This Rate is Stop Sold",
+          "tariff_total": 203,
+          "tariffs_quoted": {
+            "2026-10-31": {
+              "amount": 203,
+              "minimum_periods": "1",
+              "close_arrival": 0,
+              "close_departure": 0
+            }
+          }
+        },
+        {
+          "tariff_label": "RAC Member Rate",
+          "tariff_success": "false",
+          "tariff_code": 11,
+          "tariff_message": "This Rate is Stop Sold",
+          "tariff_total": 187,
+          "tariffs_quoted": {
+            "2026-10-31": {
+              "amount": 187,
+              "minimum_periods": "1",
+              "close_arrival": 0,
+              "close_departure": 0
+            }
+          }
+        }
+      ]
+    },
+    "8": {
+      "category_id": 8,
+      "category_type_id": "1",
+      "category_name": "One Bedroom Family Cabin with Shared Bathroom",
+      "sort": 7,
+      "sites_available": {
+        "2026-10-31": 0
+      },
+      "sites_code": {
+        "2026-10-31": 3
+      },
+      "sites_message": {
+        "2026-10-31": "There is no availability for this date"
+      },
+      "stay_through_sites_available": 0,
+      "stay_through_sites_code": 2,
+      "stay_through_sites_message": "This Site is closed as of Thu 16 Apr 2026",
+      "online_booking_url": "https://parksandresorts.rac.com.au/exmouth/booking/?available_from=2026-10-31&available_to=2026-11-01&force_category_id=8&adults=2&children=0&infants=0&animals=0",
+      "tariffs_available": [
+        {
+          "tariff_label": "Standard Rate",
+          "tariff_success": "false",
+          "tariff_code": 11,
+          "tariff_message": "This Rate is Stop Sold",
+          "tariff_total": 183,
+          "tariffs_quoted": {
+            "2026-10-31": {
+              "amount": 183,
+              "minimum_periods": "1",
+              "close_arrival": 0,
+              "close_departure": 0
+            }
+          }
+        },
+        {
+          "tariff_label": "RAC Member Rate",
+          "tariff_success": "false",
+          "tariff_code": 11,
+          "tariff_message": "This Rate is Stop Sold",
+          "tariff_total": 163,
+          "tariffs_quoted": {
+            "2026-10-31": {
+              "amount": 163,
+              "minimum_periods": "1",
+              "close_arrival": 0,
+              "close_departure": 0
+            }
+          }
+        }
+      ]
+    },
+    "48": {
+      "category_id": 48,
+      "category_type_id": "2",
+      "category_name": "Powered Natural Ground Site - No Pets",
+      "sort": 8,
+      "sites_available": {
+        "2026-10-31": 16
+      },
+      "sites_code": {
+        "2026-10-31": 0
+      },
+      "sites_message": {
+        "2026-10-31": ""
+      },
+      "stay_through_sites_available": 16,
+      "stay_through_sites_code": 0,
+      "stay_through_sites_message": "",
+      "online_booking_url": "https://parksandresorts.rac.com.au/exmouth/booking/?available_from=2026-10-31&available_to=2026-11-01&force_category_id=48&adults=2&children=0&infants=0&animals=0",
+      "tariffs_available": [
+        {
+          "tariff_label": "Standard Rate",
+          "tariff_success": "true",
+          "tariff_code": 0,
+          "tariff_message": "",
+          "tariff_total": 77,
+          "tariffs_quoted": {
+            "2026-10-31": {
+              "amount": 77,
+              "minimum_periods": "1",
+              "close_arrival": 0,
+              "close_departure": 0
+            }
+          },
+          "online_cart_url": "<redacted>"
+        },
+        {
+          "tariff_label": "RAC Member Rate",
+          "tariff_success": "true",
+          "tariff_code": 0,
+          "tariff_message": "",
+          "tariff_total": 65,
+          "tariffs_quoted": {
+            "2026-10-31": {
+              "amount": 65,
+              "minimum_periods": "1",
+              "close_arrival": 0,
+              "close_departure": 0
+            }
+          },
+          "online_cart_url": "<redacted>"
+        }
+      ]
+    },
+    "10": {
+      "category_id": 10,
+      "category_type_id": "2",
+      "category_name": "Powered Site - No Pets",
+      "sort": 9,
+      "sites_available": {
+        "2026-10-31": 7
+      },
+      "sites_code": {
+        "2026-10-31": 0
+      },
+      "sites_message": {
+        "2026-10-31": ""
+      },
+      "stay_through_sites_available": 7,
+      "stay_through_sites_code": 0,
+      "stay_through_sites_message": "",
+      "online_booking_url": "https://parksandresorts.rac.com.au/exmouth/booking/?available_from=2026-10-31&available_to=2026-11-01&force_category_id=10&adults=2&children=0&infants=0&animals=0",
+      "tariffs_available": [
+        {
+          "tariff_label": "Standard Rate",
+          "tariff_success": "true",
+          "tariff_code": 0,
+          "tariff_message": "",
+          "tariff_total": 77,
+          "tariffs_quoted": {
+            "2026-10-31": {
+              "amount": 77,
+              "minimum_periods": "1",
+              "close_arrival": 0,
+              "close_departure": 0
+            }
+          },
+          "online_cart_url": "<redacted>"
+        },
+        {
+          "tariff_label": "RAC Member Rate",
+          "tariff_success": "true",
+          "tariff_code": 0,
+          "tariff_message": "",
+          "tariff_total": 65,
+          "tariffs_quoted": {
+            "2026-10-31": {
+              "amount": 65,
+              "minimum_periods": "1",
+              "close_arrival": 0,
+              "close_departure": 0
+            }
+          },
+          "online_cart_url": "<redacted>"
+        }
+      ]
+    },
+    "43": {
+      "category_id": 43,
+      "category_type_id": "2",
+      "category_name": "Powered Site - Pets Welcome",
+      "sort": 10,
+      "sites_available": {
+        "2026-10-31": 107
+      },
+      "sites_code": {
+        "2026-10-31": 0
+      },
+      "sites_message": {
+        "2026-10-31": ""
+      },
+      "stay_through_sites_available": 107,
+      "stay_through_sites_code": 0,
+      "stay_through_sites_message": "",
+      "online_booking_url": "https://parksandresorts.rac.com.au/exmouth/booking/?available_from=2026-10-31&available_to=2026-11-01&force_category_id=43&adults=2&children=0&infants=0&animals=0",
+      "tariffs_available": [
+        {
+          "tariff_label": "Standard Rate",
+          "tariff_success": "true",
+          "tariff_code": 0,
+          "tariff_message": "",
+          "tariff_total": 77,
+          "tariffs_quoted": {
+            "2026-10-31": {
+              "amount": 77,
+              "minimum_periods": "1",
+              "close_arrival": 0,
+              "close_departure": 0
+            }
+          },
+          "online_cart_url": "<redacted>"
+        },
+        {
+          "tariff_label": "RAC Member Rate",
+          "tariff_success": "true",
+          "tariff_code": 0,
+          "tariff_message": "",
+          "tariff_total": 65,
+          "tariffs_quoted": {
+            "2026-10-31": {
+              "amount": 65,
+              "minimum_periods": "1",
+              "close_arrival": 0,
+              "close_departure": 0
+            }
+          },
+          "online_cart_url": "<redacted>"
+        }
+      ]
+    },
+    "47": {
+      "category_id": 47,
+      "category_type_id": "2",
+      "category_name": "Powered Slab Site - No Pets",
+      "sort": 11,
+      "sites_available": {
+        "2026-10-31": 11
+      },
+      "sites_code": {
+        "2026-10-31": 0
+      },
+      "sites_message": {
+        "2026-10-31": ""
+      },
+      "stay_through_sites_available": 11,
+      "stay_through_sites_code": 0,
+      "stay_through_sites_message": "",
+      "online_booking_url": "https://parksandresorts.rac.com.au/exmouth/booking/?available_from=2026-10-31&available_to=2026-11-01&force_category_id=47&adults=2&children=0&infants=0&animals=0",
+      "tariffs_available": [
+        {
+          "tariff_label": "Standard Rate",
+          "tariff_success": "true",
+          "tariff_code": 0,
+          "tariff_message": "",
+          "tariff_total": 77,
+          "tariffs_quoted": {
+            "2026-10-31": {
+              "amount": 77,
+              "minimum_periods": "1",
+              "close_arrival": 0,
+              "close_departure": 0
+            }
+          },
+          "online_cart_url": "<redacted>"
+        },
+        {
+          "tariff_label": "RAC Member Rate",
+          "tariff_success": "true",
+          "tariff_code": 0,
+          "tariff_message": "",
+          "tariff_total": 65,
+          "tariffs_quoted": {
+            "2026-10-31": {
+              "amount": 65,
+              "minimum_periods": "1",
+              "close_arrival": 0,
+              "close_departure": 0
+            }
+          },
+          "online_cart_url": "<redacted>"
+        }
+      ]
+    },
+    "31": {
+      "category_id": 31,
+      "category_type_id": "1",
+      "category_name": "Two Bedroom Budget Cabin with Shared Bathroom",
+      "sort": 12,
+      "sites_available": {
+        "2026-10-31": 0
+      },
+      "sites_code": {
+        "2026-10-31": 3
+      },
+      "sites_message": {
+        "2026-10-31": "There is no availability for this date"
+      },
+      "stay_through_sites_available": 0,
+      "stay_through_sites_code": 2,
+      "stay_through_sites_message": "This Site is closed as of Tue 9 Jun 2026",
+      "online_booking_url": "https://parksandresorts.rac.com.au/exmouth/booking/?available_from=2026-10-31&available_to=2026-11-01&force_category_id=31&adults=2&children=0&infants=0&animals=0",
+      "tariffs_available": [
+        {
+          "tariff_label": "Standard Rate",
+          "tariff_success": "false",
+          "tariff_code": 11,
+          "tariff_message": "This Rate is Stop Sold",
+          "tariff_total": 213,
+          "tariffs_quoted": {
+            "2026-10-31": {
+              "amount": 213,
+              "minimum_periods": "1",
+              "close_arrival": 0,
+              "close_departure": 0
+            }
+          }
+        },
+        {
+          "tariff_label": "RAC Member Rate",
+          "tariff_success": "false",
+          "tariff_code": 11,
+          "tariff_message": "This Rate is Stop Sold",
+          "tariff_total": 196,
+          "tariffs_quoted": {
+            "2026-10-31": {
+              "amount": 196,
+              "minimum_periods": "1",
+              "close_arrival": 0,
+              "close_departure": 0
+            }
+          }
+        }
+      ]
+    },
+    "2": {
+      "category_id": 2,
+      "category_type_id": "1",
+      "category_name": "Two Bedroom Cabin",
+      "sort": 13,
+      "sites_available": {
+        "2026-10-31": 0
+      },
+      "sites_code": {
+        "2026-10-31": 3
+      },
+      "sites_message": {
+        "2026-10-31": "There is no availability for this date"
+      },
+      "stay_through_sites_available": 0,
+      "stay_through_sites_code": 3,
+      "stay_through_sites_message": "There is no longer availability for the dates given (<strong>Sat 31 Oct 2026 14:00</strong> to <strong>Sun 1 Nov 2026 10:00</strong>)",
+      "online_booking_url": "https://parksandresorts.rac.com.au/exmouth/booking/?available_from=2026-10-31&available_to=2026-11-01&force_category_id=2&adults=2&children=0&infants=0&animals=0",
+      "tariffs_available": [
+        {
+          "tariff_label": "Standard Rate",
+          "tariff_success": "true",
+          "tariff_code": 0,
+          "tariff_message": "",
+          "tariff_total": 377,
+          "tariffs_quoted": {
+            "2026-10-31": {
+              "amount": 377,
+              "minimum_periods": "1",
+              "close_arrival": 0,
+              "close_departure": 0
+            }
+          }
+        },
+        {
+          "tariff_label": "RAC Member Rate",
+          "tariff_success": "true",
+          "tariff_code": 0,
+          "tariff_message": "",
+          "tariff_total": 347,
+          "tariffs_quoted": {
+            "2026-10-31": {
+              "amount": 347,
+              "minimum_periods": "1",
+              "close_arrival": 0,
+              "close_departure": 0
+            }
+          }
+        }
+      ]
+    },
+    "39": {
+      "category_id": 39,
+      "category_type_id": "1",
+      "category_name": "Two Bedroom Double Cabin with External Bathroom",
+      "sort": 14,
+      "sites_available": {
+        "2026-10-31": 0
+      },
+      "sites_code": {
+        "2026-10-31": 3
+      },
+      "sites_message": {
+        "2026-10-31": "There is no availability for this date"
+      },
+      "stay_through_sites_available": 0,
+      "stay_through_sites_code": 2,
+      "stay_through_sites_message": "This Site is closed as of Tue 9 Jun 2026",
+      "online_booking_url": "https://parksandresorts.rac.com.au/exmouth/booking/?available_from=2026-10-31&available_to=2026-11-01&force_category_id=39&adults=2&children=0&infants=0&animals=0",
+      "tariffs_available": [
+        {
+          "tariff_label": "Standard Rate",
+          "tariff_success": "false",
+          "tariff_code": 11,
+          "tariff_message": "This Rate is Stop Sold",
+          "tariff_total": 228,
+          "tariffs_quoted": {
+            "2026-10-31": {
+              "amount": 228,
+              "minimum_periods": "1",
+              "close_arrival": 0,
+              "close_departure": 0
+            }
+          }
+        },
+        {
+          "tariff_label": "RAC Member Rate",
+          "tariff_success": "false",
+          "tariff_code": 11,
+          "tariff_message": "This Rate is Stop Sold",
+          "tariff_total": 210,
+          "tariffs_quoted": {
+            "2026-10-31": {
+              "amount": 210,
+              "minimum_periods": "1",
+              "close_arrival": 0,
+              "close_departure": 0
+            }
+          }
+        }
+      ]
+    },
+    "26": {
+      "category_id": 26,
+      "category_type_id": "1",
+      "category_name": "Two Bedroom Pool View Cabin",
+      "sort": 15,
+      "sites_available": {
+        "2026-10-31": 1
+      },
+      "sites_code": {
+        "2026-10-31": 0
+      },
+      "sites_message": {
+        "2026-10-31": ""
+      },
+      "stay_through_sites_available": 1,
+      "stay_through_sites_code": 0,
+      "stay_through_sites_message": "",
+      "online_booking_url": "https://parksandresorts.rac.com.au/exmouth/booking/?available_from=2026-10-31&available_to=2026-11-01&force_category_id=26&adults=2&children=0&infants=0&animals=0",
+      "tariffs_available": [
+        {
+          "tariff_label": "Standard Rate",
+          "tariff_success": "true",
+          "tariff_code": 0,
+          "tariff_message": "",
+          "tariff_total": 439,
+          "tariffs_quoted": {
+            "2026-10-31": {
+              "amount": 439,
+              "minimum_periods": "1",
+              "close_arrival": 0,
+              "close_departure": 0
+            }
+          },
+          "online_cart_url": "<redacted>"
+        },
+        {
+          "tariff_label": "RAC Member Rate",
+          "tariff_success": "true",
+          "tariff_code": 0,
+          "tariff_message": "",
+          "tariff_total": 404,
+          "tariffs_quoted": {
+            "2026-10-31": {
+              "amount": 404,
+              "minimum_periods": "1",
+              "close_arrival": 0,
+              "close_departure": 0
+            }
+          },
+          "online_cart_url": "<redacted>"
+        }
+      ]
+    },
+    "11": {
+      "category_id": 11,
+      "category_type_id": "2",
+      "category_name": "Unpowered Site - No Pets",
+      "sort": 16,
+      "sites_available": {
+        "2026-10-31": 2
+      },
+      "sites_code": {
+        "2026-10-31": 0
+      },
+      "sites_message": {
+        "2026-10-31": ""
+      },
+      "stay_through_sites_available": 2,
+      "stay_through_sites_code": 0,
+      "stay_through_sites_message": "",
+      "online_booking_url": "https://parksandresorts.rac.com.au/exmouth/booking/?available_from=2026-10-31&available_to=2026-11-01&force_category_id=11&adults=2&children=0&infants=0&animals=0",
+      "tariffs_available": [
+        {
+          "tariff_label": "Standard Rate",
+          "tariff_success": "true",
+          "tariff_code": 0,
+          "tariff_message": "",
+          "tariff_total": 61,
+          "tariffs_quoted": {
+            "2026-10-31": {
+              "amount": 61,
+              "minimum_periods": "1",
+              "close_arrival": 0,
+              "close_departure": 0
+            }
+          },
+          "online_cart_url": "<redacted>"
+        },
+        {
+          "tariff_label": "RAC Member Rate",
+          "tariff_success": "true",
+          "tariff_code": 0,
+          "tariff_message": "",
+          "tariff_total": 52,
+          "tariffs_quoted": {
+            "2026-10-31": {
+              "amount": 52,
+              "minimum_periods": "1",
+              "close_arrival": 0,
+              "close_departure": 0
+            }
+          },
+          "online_cart_url": "<redacted>"
+        }
+      ]
+    }
+  }
+}

@@ -46,3 +46,49 @@ export function unitKindOf(
   }
   return undefined;
 }
+
+/** What a unit of each kind is called as a group, for its `unitType`; none for `other`. */
+const TYPE_LABELS: Readonly<Record<UnitKind, string | undefined>> = {
+  campsite: 'Sites',
+  cabin: 'Cabins',
+  room: 'Rooms',
+  dorm: 'Dorms',
+  glamping: 'Glamping',
+  other: undefined,
+};
+
+/**
+ * Every RAC unit's `unitType`: the group its kind is in, "Sites" or "Cabins". RAC's availability
+ * answer and a NewBook-native park give no label for a category's type, so the book-now page's
+ * labels ("Dorm", or a safari tent among "Cabins") are not used either: a unit's type is the
+ * same on the place page, in a check and in a watch.
+ */
+export function unitTypeOfKind(kind: UnitKind): string | undefined {
+  return TYPE_LABELS[kind];
+}
+
+/**
+ * The kind of a park's category, by `unitKindOf`, else `other`, logging such a category once
+ * (by park and category id) through `warn`.
+ */
+export function createKindResolver(
+  warn: (message: string) => void
+): (
+  park: { slug: string; categoryTypes: Readonly<Record<string, UnitKind>> },
+  category: { catId: string; name: string; typeId?: string }
+) => UnitKind {
+  const logged = new Set<string>();
+  return (park, { catId, name, typeId }) => {
+    const kind = unitKindOf(name, typeId, park.categoryTypes);
+    if (kind) return kind;
+    const key = `${park.slug}:${catId}`;
+    if (!logged.has(key)) {
+      logged.add(key);
+      warn(
+        `${park.slug}: category ${catId} (type ${typeId ?? 'none'}) has no unit kind in its ` +
+          `name or its type; it is "other"`
+      );
+    }
+    return 'other';
+  };
+}
