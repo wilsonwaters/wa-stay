@@ -53,11 +53,21 @@ jobs:
         env:
           MAPBOX_ACCESS_TOKEN: ${{ secrets.MAPBOX_ACCESS_TOKEN || vars.MAPBOX_ACCESS_TOKEN }}
 
+      # Always: the documentation's images are kept even when the website's run fails
       - name: Upload the screenshots
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: screenshots
           path: |
             docs/images/
             site/assets/screens/
+          retention-days: 7
+
+      - name: Upload the runs' results (traces, logs)
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: screenshots-test-results
+          path: test-results/
           retention-days: 7
