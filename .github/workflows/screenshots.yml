@@ -1,0 +1,63 @@
+name: Screenshots
+
+# Retakes the documentation and website screenshots with the Mapbox token from the repository's
+# secrets, which a contributor's machine may not have. Run it from the Actions tab, or add the
+# `screenshots` label to a pull request. The images come back as the `screenshots` artifact, to
+# review and commit by hand: nothing is pushed from here.
+
+on:
+  workflow_dispatch:
+  pull_request:
+    types: [labeled]
+
+permissions:
+  contents: read
+
+jobs:
+  screenshots:
+    name: Retake the screenshots
+    if: github.event_name == 'workflow_dispatch' || github.event.label.name == 'screenshots'
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: 24.x
+          check-latest: true
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Download the Electron binary
+        run: npx install-electron
+
+      - name: Install xvfb
+        run: command -v xvfb-run || (sudo apt-get update && sudo apt-get install -y xvfb)
+
+      # Both scripts rebuild the app with the token, run under xvfb themselves and never print it
+      - name: Retake the documentation screenshots
+        run: npm run docs:screenshots
+        env:
+          MAPBOX_ACCESS_TOKEN: ${{ secrets.MAPBOX_ACCESS_TOKEN || vars.MAPBOX_ACCESS_TOKEN }}
+
+      - name: Retake the website screenshots
+        run: npm run site:screenshots
+        env:
+          MAPBOX_ACCESS_TOKEN: ${{ secrets.MAPBOX_ACCESS_TOKEN || vars.MAPBOX_ACCESS_TOKEN }}
+
+      - name: Upload the screenshots
+        uses: actions/upload-artifact@v4
+        with:
+          name: screenshots
+          path: |
+            docs/images/
+            site/assets/screens/
+          retention-days: 7
