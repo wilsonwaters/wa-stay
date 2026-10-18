@@ -244,6 +244,29 @@ describe('IPC contract', () => {
     );
   });
 
+  it('catalog.stayRules takes a place and a stay, and optionally units and stay types', () => {
+    expect(contract.catalog.stayRules.channel).toBe('catalog:stay-rules');
+    const request = contract.catalog.stayRules.request;
+    const stay = { arrival: '2027-03-01', departure: '2027-03-03', adults: 2 };
+    expect(request.safeParse({ key: 'rottnest:geordie-bay', stay }).success).toBe(true);
+    expect(
+      request.safeParse({
+        key: 'rottnest:geordie-bay',
+        stay,
+        unitIds: ['GPV04'],
+        unitKinds: ['cabin'],
+      }).success
+    ).toBe(true);
+    for (const bad of [
+      { key: 'rottnest:geordie-bay' },
+      { key: 'no-key', stay },
+      { key: 'rottnest:geordie-bay', stay, unitKinds: ['castle'] },
+      { key: 'rottnest:geordie-bay', stay, unitIds: [''] },
+    ]) {
+      expect(request.safeParse(bad).success).toBe(false);
+    }
+  });
+
   it('providers: notice, acceptNotice and withdrawNotice take a provider, and a version to accept', () => {
     expect(contract.providers.notice.channel).toBe('providers:notice');
     expect(contract.providers.acceptNotice.channel).toBe('providers:accept-notice');

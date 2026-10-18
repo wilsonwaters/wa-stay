@@ -7,7 +7,9 @@
  * With dates set, it offers the notice once, above the list, and Geordie Bay's card says why it
  * has no count; nothing has been asked. The routes are then put in place, and the person reads
  * the notice, ticks it and continues. The counts appear (Geordie Bay: 6 cabins free, from the
- * stakeholder's trimmed capture). Settings → Accounts reads "Notice accepted on {today}";
+ * stakeholder's trimmed capture); the two nights are outside the peak's fixed dates. Dates in
+ * the month the next Open Day opens read "Opens {that day}", asked of nobody (Stay Rottnest's
+ * own release rules). Settings → Accounts reads "Notice accepted on {today}";
  * Withdraw, asked first, turns it back to "Notice not accepted", and Explore offers the notice
  * again.
  *
@@ -27,6 +29,60 @@ const OFFER = "Stay Rottnest checks dates once you've read and accepted its noti
 const CARD_LINE = "Read Stay Rottnest's notice to check dates";
 const TITLE = 'Before WA Stay checks Stay Rottnest';
 const CONFIRM = 'I understand, and I want WA Stay to check Stay Rottnest for me';
+
+/**
+ * Geordie Bay's fixed peak periods (first arrival, last departure: `booking-guides.ts`): there
+ * its stays arrive and leave on set dates, so the journey's two nights avoid them.
+ */
+const GEORDIE_PEAKS: ReadonlyArray<readonly [string, string]> = [
+  ['2026-11-24', '2027-02-02'],
+  ['2027-03-24', '2027-03-30'],
+  ['2027-04-09', '2027-04-28'],
+];
+
+/** The first two nights from `from` outside Geordie Bay's fixed peak periods. */
+function ordinaryDates(from: string): { arrival: string; departure: string } {
+  let arrival = from;
+  for (let i = 0; i < 200; i++) {
+    const departure = addDays(arrival, 2);
+    if (!GEORDIE_PEAKS.some(([start, end]) => arrival < end && departure > start)) {
+      return { arrival, departure };
+    }
+    arrival = addDays(arrival, 1);
+  }
+  throw new Error('No ordinary dates found');
+}
+
+/** The first Wednesday of `YYYY-MM`, a week later when it is New Year's Day. */
+function firstWednesday(month: string): string {
+  const weekday = new Date(`${month}-01T00:00:00Z`).getUTCDay();
+  const day = addDays(`${month}-01`, (3 - weekday + 7) % 7);
+  return day.endsWith('-01-01') ? addDays(day, 7) : day;
+}
+
+/**
+ * The next Open Day (8:30 am Perth on the first Wednesday of a month, `open-days.ts`) and the
+ * month of stays it opens, eight months on.
+ */
+function nextOpenDay(now = new Date()): { date: string; stayMonth: string } {
+  const today = todayIn(PERTH, now);
+  let [year, month] = today.split('-').map(Number);
+  for (;;) {
+    const ym = `${year}-${String(month).padStart(2, '0')}`;
+    const date = firstWednesday(ym);
+    const opensAt = new Date(`${date}T00:30:00.000Z`); // 8:30 am Perth
+    if (opensAt > now) {
+      const index = year * 12 + (month - 1) + 8;
+      const stayMonth = `${Math.floor(index / 12)}-${String((index % 12) + 1).padStart(2, '0')}`;
+      return { date, stayMonth };
+    }
+    month += 1;
+    if (month > 12) {
+      month = 1;
+      year += 1;
+    }
+  }
+}
 
 /**
  * Whether now is an Open Day morning in Perth (05:30 to noon on the first Wednesday of the
@@ -71,9 +127,8 @@ test('Stay Rottnest is asked nothing until its notice is accepted; withdrawing a
     timeout: 30_000,
   });
 
-  // 1. Dates on Explore: tomorrow, for two nights
-  const arrival = addDays(todayIn(PERTH), 1);
-  const departure = addDays(arrival, 2);
+  // 1. Dates on Explore: two nights from tomorrow, outside the peak's fixed dates
+  const { arrival, departure } = ordinaryDates(addDays(todayIn(PERTH), 1));
   await window.evaluate((hash) => {
     location.hash = hash;
   }, `#/?arrival=${arrival}&departure=${departure}`);
@@ -99,6 +154,23 @@ test('Stay Rottnest is asked nothing until its notice is accepted; withdrawing a
   // 4. The counts come
   await expect(geordie).toHaveAccessibleDescription(/6 cabins free/, { timeout: 20_000 });
   await expect(window.getByText(OFFER)).toBeHidden();
+
+  // 4b. Dates in the month the next Open Day opens: not on sale, and nothing asked
+  const next = nextOpenDay();
+  await window.evaluate((hash) => {
+    location.hash = hash;
+  }, `#/?arrival=${next.stayMonth}-06&departure=${next.stayMonth}-08`);
+  const opens = new Intl.DateTimeFormat('en-AU', {
+    weekday: 'short',
+    day: 'numeric',
+    month: 'short',
+    timeZone: PERTH,
+  })
+    .format(new Date(`${next.date}T00:30:00.000Z`))
+    .replace(',', '');
+  await expect(geordie).toHaveAccessibleDescription(new RegExp(`Opens ${opens}`), {
+    timeout: 20_000,
+  });
 
   // 5. Settings → Accounts: accepted today; Withdraw asks first
   await chooseAccountMenuItem(window, 'Settings');

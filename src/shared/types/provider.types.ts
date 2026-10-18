@@ -456,6 +456,44 @@ export interface UnitAvailability {
   bookingUrl?: string;
 }
 
+/** The part of a stay a provider's rules refuse: what the person changes to fix it. */
+export type StayRuleField = 'arrival' | 'departure' | 'guests' | 'units';
+
+/**
+ * Whether a stay is on sale yet, by the provider's own release rules (`stayRules`): `open`, or
+ * when it opens (`opensAt`, ISO 8601), `expected` when that comes from the provider's usual
+ * rule rather than a published date; `text` says it in a sentence.
+ */
+export interface StayRelease {
+  open: boolean;
+  opensAt?: string;
+  expected?: boolean;
+  text: string;
+}
+
+/** A stay the provider's rules suggest instead: other dates, at the same place. */
+export interface StaySuggestion {
+  arrival: string;
+  departure: string;
+}
+
+/**
+ * What a provider's booking rules say about a stay (`stayRules.check`), worked out without
+ * asking it: allowed (`ok`), or refused with the `reason` and the `field` to change (and
+ * `suggestions`: dates it would take instead). `notes` are rules worth knowing either way,
+ * and `release` whether the stay is on sale. Plain text, each at most 200 characters.
+ */
+export type StayRulesVerdict =
+  | { ok: true; notes: string[]; release?: StayRelease }
+  | {
+      ok: false;
+      reason: string;
+      field: StayRuleField;
+      notes: string[];
+      release?: StayRelease;
+      suggestions?: StaySuggestion[];
+    };
+
 export interface LocationAvailability {
   /** Location key `${providerId}:${externalId}`. */
   key: string;
@@ -505,6 +543,16 @@ export interface BulkAvailabilityEntry {
    * Passed through as the provider gives it.
    */
   byKind?: Partial<Record<UnitKind, { availableUnits: number; bookableUnits?: number }>>;
+  /**
+   * Nothing can be booked for the stay yet: when it goes on sale (ISO 8601), by the provider's
+   * own release rules, with `bookableUnits` 0. Explore reads "Opens Wed 4 Nov".
+   */
+  opensAt?: string;
+  /**
+   * The provider's published rules refuse the stay here (`stayRules`), in a sentence, with
+   * `bookableUnits` 0. Explore reads "Not bookable for these dates".
+   */
+  refused?: string;
 }
 
 /** The state of a provider's waiting room or queue. */

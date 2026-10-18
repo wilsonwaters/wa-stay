@@ -132,6 +132,7 @@ const api: WindowApi = {
     get: (key) => ({ key }),
     availability: (stay, options) => ({ stay, ...options }),
     checkLocation: (key, stay) => ({ key, stay }),
+    stayRules: (key, stay, options) => ({ key, stay, ...options }),
     refresh: (providerId) => ({ providerId }),
     status: none,
     openDocument: (locationKey, documentId) => ({ locationKey, documentId }),

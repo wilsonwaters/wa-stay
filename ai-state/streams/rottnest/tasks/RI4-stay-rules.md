@@ -30,7 +30,13 @@ M.
 
 ## Completion criteria
 
-- [ ] Core tests for each field.
-- [ ] Providers without the module are unchanged.
-- [ ] The IPC parity tests pass.
-- [ ] The full gate passes.
+- [x] Core tests for each field.
+- [x] Providers without the module are unchanged.
+- [x] The IPC parity tests pass.
+- [x] The full gate passes.
+
+## Notes from the build
+
+- Built as specified (architecture-notes §12.37), with `suggestions` on a refusal (RI6's chips) and `notes` either way.
+- The cleaning lives in `src/main/core/stay-rules.ts` (`checkStayRules`), shared by the catalogue, watch and snipe services; a module that throws or answers nonsense gives no verdict.
+- `guests` maps to `stay.adults` (the form's party field), as the watch form's `issueField` reads it.

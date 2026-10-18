@@ -93,6 +93,7 @@ export {
   useLocationSearch,
   useOpenLocationDocument,
   usePlaceUnitsLoader,
+  useStayRules,
   type BulkAvailability,
   type BulkAvailabilityStatus,
 } from './catalog';

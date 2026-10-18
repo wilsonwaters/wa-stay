@@ -30,6 +30,9 @@ const STAY: StayQuery = { arrival: '2027-06-28', departure: '2027-07-01', adults
 /** A stay the fixtures answer with every type unavailable. */
 const SOLD_OUT: StayQuery = { arrival: '2027-06-14', departure: '2027-06-17', adults: 2 };
 const NIGHTS = ['2027-06-28', '2027-06-29', '2027-06-30'];
+/** The capture's day, 18 Oct 2026 (10 am Perth): June 2027 has been on sale since 7 Oct. */
+const NOW = new Date('2026-10-18T02:00:00.000Z');
+const clock = () => NOW;
 
 /** A fixture client that counts what it is asked. */
 function countingFixtures(): { http: HttpClient; count: () => number } {
@@ -47,14 +50,14 @@ function countingFixtures(): { http: HttpClient; count: () => number } {
   return { http, count: () => sent };
 }
 
-function fixtureContext(clock?: () => Date) {
+function fixtureContext() {
   return createTestProviderContext(rottnestManifest, {
     http: new FixtureHttpClient({
       providerId: 'rottnest',
       fixturesDir: FIXTURES_DIR,
       logFile: UNEXPECTED_LOG,
     }),
-    ...(clock ? { clock } : {}),
+    clock,
   });
 }
 
@@ -73,7 +76,7 @@ describe('Stay Rottnest: catalogue', () => {
 
   it('lists the nine precincts from the seed, sending nothing', async () => {
     const { http, count } = countingFixtures();
-    const quiet = rottnestFactory(createTestProviderContext(rottnestManifest, { http }));
+    const quiet = rottnestFactory(createTestProviderContext(rottnestManifest, { http, clock }));
     const places = await quiet.catalog!.listLocations!();
     expect(places.map((place) => place.key)).toEqual(
       ROTTNEST_PRECINCTS.map((precinct) => `rottnest:${precinct.slug}`)
@@ -229,15 +232,26 @@ describe("Stay Rottnest: Explore's free counts", () => {
       room: { availableUnits: 1 },
       cabin: { availableUnits: 5 },
     });
-    // A free count, never a total of the precinct's units
-    expect(entries.every((entry) => entry.bookableUnits === undefined)).toBe(true);
+    // A free count, never a total of the precinct's units, but for one nothing can be booked at:
+    // Bathurst is closed through June 2027 (its guide), so it was not looked for in the answer
+    expect(entries.find((entry) => entry.key === 'rottnest:bathurst')).toEqual({
+      key: 'rottnest:bathurst',
+      availableUnits: 0,
+      bookableUnits: 0,
+      refused: 'Bathurst is closed from 27 Apr 2027 to 30 June 2027.',
+    });
+    expect(
+      entries
+        .filter((entry) => entry.key !== 'rottnest:bathurst')
+        .every((entry) => entry.bookableUnits === undefined)
+    ).toBe(true);
   });
 });
 
 describe('Stay Rottnest: one shared search', () => {
   it('serves the bulk search, every check and every caller at once from one request', async () => {
     const { http, count } = countingFixtures();
-    const provider = rottnestFactory(createTestProviderContext(rottnestManifest, { http }));
+    const provider = rottnestFactory(createTestProviderContext(rottnestManifest, { http, clock }));
     await Promise.all([
       provider.availability!.search!(STAY),
       provider.availability!.check('geordie-bay', STAY),
@@ -246,12 +260,12 @@ describe('Stay Rottnest: one shared search', () => {
     await provider.availability!.check('bathurst', STAY);
     expect(count()).toBe(1);
     // Another party is another search
-    await provider.availability!.check('bathurst', { ...STAY, adults: 2 });
+    await provider.availability!.check('geordie-bay', { ...STAY, adults: 2 });
     expect(count()).toBe(2);
   });
 
   it('asks again once the answer is two minutes old', async () => {
-    let now = new Date('2026-10-02T02:00:00.000Z');
+    let now = NOW;
     const { http, count } = countingFixtures();
     const provider = rottnestFactory(
       createTestProviderContext(rottnestManifest, { http, clock: () => now })
@@ -281,7 +295,9 @@ describe('Stay Rottnest: one shared search', () => {
         json: async () => ({}),
       };
     };
-    const modules = createRottnestModules(createTestProviderContext(rottnestManifest, { http }));
+    const modules = createRottnestModules(
+      createTestProviderContext(rottnestManifest, { http, clock })
+    );
     await expect(modules.availability!.check('geordie-bay', STAY)).rejects.toBeInstanceOf(
       ProviderParseError
     );
@@ -293,5 +309,61 @@ describe('Stay Rottnest: one shared search', () => {
       key: 'rottnest:geordie-bay',
     });
     expect(sent).toBe(2);
+  });
+});
+
+describe('Stay Rottnest: nothing asked for a stay that cannot be booked', () => {
+  /** A July 2027 stay: not on sale until Wed 4 Nov 2026, 8:30 am Perth. */
+  const JULY: StayQuery = { arrival: '2027-07-06', departure: '2027-07-08', adults: 2 };
+
+  it('a stay not on sale yet: every night not released, when it opens, and no request', async () => {
+    const { http, count } = countingFixtures();
+    const provider = rottnestFactory(createTestProviderContext(rottnestManifest, { http, clock }));
+    const result = await provider.availability!.check('geordie-bay', JULY);
+    expect(result.release).toEqual({ open: false, opensAt: '2026-11-04T00:30:00.000Z' });
+    expect(
+      result.units.every(
+        (unit) =>
+          !unit.fullyAvailable &&
+          unit.freeCount === 0 &&
+          unit.nights.every((night) => night.state === 'not-released')
+      )
+    ).toBe(true);
+    expect(count()).toBe(0);
+  });
+
+  it('a stay its rules refuse: every night unknown, labelled why, and no request', async () => {
+    const { http, count } = countingFixtures();
+    const provider = rottnestFactory(createTestProviderContext(rottnestManifest, { http, clock }));
+    const result = await provider.availability!.check('bathurst', STAY);
+    expect(result.release).toBeUndefined();
+    expect(result.units[0].nights[0]).toEqual({
+      date: '2027-06-28',
+      state: 'unknown',
+      label: 'Bathurst is closed from 27 Apr 2027 to 30 June 2027.',
+    });
+    expect(result.units.every((unit) => !unit.fullyAvailable)).toBe(true);
+    expect(count()).toBe(0);
+  });
+
+  it("Explore's counts for a stay nowhere on sale yet send nothing, and say when each place opens", async () => {
+    const { http, count } = countingFixtures();
+    const provider = rottnestFactory(createTestProviderContext(rottnestManifest, { http, clock }));
+    const entries = await provider.availability!.search!(JULY);
+    expect(entries).toHaveLength(ROTTNEST_PRECINCTS.length);
+    expect(entries[0]).toEqual({
+      key: 'rottnest:thomson-bay-north',
+      availableUnits: 0,
+      bookableUnits: 0,
+      opensAt: '2026-11-04T00:30:00.000Z',
+    });
+    expect(count()).toBe(0);
+  });
+
+  it('offers its booking rules as a module, which the place page reads', () => {
+    const provider = rottnestFactory(fixtureContext());
+    expect(
+      provider.stayRules!.check({ externalId: 'geordie-bay', stay: JULY, now: NOW }).release
+    ).toMatchObject({ open: false });
   });
 });

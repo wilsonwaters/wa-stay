@@ -57,6 +57,8 @@ export interface StayCardProps {
   onRetry: () => void;
   /** Opens the provider's notice, for a check it held back (`failure` is `notice`). */
   onReadNotice?: () => void;
+  /** What the provider's booking rules say about the dates, when it has rules. */
+  rules?: ReactNode;
   links: PlaceLinks;
   /** The create-flow hand-offs, when the provider offers them. */
   watchHref?: string;
@@ -139,6 +141,7 @@ export function StayCard({
   failure,
   onRetry,
   onReadNotice,
+  rules,
   links,
   watchHref,
   snipeHref,
@@ -181,6 +184,8 @@ export function StayCard({
         />
         <GuestsField label="Guests" value={guests} onChange={onGuestsChange} />
       </div>
+
+      {rules}
 
       {ability.kind === 'loading' && <Skeleton className="h-10 w-full" />}
       {ability.kind === 'available' && (

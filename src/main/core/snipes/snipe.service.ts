@@ -72,6 +72,7 @@ import { AppError } from '../../utils/app-error';
 import { logger } from '../../utils/logger';
 import type { AccountGate } from '../accounts/ports';
 import { firstBookingLink } from '../booking-link';
+import { checkStayRules, STAY_RULE_ISSUES } from '../stay-rules';
 import type { NightGuard } from '../holds/night-guard';
 import type { NotificationService } from '../notifications/notification.service';
 import { resolveStayParams } from '../stay-params';
@@ -1037,20 +1038,35 @@ export class SiteSniperService {
       input.windowDurationMs ?? DEFAULT_SNIPE_WINDOW_MS
     );
 
+    const stay = toStayQuery(
+      {
+        ...input.stay,
+        children: input.stay.children ?? 0,
+        infants: input.stay.infants ?? 0,
+        concessions: input.stay.concessions ?? 0,
+      },
+      stayParams
+    );
+    // A stay the provider's published rules refuse: VALIDATION on the field to change
+    const verdict = checkStayRules(provider, {
+      externalId: input.location.externalId,
+      stay,
+      ...(input.unitIds?.length ? { unitIds: [...input.unitIds] } : {}),
+      ...(input.unitKinds?.length ? { unitKinds: [...input.unitKinds] } : {}),
+      now: this.clock(),
+    });
+    if (verdict && !verdict.ok) {
+      throw new AppError('VALIDATION', verdict.reason, {
+        issues: [STAY_RULE_ISSUES[verdict.field]],
+      });
+    }
+
     let releaseAt: Date | undefined;
     try {
       const at = await release.computeReleaseAt({
         mode: input.releaseMode,
         externalId: input.location.externalId,
-        stay: toStayQuery(
-          {
-            ...input.stay,
-            children: input.stay.children ?? 0,
-            infants: input.stay.infants ?? 0,
-            concessions: input.stay.concessions ?? 0,
-          },
-          stayParams
-        ),
+        stay,
         params: stayParams,
         requestedAt,
         unitIds: [...(input.unitIds ?? [])],

@@ -24,6 +24,11 @@
  *   showing the precinct (`links.ts`), never the booking step.
  * - **No answer:** a page with no card is a `ProviderParseError`; a block or the Open Day pause
  *   is the client's error (`client.ts`). Nothing is retried.
+ * - **Nothing asked for a stay that can't be booked** (`rules.ts`): one its booking rules
+ *   refuse has every night `unknown`, labelled with the reason; one not on sale yet has every
+ *   night `not-released` and `release: { open: false, opensAt }`. Explore's entry for such a
+ *   place says so (`refused`, `opensAt`, `bookableUnits` 0), and when every place is one of
+ *   them, the search is not sent at all.
  */
 
 import type {
@@ -38,7 +43,11 @@ import { eachNight } from '@shared/utils/calendar-date';
 import { makeLocationKey } from '@shared/utils/location-key';
 import type { ProviderContext } from '../sdk/context';
 import { createAbortError, ProviderError, ProviderParseError, throwIfAborted } from '../sdk/errors';
-import type { AvailabilityCheckOptions, AvailabilityModule } from '../sdk/provider';
+import type {
+  AvailabilityCheckOptions,
+  AvailabilityModule,
+  StayRulesModule,
+} from '../sdk/provider';
 import type { RottnestClient } from './client';
 import { searchUrl } from './links';
 import {
@@ -50,6 +59,7 @@ import {
   type RottnestRoomType,
 } from './precincts';
 import { readResultsPage, type ResultsCard } from './results-page';
+import { createRottnestRules, partyOf } from './rules';
 
 /** How long one search's answer serves every caller: two minutes. */
 export const ROTTNEST_SEARCH_TTL_MS = 2 * 60_000;
@@ -65,11 +75,6 @@ const RATE_NOTES: Readonly<Record<string, string>> = {
 export interface RottnestSearchResult {
   cards: Map<string, ResultsCard>;
   checkedAt: string;
-}
-
-/** Everyone a stay sleeps: Stay Rottnest's adults and children (0–17, so infants too). */
-export function partyOf(stay: StayQuery): number {
-  return stay.adults + (stay.children ?? 0) + (stay.infants ?? 0);
 }
 
 /** The memo's key: what the search sends. */
@@ -108,6 +113,8 @@ function raceAbort<T>(pending: Promise<T>, signal?: AbortSignal): Promise<T> {
 export interface RottnestAvailabilityDeps {
   ctx: ProviderContext;
   client: RottnestClient;
+  /** Stay Rottnest's booking rules (default: `createRottnestRules()`). */
+  rules?: StayRulesModule;
 }
 
 export interface RottnestAvailability extends Required<AvailabilityModule> {
@@ -120,6 +127,7 @@ export interface RottnestAvailability extends Required<AvailabilityModule> {
 export function createRottnestAvailability({
   ctx,
   client,
+  rules = createRottnestRules(),
 }: RottnestAvailabilityDeps): RottnestAvailability {
   const memo = new Map<string, { pending: Promise<RottnestSearchResult>; at?: number }>();
   const unknownCodes = new Set<string>();
@@ -208,6 +216,49 @@ export function createRottnestAvailability({
     );
   }
 
+  /**
+   * Why the stay can't be booked at the precinct, known without asking: its rules refuse it,
+   * or it is not on sale yet. Undefined when it may be.
+   */
+  function heldBack(
+    precinct: RottnestPrecinct,
+    stay: StayQuery,
+    unitIds?: string[]
+  ): { refused: string } | { opensAt?: string } | undefined {
+    const verdict = rules.check({
+      externalId: precinct.slug,
+      stay,
+      ...(unitIds?.length ? { unitIds } : {}),
+      now: ctx.clock(),
+    });
+    if (!verdict.ok) return { refused: verdict.reason };
+    if (verdict.release && !verdict.release.open) {
+      return verdict.release.opensAt ? { opensAt: verdict.release.opensAt } : {};
+    }
+    return undefined;
+  }
+
+  /** Each room type of a stay held back: no night free, and why. */
+  function heldBackUnits(
+    precinct: RottnestPrecinct,
+    stay: StayQuery,
+    why: { refused: string } | { opensAt?: string }
+  ): UnitAvailability[] {
+    return precinct.roomTypes.map((type) => ({
+      unitId: type.code,
+      unitName: type.name,
+      unitKind: type.kind,
+      nights: eachNight(stay.arrival, stay.departure).map((date): NightStatus =>
+        'refused' in why
+          ? { date, state: 'unknown', label: why.refused }
+          : { date, state: 'not-released' }
+      ),
+      fullyAvailable: false,
+      freeCount: 0,
+      bookingUrl: searchUrl(stay, precinct.group),
+    }));
+  }
+
   return {
     searchOnce,
 
@@ -223,22 +274,51 @@ export function createRottnestAvailability({
           message: `${ctx.manifest.name} has no precinct "${externalId}"`,
         });
       }
-      const result = await searchOnce(stay, options.signal);
       const wanted = options.unitIds?.length ? new Set(options.unitIds) : undefined;
-      const units = unitsAt(precinct, result, stay).filter(
-        (unit) => !wanted || wanted.has(unit.unitId)
-      );
+      const keep = (unit: UnitAvailability) => !wanted || wanted.has(unit.unitId);
+      const key = makeLocationKey(ctx.id, precinct.slug);
+      const bookingUrl = searchUrl(stay, precinct.group);
+      const why = heldBack(precinct, stay, options.unitIds);
+      if (why) {
+        // Answered without asking; still settle after the caller could abort
+        await Promise.resolve();
+        throwIfAborted(options.signal);
+        return {
+          key,
+          checkedAt: ctx.clock().toISOString(),
+          units: heldBackUnits(precinct, stay, why).filter(keep),
+          bookingUrl,
+          ...('refused' in why
+            ? {}
+            : { release: { open: false, ...(why.opensAt ? { opensAt: why.opensAt } : {}) } }),
+        };
+      }
+      const result = await searchOnce(stay, options.signal);
       return {
-        key: makeLocationKey(ctx.id, precinct.slug),
+        key,
         checkedAt: result.checkedAt,
-        units,
-        bookingUrl: searchUrl(stay, precinct.group),
+        units: unitsAt(precinct, result, stay).filter(keep),
+        bookingUrl,
       };
     },
 
     async search(stay: StayQuery, signal?: AbortSignal): Promise<BulkAvailabilityEntry[]> {
-      const result = await searchOnce(stay, signal);
+      const held = new Map(ROTTNEST_PRECINCTS.map((p) => [p.slug, heldBack(p, stay)]));
+      // Every place held back: nothing to ask
+      const result = [...held.values()].every(Boolean) ? undefined : await searchOnce(stay, signal);
+      await Promise.resolve();
+      throwIfAborted(signal);
       return ROTTNEST_PRECINCTS.map((precinct): BulkAvailabilityEntry => {
+        const why = held.get(precinct.slug);
+        if (why || !result) {
+          return {
+            key: makeLocationKey(ctx.id, precinct.slug),
+            availableUnits: 0,
+            bookableUnits: 0,
+            ...(why && 'refused' in why ? { refused: why.refused } : {}),
+            ...(why && 'opensAt' in why && why.opensAt ? { opensAt: why.opensAt } : {}),
+          };
+        }
         const units = unitsAt(precinct, result, stay);
         const free = units.filter((unit) => unit.fullyAvailable).length;
         const entry: BulkAvailabilityEntry = {

@@ -40,7 +40,14 @@ L.
 
 ## Completion criteria
 
-- [ ] The rule is tested over the 54 known Open Days and the 1 January years.
-- [ ] Each rule is tested with the guides' own examples.
-- [ ] Release status is tested at 08:29:59 and 08:30:00 on an Open Day.
-- [ ] The full gate passes.
+- [x] The rule is tested over the 54 known Open Days and the 1 January years.
+- [x] Each rule is tested with the guides' own examples.
+- [x] Release status is tested at 08:29:59 and 08:30:00 on an Open Day.
+- [x] The full gate passes.
+
+## Notes from the build
+
+- The guide data was extracted from the saved guides by hand-checked script, cross-checked against the PDFs' own tables (`booking-guides.ts` header has the upkeep steps).
+- *Deviations, from the guides themselves:* no general Saturday two-night minimum (no guide from September 2026 says it; only the Channel Swim and Port to Pub Saturdays are refused alone), and an arrival or departure on a public holiday is a note, not a refusal (the guides from July 2026 dropped the ban; the terms say restrictions "may apply").
+- Postponements are rows in `PUBLISHED_OPEN_DAYS`, which win over the rule.
+- *Moved to RI7/RI9:* the `open_day` release mode (`remindOnly`) and `describe()` for snipes need the remind snipes; the place's `releaseInfo` already describes the Open Days.

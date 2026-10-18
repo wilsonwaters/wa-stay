@@ -36,6 +36,8 @@ export type AvailabilityState =
   | 'available'
   | 'full'
   | 'none-open'
+  | 'opens'
+  | 'refused'
   | 'unknown';
 
 /**
@@ -57,7 +59,13 @@ export type PlaceAvailability =
   | { state: 'full'; bookableUnits?: number }
   /** `queue`: the provider's waiting queue is up (its access gate), not a fault. */
   | { state: 'error'; queue: boolean }
-  | { state: Exclude<AvailabilityState, 'available' | 'full' | 'error'> };
+  /** Not on sale yet, by the provider's release rules: when it opens (ISO 8601). */
+  | { state: 'opens'; opensAt: string }
+  /** The provider's published rules refuse the stay here: why. */
+  | { state: 'refused'; reason: string }
+  | {
+      state: Exclude<AvailabilityState, 'available' | 'full' | 'error' | 'opens' | 'refused'>;
+    };
 
 export interface AvailabilityInput {
   /** Both dates are chosen and valid (`exploreStay`). */
@@ -151,9 +159,11 @@ function chosenCounts(
  * `offline-booking` (not bookable online), `check-dates` (the provider checks one place at a
  * time but not in bulk), `not-supported` (no availability at all), `notice` (its notice is not
  * accepted, so it was not asked: `NOTICE_REQUIRED`), `error`, `loading`, then
- * from the provider's entry `available` (a unit free every night), `full` (no unit free every
- * night, some bookable or no total given) or `none-open` (a total of 0: not released, closed or
- * too far ahead), and `unknown` when the provider answered without this place.
+ * from the provider's entry `refused` (its published rules refuse the stay: `entry.refused`),
+ * `opens` (not on sale yet: `entry.opensAt`), `available` (a unit free every night), `full`
+ * (no unit free every night, some bookable or no total given) or `none-open` (a total of 0:
+ * not released, closed or too far ahead), and `unknown` when the provider answered without
+ * this place.
  *
  * With `stayTypes` chosen and the place having a kind not chosen, the entry's counts for the
  * chosen kinds it has (`byKind`) decide instead of its totals, and without any it is
@@ -189,6 +199,13 @@ export function deriveAvailability(
   }
   const { entry } = input;
   if (!entry) return { state: 'unknown' };
+  // Held back by the provider's own rules, known without asking it
+  if (typeof entry.refused === 'string' && entry.refused) {
+    return { state: 'refused', reason: entry.refused };
+  }
+  if (typeof entry.opensAt === 'string' && entry.opensAt) {
+    return { state: 'opens', opensAt: entry.opensAt };
+  }
   const counts = chosenCounts(location, entry, input.stayTypes ?? []);
   if (!counts) return { state: 'check-dates' };
   const { available, bookable } = counts;
@@ -228,7 +245,9 @@ export const LOADING_PILL = '···';
 export function availabilityLabel(
   availability: PlaceAvailability,
   kinds: readonly UnitKind[],
-  shortName: string
+  shortName: string,
+  /** The provider's time zone, for when a stay opens. */
+  timeZone = 'Australia/Perth'
 ): AvailabilityLabel | null {
   const noun = nounForKinds(kinds);
   switch (availability.state) {
@@ -267,6 +286,21 @@ export function availabilityLabel(
       return { pill: 'Not open', card: `No ${noun.many} open for these dates`, tone: 'neutral' };
     case 'check-dates':
       return { pill: 'Check dates', card: 'Check dates on the place page', tone: 'neutral' };
+    case 'opens': {
+      const at = new Date(availability.opensAt);
+      if (Number.isNaN(at.getTime())) {
+        return { pill: 'Not open', card: 'Not on sale yet', tone: 'neutral' };
+      }
+      const day = (options: Intl.DateTimeFormatOptions) =>
+        new Intl.DateTimeFormat('en-AU', { ...options, timeZone }).format(at).replace(',', '');
+      return {
+        pill: `Opens ${day({ day: 'numeric', month: 'short' })}`,
+        card: `Opens ${day({ weekday: 'short', day: 'numeric', month: 'short' })}`,
+        tone: 'neutral',
+      };
+    }
+    case 'refused':
+      return { pill: NO_STATE_PILL, card: 'Not bookable for these dates', tone: 'neutral' };
     case 'notice':
       // The notice is offered once, above the list
       return {
@@ -302,6 +336,8 @@ const RANK: Record<AvailabilityState, number> = {
   available: 0,
   full: 1,
   'none-open': 2,
+  opens: 2,
+  refused: 2,
   'check-dates': 3,
   notice: 3,
   'offline-booking': 4,

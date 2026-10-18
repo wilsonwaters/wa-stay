@@ -79,6 +79,8 @@ function defaultStubs(): ApiStubs {
     // with the ParkStay fixture instead (tests/utils/renderer/catalog.ts).
     catalog: {
       search: resolve(ok({ items: [], total: 0 })),
+      // As main answers for a provider without booking rules (ParkStay)
+      stayRules: resolve(fail('parkstay does not support stayRules', 'CAPABILITY')),
       status: resolve(
         ok({ providers: [{ providerId: 'parkstay', count: 0, stale: true, syncing: true }] })
       ),

@@ -912,6 +912,8 @@ it has an answer for:
 | `availableUnits` | How many units are free on **every** night of the stay. A unit free on some nights only does not count. |
 | `bookableUnits` | Optional: how many units can be booked online for these dates at all, free or not: the place's total, or 0 when none can be booked (not released yet, closed, or past the provider's booking window). Leave it out when the provider gives no unit total (RAC counts free units only); 0 still means none can be booked. |
 | `byKind` | Optional: the same two counts for each unit kind the place has, e.g. `{ campsite: { availableUnits: 2, bookableUnits: 5 }, cabin: { availableUnits: 0, bookableUnits: 3 } }`, so a filter on cabins counts only the cabins. Set it for a place with more than one kind. Each kind's `bookableUnits` is optional too, by the same rule; a sum of kinds has no total when any kind in it has none. Main passes it on as you give it. |
+| `opensAt` | Optional: nothing at the place is on sale for the stay yet, by your own release rules; when it goes on sale (ISO 8601), with `bookableUnits` 0. |
+| `refused` | Optional: your published [booking rules](#booking-rules) refuse the stay at the place; why, in a sentence, with `bookableUnits` 0. |
 
 The names invite a swap: `availableUnits` is the smaller number, the free ones, and
 `bookableUnits` the total. Explore reads them as:
@@ -922,6 +924,8 @@ The names invite a swap: `availableUnits` is the smaller number, the free ones, 
 | `availableUnits` above 0, no `bookableUnits` | "2 sites free" ("2 free" on its map pin), never "of" a total |
 | `availableUnits` 0, `bookableUnits` above 0 or left out | "No site free every night" |
 | Both 0 | "No sites open for these dates" |
+| `opensAt` | "Opens Wed 4 Nov" ("Opens 4 Nov" on its pin) |
+| `refused` | "Not bookable for these dates" |
 | No entry for the place | "Availability unknown" |
 
 So leave out a place you have no answer for rather than send zeros, which would read as full or
@@ -1584,6 +1588,57 @@ When dates become bookable, for Site Sniper (`release`). ParkStay: `release-poli
 `bookings.get(reference)` (and `list`) return `ExternalBooking`s, for "Import booking"
 (`capabilities.bookingImport`). `links.manageBooking(reference)` gives "Manage on {shortName}"
 on a booking.
+
+### Booking rules
+
+When your provider publishes rules a stay must follow (the longest stay, fixed arrival dates in
+the peak, minimum stays, closures, how many a unit sleeps, when dates go on sale), give them as
+`stayRules`. The app refuses a watch or a snipe for a stay they refuse, and the place page says
+what they mean for the dates before anything is checked.
+
+```ts
+interface StayRulesModule {
+  check(input: {
+    externalId: string;
+    stay: StayQuery;
+    unitIds?: string[]; // the units the person chose
+    unitKinds?: UnitKind[]; // the stay types the person chose
+    now: Date;
+  }): StayRulesVerdict;
+}
+
+type StayRulesVerdict =
+  | { ok: true; notes: string[]; release?: StayRelease }
+  | {
+      ok: false;
+      reason: string; // why, in a sentence
+      field: 'arrival' | 'departure' | 'guests' | 'units'; // what the person changes
+      notes: string[];
+      release?: StayRelease;
+      suggestions?: { arrival: string; departure: string }[]; // dates you would take instead
+    };
+
+interface StayRelease {
+  open: boolean;
+  opensAt?: string; // ISO 8601, while not open
+  expected?: boolean; // from your usual rule, not a published date
+  text: string; // "Opens Wed 4 Nov 2026, 8:30 am."
+}
+```
+
+- **Pure.** `check` sends nothing and waits for nothing: it reads facts your module keeps (a
+  seed of your published rules). For a place or a stay it doesn't know, it answers `ok` with no
+  notes; it never throws.
+- **Its words are the person's.** Plain text, each at most 200 characters (longer is cut), at
+  most 6 notes and 6 suggestions.
+- **What the app does with it.** A watch or a snipe whose stay you refuse is refused on the
+  field you name, in your words. The place page shows your verdict beside the dates, with your
+  suggestions as buttons that set them. Your own `availability` may use it too, to answer a
+  stay you refuse, or one not on sale yet, without asking your site: give a refused stay's
+  nights `unknown` with the reason as their `label`, and an unreleased stay's nights
+  `not-released` with `release: { open: false, opensAt }`. In bulk availability, such a place's
+  entry has `bookableUnits: 0` and `refused` (the reason) or `opensAt`, and Explore reads it as
+  "Not bookable for these dates" or "Opens Wed 4 Nov".
 
 ### Links and dispose
 

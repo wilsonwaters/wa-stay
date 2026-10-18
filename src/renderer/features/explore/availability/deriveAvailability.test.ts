@@ -379,6 +379,56 @@ describe('availabilityLabel', () => {
     expect(label({ state: 'no-dates' })).toBeNull();
   });
 
+  it("reads a stay not on sale yet as when it opens, and one the provider's rules refuse as not bookable", () => {
+    const opens = deriveAvailability(
+      { bookingMode: 'online', kind: 'cabin' },
+      {
+        staySet: true,
+        capabilities: BULK,
+        status: 'success',
+        entry: {
+          key: 'rottnest:geordie-bay',
+          availableUnits: 0,
+          bookableUnits: 0,
+          opensAt: '2026-11-04T00:30:00.000Z',
+        },
+      }
+    );
+    expect(opens).toEqual({ state: 'opens', opensAt: '2026-11-04T00:30:00.000Z' });
+    expect(availabilityLabel(opens, ['cabin'], 'Stay Rottnest', 'Australia/Perth')).toEqual({
+      pill: 'Opens 4 Nov',
+      card: 'Opens Wed 4 Nov',
+      tone: 'neutral',
+    });
+    const refused = deriveAvailability(
+      { bookingMode: 'online', kind: 'cabin' },
+      {
+        staySet: true,
+        capabilities: BULK,
+        status: 'success',
+        entry: {
+          key: 'rottnest:geordie-bay',
+          availableUnits: 0,
+          bookableUnits: 0,
+          refused: 'Stay Rottnest takes stays of 14 nights at most.',
+        },
+      }
+    );
+    expect(refused).toEqual({
+      state: 'refused',
+      reason: 'Stay Rottnest takes stays of 14 nights at most.',
+    });
+    expect(availabilityLabel(refused, ['cabin'], 'Stay Rottnest')).toEqual({
+      pill: '–',
+      card: 'Not bookable for these dates',
+      tone: 'neutral',
+    });
+    // An unreadable opening date still says the stay is not on sale
+    expect(
+      availabilityLabel({ state: 'opens', opensAt: 'soon' }, ['cabin'], 'Stay Rottnest')
+    ).toEqual({ pill: 'Not open', card: 'Not on sale yet', tone: 'neutral' });
+  });
+
   it("asks for the provider's notice on every card, calmly, and draws no count on the pill", () => {
     expect(availabilityLabel({ state: 'notice' }, ['cabin'], 'Stay Rottnest')).toEqual({
       pill: '–',

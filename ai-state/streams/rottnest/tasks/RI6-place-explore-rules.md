@@ -25,6 +25,13 @@ M.
 
 ## Completion criteria
 
-- [ ] Renderer tests for each state.
-- [ ] An e2e step (July 2027 dates before 4 Nov 2026 read "Opens Wed 4 Nov 2026").
-- [ ] The full gate passes.
+- [x] Renderer tests for each state.
+- [x] An e2e step (July 2027 dates before 4 Nov 2026 read "Opens Wed 4 Nov 2026").
+- [x] The full gate passes.
+
+## Notes from the build
+
+- The place page's panel is in the "Check your dates" card (`StayRulesPanel`); a check of a stay not on sale already said when it opens.
+- Explore reads `BulkAvailabilityEntry.opensAt` and `refused` (states `opens`, `refused`); a refused card reads "Not bookable for these dates" rather than a short reason, since the reasons are sentences.
+- *Moved to RI8:* "Plan for Open Day" replacing the check, with the plan screens.
+- No axe scans: the repository has no axe tooling; the tests assert roles and names.

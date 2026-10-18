@@ -432,6 +432,12 @@ describe('ProviderRegistry.register', () => {
           ]),
         /access\.waitingRoomOrigins must be https origins or https:\/\/\*\.<domain> patterns/,
       ],
+      [
+        'stayRules',
+        {},
+        (p) => ((p as { stayRules?: object }).stayRules = {}),
+        /stayRules needs stayRules\.check/,
+      ],
       ['snipes', {}, (p) => delete p.release, /snipes needs availability and release/],
       [
         'release modes supported',

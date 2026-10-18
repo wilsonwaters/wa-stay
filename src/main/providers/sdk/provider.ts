@@ -24,6 +24,7 @@ import type {
   ProviderManifest,
   StayParams,
   StayQuery,
+  StayRulesVerdict,
   UnitKind,
 } from '@shared/types/provider.types';
 import type {
@@ -400,6 +401,30 @@ export interface AutomationAuth extends AuthBase {
 
 export type ProviderAuth = BrowserSessionAuth | CredentialsAuth | AutomationAuth;
 
+/** What `stayRules.check` is asked about: a stay at one place, for some units or kinds. */
+export interface StayRulesInput {
+  externalId: string;
+  stay: StayQuery;
+  /** The units the person chose (a watch's or snipe's), or none for any. */
+  unitIds?: string[];
+  /** The stay types the person chose, or none for any. */
+  unitKinds?: UnitKind[];
+  /** When it is asked, for "today" and for what is on sale yet. */
+  now: Date;
+}
+
+/**
+ * A provider's published booking rules (the longest stay, fixed peak dates, days arrivals are
+ * refused, how many a unit sleeps, when dates go on sale), worked out without asking it: the
+ * core refuses a watch or snipe for a stay the provider would refuse, and the place page says
+ * why before anything is checked (`catalog.stayRules`). Optional, and pure: `check` sends
+ * nothing, waits for nothing and never throws for a place or stay it doesn't know (it answers
+ * `ok` with no notes). Its words are the person's: plain text, each at most 200 characters.
+ */
+export interface StayRulesModule {
+  check(input: StayRulesInput): StayRulesVerdict;
+}
+
 export interface ProviderLinks {
   /** The location's page on the provider's site. */
   location(externalId: string): string | null;
@@ -424,6 +449,8 @@ export interface AccommodationProvider {
   holds?: HoldsModule;
   bookings?: BookingsModule;
   auth?: ProviderAuth;
+  /** Its published booking rules, worked out without asking it (`StayRulesModule`). */
+  stayRules?: StayRulesModule;
   links: ProviderLinks;
   dispose?(): Promise<void>;
 }
@@ -457,6 +484,7 @@ export function assembleProvider(
   if (impl.holds) provider.holds = impl.holds;
   if (impl.bookings) provider.bookings = impl.bookings;
   if (impl.auth) provider.auth = impl.auth;
+  if (impl.stayRules) provider.stayRules = impl.stayRules;
   if (typeof impl.dispose === 'function') provider.dispose = impl.dispose.bind(impl);
   return provider;
 }

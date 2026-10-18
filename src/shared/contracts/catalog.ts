@@ -18,9 +18,12 @@ import {
 import {
   ProviderIdSchema,
   StayQuerySchema,
+  UnitKindSchema,
   type LocationAvailability,
   type ProviderId,
   type StayQuery,
+  type StayRulesVerdict,
+  type UnitKind,
 } from '../types/provider.types';
 import { LocationKeySchema } from '../utils/location-key';
 import { assertTypeEquals } from '../utils/type-equality';
@@ -50,6 +53,18 @@ export interface CatalogCheckLocationRequest {
   stay: StayQuery;
 }
 
+/** What `catalog.stayRules` asks about beside the stay: the units or stay types chosen. */
+export interface CatalogStayRulesOptions {
+  unitIds?: string[];
+  unitKinds?: UnitKind[];
+}
+
+/** The `catalog.stayRules` payload. */
+export interface CatalogStayRulesRequest extends CatalogStayRulesOptions {
+  key: string;
+  stay: StayQuery;
+}
+
 /** The `catalog.refresh` payload: one provider, or every catalogue provider. */
 export interface CatalogRefreshRequest {
   providerId?: ProviderId;
@@ -71,6 +86,12 @@ const availabilityRequest = z.object({
   bbox: BoundingBoxSchema.optional(),
 });
 const checkLocationRequest = z.object({ key: LocationKeySchema, stay: StayQuerySchema });
+const stayRulesRequest = z.object({
+  key: LocationKeySchema,
+  stay: StayQuerySchema,
+  unitIds: z.array(z.string().min(1).max(64)).max(200).optional(),
+  unitKinds: z.array(UnitKindSchema).max(8).optional(),
+});
 const refreshRequest = z.object({ providerId: ProviderIdSchema.optional() });
 const openDocumentRequest = z.object({
   locationKey: LocationKeySchema,
@@ -83,6 +104,8 @@ assertTypeEquals<z.input<typeof availabilityRequest>, CatalogAvailabilityRequest
 assertTypeEquals<z.output<typeof availabilityRequest>, CatalogAvailabilityRequest>(true);
 assertTypeEquals<z.input<typeof checkLocationRequest>, CatalogCheckLocationRequest>(true);
 assertTypeEquals<z.output<typeof checkLocationRequest>, CatalogCheckLocationRequest>(true);
+assertTypeEquals<z.input<typeof stayRulesRequest>, CatalogStayRulesRequest>(true);
+assertTypeEquals<z.output<typeof stayRulesRequest>, CatalogStayRulesRequest>(true);
 assertTypeEquals<z.input<typeof refreshRequest>, CatalogRefreshRequest>(true);
 assertTypeEquals<z.output<typeof refreshRequest>, CatalogRefreshRequest>(true);
 assertTypeEquals<z.input<typeof openDocumentRequest>, CatalogOpenDocumentRequest>(true);
@@ -115,6 +138,17 @@ export const catalog = {
     request: checkLocationRequest,
     args: {} as [key: string, stay: StayQuery],
     response: {} as LocationAvailability,
+  },
+  /**
+   * What the place's provider's published booking rules say about the stay (`stayRules`),
+   * worked out without asking the provider: allowed or refused (with why and what to change),
+   * its notes, and whether it is on sale yet. `CAPABILITY` for a provider without rules.
+   */
+  stayRules: {
+    channel: C.stayRules,
+    request: stayRulesRequest,
+    args: {} as [key: string, stay: StayQuery, options?: CatalogStayRulesOptions],
+    response: {} as StayRulesVerdict,
   },
   /** Re-syncs one provider's catalogue (or all), then returns the status. */
   refresh: {

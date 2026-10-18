@@ -279,6 +279,11 @@ export const CONSISTENCY_RULES: readonly ConsistencyRule[] = [
         : undefined,
   },
   {
+    rule: 'stayRules',
+    violation: (p) =>
+      p.stayRules && !fn(p.stayRules.check) ? 'stayRules needs stayRules.check' : undefined,
+  },
+  {
     rule: 'snipes',
     violation: (p) =>
       p.manifest.capabilities.snipes && !(hasCheck(p) && fn(p.release?.computeReleaseAt))

@@ -23,6 +23,7 @@ import type {
   LocationAvailability,
   ProviderId,
   StayQuery,
+  StayRulesVerdict,
 } from '../../shared/types/provider.types';
 import { catalogSearchArea, clampBbox } from '../../shared/utils/catalog-area';
 import { parseLocationKey } from '../../shared/utils/location-key';
@@ -328,6 +329,29 @@ export function useLocationCheck(key: string | null, stay: StayQuery | null) {
     retry: false,
     // Coming back online never re-asks the provider by itself either.
     refetchOnReconnect: false,
+  });
+}
+
+/**
+ * `catalog.stayRules(key, stay)`: what the place's provider's published booking rules say
+ * about the stay, worked out in main without asking the provider: allowed or refused (why,
+ * and dates to try instead), its notes, and whether it is on sale yet. `null` for a provider
+ * that has no rules (`CAPABILITY`). Asks only once there is a stay.
+ */
+export function useStayRules(key: string | null, stay: StayQuery | null) {
+  return useQuery<StayRulesVerdict | null>({
+    queryKey: queryKeys.catalog.stayRules(key ?? '', stay),
+    queryFn: async () => {
+      try {
+        return await unwrap((api) => api.catalog.stayRules(key as string, stay as StayQuery));
+      } catch (error) {
+        if (toApiError(error).code === 'CAPABILITY') return null;
+        throw error;
+      }
+    },
+    enabled: Boolean(key && stay),
+    retry: false,
+    staleTime: 60_000,
   });
 }
 

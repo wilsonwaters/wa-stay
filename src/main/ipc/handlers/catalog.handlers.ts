@@ -20,6 +20,9 @@ export function registerCatalogHandlers(handle: Handle, c: AppContainer): void {
     catalog.availability(stay, { providerIds, bbox })
   );
   handle(api.checkLocation, ({ key, stay }) => catalog.checkLocation(key, stay));
+  handle(api.stayRules, ({ key, stay, unitIds, unitKinds }) =>
+    catalog.stayRules(key, stay, { unitIds, unitKinds })
+  );
   handle(api.refresh, ({ providerId }) => catalog.refresh(providerId));
   handle(api.status, () => catalog.status());
   // The address comes from the cached detail, never from the renderer

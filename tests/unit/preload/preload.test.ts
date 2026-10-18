@@ -92,6 +92,8 @@ describe('preload window.api', () => {
     await api.catalog.availability(stay);
     await api.catalog.availability(stay, { providerIds: ['parkstay'], bbox: [115, -35, 117, -33] });
     await api.catalog.checkLocation('parkstay:20', stay);
+    await api.catalog.stayRules('rottnest:geordie-bay', stay);
+    await api.catalog.stayRules('rottnest:geordie-bay', stay, { unitIds: ['GPV04'] });
     await api.catalog.refresh();
     await api.catalog.refresh('parkstay');
     await api.accounts.status('parkstay');
@@ -113,6 +115,8 @@ describe('preload window.api', () => {
       ['catalog:availability', { stay }],
       ['catalog:availability', { stay, providerIds: ['parkstay'], bbox: [115, -35, 117, -33] }],
       ['catalog:check-location', { key: 'parkstay:20', stay }],
+      ['catalog:stay-rules', { key: 'rottnest:geordie-bay', stay }],
+      ['catalog:stay-rules', { key: 'rottnest:geordie-bay', stay, unitIds: ['GPV04'] }],
       ['catalog:refresh', { providerId: undefined }],
       ['catalog:refresh', { providerId: 'parkstay' }],
       ['accounts:status', { providerId: 'parkstay' }],

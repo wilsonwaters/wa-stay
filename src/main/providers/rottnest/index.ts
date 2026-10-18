@@ -10,6 +10,9 @@
  * - `catalog.ts`: the catalogue, from the seed;
  * - `availability.ts` and `results-page.ts`: the shared search and its reading;
  * - `open-days.ts`: Stay Rottnest's Open Days, for the client's Open Day pause;
+ * - `release.ts`: whether a stay is on sale yet, and when it opens (the 5/3 rule included);
+ * - `rules.ts`, with `booking-guides.ts` and `public-holidays.ts`: Stay Rottnest's published
+ *   booking rules (`stayRules`), so a stay they refuse, or one not on sale yet, is never asked;
  * - `links.ts`: Stay Rottnest's own pages, never its booking step;
  * - `client.ts`: every request, `GET /rates-room1` only, with the block cool-down.
  *
@@ -36,6 +39,8 @@ import { createRottnestCatalog } from './catalog';
 import { RottnestClient } from './client';
 import { rottnestLinks } from './links';
 import { rottnestManifest } from './manifest';
+import { describeOpenDays } from './release';
+import { createRottnestRules } from './rules';
 
 export { ROTTNEST_BOOKINGS_URL, ROTTNEST_SITE_URL, rottnestLinks, searchUrl } from './links';
 export { ROTTNEST_PRECINCTS } from './precincts';
@@ -52,11 +57,18 @@ export function createRottnestModules(ctx: ProviderContext): ProviderModules {
     clock: ctx.clock,
     maxConcurrent: ctx.limits.maxConcurrentRequests,
   });
-  const availability = createRottnestAvailability({ ctx, client });
+  const stayRules = createRottnestRules();
+  const availability = createRottnestAvailability({ ctx, client, rules: stayRules });
   return {
     links: rottnestLinks,
-    catalog: createRottnestCatalog({ ctx, links: rottnestLinks }),
+    catalog: createRottnestCatalog({
+      ctx,
+      links: rottnestLinks,
+      // The place's booking rules: how its stays go on sale (no request)
+      release: { describe: async () => describeOpenDays(ctx.clock()) },
+    }),
     availability: { check: availability.check, search: availability.search },
+    stayRules,
     async dispose() {
       availability.dispose();
     },

@@ -35,6 +35,8 @@ export const queryKeys = {
     area: (areaKey: string, providerIds: readonly string[]) =>
       [...catalog, 'area', areaKey, providerIds] as const,
     detail: (key: string) => [...catalog, 'detail', key] as const,
+    /** What a place's provider's rules say about a stay (`catalog.stayRules`). */
+    stayRules: (key: string, stay: unknown) => [...catalog, 'stay-rules', key, stay] as const,
     /** One location's availability for one stay (`catalog.checkLocation`). */
     check: (key: string, stay: unknown) => [...catalog, 'check', key, stay] as const,
     /** One provider's bulk availability for one stay (`catalog.availability`), by stay key. */

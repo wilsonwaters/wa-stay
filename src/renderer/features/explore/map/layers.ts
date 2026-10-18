@@ -67,7 +67,7 @@ export const MAP_FONT_BOLD = ['DIN Pro Bold', 'Arial Unicode MS Bold'];
 /** The feature property with a place's availability state, with dates (geo.ts). */
 const AVAIL: ExpressionSpecification = ['get', 'avail'];
 /** States whose pills and pins are muted. */
-const MUTED_STATES = ['full', 'none-open'];
+const MUTED_STATES = ['full', 'none-open', 'opens', 'refused'];
 /** A cluster holds at least one available place (with dates). */
 const HAS_FREE: ExpressionSpecification = ['>', ['get', 'availableCount'], 0];
 

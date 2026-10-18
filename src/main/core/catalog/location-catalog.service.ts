@@ -87,6 +87,8 @@ import {
   type LocationAvailability,
   type ProviderId,
   type StayQuery,
+  type StayRulesVerdict,
+  type UnitKind,
 } from '@shared/types/provider.types';
 import type { EventSink } from '@shared/contracts/events';
 import { bboxContains, catalogSearchArea } from '@shared/utils/catalog-area';
@@ -113,8 +115,11 @@ import type {
   ProviderLocationDetail,
   ProviderLocationDocument,
   SearchCatalogModule,
+  StayRulesInput,
 } from '../../providers/sdk/provider';
+import { ProviderCapabilityError } from '../../providers/sdk/errors';
 import { AppError } from '../../utils/app-error';
+import { checkStayRules } from '../stay-rules';
 import {
   catalogErrorCode,
   errorMessage,
@@ -1218,6 +1223,26 @@ export class LocationCatalogService {
       });
     this.checks.set(cacheKey, run);
     return run;
+  }
+
+  /**
+   * What the place's provider's published booking rules say about `stay` (`stayRules.check`),
+   * worked out without asking it, so neither the notice nor pacing applies. A verdict the
+   * provider could not give reads as allowed, with no notes. Throws `UnknownProviderError`,
+   * and `ProviderCapabilityError` for a provider without rules.
+   */
+  stayRules(
+    key: string,
+    stay: StayQuery,
+    options: { unitIds?: string[]; unitKinds?: UnitKind[] } = {}
+  ): StayRulesVerdict {
+    const { providerId, externalId } = parseLocationKey(key);
+    const provider = this.registry.get(providerId);
+    if (!provider.stayRules) throw new ProviderCapabilityError(providerId, 'stayRules');
+    const input: StayRulesInput = { externalId, stay, now: this.clock() };
+    if (options.unitIds?.length) input.unitIds = options.unitIds;
+    if (options.unitKinds?.length) input.unitKinds = options.unitKinds;
+    return checkStayRules(provider, input) ?? { ok: true, notes: [] };
   }
 
   /** Caches `value` and drops entries that have expired, so the caches stay small. */

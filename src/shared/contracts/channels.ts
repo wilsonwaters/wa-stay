@@ -86,6 +86,7 @@ export const CHANNELS = {
     get: 'catalog:get',
     availability: 'catalog:availability',
     checkLocation: 'catalog:check-location',
+    stayRules: 'catalog:stay-rules',
     refresh: 'catalog:refresh',
     status: 'catalog:status',
     openDocument: 'catalog:open-document',

@@ -55,6 +55,7 @@ import {
 import { withRequestPriority } from '../../providers/sdk/pacing';
 import type { HoldSuccess } from '../../providers/sdk/provider';
 import { matchedStayLink } from '../booking-link';
+import { checkStayRules, STAY_RULE_ISSUES } from '../stay-rules';
 import { AppError } from '../../utils/app-error';
 import { logger } from '../../utils/logger';
 import type { NightGuard } from '../holds/night-guard';
@@ -195,6 +196,13 @@ export class WatchService {
     this.assertNotice(input.providerId);
     this.assertAutoHold(provider, input.autoHold);
     this.assertStay(provider, input.stay);
+    this.assertStayRules(provider, {
+      externalId: input.location.externalId,
+      stay: input.stay,
+      stayParams: input.stayParams,
+      unitIds: input.unitIds,
+      unitKinds: input.unitKinds,
+    });
     const prepared: WatchInput = {
       ...input,
       unitKinds: cleanUnitKinds(input.unitKinds),
@@ -231,6 +239,21 @@ export class WatchService {
       this.assertAutoHold(provider, updates.autoHold, { turningOn: !watch.autoHold });
     }
     if (updates.stay) this.assertStay(provider, updates.stay);
+    // What the provider's rules judge changed: the place, the stay, the units or the stay types
+    if (
+      updates.location !== undefined ||
+      updates.stay !== undefined ||
+      updates.unitIds !== undefined ||
+      updates.unitKinds !== undefined
+    ) {
+      this.assertStayRules(provider, {
+        externalId: (updates.location ?? watch.location).externalId,
+        stay: updates.stay ?? watch.stay,
+        stayParams: updates.stayParams ?? watch.stayParams,
+        unitIds: updates.unitIds ?? watch.unitIds,
+        unitKinds: updates.unitKinds ?? watch.unitKinds,
+      });
+    }
     const prepared: WatchUpdate = { ...updates };
     if (updates.unitKinds !== undefined) prepared.unitKinds = cleanUnitKinds(updates.unitKinds);
     if (updates.stayParams !== undefined || updates.autoHold !== undefined) {
@@ -602,6 +625,44 @@ export class WatchService {
     if (compareDates(departure, arrival) <= 0) {
       throw new AppError('VALIDATION', 'Departure date must be after arrival date', {
         issues: ['stay.departure'],
+      });
+    }
+  }
+
+  /**
+   * A stay the provider's published rules refuse (`stayRules`: too long, outside fixed peak
+   * dates, a party too big…) is `VALIDATION` on the field to change, in the provider's words.
+   * A provider without rules, or one that can't judge the stay, is not asked.
+   */
+  private assertStayRules(
+    provider: WatchProvider,
+    watch: {
+      externalId: string;
+      stay: StayInput;
+      stayParams?: Watch['stayParams'];
+      unitIds?: string[];
+      unitKinds?: Watch['unitKinds'];
+    }
+  ): void {
+    const { stay } = watch;
+    const verdict = checkStayRules(provider, {
+      externalId: watch.externalId,
+      stay: {
+        arrival: stay.arrival,
+        departure: stay.departure,
+        adults: stay.adults,
+        children: stay.children ?? 0,
+        infants: stay.infants ?? 0,
+        concessions: stay.concessions ?? 0,
+        params: watch.stayParams ?? {},
+      },
+      ...(watch.unitIds?.length ? { unitIds: [...watch.unitIds] } : {}),
+      ...(watch.unitKinds?.length ? { unitKinds: [...watch.unitKinds] } : {}),
+      now: this.clock(),
+    });
+    if (verdict && !verdict.ok) {
+      throw new AppError('VALIDATION', verdict.reason, {
+        issues: [STAY_RULE_ISSUES[verdict.field]],
       });
     }
   }

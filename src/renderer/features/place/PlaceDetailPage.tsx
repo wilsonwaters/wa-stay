@@ -10,6 +10,7 @@ import {
   useLocationDetail,
   useLocationDetailUpdates,
   useProviders,
+  useStayRules,
 } from '../../api';
 import { buildPath, PATTERNS, placeLinkState, ROUTES } from '../../app/routes';
 import { parseStayTypes, stayParamsQuery, type StayParams } from '../../app/stayParams';
@@ -48,6 +49,7 @@ import {
   stayQueryOf,
 } from './placeModel';
 import { MAX_NIGHTS, StayCard, type CheckAbility } from './StayCard';
+import { StayRulesPanel } from './StayRulesPanel';
 import { usePlaceStay } from './usePlaceStay';
 
 /** After this long, a check says it is still going (EQ7: a busy DBCA queue can delay it). */
@@ -228,6 +230,8 @@ export default function PlaceDetailPage() {
   const awaiting = useRef(false);
   // A provider with a notice the person has not accepted is asked nothing until they do
   const noticeGate = useNoticeGate(manifest);
+  // What the provider's booking rules say about the dates in the card (no request to it)
+  const stayRules = useStayRules(manifest ? key : null, currentStay);
   const onCheck = () => {
     if (!currentStay) {
       setDatesError('Choose your check-in and check-out dates');
@@ -420,6 +424,15 @@ export default function PlaceDetailPage() {
             onRetry={() => void check.refetch()}
             // Accepting asks the check again by itself (its answer is dropped)
             onReadNotice={() => noticeGate.ask()}
+            rules={
+              stayRules.data && (
+                <StayRulesPanel
+                  verdict={stayRules.data}
+                  shortName={shortName}
+                  onSuggest={({ arrival, departure }) => onDatesChange({ arrival, departure })}
+                />
+              )
+            }
             links={links}
             watchHref={manifest?.capabilities.watches ? ROUTES.watchNew(prefill) : undefined}
             snipeHref={manifest?.capabilities.snipes ? ROUTES.snipeNew(prefill) : undefined}

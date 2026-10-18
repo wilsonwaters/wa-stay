@@ -88,7 +88,7 @@ export const SLOW_AVAILABILITY_MS = 10_000;
 export const AREA_SEARCH_DEBOUNCE_MS = 500;
 const ALL_PLACES: PlaceAvailability = { state: 'no-dates' };
 /** The states in which a place's units were counted for the stay. */
-const COUNTED = new Set<AvailabilityState>(['available', 'full', 'none-open']);
+const COUNTED = new Set<AvailabilityState>(['available', 'full', 'none-open', 'opens', 'refused']);
 const HEADER_HEIGHT = 64;
 
 const unique = (values: Iterable<string | undefined>) =>
@@ -331,7 +331,13 @@ export default function ExplorePage() {
     for (const item of results) {
       const availability = placeAvailability.get(item.key) ?? ALL_PLACES;
       const shortName = manifests.get(item.providerId)?.shortName ?? item.providerId;
-      const label = availabilityLabel(availability, countedKinds(item, stayTypes), shortName);
+      const manifest = manifests.get(item.providerId);
+      const label = availabilityLabel(
+        availability,
+        countedKinds(item, stayTypes),
+        shortName,
+        manifest?.timezone
+      );
       if (!label) continue;
       pins.set(item.key, { state: availability.state, pill: label.pill });
       if (label.card === null) continue;
