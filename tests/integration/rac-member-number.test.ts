@@ -107,6 +107,10 @@ function racAnswer(hop: HopRequest): HopAnswer {
   if (hop.method === 'GET' && url.pathname === '/bookings/') {
     return { body: read('parks-page.html'), headers: { 'content-type': 'text/html' } };
   }
+  // A park's home page (`/<slug>/`): the synthetic one
+  if (hop.method === 'GET' && RAC_PARKS.some((p) => url.pathname === `/${p.slug}/`)) {
+    return { body: read('park-home.html'), headers: { 'content-type': 'text/html' } };
+  }
   if (hop.method === 'POST' && url.pathname === RAC_AVAILABILITY_PATH) {
     const form = new URLSearchParams(hop.body);
     const park = RAC_PARKS.find((p) => String(p.blogId) === form.get('blog_id'));
@@ -248,12 +252,26 @@ describe('an RAC member number in the app', () => {
     });
     expect(http.requests).toEqual([]);
 
+    // A catalogue sync with the number saved: RAC's parks page, and nothing of the number
+    await container.catalogService.sync('rac', { force: true });
+    expect(http.requests.map((r) => [r.method, new URL(r.url).pathname])).toEqual([
+      ['GET', '/bookings/'],
+    ]);
+
     // Everything a window can read about RAC and its account
     await answer(call('accounts:list'));
     await answer(call('accounts:status', { providerId: 'rac' }));
     await answer(call('providers:list'));
     const detail = await answer(call('catalog:get', { key: 'rac:busselton' }));
-    expect(detail).toMatchObject({ key: 'rac:busselton' });
+    // Its book-now page and its home page, whose intro is About
+    expect(detail).toMatchObject({
+      key: 'rac:busselton',
+      descriptionHtml: expect.stringContaining('Made-up introduction'),
+    });
+    expect(http.requests.slice(1).map((r) => [r.method, new URL(r.url).pathname])).toEqual([
+      ['GET', '/busselton/book-now/'],
+      ['GET', '/busselton/'],
+    ]);
     const checked = await answer(check());
     // The number's only trace: a member's price, and the book-now page as a member
     expect(powered(checked)).toMatchObject({ total: 136, priceNote: 'RAC member rate' });
@@ -310,8 +328,9 @@ describe('an RAC member number in the app', () => {
     const mail = mockSendMail.mock.calls[0][0];
     expect(mail.text).toContain('Book on RAC');
 
-    // Each request RAC saw: the detail's page, the check, the bulk search and the watch's check
-    expect(http.requests.length).toBeGreaterThanOrEqual(1 + 1 + RAC_PARKS.length + 1);
+    // Each request RAC saw: the sync's parks page, the detail's book-now and home pages, the
+    // check, the bulk search and the watch's check
+    expect(http.requests.length).toBeGreaterThanOrEqual(1 + 2 + 1 + RAC_PARKS.length + 1);
     const requests = JSON.stringify(
       http.requests.map(({ method, url, headers, body }) => ({ method, url, headers, body }))
     );

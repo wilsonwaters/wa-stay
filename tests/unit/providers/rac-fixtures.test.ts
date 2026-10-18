@@ -15,7 +15,8 @@
  *   when (`_fixture`). The auto-cart's fixtures (`cart/`, R19) are synthetic and say so: their
  *   cart addresses are RAC's booking page with the made-up token of 32 zeros
  *   (`rest_api_data_id` is that token or `<redacted>` everywhere). So are the park pages (RAC's
- *   parks page and a park's home page), with made-up words and photo addresses.
+ *   parks page and a park's home page), with made-up words and photo addresses: every paragraph
+ *   in them, whatever its class, starts "Made-up".
  * - **Rule 1, the source.** Every URL in `src/main/providers/rac/` is on RAC's host; NewBook's
  *   image host is named only where photos are checked; and nothing names a cart address
  *   (`online_cart_url`, `/booking/?cart`), except that the auto-cart (`holds.ts`) reads a
@@ -203,6 +204,19 @@ function fixtureViolations(raw: string, { synthetic = false } = {}): string[] {
 }
 
 /**
+ * What in a synthetic park page (RAC's parks page, a park's home page) is not made up, as
+ * messages ([] when nothing): every paragraph, whatever its class, holds made-up words only.
+ */
+function parkPageViolations(text: string): string[] {
+  const found: string[] = [];
+  for (const [, paragraph] of text.matchAll(/<p\b[^>]*>([\s\S]*?)<\/p>/gi)) {
+    const plain = paragraph.replace(/<[^>]*>/g, '').trim();
+    if (!MADE_UP_WORDS.test(plain)) found.push(`a paragraph "${plain.slice(0, 40)}"`);
+  }
+  return found;
+}
+
+/**
  * What in a source file breaks rule 1, as messages ([] when nothing). `cartSource`: the
  * auto-cart (`holds.ts`), which may read a tariff's `online_cart_url`.
  */
@@ -266,6 +280,30 @@ describe('RAC fixtures (terms rule 7)', () => {
 
   it.each(files.map((file) => [file]))('%s is trimmed to facts', (file) => {
     expect(fixtureViolations(read(file), { synthetic: file.startsWith(CART_DIR) })).toEqual([]);
+  });
+
+  it.each(files.filter((f) => PARK_PAGES.includes(path.basename(f))).map((file) => [file]))(
+    '%s holds made-up words in every paragraph',
+    (file) => {
+      expect(parkPageViolations(read(file))).toEqual([]);
+    }
+  );
+
+  it('catches a paragraph of a park page that is not made up, whatever its class', () => {
+    for (const sample of [
+      '<p>Nestled by the bay, our park…</p>',
+      '<p class="intro">Wake up to birdsong.</p>',
+      '<p class="has-text-align-center"><a href="contact-us/">Our park</a> is close to town.</p>',
+      '<p>Made up without the hyphen.</p>',
+    ]) {
+      expect([sample, parkPageViolations(sample).length]).not.toEqual([sample, 0]);
+    }
+    expect(
+      parkPageViolations(
+        '<p>Made-up introduction.</p><p class="x">Made-up <strong>emphasis</strong>.</p>' +
+          '<div>Not a paragraph.</div>'
+      )
+    ).toEqual([]);
   });
 
   it('labels every auto-cart fixture as synthetic, and finds them (R19)', () => {

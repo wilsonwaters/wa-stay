@@ -45,7 +45,7 @@ import {
   racLinks,
   racManifest,
 } from '@main/providers/rac';
-import { toLocationSummary } from '@main/providers/rac/catalog';
+import { RAC_HOME_PAGE_CUTOFF_MS, toLocationSummary } from '@main/providers/rac/catalog';
 import { racPark, type RacPark } from '@main/providers/rac/parks';
 import { RAC_AVAILABILITY_PATH } from '@main/providers/rac/availability';
 import { RAC_BLOCK_STATE_KEY, RacClient } from '@main/providers/rac/client';
@@ -103,8 +103,8 @@ const coreIntro = (pageUrl: string) => sanitizeProviderHtml(homeIntro(pageUrl), 
 const HOME_PHOTOS = [parkPhoto(0, 1), parkPhoto(0, 2)];
 const HOME_ACCOMMODATION_PHOTOS = [101, 102, 103, 104].map(placeholder);
 /** A park's home page, `/<slug>/`, and RAC's parks page. */
-const isHomePage = (url: string) => /^https:\/\/[^/]+\/[a-z-]+\/$/.test(url);
 const isParksPage = (url: string) => new URL(url).pathname === '/bookings/';
+const isHomePage = (url: string) => !isParksPage(url) && /^https:\/\/[^/]+\/[a-z-]+\/$/.test(url);
 
 /** A test context (in-memory state, a fixed clock) whose HTTP answers from the fixtures. */
 function fixtureContext(overrides: Partial<Omit<ProviderContext, 'id'>> = {}): ProviderContext {
@@ -355,6 +355,16 @@ describe('RAC Parks & Resorts', () => {
         expect(restarted.http.requests).toHaveLength(failure.status === 429 ? 0 : 1);
       }
     );
+
+    it('gives the photos just read even when they cannot be kept, with a warning', async () => {
+      const state = new InMemoryKeyValueStore();
+      state.set = () => Promise.reject(new Error('The disk is full.'));
+      const { catalog, logger } = syncing({ body: page('parks-page.html') }, state);
+      expect(photosOf(await catalog.listLocations!())).toEqual(ALL_PHOTOS);
+      expect(warnings(logger)).toEqual([
+        'The park photos read could not be kept: The disk is full',
+      ]);
+    });
 
     it('lists the parks without photos when the parks page fails and none were read before', async () => {
       const { catalog, logger, state } = syncing({ status: 503, body: '' });
@@ -800,6 +810,163 @@ describe('RAC Parks & Resorts', () => {
         // The book-now page was on the wire; the home page never left
         expect(http.requests.map((r) => r.url)).toEqual([`${RAC}/busselton/book-now/`]);
       });
+
+      describe("bounded, so the detail answers within the core's deadline", () => {
+        afterEach(() => jest.useRealTimers());
+
+        /** The provider on Jest's fake timers, each hop answering after its own time. */
+        function timed(respond: (hop: HopRequest) => HopAnswer) {
+          jest.useFakeTimers({ now: NOW });
+          const http = new RecordingHttpClient({ providerId: 'rac', respond });
+          const logger = createMemoryLogger();
+          const ctx = createTestProviderContext(racManifest, { http, logger, clock: () => NOW });
+          const provider = racFactory(ctx);
+          return { http, logger, provider, catalog: provider.catalog! };
+        }
+        /** Answers a park's pages and its availability, each after `ms[kind]` (0 by default). */
+        const pages =
+          (
+            ms: { book?: number; home?: number; post?: number },
+            book = page('book-now-busselton.html')
+          ) =>
+          (hop: HopRequest): HopAnswer => {
+            if (hop.method === 'POST') {
+              return {
+                body: page('availability-monkey-mia-2026-10-31-1n.json'),
+                delayMs: ms.post ?? 0,
+              };
+            }
+            if (isHomePage(hop.url)) return { body: page('park-home.html'), delayMs: ms.home ?? 0 };
+            return { body: book, delayMs: ms.book ?? 0 };
+          };
+        /** Runs fake time until `promise` settles: what it gave or its error, and when. */
+        async function settled<T>(promise: Promise<T>) {
+          const start = Date.now();
+          let outcome: { value?: T; error?: unknown; ms?: number } = {};
+          promise.then(
+            (value) => (outcome = { value, ms: Date.now() - start }),
+            (error: unknown) => (outcome = { error, ms: Date.now() - start })
+          );
+          for (let waited = 0; waited < 120_000 && outcome.ms === undefined; waited += 100) {
+            await jest.advanceTimersByTimeAsync(100);
+          }
+          return outcome;
+        }
+        const paths = (http: RecordingHttpClient) =>
+          http.requests.map((r) => `${r.method} ${new URL(r.url).pathname}`);
+        const CUTOFF = new RegExp(
+          `^RAC Busselton Holiday Park: /busselton/ not read within ${RAC_HOME_PAGE_CUTOFF_MS / 1_000} s ` +
+            "of the detail's start; the detail is shown without it$"
+        );
+
+        it('gives the home page up 30 s after the detail starts, well inside the 42 s the core allows', () => {
+          expect(RAC_HOME_PAGE_CUTOFF_MS).toBe(30_000);
+          expect(
+            pacedDeadlineMs(DEFAULT_CATALOG_TIMINGS.detailTimeoutMs, racManifest.limits!, {
+              requests: 2,
+              priority: 'interactive',
+            })
+          ).toBe(42_000);
+        });
+
+        it('reads both pages as before when they answer in time, and leaves no timer behind', async () => {
+          const { catalog, logger, http } = timed(pages({ book: 2_000, home: 2_000 }));
+          const { value, ms } = await settled(catalog.getLocation('busselton'));
+          expect(value?.descriptionHtml).toBe(homeIntro(`${RAC}/busselton/`));
+          expect(value?.imageUrls.slice(0, 2)).toEqual(HOME_PHOTOS);
+          expect(ms).toBe(4_000);
+          expect(paths(http)).toEqual(['GET /busselton/book-now/', 'GET /busselton/']);
+          expect(warnings(logger)).toEqual([]);
+          expect(jest.getTimerCount()).toBe(0);
+        });
+
+        it('calls off a home page still waiting at the cutoff: never sent, and the categories still come back', async () => {
+          // A check's POST is on the wire for 25 s; the book-now page then takes 10 s
+          const { catalog, logger, http, provider } = timed((hop) =>
+            hop.method === 'POST'
+              ? { body: page('availability-busselton-2026-11-06-2n.json'), delayMs: 25_000 }
+              : pages({ book: 10_000 })(hop)
+          );
+          const checking = provider.availability!.check('busselton', STAY);
+          const { value, ms } = await settled(
+            catalog.getLocation('busselton', undefined, known('busselton', [CARD], '<p>Kept.</p>'))
+          );
+          await checking;
+          expect(value?.units).toHaveLength(6);
+          expect(value?.descriptionHtml).toBe('<p>Kept.</p>');
+          expect(value?.imageUrls[0]).toBe(CARD);
+          expect(ms).toBe(35_000);
+          expect(paths(http)).toEqual([
+            `POST ${RAC_AVAILABILITY_PATH}`,
+            'GET /busselton/book-now/',
+          ]);
+          expect(warnings(logger)).toEqual([expect.stringMatching(CUTOFF)]);
+          expect(jest.getTimerCount()).toBe(0);
+        });
+
+        it('calls off a home page in flight at the cutoff, and answers then without it', async () => {
+          const { catalog, logger, http } = timed(pages({ book: 25_000, home: 10_000 }));
+          const { value, ms } = await settled(
+            catalog.getLocation('busselton', undefined, known('busselton', [CARD]))
+          );
+          expect(value?.units).toHaveLength(6);
+          expect(value?.descriptionHtml).toBeUndefined();
+          expect(value?.imageUrls[0]).toBe(CARD);
+          expect(ms).toBe(RAC_HOME_PAGE_CUTOFF_MS);
+          expect(paths(http)).toEqual(['GET /busselton/book-now/', 'GET /busselton/']);
+          expect(warnings(logger)).toEqual([expect.stringMatching(CUTOFF)]);
+          expect(jest.getTimerCount()).toBe(0);
+        });
+
+        it.each<[string, string, (hop: HopRequest) => HopAnswer, string]>([
+          [
+            'a book-now page with no category (a parse error)',
+            'busselton',
+            pages({ book: 1_000 }, '<html><body><h1>Book now</h1></body></html>'),
+            'GET /busselton/book-now/',
+          ],
+          [
+            'HTTP 500 for the book-now page',
+            'busselton',
+            (hop) =>
+              isHomePage(hop.url)
+                ? { body: page('park-home.html') }
+                : { status: 500, body: '', delayMs: 1_000 },
+            'GET /busselton/book-now/',
+          ],
+          [
+            "HTTP 503 for a native park's availability",
+            'monkey-mia',
+            (hop) =>
+              isHomePage(hop.url)
+                ? { body: page('park-home.html') }
+                : { status: 503, body: '', delayMs: 1_000 },
+            `POST ${RAC_AVAILABILITY_PATH}`,
+          ],
+        ])(
+          'sends no home page when the categories fail (%s), and rejects with their error',
+          async (_, slug, respond, sent) => {
+            const { catalog, logger, http } = timed(respond);
+            const { error } = await settled(catalog.getLocation(slug));
+            expect(error).toBeInstanceOf(ProviderError);
+            expect(isAbortError(error)).toBe(false);
+            expect(paths(http)).toEqual([sent]);
+            expect(warnings(logger)).toEqual([]);
+            expect(jest.getTimerCount()).toBe(0);
+          }
+        );
+
+        it('rejects the detail when its own signal aborts while the home page is in flight', async () => {
+          const { catalog, http } = timed(pages({ book: 1_000, home: 10_000 }));
+          const controller = new AbortController();
+          setTimeout(() => controller.abort(), 5_000);
+          const { error, ms } = await settled(catalog.getLocation('busselton', controller.signal));
+          expect(isAbortError(error)).toBe(true);
+          expect(ms).toBe(5_000);
+          expect(paths(http)).toEqual(['GET /busselton/book-now/', 'GET /busselton/']);
+          expect(jest.getTimerCount()).toBe(0);
+        });
+      });
     });
 
     it('rejects a page with no category (a redesign) with a ProviderParseError', async () => {
@@ -843,9 +1010,11 @@ describe('RAC terms rules', () => {
       providerId: 'rac',
       delayMs: 4_000,
       respond: (hop) =>
-        hop.url.includes('margaret-river')
-          ? { body: page('book-now-margaret-river.html') }
-          : { body: page('book-now-busselton.html') },
+        isHomePage(hop.url)
+          ? { body: page('park-home.html') }
+          : hop.url.includes('margaret-river')
+            ? { body: page('book-now-margaret-river.html') }
+            : { body: page('book-now-busselton.html') },
     });
     const ctx = createProviderContext(racManifest, {
       createHttp: () => inner,
@@ -861,14 +1030,18 @@ describe('RAC terms rules', () => {
       catalog.getLocation('margaret-river'),
     ]);
     await jest.advanceTimersByTimeAsync(90_000);
-    await both;
-    // Each park's book-now page and home page, one at a time, 10 s apart in the background
+    const [busselton, margaretRiver] = await both;
+    // One at a time, 10 s apart in the background: Busselton's book-now page (0–4 s) and home
+    // page (14–18 s), then Margaret River's book-now page (28–32 s). Its home page, due at 42 s,
+    // is called off, unsent, at its detail's cutoff (30 s), and the detail answers without it
     expect(inner.requests.map((r) => new URL(r.url).pathname)).toEqual([
       '/busselton/book-now/',
       '/busselton/',
       '/margaret-river/book-now/',
-      '/margaret-river/',
     ]);
+    expect(busselton.descriptionHtml).toBeDefined();
+    expect(margaretRiver.units.length).toBeGreaterThan(0);
+    expect(margaretRiver.descriptionHtml).toBeUndefined();
     expect(inner.peakInFlight).toBe(1);
     for (let i = 1; i < inner.requests.length; i++) {
       expect(inner.requests[i].sentAt - inner.requests[i - 1].endedAt!).toBeGreaterThanOrEqual(
@@ -1703,6 +1876,31 @@ describe('RAC bulk availability', () => {
         'POST',
       ]);
       expect(inner.peakInFlight).toBe(1);
+    });
+
+    it("slow answers with one request in flight: the detail answers before the core's deadline, without its home page", async () => {
+      // Every answer takes 14 s, and another park's check is on the wire when the page opens
+      const { inner, catalog } = await pacedRac(14 * SECOND);
+      const checked = track(catalog.checkLocation('rac:cervantes', STAY));
+      await jest.advanceTimersByTimeAsync(SECOND);
+      const opened = track(catalog.get('rac:busselton'));
+      await settle(checked, opened);
+
+      // The check ends at 14 s, the book-now page goes at 15 s and ends at 29 s, the home page
+      // goes at 30 s and is called off at the cutoff, 30 s after the detail started (31 s)
+      expect(opened.error).toBeUndefined();
+      expect(opened.value?.stale).toBeUndefined();
+      expect(opened.value?.units.length).toBeGreaterThan(0);
+      expect(opened.value?.descriptionHtml).toBeUndefined();
+      // The card's photo stands in for the park's own
+      expect(opened.value?.imageUrls[0]).toBe(cardPhoto(racPark('busselton')!));
+      expect(Math.round(opened.ms!)).toBe(RAC_HOME_PAGE_CUTOFF_MS);
+      expect(opened.ms).toBeLessThan(DETAIL_DEADLINE_MS);
+      expect(
+        inner.requests.slice(0, 3).map((r) => `${r.method} ${new URL(r.url).pathname}`)
+      ).toEqual([`POST ${RAC_AVAILABILITY_PATH}`, 'GET /busselton/book-now/', 'GET /busselton/']);
+      expect(inner.peakInFlight).toBe(1);
+      expect(checked.error).toBeUndefined();
     });
 
     it('a date change during a search stops the older one, so the newer one meets its deadline', async () => {

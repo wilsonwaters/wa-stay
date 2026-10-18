@@ -220,16 +220,45 @@ describe('readParkHomePage', () => {
     );
   });
 
-  it('takes the paragraphs after the h1 beside it, with text, at most eight', () => {
+  it('takes the paragraphs right after the h1, with text, at most eight', () => {
     const paragraphs = Array.from({ length: 10 }, (_, i) => `<p>Made-up ${i + 1}.</p>`).join('');
     expect(descriptionOf(`<p>  </p><p>&nbsp;</p>${paragraphs}`)).toBe(
       Array.from({ length: RAC_INTRO_MAX_PARAGRAPHS }, (_, i) => `<p>Made-up ${i + 1}.</p>`).join(
         ''
       )
     );
-    // Before the h1, or in another block, is not the intro
-    const page = `<p>Before.</p>${intro('<div><p>Nested.</p></div><p>Made-up intro.</p>')}<p>After.</p>`;
+    // White space between them, as on RAC's pages, is no stop
+    expect(descriptionOf('\n\n<p>Made-up 1.</p>\n\n\n<p>Made-up 2.</p>\n')).toBe(
+      '<p>Made-up 1.</p><p>Made-up 2.</p>'
+    );
+    // Before the h1, or after its column, is not the intro
+    const page = `<p>Before.</p>${intro('<p>Made-up intro.</p>')}<p>After.</p>`;
     expect(readParkHomePage(page, PAGE_URL).descriptionHtml).toBe('<p>Made-up intro.</p>');
+  });
+
+  it('stops at the next heading, so a later section of a flat page is never the intro', () => {
+    for (const heading of ['h2', 'h3', 'h6', 'h1']) {
+      expect(
+        descriptionOf(
+          `<p>Made-up intro.</p><p>Made-up more.</p><${heading}>Pets</${heading}><p>Pets are welcome.</p>`
+        )
+      ).toBe('<p>Made-up intro.</p><p>Made-up more.</p>');
+    }
+  });
+
+  it('stops at the first thing that is not a paragraph: a block, a break or loose text', () => {
+    expect(descriptionOf('<p>Made-up intro.</p><div><p>Nested.</p></div><p>After.</p>')).toBe(
+      '<p>Made-up intro.</p>'
+    );
+    expect(descriptionOf('<p>Made-up intro.</p><ul><li>A list.</li></ul><p>After.</p>')).toBe(
+      '<p>Made-up intro.</p>'
+    );
+    expect(descriptionOf('<p>Made-up intro.</p><br><p>After.</p>')).toBe('<p>Made-up intro.</p>');
+    expect(descriptionOf('<p>Made-up intro.</p> Loose words. <p>After.</p>')).toBe(
+      '<p>Made-up intro.</p>'
+    );
+    // A block straight after the h1: no intro at all
+    expect(descriptionOf('<div><p>Nested.</p></div><p>Made-up words.</p>')).toBeUndefined();
   });
 
   it('reads no intro from a page with no h1, or none followed by a paragraph', () => {

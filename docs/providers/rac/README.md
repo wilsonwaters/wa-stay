@@ -88,12 +88,21 @@ new layout), the parks are listed with the photos read before, or with none; the
 for it.
 
 A park's page (its detail) reads the park's home page (`/<slug>/`) as well as its categories: the
-paragraphs under its heading ("Welcome to RAC Busselton Holiday Park") are its About, RAC's own
-words with their links, and its banner photo comes first in its photos. Both requests are queued
-at once, so a park's page opened while Explore's counts are on their way waits for one of
-Explore's requests, not one between its own two. A home page that can't be read, or shows no
-intro or photo, never fails the page: the intro stored before stays, and the card's photo stands
-in for the park's.
+paragraphs right after its heading ("Welcome to RAC Busselton Holiday Park"), up to anything
+else, are its About, RAC's own words with their links, and its banner photo comes first in its
+photos. Both requests are queued at once, categories first, so a park's page opened while
+Explore's counts are on their way waits for one of Explore's requests, not one between its own
+two. The home page is the extra one, so it is bounded: the core gives a park's page time for two
+requests (its own and one already on the wire, 42 s at RAC's pace), and the home page
+
+- is sent only once the categories have been read: a page whose categories fail sends nothing
+  more;
+- is given up 30 seconds after the page was opened (`RAC_HOME_PAGE_CUTOFF_MS`): called off
+  unsent if it is still waiting, or stopped if it is on the wire.
+
+A home page that can't be read, is given up, or shows no intro or photo never fails the page:
+the intro stored before stays, and the card's photo stands in for the park's. Only closing the
+page (the detail's own abort) calls the page off.
 
 ## Stay types
 

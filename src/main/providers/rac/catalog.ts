@@ -25,10 +25,15 @@
  * - With it, at every park, one GET of its **home page** (`/<slug>/`, `park-pages.ts`), queued
  *   at once behind the categories' request: its intro, RAC's own paragraphs, is the detail's
  *   `descriptionHtml` (the place page's About), and its own photos come first in `imageUrls`,
- *   before the widget gallery's photos or, at a native park, its accommodation grid's. A home
- *   page that fails, or shows no intro or no photo, never fails the detail: the intro of the
- *   detail the core stored before is kept, and the card's photo stands in for the park's (a
- *   warning says why).
+ *   before the widget gallery's photos or, at a native park, its accommodation grid's. It is
+ *   optional, and bounded so the detail still answers within the core's deadline:
+ *   - it is sent only once the categories have been read (`RacRequestOptions.ready`), so a
+ *     detail whose categories fail sends nothing more;
+ *   - it is given up `RAC_HOME_PAGE_CUTOFF_MS` (30 s) after the detail started: called off in
+ *     the queue (never sent) or in flight;
+ *   - only the detail's own abort rejects the detail. A home page that fails, is given up, or
+ *     shows no intro or no photo never fails it: the intro of the detail the core stored before
+ *     is kept, and the card's photo stands in for the park's (a warning says why).
  * - RAC's photos and words are fetched live and shown only in the app, as RAC publishes them,
  *   with the link to its page (rule 6); the card's photo address is kept in the person's own
  *   catalogue.
@@ -47,7 +52,13 @@ import type { ProviderId, StayQuery } from '@shared/types/provider.types';
 import { addDays, todayIn } from '@shared/utils/calendar-date';
 import { makeLocationKey } from '@shared/utils/location-key';
 import type { ProviderContext } from '../sdk/context';
-import { isAbortError, ProviderError, ProviderParseError, throwIfAborted } from '../sdk/errors';
+import {
+  createAbortError,
+  isAbortError,
+  ProviderError,
+  ProviderParseError,
+  throwIfAborted,
+} from '../sdk/errors';
 import type {
   FullCatalogModule,
   GetLocationOptions,
@@ -69,6 +80,16 @@ import { unitTypeOfKind } from './unit-kinds';
 
 /** How far ahead a native park's near stay is, to list its categories: 14 days. */
 export const RAC_NATIVE_LOOKAHEAD_DAYS = 14;
+
+/**
+ * How long after a detail starts its home page may still be read: 30 s. The core gives a paced
+ * provider's detail time for 2 requests, its own and one already in flight ahead of it
+ * (`pacedDeadlineMs`, documented in the provider guide's timeouts): for RAC, 20 s + 2 × (1 s +
+ * 10 s) = 42 s. The home page is the detail's second request of its own, so it gives way: at the
+ * cutoff it is called off, and the detail answers without it, well inside the core's 42 s, with
+ * time left for the release info.
+ */
+export const RAC_HOME_PAGE_CUTOFF_MS = 30_000;
 
 /**
  * Where the parks' card photos last read from RAC's parks page are kept (slug → photo), for a
@@ -261,7 +282,12 @@ export function createRacCatalog({
         if (photo) photos.set(park.slug, photo);
       }
       if (photos.size > 0) {
-        await ctx.state.set(RAC_PARK_PHOTOS_STATE_KEY, Object.fromEntries(photos));
+        // Kept for a sync whose read fails; the photos just read count either way
+        try {
+          await ctx.state.set(RAC_PARK_PHOTOS_STATE_KEY, Object.fromEntries(photos));
+        } catch (error) {
+          ctx.logger.warn(`The park photos read could not be kept: ${reasonOf(error)}`);
+        }
         return photos;
       }
       reason = 'it shows none of the parks with a photo (a new layout?)';
@@ -277,14 +303,30 @@ export function createRacCatalog({
     return kept;
   }
 
+  /** How a detail's home page read is bounded (`getLocation`). */
+  interface HomePageRead {
+    /** The home page's own signal: the detail's abort, a failure of its categories, the cutoff. */
+    signal: AbortSignal;
+    /** The detail's own signal: only its abort rejects the detail. */
+    outer?: AbortSignal;
+    /** Whether the cutoff called the home page off. */
+    cutOff: () => boolean;
+    /** Awaited in the request's turn: rejects when the categories were not read. */
+    ready: () => Promise<void>;
+  }
+
   /**
-   * The park's home page as read, or undefined when it could not be (a warning says why). A
-   * page read with no intro is logged too. An abort rejects.
+   * The park's home page as read, or undefined when it could not be or was called off (a
+   * warning says why, unless its categories failed: the detail fails then). A page read with no
+   * intro or photo is logged too. Only an abort of the detail's own signal rejects.
    */
-  async function homePage(park: RacPark, signal?: AbortSignal): Promise<ParkHomePage | undefined> {
+  async function homePage(
+    park: RacPark,
+    { signal, outer, cutOff, ready }: HomePageRead
+  ): Promise<ParkHomePage | undefined> {
     const path = `/${park.slug}/`;
     try {
-      const response = await client.getPage(`/${park.slug}/`, { signal });
+      const response = await client.getPage(`/${park.slug}/`, { signal, ready });
       const page = readParkHomePage(response.body, response.url);
       if (!page.descriptionHtml || page.photos.length === 0) {
         const missing = [page.descriptionHtml ? '' : 'intro', page.photos.length ? '' : 'photo']
@@ -294,8 +336,16 @@ export function createRacCatalog({
       }
       return page;
     } catch (error) {
-      if (isAbortError(error) || signal?.aborted) throw error;
-      ctx.logger.warn(`${park.name}: no intro or photos from ${path}: ${reasonOf(error)}`);
+      // The detail itself was called off
+      throwIfAborted(outer);
+      if (cutOff()) {
+        ctx.logger.warn(
+          `${park.name}: ${path} not read within ${RAC_HOME_PAGE_CUTOFF_MS / 1_000} s of the ` +
+            "detail's start; the detail is shown without it"
+        );
+      } else if (!signal.aborted) {
+        ctx.logger.warn(`${park.name}: no intro or photos from ${path}: ${reasonOf(error)}`);
+      }
       return undefined;
     }
   }
@@ -347,22 +397,52 @@ export function createRacCatalog({
         unitsAreTypes: true,
         fetchedAt: ctx.clock().toISOString(),
       };
-      // Its categories, and its own words and photos from its home page: both requests are
+      // Its categories, then its own words and photos from its home page: both requests are
       // queued at once, in that order, so a place page opened while Explore's search runs
-      // waits for one of the search's requests, not one between its own two
-      const [book, home] = await Promise.all([
-        park.bookNow === 'native' ? nativeBook(park, signal) : widgetBook(park, signal),
-        homePage(park, signal),
-      ]);
-      detail.units = book.units;
-      if (book.notices.length > 0) detail.notices = book.notices;
-      // Photos of the accommodation: the widget's gallery, or a native park's home page grid's
-      const accommodationPhotos =
-        park.bookNow === 'native' ? (home?.accommodationPhotos ?? []) : book.photos;
-      const ownPhotos = home?.photos.length ? home.photos : cardPhotos(park, options);
-      detail.imageUrls = [...new Set([...ownPhotos, ...accommodationPhotos])];
-      const description = home?.descriptionHtml ?? keptIntro(park, options);
-      if (description) detail.descriptionHtml = description;
+      // waits for one of the search's requests, not one between its own two. The home page has
+      // a signal of its own: the detail's abort, a failure of the categories or the cutoff
+      // calls it off, and it is sent only once the categories have been read.
+      const home = new AbortController();
+      const stopHome = (): void => home.abort();
+      signal?.addEventListener('abort', stopHome, { once: true });
+      let cutOff = false;
+      const cutoff = setTimeout(() => {
+        cutOff = true;
+        home.abort();
+      }, RAC_HOME_PAGE_CUTOFF_MS);
+      try {
+        const booking =
+          park.bookNow === 'native' ? nativeBook(park, signal) : widgetBook(park, signal);
+        // Never rejects: whether the categories were read
+        const categoriesRead = booking.then(
+          () => true,
+          () => {
+            home.abort();
+            return false;
+          }
+        );
+        const reading = homePage(park, {
+          signal: home.signal,
+          outer: signal,
+          cutOff: () => cutOff,
+          ready: async () => {
+            if (!(await categoriesRead)) throw createAbortError(home.signal);
+          },
+        });
+        const [book, read] = await Promise.all([booking, reading]);
+        detail.units = book.units;
+        if (book.notices.length > 0) detail.notices = book.notices;
+        // Photos of the accommodation: the widget's gallery, or a native park's home page grid's
+        const accommodationPhotos =
+          park.bookNow === 'native' ? (read?.accommodationPhotos ?? []) : book.photos;
+        const ownPhotos = read?.photos.length ? read.photos : cardPhotos(park, options);
+        detail.imageUrls = [...new Set([...ownPhotos, ...accommodationPhotos])];
+        const description = read?.descriptionHtml ?? keptIntro(park, options);
+        if (description) detail.descriptionHtml = description;
+      } finally {
+        clearTimeout(cutoff);
+        signal?.removeEventListener('abort', stopHome);
+      }
 
       // When its dates open: the park's own hour and the members' pre-sale, or its season. Read
       // after the requests, so they take their place in the queue at once.

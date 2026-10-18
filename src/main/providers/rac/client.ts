@@ -8,7 +8,10 @@
  *   by redirect, is a `ProviderHttpError` (`blocked`) and is never sent (terms rule 1). NewBook's
  *   hosts are never asked, and the NewBook key RAC's answers echo is never used.
  * - **One at a time.** A request, redirects included, waits for the one before it to end
- *   (`limits.maxConcurrentRequests`, 1; terms rule 4).
+ *   (`limits.maxConcurrentRequests`, 1; terms rule 4). A page may also wait, once its turn has
+ *   come and before anything is sent, for what it depends on (`RacRequestOptions.ready`: a
+ *   park's home page waits for its categories): it keeps its place in the queue, and if that
+ *   rejects, nothing is sent.
  * - **Headers.** A page asks for `text/html`. `postAjax` (for the availability endpoint) sends
  *   what RAC's own page sends: `X-Requested-With: XMLHttpRequest`, `Origin` and the park's
  *   book-now page as `Referer`. The module sets no User-Agent, client hints or languages of its
@@ -80,6 +83,12 @@ export interface RacRequestOptions {
   signal?: AbortSignal;
   /** Called once the request is sent (`HttpRequestOptions.onSend`), not while it waits its turn. */
   onSend?: () => void;
+  /**
+   * Awaited once the request's turn comes, before anything is sent: when it rejects, the request
+   * rejects with its error and sends nothing. It holds the client's turn meanwhile, so it must
+   * only wait for requests queued before this one (a park's home page waits for its categories).
+   */
+  ready?: () => Promise<void>;
 }
 
 export interface RacAjaxOptions {
@@ -229,6 +238,7 @@ export class RacClient {
       query: options.query,
       signal: options.signal,
       onSend: options.onSend,
+      ready: options.ready,
       headers: { Accept: 'text/html' },
     });
   }
@@ -268,6 +278,8 @@ export class RacClient {
       signal?: AbortSignal;
       /** Called when the first hop is sent; a redirect is the same request. */
       onSend?: () => void;
+      /** Awaited in the request's turn, before it is sent (`RacRequestOptions.ready`). */
+      ready?: () => Promise<void>;
       headers: Record<string, string>;
       body?: string;
     }
@@ -277,6 +289,9 @@ export class RacClient {
     const url = this.racUrl(path);
     this.guard(method, withQueryOf(url, request.query), request.body);
     const queued = this.limit(async () => {
+      throwIfAborted(signal);
+      // What the request depends on, in its turn: if it rejects, nothing is sent
+      if (request.ready) await request.ready();
       throwIfAborted(signal);
       const block = await this.currentBlock();
       if (block) throw this.blockError(url, block);

@@ -14,8 +14,9 @@
  *   NewBook's own engine:
  *   - its hero banner (`div.large-park-hero-banner__slider__item`, one per slide, the photo in
  *     `data-back`), else its `og:image`: the park's own photos;
- *   - its intro: the paragraphs (`p`) beside the page's one `h1` ("Welcome to RAC Busselton
- *     Holiday Park"), RAC's own words with their links, as sanitised HTML (`descriptionHtml`);
+ *   - its intro: the paragraphs (`p`) right after the page's one `h1` ("Welcome to RAC
+ *     Busselton Holiday Park"), up to anything else, RAC's own words with their links, as
+ *     sanitised HTML (`descriptionHtml`);
  *   - its accommodation grid (`.accommodation-and-sites-block__grid__item__gallery`): photos of
  *     its categories, on NewBook's image host, which a NewBook-native park's place page shows
  *     (its book-now page has none).
@@ -151,18 +152,34 @@ function inlineHtml(node: HtmlNode): string {
 }
 
 /**
- * The intro: the paragraphs beside the page's first `h1`, after it, that have text, as `<p>`s
- * (at most `RAC_INTRO_MAX_PARAGRAPHS`), sanitised against `pageUrl`. Undefined when there are
- * none.
+ * The paragraphs right after `heading` in its parent: the run of `p`s that follows it, up to the
+ * first thing that is not one (a heading, a block, loose text), so a later section of the page is
+ * never taken for the intro. On RAC's pages (read on 18 Oct 2026) the intro's `h1` is followed
+ * by its `p`s and nothing else, with only white space between them.
+ */
+function paragraphsAfter(holder: HtmlElement, heading: HtmlElement): HtmlElement[] {
+  const paragraphs: HtmlElement[] = [];
+  for (const node of holder.children.slice(holder.children.indexOf(heading) + 1)) {
+    if (!isElement(node)) {
+      if (node.text.trim() === '') continue;
+      break;
+    }
+    if (node.tag !== 'p') break;
+    paragraphs.push(node);
+  }
+  return paragraphs;
+}
+
+/**
+ * The intro: the paragraphs right after the page's first `h1` (`paragraphsAfter`) that have
+ * text, as `<p>`s (at most `RAC_INTRO_MAX_PARAGRAPHS`), sanitised against `pageUrl`. Undefined
+ * when there are none.
  */
 function introHtml(root: HtmlElement, pageUrl: string): string | undefined {
   const [heading] = findAll(root, (element) => element.tag === 'h1');
   if (!heading) return undefined;
   const [parent] = findAll(root, (element) => element.children.includes(heading));
-  const holder = parent ?? root;
-  const after = holder.children.slice(holder.children.indexOf(heading) + 1);
-  const paragraphs = after
-    .filter((node): node is HtmlElement => isElement(node) && node.tag === 'p')
+  const paragraphs = paragraphsAfter(parent ?? root, heading)
     .filter((paragraph) => textOf(paragraph) !== '')
     .slice(0, RAC_INTRO_MAX_PARAGRAPHS)
     .map((paragraph) => `<p>${paragraph.children.map(inlineHtml).join('').trim()}</p>`);
