@@ -298,6 +298,8 @@ describe('RAC Parks & Resorts', () => {
       expect(detail.imageUrls).toEqual(Array.from({ length: 12 }, (_, i) => placeholder(i + 1)));
       expect(detail.releaseInfo).toBe(releaseInfo(8));
       expect(detail.fetchedAt).toBe(NOW.toISOString());
+      // Each unit is a category of sites or cabins, so the place page lists types, not a count
+      expect(detail.unitsAreTypes).toBe(true);
     });
 
     it('gives Margaret River its dorms and its safari tent', async () => {
@@ -380,6 +382,8 @@ describe('RAC Parks & Resorts', () => {
 
     it("lists Exmouth's categories in RAC's order, with their kinds and types, and no prices", async () => {
       const detail = await provider.catalog.getLocation('exmouth');
+      // A park on NewBook's own engine lists types too
+      expect(detail.unitsAreTypes).toBe(true);
       expect(detail.units.slice(0, 6)).toEqual([
         { unitId: 'cat:25', unitName: 'Blue Reef Motel', unitType: 'Rooms', unitKind: 'room' },
         { unitId: 'cat:35', unitName: 'Blue Reef Queen', unitType: 'Rooms', unitKind: 'room' },

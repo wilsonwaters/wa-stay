@@ -182,6 +182,8 @@ export function createRacCatalog({
       const detail: LocationDetail = {
         ...toLocationSummary(ctx.id, park, links),
         units: [],
+        // Each unit is a category of sites or cabins: a type, never one place to stay
+        unitsAreTypes: true,
         fetchedAt: ctx.clock().toISOString(),
       };
       // When its dates open: the park's own hour and the members' pre-sale, or its season. Read

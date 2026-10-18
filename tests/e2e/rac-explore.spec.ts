@@ -7,7 +7,8 @@
  * "Cabins & villas" counts only the cabins: Busselton's answer lists no cabin, so its card turns
  * to "No cabins open for these dates", Esperance's reads its six free cabins, and Cervantes',
  * whose villas are booked out, "No cabin free every night". Busselton's page counts the same
- * 51 for the stay ("51 spots free for all 2 nights", no "of M"). Fixture mode refuses no
+ * 51 for the stay ("51 spots free for all 2 nights", no "of M"), and lists its categories as
+ * types ("Bookable as 6 spot types"), never as a count of spots. Fixture mode refuses no
  * request, and the window logs no errors. Roles and accessible names only.
  */
 
@@ -115,6 +116,11 @@ test('RAC parks read their free spots beside ParkStay’s “N of M”, and Stay
     availability.getByText('51 spots free for all 2 nights', { exact: true })
   ).toBeVisible({ timeout: 20_000 });
   await expect(availability.getByText(/\b\d+ of \d+ spots free/)).toHaveCount(0);
+  // Its categories are types of spot, not a count of spots beside the 51 free
+  const spots = window.getByRole('region', { name: 'Spots', exact: true });
+  await expect(spots.getByText('Bookable as 6 spot types', { exact: true })).toBeVisible();
+  await expect(spots.getByRole('button', { name: 'Show all 6 spot types' })).toBeVisible();
+  await expect(spots.getByText(/^\d+ spots$/)).toHaveCount(0);
 
   // Nothing left the fixtures, and the window logged no errors
   const requests = wa.unexpectedRequests();

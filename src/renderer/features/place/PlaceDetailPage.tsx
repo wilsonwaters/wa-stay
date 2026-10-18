@@ -437,7 +437,12 @@ export default function PlaceDetailPage() {
           )}
           {detail && <FacilitiesSection amenities={detail.amenities} />}
           {loaded && detail && (
-            <SitesSection units={units} unitCount={detail.unitCount} noun={noun} />
+            <SitesSection
+              units={units}
+              unitCount={detail.unitCount}
+              unitsAreTypes={detail.unitsAreTypes === true}
+              noun={noun}
+            />
           )}
           {loaded && detail && <BookingRulesSection releaseInfo={detail.releaseInfo} />}
         </div>
