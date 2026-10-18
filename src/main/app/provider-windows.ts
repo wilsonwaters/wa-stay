@@ -22,7 +22,11 @@
  * - every permission request and check, and every device request, is refused; certificate
  *   errors are rejected; no client certificate or HTTP credentials are offered; a page cannot
  *   stop the window closing (`will-prevent-unload`);
- * - the page keeps its own Content-Security-Policy: nothing here touches response headers.
+ * - the page keeps its own Content-Security-Policy: nothing here touches response headers;
+ * - the partition presents the browser the provider's API calls present (`browserIdentity`):
+ *   its user agent and languages are set with `session.setUserAgent`, and Chromium's own client
+ *   hints (`navigator.userAgentData`, `sec-ch-ua*`) already name the same Chromium and
+ *   operating system (architecture-notes §12.32).
  *
  * The window has no address bar, so its title names the provider, the purpose and the host
  * it shows (`ParkStay — Sign in · dbcab2c.b2clogin.com`); a page cannot change it.
@@ -55,7 +59,7 @@ import type {
 import { ProviderError } from '../providers/sdk/errors';
 import { providerPartition } from '../providers/sdk/http-electron';
 import { describeUrl, matchesOrigin } from '../providers/sdk/url-patterns';
-import { chromeUserAgent, runtimeChromeMajor } from '../providers/sdk/user-agent';
+import { browserIdentity, type BrowserIdentity } from '../providers/sdk/user-agent';
 import { logger } from '../utils/logger';
 
 const log = logger.child({ module: 'provider-windows' });
@@ -113,8 +117,10 @@ function placeOf(url: string): { origin: string; path: string } | undefined {
 export interface ProviderWindowsOptions {
   /** DevTools in provider windows: never in a packaged build. */
   devTools: boolean;
-  /** The Chrome major version the partition presents. Defaults to the one Electron runs. */
+  /** The Chromium major version the partition presents. Defaults to the one Electron runs. */
   chromeMajor?: string;
+  /** Tests only: the operating system to present. Defaults to the one the app runs on. */
+  platform?: NodeJS.Platform;
   /** Tests only: `SHOW_AFTER_MS`. */
   showAfterMs?: number;
 }
@@ -125,11 +131,14 @@ export class ProviderWindows implements ProviderWindowOpener, ProviderSessionSto
     { handle: ProviderWindowHandle; window: BrowserWindow }
   >();
   private readonly hardened = new WeakSet<Session>();
-  private readonly userAgent: string;
+  private readonly identity: BrowserIdentity;
   private parent: BrowserWindow | null = null;
 
   constructor(private readonly options: ProviderWindowsOptions) {
-    this.userAgent = chromeUserAgent(options.chromeMajor ?? runtimeChromeMajor());
+    this.identity = browserIdentity({
+      chromeMajor: options.chromeMajor,
+      platform: options.platform,
+    });
   }
 
   /** Provider windows sit above the main window, and close with it. */
@@ -376,7 +385,7 @@ export class ProviderWindows implements ProviderWindowOpener, ProviderSessionSto
     ses.setPermissionRequestHandler((_contents, _permission, callback) => callback(false));
     ses.setPermissionCheckHandler(() => false);
     ses.setDevicePermissionHandler(() => false);
-    ses.setUserAgent(this.userAgent);
+    ses.setUserAgent(this.identity.userAgent, this.identity.acceptLanguages);
   }
 
   private guard(

@@ -14,11 +14,15 @@
  * default policy Chromium cancels a request whose cross-origin Referer carries a path
  * (`ERR_BLOCKED_BY_CLIENT`).
  *
- * The partition presents the Chrome version Electron really runs (`process.versions.chrome`):
- * its user agent is set once, and every request's `User-Agent` and `sec-ch-ua` headers are
- * rewritten to that version, whatever the provider put there. API calls and the provider's
- * windows therefore present one browser whose user agent agrees with Chromium's own client
- * hints (architecture-notes §12.32).
+ * The partition presents one browser (`browserIdentity`, `user-agent.ts`): the Chromium
+ * Electron really runs, on the operating system the app runs on. Its user agent and languages
+ * are set once (`session.setUserAgent(userAgent, ACCEPT_LANGUAGES)`), and each request's
+ * `User-Agent`, and its `sec-ch-ua`, `sec-ch-ua-mobile`, `sec-ch-ua-platform` and
+ * `Accept-Language` when the provider sent them, are rewritten to that browser's
+ * (`withBrowserIdentity`). Nothing is added: Chromium itself gives a request without an
+ * `Accept-Language` the partition's, and adds no client hints. API calls and the provider's
+ * windows therefore send the same user agent, client hints and languages
+ * (architecture-notes §12.32; checked live by `tests/electron/provider-windows.electron.ts`).
  *
  * This is the only file under `providers/` that imports `electron`. Build it after the app
  * is ready (`session.fromPartition` needs `ready`).
@@ -35,7 +39,7 @@ import {
   type HopResponse,
   type HttpCookie,
 } from './http';
-import { chromeBrands, chromeUserAgent, runtimeChromeMajor } from './user-agent';
+import { browserIdentity, withBrowserIdentity, type BrowserIdentity } from './user-agent';
 
 export function providerPartition(providerId: ProviderId): string {
   return `persist:provider-${providerId}`;
@@ -108,39 +112,36 @@ class ElectronCookieStore implements CookieStore {
 
 export interface ElectronSessionHttpClientOptions {
   providerId: ProviderId;
-  /** The Chrome major version to present. Defaults to the one Electron runs. */
+  /** The Chromium major version to present. Defaults to the one Electron runs. */
   chromeMajor?: string;
+  /** The operating system to present. Defaults to the one the app runs on. Tests only. */
+  platform?: NodeJS.Platform;
 }
 
 export class ElectronSessionHttpClient extends BaseHttpClient {
   readonly providerId: ProviderId;
   readonly partition: string;
   readonly cookies: CookieStore;
-  /** The desktop Chrome user agent this partition presents. */
+  /** The browser this partition presents. */
+  readonly identity: BrowserIdentity;
+  /** Its desktop Chrome user agent. */
   readonly userAgent: string;
-  private readonly brands: string;
   private readonly ses: Session;
 
-  constructor({
-    providerId,
-    chromeMajor = runtimeChromeMajor(),
-  }: ElectronSessionHttpClientOptions) {
+  constructor({ providerId, chromeMajor, platform }: ElectronSessionHttpClientOptions) {
     super();
     this.providerId = providerId;
     this.partition = providerPartition(providerId);
-    this.userAgent = chromeUserAgent(chromeMajor);
-    this.brands = chromeBrands(chromeMajor);
+    this.identity = browserIdentity({ chromeMajor, platform });
+    this.userAgent = this.identity.userAgent;
     this.ses = session.fromPartition(this.partition);
-    this.ses.setUserAgent(this.userAgent);
+    this.ses.setUserAgent(this.identity.userAgent, this.identity.acceptLanguages);
     this.cookies = new ElectronCookieStore(this.ses);
   }
 
-  /** The hop's headers, with the partition's own `User-Agent` and (when sent) `sec-ch-ua`. */
+  /** The hop's headers, presenting the partition's browser (`withBrowserIdentity`). */
   private identityHeaders(headers: Headers): Record<string, string> {
-    const out = Object.fromEntries(headers.entries());
-    out['user-agent'] = this.userAgent;
-    if ('sec-ch-ua' in out) out['sec-ch-ua'] = this.brands;
-    return out;
+    return withBrowserIdentity(Object.fromEntries(headers.entries()), this.identity);
   }
 
   protected send(hop: HopRequest): Promise<HopResponse> {

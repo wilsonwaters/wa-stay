@@ -11,7 +11,11 @@
  *   (`limits.maxConcurrentRequests`, 1; terms rule 4).
  * - **Headers.** A page asks for `text/html`. `postAjax` (for the availability endpoint) sends
  *   what RAC's own page sends: `X-Requested-With: XMLHttpRequest`, `Origin` and the park's
- *   book-now page as `Referer`. The User-Agent is never set or changed (terms rule 5).
+ *   book-now page as `Referer`. The module sets no User-Agent, client hints or languages of its
+ *   own: in the app, the `persist:provider-rac` session presents one browser (the SDK's user
+ *   agent and `Accept-Language`) for these requests and for any window on it (the cart page,
+ *   with `autoCart` on). That identity is fixed (it changes only with the Chromium an app
+ *   update brings), and never rotated or changed to get past a check (terms rule 5).
  * - **A block** is a 403 or a 429, a `cf-mitigated: challenge` header, or a 503 or 200 page
  *   with Cloudflare's challenge in it ("Just a moment…" as its title, or `cf_chl_opt`). The bot
  *   detection script ordinary pages load (`/cdn-cgi/challenge-platform/scripts/jsd/main.js`) is
