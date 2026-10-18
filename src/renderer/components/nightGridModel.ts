@@ -203,7 +203,12 @@ function dayLabel(date: string): string {
   return format(parseIsoDate(date), 'EEE d MMM');
 }
 
-/** The units the summary line leaves out, and why. */
+/**
+ * The units the summary line leaves out, and why. A provider that counts its units
+ * (`freeUnits`: each row a type standing for several, such as RAC's categories) gets no number
+ * of rows, which would read as a count beside its free count: "Some spots need a stay of at
+ * least 3 nights."
+ */
 export function summaryNotes(
   summary: AvailabilitySummary,
   noun: UnitNoun,
@@ -211,6 +216,12 @@ export function summaryNotes(
 ): string[] {
   const notes: string[] = [];
   const { notReleased, unknown } = summary;
+  const rowsAreTypes = summary.freeUnits !== undefined;
+  /** "2 sites need" / "1 site needs", or "Some spots need" when rows are types. */
+  const some = (count: number, verbs: [one: string, many: string]): string =>
+    rowsAreTypes
+      ? `Some ${noun.many} ${verbs[1]}`
+      : `${count} ${plural(count, noun)} ${count === 1 ? verbs[0] : verbs[1]}`;
   if ((summary.split ?? 0) > 0) {
     notes.push(`Free on some nights, but not on one ${noun.one} for the whole stay.`);
   }
@@ -218,31 +229,48 @@ export function summaryNotes(
     .map(([minimum, count]) => [Number(minimum), count] as const)
     .sort(([a], [b]) => a - b);
   for (const [minimum, count] of minimums) {
-    notes.push(
-      `${count} ${plural(count, noun)} ${count === 1 ? 'needs' : 'need'} a stay of at least ${minimum} nights.`
-    );
+    notes.push(`${some(count, ['needs', 'need'])} a stay of at least ${minimum} nights.`);
   }
   if (summary.noArrival) {
     const { date, units } = summary.noArrival;
     notes.push(
       units === summary.total
         ? `No arrivals on ${dayLabel(date)}.`
-        : `${units} ${plural(units, noun)} ${units === 1 ? 'takes' : 'take'} no arrivals on ${dayLabel(date)}.`
+        : `${some(units, ['takes', 'take'])} no arrivals on ${dayLabel(date)}.`
     );
   }
   if (notReleased > 0 && summary.known > 0) {
     notes.push(
-      `${notReleased} more ${plural(notReleased, noun)} ${
-        notReleased === 1 ? 'has' : 'have'
-      } nights that aren't released yet.`
+      rowsAreTypes
+        ? `Some other ${noun.many} have nights that aren't released yet.`
+        : `${notReleased} more ${plural(notReleased, noun)} ${
+            notReleased === 1 ? 'has' : 'have'
+          } nights that aren't released yet.`
     );
   }
   if (unknown > 0 && (summary.known > 0 || notReleased > 0)) {
     notes.push(
-      `${source} didn't say which nights are free for ${unknown} more ${plural(unknown, noun)}.`
+      rowsAreTypes
+        ? `${source} didn't say which nights are free for some other ${noun.many}.`
+        : `${source} didn't say which nights are free for ${unknown} more ${plural(unknown, noun)}.`
     );
   }
   return notes;
+}
+
+/**
+ * "Show all 24 sites" and "Show fewer sites", or, when each row is a type standing for several
+ * (a provider that counts its units, such as RAC's categories), "Show all 12 spot types": the
+ * rows are never counted as units beside the free count.
+ */
+export function showAllLabel(
+  showAll: boolean,
+  rows: number,
+  noun: UnitNoun,
+  rowsAreTypes: boolean
+): string {
+  const what = rowsAreTypes ? `${noun.one} types` : noun.many;
+  return showAll ? `Show fewer ${what}` : `Show all ${rows} ${what}`;
 }
 
 /** Why "Fully available only" shows no rows, and what to do about it. */

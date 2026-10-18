@@ -7,6 +7,7 @@ import {
   nightCellText,
   nightHeading,
   noFullRowsMessage,
+  showAllLabel,
   stayNights,
   stayRangeLabel,
   summariseAvailability,
@@ -188,6 +189,16 @@ describe('free counts (a provider that counts its units, such as RAC)', () => {
       NIGHTS
     );
     expect(summaryLine(summary, SPOTS, 'RAC')).toBe("These nights aren't released for booking yet");
+  });
+});
+
+describe('showAllLabel', () => {
+  it('counts rows as units, or as types when each stands for several (RAC)', () => {
+    expect(showAllLabel(false, 24, SITE, false)).toBe('Show all 24 sites');
+    expect(showAllLabel(true, 24, SITE, false)).toBe('Show fewer sites');
+    const SPOTS = { one: 'spot', many: 'spots' };
+    expect(showAllLabel(false, 12, SPOTS, true)).toBe('Show all 12 spot types');
+    expect(showAllLabel(true, 12, SPOTS, true)).toBe('Show fewer spot types');
   });
 });
 
@@ -374,6 +385,48 @@ describe('min-stay nights (free, but refused for this stay by the stay rules)', 
     // A minimum the stay meets (refused for another rule) is not a note
     const longEnough = summariseAvailability([refused('a')], [...STAY, '2027-09-27']);
     expect(summaryNotes(longEnough, SITE, 'RAC')).toEqual(['No arrivals on Sat 25 Sep.']);
+  });
+
+  it('name no number of rows when each row is a type standing for several (RAC): "Some spots need …"', () => {
+    const SPOTS = { one: 'spot', many: 'spots' };
+    const counted = (unit: UnitAvailability, freeCount: number) => ({ ...unit, freeCount });
+    const unreleased = (unitId: string) =>
+      counted(
+        {
+          unitId,
+          unitName: unitId,
+          nights: STAY.map((date) => ({ date, state: 'not-released' as const })),
+          fullyAvailable: false,
+        },
+        0
+      );
+    const silent = (unitId: string) =>
+      counted({ unitId, unitName: unitId, nights: [], fullyAvailable: false }, 0);
+    const summary = summariseAvailability(
+      [
+        counted(refused('a'), 0),
+        counted(refused('b', { minNights: 5 }), 0),
+        counted(free('c'), 51),
+        unreleased('d'),
+        unreleased('e'),
+        silent('f'),
+      ],
+      STAY
+    );
+    expect(summary.freeUnits).toBe(51);
+    expect(summaryLine(summary, SPOTS, 'RAC')).toBe('51 spots free for all 2 nights');
+    expect(summaryNotes(summary, SPOTS, 'RAC')).toEqual([
+      'Some spots need a stay of at least 3 nights.',
+      'Some spots take no arrivals on Sat 25 Sep.',
+      "Some other spots have nights that aren't released yet.",
+      "RAC didn't say which nights are free for some other spots.",
+    ]);
+    // Every row takes no arrivals: no count was ever given
+    const all = summariseAvailability([counted(refused('a'), 0)], STAY);
+    expect(summaryNotes(all, SPOTS, 'RAC')).toEqual([
+      'Some spots need a stay of at least 3 nights.',
+      'No arrivals on Sat 25 Sep.',
+    ]);
   });
 
   it("read a unit's minimum from its arrival night, else the unit; 0, 1, negative or a fraction is none", () => {

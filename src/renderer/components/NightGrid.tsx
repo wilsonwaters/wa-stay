@@ -25,6 +25,7 @@ import {
   nightHeading,
   nightOf,
   noFullRowsMessage,
+  showAllLabel,
   stayNights,
   stayRangeLabel,
   summariseAvailability,
@@ -399,7 +400,7 @@ export function NightGrid({
               aria-expanded={showAll}
               onClick={() => setShowAll((all) => !all)}
             >
-              {showAll ? `Show fewer ${unitNoun.many}` : `Show all ${rows.length} ${unitNoun.many}`}
+              {showAllLabel(showAll, rows.length, unitNoun, summary.freeUnits !== undefined)}
             </Button>
           )}
         </>
