@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.1.0] - 2026-10-18
+
 ### Added
 
 - **RAC Parks & Resorts**, WA Stay's second provider: its eight open holiday parks and resorts on Explore beside ParkStay's campgrounds, each park's categories (powered sites, cabins, rooms, dorms, glamping) night by night with prices and RAC's stay rules, its free counts for your dates on Explore, watches, and Site Sniper release alerts timed to RAC's 364-day window and its school-holiday releases (#52, #57, #58, #61).
