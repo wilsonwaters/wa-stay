@@ -337,3 +337,57 @@ Totals by host:
 - `requests-log.tsv`, `STOP`
 
 Scripts are in `/tmp/claude-0/-home-user/ad6929c6-e464-57e2-adce-3cdda806854a/scratchpad/rottnest/site-scripts/`: `live_get.sh` (logged, rate-limited, stop on challenge), `cc_lookup.py`, `cc_debug.py`, `pdf_links.py`.
+
+---
+
+## 11 The results page (from the stakeholder's browser capture, 18 Oct 2026)
+
+The stakeholder ran one search in their own browser and exported it as a HAR (Chrome's sanitised export: **no cookies**). Nothing below was requested by an agent.
+
+**The request:**
+- `GET https://bookings.stayrottnest.com/rates-room1?hotel=62607&arrival=2027-06-28&departure=2027-07-01&rooms=1&adults[1]=1&children[1]=0&roomCategories[]=39&type[]=campground&type[]=hostel-dorms&type[]=self-contained`.
+- It was sent anonymously (no cookie) and answered 200 `text/html`, about 1.48 MB gzipped on the wire as about 1.5 MB of HTML, in 3.3 s.
+- Response headers: `cache-control: no-store, no-cache, must-revalidate, private`, `server: cloudflare`, `x-frame-options: SAMEORIGIN`.
+- The page then loads its scripts (jQuery, Vue 2.7, `ibe-core.min.js`, `rooms-calendar.min.js`) and `GET /api/hotel-occupancys`: a JSON list of the adult counts 1–18 with each one's most children, the party picker's limits.
+- It runs Cloudflare's script detections (`/cdn-cgi/challenge-platform/.../precursor`) and analytics (Google, Meta, Yahoo, Sitefinity Insight).
+
+**What the page holds.** Every room type on the island is rendered server-side, whatever the filters, as a card:
+
+```html
+<div class="card-style room-and-rates [unavailable]" room-calendar-root="GPV04" data-group="39"
+     data-location-type="self-contained" data-sleeps="6" data-bedrooms="2" data-features=""
+     data-filtered-reasons="">
+```
+
+- **`room-calendar-root`:** the room type's code: precinct letter(s), type, beds. `GPV04` is Geordie Premium View, 4 beds.
+- **`data-group`:** the precinct:
+
+  | Group | Precinct | Group | Precinct |
+  | --- | --- | --- | --- |
+  | 36 | Caroline Thomson Cabins | 41 | North Thomson Bay |
+  | 37 | Kingstown (hostel, dorms, Governor Circle, heritage cottages) | 42 | South Thomson Bay |
+  | 38 | Fay's Bay | 43 | Bathurst |
+  | 39 | Geordie Bay | 44 | Campground |
+  | 40 | Longreach Bay | | |
+
+- **`data-location-type`:** `self-contained`, `hostel-dorms` or `campground` (the `type[]` filter). `data-sleeps` is the most people; `data-bedrooms` is the bedrooms (0 for the campground, cabins and hostel bed).
+- **`data-filtered-reasons`:** what the person's filters hide in the browser (`group` for another precinct). Filtering is the browser's: **one search covers all 68 room types**, so `roomCategories[]` and `type[]` only change what is shown.
+- **A free type:**
+  - `<h2 class="icon-header-info">Geordie Bay Premium View - 4 Beds</h2>`;
+  - "from `<span class="currency-symbol"> &#36;1,074.00</span>` for 3 nights" (the whole stay, the cheapest rate);
+  - a rate block per rate (`data-target="#RIA25-GPV04"`), with its name ("Best Available Rate (25% Deposit Required)"), price and a "Book" button whose `formaction` is the booking step, `/details/hotel/62607/arrival/…/RIA25/GPV04`. **WA Stay never requests or links to `/details/`.**
+- **An unavailable type:** the card has the class `unavailable` and "Unavailable on your dates", with no price and no rate.
+- **Rates seen:** `RIA25` (self-contained and family rooms, 25% deposit), `CAMPING` (campground), `HOSTS` (hostel bed). Campground and hostel bookings are paid in full (T&Cs 7(c)).
+- **In this sample** (28 Jun–1 Jul 2027, one adult), 33 types were free and 35 unavailable.
+- **No per-night detail.** The page answers for the whole stay. The calendar component can show nights, but only after a script call the page makes when the person asks for "Flexible Dates?", which was not captured.
+
+**The 68 room types**, by code (from the capture; names in RIA's words are kept in the seed):
+
+`CG06`; `CTC06`; `KYB01`, `KYF03`, `KDM02`, `KDM04`, `KDM04B`, `KDM08`, `KDM12`, `KDM12B`, `KDM14`, `KDM18`, `KGC09`, `KGC13`, `KGC18`, `KHV06`, `KHSV06`, `KHOV06`; `FPR04`, `FPR06`, `FPV04`, `FPV06`; `GPR06`, `GPV04`, `GPV06`, `GPV08`, `GOV04`, `GOV06`; `LOV04`, `LOV06`, `LOV08`, `LPV04`, `LPV06`, `LPV08`; `NBU04`, `NBU06`, `NBV04`, `NCH04`, `NHC04`, `NHC06`, `NHC08`, `NHP08`, `NHSV08`, `NHV04`, `NHV06`, `NHV08`, `NOV04`, `NOV06`, `NOV08`, `NPR04`, `NPR06`, `NPV04`, `NPV06`, `NSD06`; `SOV04`, `SOV06`, `SPR04`, `SPR06`, `SSD04`; `BHV04`, `BHV06`, `BOV06`, `BOV08`, `BPR04`, `BPR06`, `BPV04`, `BPV06`, `BSD04`.
+
+**Still unknown:**
+- how a month not yet released answers (all unavailable, or a message);
+- whether a party larger than a type's `data-sleeps` hides it (`data-filtered-reasons`) or marks it unavailable;
+- what a minimum-stay or fixed-block refusal looks like.
+
+The parser treats anything it can't read as unknown, never free, and refuses a party larger than `data-sleeps` itself.

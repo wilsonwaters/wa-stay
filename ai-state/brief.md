@@ -4,6 +4,81 @@ This file holds one brief per project. The current project is first; earlier pro
 
 ---
 
+# Project 3 — Rottnest Island (Stay Rottnest) provider
+
+> Agreed with the stakeholder (Wilson Waters) on 2026-10-18, after the plan of 2026-10-17. Re-edit only on a major scope change.
+
+## What we're building
+
+WA Stay's third provider: **Rottnest Island**, booked through **Stay Rottnest** (`stayrottnest.com`), the Rottnest Island Authority's (RIA) booking service.
+
+- **Inventory.** 68 room types in nine precincts (Thomson Bay North and South, Bathurst, Caroline Thomson Cabins, Longreach, Fay's Bay, Geordie Bay, Kingstown, the Campground): self-contained units, cottages, bungalows and cabins, the hostel and dorms, and campsites. The private island operators are out of scope.
+- **The booking engine** is P3 Hotel Software's on `bookings.stayrottnest.com`, behind Cloudflare. One anonymous `GET /rates-room1?hotel=62607&arrival=…&departure=…&rooms=1&adults[1]=…&children[1]=…` returns every room type on the island for the stay, each free (with a whole-stay price) or "Unavailable on your dates". This is from the stakeholder's own browser capture; the research doesn't request it.
+
+## Who uses it
+
+WA Stay users after WA's most contested public accommodation (about 15,000 people queue for about 1,500 peak places). They want to:
+
+- see the island's accommodation on Explore, with what's free for their dates;
+- **watch** for a cancellation and be told at once (the stakeholder's priority, "core to WA Stay");
+- be ready for the monthly Open Day, when months open nine months ahead.
+
+## Research inputs
+
+- `ai-state/research/rottnest-terms.md`: the contract review of the booking terms, and the stakeholder's decision record (§9).
+- `ai-state/research/rottnest-release-rules.md`: Open Days, the waiting room, peak fixed blocks, booking rules, cancellations, inventory.
+- `ai-state/research/rottnest-prior-art.md`: the platform and protection layers, and two paid notify-only watchers.
+- `ai-state/research/rottnest-booking-flow.md`: the site, its links, and (§11) the results page from the stakeholder's capture.
+
+## Facts that shape the design (verified 2026-10-17/18)
+
+- **Clause 4 of the booking terms** (RIA4555, for bookings from 4 March 2026): "bookings may not be made or assisted by the use of automated software", naming "web scraping, data mining, rate shopping, booking". RIA may cancel a suspect booking without refund and block IP addresses. The search page presents the same terms as covering "using this site". The privacy statement says RIA logs IP addresses and device identifiers and may use them to investigate "inappropriate activity".
+- **Open Days:** the first Wednesday of month M at 8:30 am AWST opens month M+8. A Queue-it waiting room opens at 6 am, and everyone in it before 8:30 gets a random place. An SMS passcode is needed; when called, a person has 30 minutes.
+- **Peak periods** sell fixed arrival and departure blocks per precinct. Other rules: the 5/3 rule, Saturdays need two nights, no public-holiday arrivals or departures, at most 14 nights, occupancy per type.
+- **The results page** is server-rendered HTML (about 1.5 MB). Each room type is a `room-and-rates` card with `room-calendar-root` (its code, e.g. `GPV04`), `data-group` (its precinct: 36–44), `data-location-type`, `data-sleeps`, `data-bedrooms`, and, when free, a "from $X for N nights" price and a rate (`RIA25`, `CAMPING`, `HOSTS`). Availability is for the whole stay: no per-night detail and no count of free units.
+
+## Stakeholder decisions (2026-10-18)
+
+| # | Decision |
+|---|---|
+| T1 | **An automatic watch, accepting clause 4's risk.** WA Stay checks Stay Rottnest automatically for watches, **every 30 minutes at most**. It is notify-only: it never holds, carts or books, and the person books on Stay Rottnest's own site. The terms review's links-only recommendation is declined; its mitigations are kept (terms review §9). |
+| T2 | **No letter to RIA.** |
+| T3 | **Open Day reminders** (Site Sniper's Rottnest form) for opening periods, plus the automatic watch for cancellations. No "look reminder" watches. |
+| T4 | **First-use notice.** Rottnest checks are offered to everyone; before WA Stay sends Stay Rottnest its first request, the person reads a notice of the clause 4 risk and ticks "I understand" once. It can be withdrawn in Settings → Accounts. |
+| T5 | **Checks:** watches (30 minutes at least), the place page's check on the person's click, and Explore's free counts. One search covers the island, so a date change on Explore is one request. |
+| T6 | **The search link:** `https://bookings.stayrottnest.com/rates-room1?hotel=62607&arrival=YYYY-MM-DD&departure=YYYY-MM-DD&rooms=1&adults[1]=N&children[1]=N`, plus `roomCategories[]=<precinct group>` to show one precinct. |
+| T7 | **Samples** of the results page come from the stakeholder's own browser (a HAR), never from the agents. |
+
+## Orchestrator defaults (stated to the stakeholder, can be overridden)
+
+| # | Default |
+|---|---|
+| TO1 | **Process:** as projects 1 and 2: one PR from `ccr-b1b30894-k6djyp`, `ai-state/` committed in it, commits as the stakeholder with no tool attribution. |
+| TO2 | **An API provider** (`integration: 'api'`), read over the SDK's `HttpClient` on `persist:provider-rottnest`, presenting the app's one browser identity (§12.32) and no identity of its own. |
+| TO3 | **Gentle by design:** one request at a time, at least 60 s apart in the background; one search per stay and party shared by every caller; nothing on Open Day mornings (05:30–12:00 Perth); only `GET /rates-room1`. A 403, 429, Cloudflare challenge or waiting room stops every request for 12 hours, doubling to 7 days. Nothing is retried, solved or worked around. |
+| TO4 | **Never:** holds, carts, the `/details/` booking step, sign-in, the waiting room or the SMS passcode. |
+| TO5 | **Content:** facts only (names, types, sleeps, bedrooms, prices). No RIA photos, descriptions or logos in the app's seed, fixtures, docs or website: a monogram and colour, plus the independence notice. |
+| TO6 | **Counts:** a room type counts as one free "spot" when at least one of its units is free for the stay, so a count is a lower bound; the place page lists types, never units. |
+
+## Success criteria
+
+1. Explore lists Rottnest's precincts with their room types, and, once the notice is accepted, free counts for chosen dates; a place page checks on a click.
+2. A Rottnest watch checks every 30 minutes at most, alerts on a freed room type with the search link, and never holds.
+3. Nothing is sent to Stay Rottnest before the person accepts the notice; withdrawing it stops every check.
+4. Open Day plans name the stay's Open Day, check the stay against RIA's rules, and remind the person the evening before, at 6 am and at 8:15, with RIA's checklist.
+5. Every rule in `rottnest-terms.md` §9 that applies is enforced, with a test where testable.
+6. The full gate passes: `lint`, `format:check`, `type-check`, `test`, `test:tz`, `build:e2e` and `test:e2e`.
+7. The docs, CLAUDE.md and the website describe Rottnest truthfully, including the risk.
+
+## Out of scope
+
+- Holds, carts, bookings, the waiting room or the SMS passcode on Stay Rottnest.
+- Any request beyond `GET /rates-room1`.
+- Private island operators; ferries; activities.
+- RottoWatch's or Quokka Watch's APIs.
+
+---
+
 # Project 2 — RAC Parks & Resorts provider
 
 > Agreed with the stakeholder (Wilson Waters) on 2026-10-16. Re-edit only on a major scope change.

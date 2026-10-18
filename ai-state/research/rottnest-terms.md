@@ -30,6 +30,7 @@ It is a structured analysis for planning, not legal advice. Where an outcome tur
 - [6. Rules the app must follow](#6-rules-the-app-must-follow)
 - [7. The route to an automated cancellation watch](#7-the-route-to-an-automated-cancellation-watch)
 - [8. Ambiguities for the stakeholder](#8-ambiguities-for-the-stakeholder)
+- [9. Stakeholder decision and the rules for the automated watch](#9-stakeholder-decision-and-the-rules-for-the-automated-watch)
 - [Appendix A: draft request to RIA](#appendix-a-draft-request-to-ria)
 - [Documents read](#documents-read)
 
@@ -48,6 +49,8 @@ Clause 4 is unusually broad. Unlike RAC's terms, which never mention automation,
 | (g) Automatic hold, cart or booking: auto-hold watches, hold snipes, an auto-cart experiment | **Prohibited** | "bookings may not be made ... by the use of automated software"; "booking" is a listed example. |
 | (h) Automating the waiting room, the SMS passcode or the queue | **Prohibited** | It "mimic[s] human behaviour to gain unauthorized access". It also defeats a security control RIA added "to improve fairness". |
 | (i) Release-instant polling (RAC-style alert snipes) | **Prohibited, and pointless** | As (f). Queue-it also gives everyone a random place before 8:30, so being first at 8:30:00 gains nothing. |
+
+> **Decided otherwise on 2026-10-18.** The stakeholder chose an automated, notify-only watch (with Explore's counts and the place page's check), accepting the clause 4 risk, and no request to RIA. [§9](#9-stakeholder-decision-and-the-rules-for-the-automated-watch) records the decision and the rules that now apply; this section's analysis stands unchanged.
 
 **Recommendation.** Ship a Rottnest provider built only from (a)–(d), with no request from the app to Stay Rottnest at all, and enforce that in code. Ask RIA in writing for (e) and (f) ([§7](#7-the-route-to-an-automated-cancellation-watch); [Appendix A](#appendix-a-draft-request-to-ria)). Never build (g)–(i).
 
@@ -68,7 +71,7 @@ From `rottnest-booking-flow.md` §2 and §9. The site served a Cloudflare challe
   - Browse-wrap terms, which a visitor accepts only by using the site, bind less reliably than terms ticked at checkout. Australian law has no settled appellate rule on them; the question is whether the notice was reasonable.
   - A notice on the search page itself, before any search, is about as prominent as browse-wrap gets.
   - The design does not depend on this point: it sends no request.
-- **Other pages.** A Disclaimer exists (`/disclaimer`, search summary only: accuracy, liability and external links; no automation clause seen). The login footer lists a Privacy Statement and Terms & Conditions, and a sign-up checkbox reportedly refers to "Terms of Use of Rottnest Island Authority". **Not retrieved:** the Privacy Statement and any separate Terms of Use (copyright, linking or framing clauses). A person should read them in a browser before RI3 ships (master plan TQ7). Linking to public pages is not normally restricted, but the check costs nothing.
+- **Other pages.** A Disclaimer exists (`/disclaimer`, search summary only: accuracy, liability and external links; no automation clause seen). The login footer lists a Privacy Statement and Terms & Conditions, and a sign-up checkbox reportedly refers to "Terms of Use of Rottnest Island Authority". **Read later (18 Oct 2026, supplied by the stakeholder):** the _Privacy Statement_ ("Rottnest Island Authority trading as Stay Rottnest", 4 pages, PDF of 23 Nov 2022). It has no clause on automated access, linking, framing or copying. It says the servers record "your computer's IP address", "pages accessed", the "type of browser used" and "unique device identifiers", and that "no attempt will be made to identify visitors or their browsing activities except in the unlikely event of an investigation, or the need to determine details related to a security breach or other inappropriate activity": the evidence a 4(b) suspicion would rest on. The stakeholder also supplied the booking terms as the site's terms of use; they are byte-identical to RIA4555 as reviewed here, so there is no separate Terms of Use.
 - **robots.txt.**
   - `www.stayrottnest.com` allows everything.
   - `bookings.stayrottnest.com` disallows everything except `/search-rates`, `/offer` and `/offers` (as archived in August 2026).
@@ -300,7 +303,58 @@ A practical note on B: RIA has said what it wants. It wants unwanted bookings re
 6. **How should the Open Day calendar reach people:** an app update per change (as RAC's release calendar does), or a small calendar file on WA Stay's own website that the app reads? The rule (first Wednesday of month M opens month M+8) covers most of it, so updates are rare.
 7. **Should WA Stay ask RIA at all?** Asking draws attention, and a "no" closes option C for good. But C is not recommended anyway, and a "yes" unlocks the watch.
 
+## 9. Stakeholder decision and the rules for the automated watch
+
+**The decision (2026-10-18, brief Project 3, T1–T5).** The stakeholder, who owns WA Stay, decided:
+
+- to offer an **automatic, notify-only watch** for Stay Rottnest, checking **no more often than every 30 minutes**;
+- to check on the place page when the person clicks;
+- to show free counts on Explore, as for the other providers;
+- **not** to ask RIA;
+- that each person reads a **notice of the risk** and accepts it once before WA Stay sends Stay Rottnest anything.
+
+The stakeholder considers the watch core to WA Stay and accepts the risk below. That is the stakeholder's call to make. This review's job now is to keep the risk as small as the design allows, and to make sure each person sees it before taking it on.
+
+**What the decision does not change.** On the better reading of clause 4 ([§3](#3-clause-4-use-of-automated-software)):
+
+- automated availability checks are "web scraping" and "rate shopping";
+- a booking made from a watch's alert is "assisted" by them;
+- RIA may cancel such a booking without refund on reasonable suspicion, and block the person's IP address.
+
+The design below cannot remove that risk, and the notice must not pretend it does. **The risk sits with each person, on their own bookings and connection**, which is why every person is told and asked first.
+
+**What the design does about it.** Each choice keeps WA Stay inside the narrow reading of [§3.5](#35-the-trailing-purpose-words) (no "excessive interactions", no "unauthorized access") as far as a scheduled check can be. Each also keeps what RIA sees small and unremarkable, and keeps WA Stay away from the parts of the site RIA protects hardest.
+
+1. **The person is told, and agrees, first.** No request goes to Stay Rottnest until the person has read the notice and ticked "I understand". The notice gives clause 4's words, what RIA may do, what WA Stay does and doesn't do, and that the risk is theirs.
+   - Withdrawing it in Settings → Accounts stops every check at once, and paused watches say why.
+   - A changed notice (a new version) is asked again.
+   - **Test:** with the notice unaccepted, a watch run, a place-page check and an Explore search send nothing (request log), and each is refused with its own code.
+2. **Notify only, never "made".** No hold, cart, form, `/details/` booking step, sign-in, waiting room or passcode; `holds`, `bookingImport`, `accessGate` and `account` stay off, and no experiment turns them on.
+   - The client refuses every path but `GET /rates-room1` with the search's own query fields.
+   - **Test:** the client's allow-list, and a manifest test.
+3. **Slow.**
+   - Watches every 30 minutes at most (`minWatchIntervalMinutes: 30`).
+   - Background requests one at a time and at least 60 s apart; the person's own clicks 1 s apart, as the SDK paces every provider.
+   - **One search per stay and party**, shared for two minutes by every caller (Explore, the place page, every watch with that stay), so ten watches of one stay cost one request, not ten.
+   - **Test:** pacing and the shared search, with a fake clock.
+4. **Quiet on Open Days.** Nothing is sent on an Open Day from 05:30 to 12:00 Perth time, while the waiting room and the passcode are in force. Watches pick up again after.
+   - **Test:** with a fake clock on 4 Nov 2026.
+5. **No evasion, ever.** The app presents its one fixed browser identity (§12.32), the same as its windows, never rotated and never changed for Rottnest.
+   - A 403, a 429, a Cloudflare challenge, or a redirect to a waiting room or any other host ends the request unanswered. It is never followed, solved or retried, and it stops **every** request for 12 hours, doubling for blocks in a row, up to 7 days.
+   - The person is told, in the watch and on the place page.
+   - **Test:** each kind of block, and the cool-down's length and persistence.
+6. **Anonymous.** The checks carry no Stay Rottnest account and no personal detail, on a partition of their own (`persist:provider-rottnest`) that the person never signs in on. Nothing links a check to the person's Stay Rottnest profile except the IP address all their traffic shares.
+7. **Facts only, nothing republished.** The seed and the fixtures hold names, codes, groups, sleeps, bedrooms and prices: no RIA photos, descriptions, maps or logos. The fixtures are trimmed from the stakeholder's own capture and checked by a guard test.
+8. **The rules of booking are still RIA's.** Rules 7–12 of [§6](#6-rules-the-app-must-follow) apply unchanged: personal and non-commercial use, RIA's booking rules shaping every suggestion, fair Open Day coaching, never cancelling or changing a booking, only booking what you need, and independence.
+9. **Open Days stay reminders.** Site Sniper never polls at an Open Day's release, which is also where RIA's defences are strongest. It reminds the person, as [§5](#5-feature-by-feature) designs.
+
+**Rules 1–5 of §6 are replaced by 1–6 above for the automated watch.** Rule 1 ("no request") gives way to a notice-gated, slow, single-path client. Rules 2–5 stand in the forms above.
+
+**For the stakeholder.** RIA could tell this traffic apart from a person's: a check every 30 minutes, at the same dates, for weeks. Whether RIA does anything about it is not knowable from here. If RIA writes to WA Stay or its users, or tightens clause 4, this decision should be revisited before anything else ships.
+
 ## Appendix A: draft request to RIA
+
+_Not sent: the stakeholder decided not to write to RIA (decision T2, 2026-10-18). Kept for the record._
 
 To: Stay Rottnest reservations, `stay@rottnestisland.com` (the address the FAQ gives; RIA may prefer another)
 Subject: Request for guidance on clause 4 (Use of Automated Software): personal availability alerts
