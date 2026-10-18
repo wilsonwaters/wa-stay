@@ -40,8 +40,12 @@ park a WordPress site of its own with a numeric site id (`blog_id`).
   Explore's dates, "Check now"), which goes first ([pacing](README.md#pacing)).
 - **Headers.** A page asks for `text/html`. The availability request sends what RAC's own page
   sends: `X-Requested-With: XMLHttpRequest` (without it RAC answers "No direct file access"),
-  `Origin`, and the park's book-now page as `Referer`. The User-Agent is never set or changed:
-  the app's own Chromium one goes.
+  `Origin`, and the park's book-now page as `Referer`. The module sets no User-Agent, client
+  hints or languages of its own: the session presents one browser for its requests and for any
+  window the app opens on it (the park's cart page, with the auto-cart experiment on), the user
+  agent of the Chromium the app runs, on this operating system, and the app's
+  `Accept-Language`. That identity is fixed (it changes only with the Chromium an app update
+  brings), and is never rotated or changed to get past a check.
 - **A block stops everything.** A 403, a 429, a `cf-mitigated: challenge` header, or a 503 or 200
   page with Cloudflare's challenge in it ("Just a moment…" as its title, or `cf_chl_opt`) stops
   every RAC request for 30 minutes, doubled for each block in a row with no answer between, and

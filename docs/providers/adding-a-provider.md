@@ -516,8 +516,11 @@ They all behave the same:
   no response a `ProviderHttpError` with status 0, an abort an `AbortError`. `request` itself
   resolves for any status: check `response.status`.
 
-If the provider blocks library user agents, send a browser one (ParkStay's `headers.ts`). In
-the app, the partition's user agent already matches Electron's Chromium.
+If the provider blocks library user agents, send a browser one (ParkStay's `headers.ts`, from
+the SDK's `browserIdentity()`). In the app, the partition already presents the browser its
+windows present: Electron's Chromium on the person's operating system, with the app's
+languages. The client rewrites a request's user agent, and any client hints or
+`Accept-Language` it carries, to match; it adds none. Never rotate or vary them.
 
 ## 4. An API provider
 

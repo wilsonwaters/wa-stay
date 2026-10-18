@@ -42,8 +42,11 @@ of its routes do not exist in the DBCA backend. They are listed under
   server (`ParkStayEndpoints`).
 - **A browser user agent.** DBCA's queue middleware answers library user agents (axios,
   python, curl, java, httpclient…) with its queue redirect page (`queue_middleware.py:16-28`).
-  Every request presents the desktop Chrome user agent and matching client hints
-  (`headers.ts`); in the app the major version is Electron's own Chromium.
+  Every request presents a desktop Chrome user agent with the client hints and
+  `Accept-Language` that go with it (`headers.ts`, from the SDK's `user-agent.ts`): in the app,
+  exactly what ParkStay's sign-in and payment windows send on the same session. That is
+  Electron's own Chromium version, Chromium's own `sec-ch-ua` brand list for it (no
+  "Google Chrome"), the operating system the app runs on, and `en-AU,en;q=0.9,en-US;q=0.8`.
 - **The ParkStay `Referer`.** `campsite_availablity_view` answers HTTP 500 without
   `Referer: https://parkstay.dbca.wa.gov.au/` (`api.py:1224-1240`), and the campground page
   redirects away. A POST also carries `Origin`. No `Sec-Fetch-*` headers: Chromium sets them
