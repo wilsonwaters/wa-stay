@@ -228,8 +228,12 @@ npm run test:electron -- http-transport
   `tests/unit/providers/http-transport-parity.test.ts`, which Jest runs against
   `NodeHttpClient` (from `tests/utils/http-transport-cases.ts`), plus Electron-only checks.
   A behaviour change in either client must keep both runs green.
+- `provider-windows.electron.ts` also checks that an API call and a provider window on one
+  partition present one browser: the same `User-Agent`, `sec-ch-ua`, `sec-ch-ua-mobile`,
+  `sec-ch-ua-platform` and `Accept-Language`, and a `navigator.userAgentData` that agrees.
 - Not part of `npm test`: it needs the Electron binary and a display. Run it when you change
-  `src/main/providers/sdk/http*.ts`.
+  `src/main/providers/sdk/http*.ts`, `src/main/providers/sdk/user-agent.ts` or
+  `src/main/app/provider-windows.ts`.
 
 ## Electron smoke tests (E2E)
 
