@@ -846,9 +846,11 @@ The rules the normalised types carry (`src/shared/types/provider.types.ts`,
   Every count of what is free for a stay adds these up (`freeUnitsOf`,
   `src/shared/utils/free-units.ts`): the place page's summary, a watch's alert, email, card and
   Check now, so they say the same number as your bulk `availableUnits` should. Such a provider
-  has no total of its units, so those counts give no "of M" ("51 spots free for all 2
-  nights"). Without it each unit counts as one ("2 of 5 sites free"). The contract suite checks
-  the numbers (`freeCountViolations`).
+  has no total of its units, so those counts give no "of M" and say "free" ("51 spots free for
+  all 2 nights"). Without it each unit counts as one ("2 of 5 sites free"). The contract suite
+  checks the numbers (`freeCountViolations`). Set `unitsAreTypes: true` on the location's
+  detail too, so its page lists such units as types ("Bookable as 6 spot types") rather than
+  counting them as places to stay.
 - **Dates and time zones.** Stays are calendar dates: never turn them into `Date` objects and
   back (a time zone shifts them). Convert to the provider's own format with a string
   transform, as ParkStay's `toParkStayDate` does (`2026-11-10` → `2026/11/10`). "Today" is

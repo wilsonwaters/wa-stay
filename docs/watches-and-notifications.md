@@ -53,10 +53,12 @@ provider, the place and your dates, and opens on "Your stay"). Five steps:
   stands for (`UnitAvailability.freeCount`, added up by `freeUnitsOf` in
   `src/shared/utils/free-units.ts`), else one. A provider whose units are single sites counts
   one each (ParkStay: "Found 3 sites available", "2 of 3 sites free for all 2 nights"); RAC's
-  units are categories, each counting its sites free for the whole stay, with no total ("Found
-  51 sites available", "51 sites free for all 2 nights", where Explore says "51 spots free").
-  The alert, its email, Check now, the watch's card and its night grid all count this way. A
-  partial match describes nights, not a count ("2 of 3 nights available").
+  units are categories, each counting its sites free for the whole stay, with no total and in
+  Explore's word, "free" (`freeUnitsWord`): "Found 51 sites free", "51 sites free for all 2
+  nights", where Explore says "51 spots free". The alert, its email, Check now, the watch's
+  card and its night grid all count this way, and the night grid's notes and "Show all" name
+  RAC's categories as types, never as a count of sites. A partial match describes nights, not
+  a count ("2 of 3 nights available").
 - **Results** are kept on the watch: the last result, when it last ran and runs next, how
   many times it has found something, and the last availability (with each unit's count),
   which its page shows night by night. A check stored before counts reads one per unit until

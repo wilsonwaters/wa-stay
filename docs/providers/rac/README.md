@@ -122,8 +122,10 @@ answer to a unit, night by night (the codes are in [endpoints](endpoints.md#racs
   whole stay (`freeCount`, RAC's whole-stay count, not a night's), and any other category
   carries none. Every count of what is free adds these up, so a park reads the same number on
   Explore, on its page ("51 spots free for all 2 nights") and in a watch and its alert ("Found
-  51 sites available"), never one per category and never "of" a total: RAC gives no total of
-  its sites.
+  51 sites free"), never one per category and never "of" a total: RAC gives no total of its
+  sites. The park's details say its units are types (`unitsAreTypes`), so its page lists its
+  categories as kinds ("Bookable as 6 spot types"), and the night grid's notes and "Show all"
+  never count them as sites.
 - **Stay rules.** A minimum stay (from the rate's minimum for the arrival night), and days with
   no arrivals or no departures. A stay that breaks them is never free: its free nights read
   "stay rules apply", and a watch never alerts on it.
@@ -379,8 +381,9 @@ show ParkStay only. RAC's monogram is plain text on the app's own colour; there 
   status, and every path the module requests is documented.
 - The Electron smoke tests: RAC's parks on Explore and a park's categories
   (`rac-catalogue.spec.ts`), its free counts on Explore and the park's page
-  (`rac-explore.spec.ts`), a watch and its count (`rac-watch.spec.ts`) and the member number (`rac-member-number.spec.ts`), from the recorded
-  answers in `tests/e2e/fixtures/http/rac/` (every park's, for 6–8 Nov 2026).
+  (`rac-explore.spec.ts`), a watch and its count (`rac-watch.spec.ts`) and the member number
+  (`rac-member-number.spec.ts`), from the recorded answers in `tests/e2e/fixtures/http/rac/`
+  (every park's, for 6–8 Nov 2026).
 - The preview: `npm run build:e2e`, then
   `npx cross-env PREVIEW_PROVIDER=rac PREVIEW_ARRIVAL=2026-11-06 playwright test preview-provider`
   (`xvfb-run -a` on Linux).
