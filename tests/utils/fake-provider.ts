@@ -13,6 +13,9 @@
  *
  * Knobs:
  * - `failNext(module, error)`: the next call into that module rejects with `error`;
+ * - `pauseNext(module)`: the next call into that module waits, after its delay, until the
+ *   returned `resume()` is called (abortable), so a test can act while it is in flight
+ *   whatever the machine's speed;
  * - `delayMs`: every async call waits this long first (abortable); `delays` per module;
  * - `limits`: replaces parts of the manifest's limits;
  * - `calls`: every call, in order, with its `signal` and the ambient request priority it was
@@ -240,6 +243,8 @@ export interface FakeProvider extends AccommodationProvider {
   /** The context the factory was called with. */
   ctx?: ProviderContext;
   failNext(module: FakeModule, error: Error): void;
+  /** The next call into `module` waits (after its delay) until `resume()`; abortable. */
+  pauseNext(module: FakeModule): () => void;
   /** Replaces a location's units from now on. */
   setAvailability(externalId: string, units: Record<string, FakeUnitNights>): void;
   /** The next `holds.create` calls answer these, in order. */
@@ -314,6 +319,20 @@ function wait(ms: number, signal?: AbortSignal): Promise<void> {
   });
 }
 
+/** Resolves when `paused` does, or rejects when `signal` aborts first. */
+function untilResumed(paused: Promise<void>, signal?: AbortSignal): Promise<void> {
+  if (!signal) return paused;
+  if (signal.aborted) return Promise.reject(createAbortError(signal));
+  return new Promise((resolve, reject) => {
+    const onAbort = (): void => reject(createAbortError(signal));
+    signal.addEventListener('abort', onAbort, { once: true });
+    void paused.then(() => {
+      signal.removeEventListener('abort', onAbort);
+      resolve();
+    });
+  });
+}
+
 export function createFakeProvider(options: FakeProviderOptions = {}): FakeProvider {
   const id = options.id ?? 'fake';
   const capabilities: ProviderCapabilities = { ...ALL_ON, ...options.capabilities };
@@ -328,6 +347,7 @@ export function createFakeProvider(options: FakeProviderOptions = {}): FakeProvi
   };
   const scriptedHolds: HoldResult[] = [];
   const scriptedReleases: HoldReleaseOutcome[] = [];
+  const pauses = new Map<FakeModule, Promise<void>[]>();
   const active = new Map<FakeModule, number>();
   const peaks = new Map<FakeModule, number>();
   let holdCount = 0;
@@ -456,6 +476,8 @@ export function createFakeProvider(options: FakeProviderOptions = {}): FakeProvi
     try {
       // Always yields to a timer, so an abort right after the call still lands.
       await wait(options.delays?.[module] ?? fake.delayMs, signal);
+      const pause = pauses.get(module)?.shift();
+      if (pause) await untilResumed(pause, signal);
     } finally {
       active.set(module, (active.get(module) ?? 1) - 1);
     }
@@ -698,6 +720,14 @@ export function createFakeProvider(options: FakeProviderOptions = {}): FakeProvi
     }),
     failNext(module, error) {
       failures.set(module, error);
+    },
+    pauseNext(module) {
+      let resume!: () => void;
+      const paused = new Promise<void>((resolve) => {
+        resume = resolve;
+      });
+      pauses.set(module, [...(pauses.get(module) ?? []), paused]);
+      return () => resume();
     },
     setAvailability(externalId, units) {
       availabilityByLocation[externalId] = units;
