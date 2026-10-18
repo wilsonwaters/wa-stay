@@ -261,6 +261,20 @@ describe('RacClient: host and headers', () => {
     await client.getPage('/c/');
     expect(http.requests.map((r) => r.url)).toEqual([`${RAC}/c/`]);
   });
+
+  it('frees its turn when aborted while what it is ready on never settles', async () => {
+    const client = makeClient();
+    const controller = new AbortController();
+    const page = client.getPage('/b/', {
+      signal: controller.signal,
+      ready: () => new Promise<void>(() => undefined),
+    });
+    await Promise.resolve();
+    controller.abort();
+    expect(isAbortError(await page.catch((e: unknown) => e))).toBe(true);
+    await client.getPage('/c/');
+    expect(http.requests.map((r) => r.url)).toEqual([`${RAC}/c/`]);
+  });
 });
 
 describe('RacClient: a block', () => {

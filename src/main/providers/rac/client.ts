@@ -290,8 +290,9 @@ export class RacClient {
     this.guard(method, withQueryOf(url, request.query), request.body);
     const queued = this.limit(async () => {
       throwIfAborted(signal);
-      // What the request depends on, in its turn: if it rejects, nothing is sent
-      if (request.ready) await request.ready();
+      // What the request depends on, in its turn: if it rejects, nothing is sent, and an abort
+      // frees the turn at once, even when it never settles
+      if (request.ready) await raceAbort(request.ready(), signal);
       throwIfAborted(signal);
       const block = await this.currentBlock();
       if (block) throw this.blockError(url, block);
