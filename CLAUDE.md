@@ -289,7 +289,7 @@ Rules:
   | Providers (`BUILT_IN_PROVIDERS`) | "Different providers, one app": one row per shipped provider, showing its manifest name, monogram and brand colour, and what WA Stay does with it |
   | Site Sniper, Bookings (marked "Soon") | "Coming next". When a "Soon" pill goes, move the feature out of this section and into its own |
   | Settings, accounts, updates, platforms, data | "Questions", and the two download sections |
-- **Screenshots:** when a screen they show changes, retake them with `npm run site:screenshots` (`tests/site/`; it needs a Mapbox token), or with the repository's token through the **Screenshots** workflow (`.github/workflows/screenshots.yml`: run it from the Actions tab or label a pull request `screenshots`; it uploads the docs' and site's images as the `screenshots` artifact and pushes nothing). Then update the images' sizes and alt text in `site/index.html`; the site test checks the sizes.
+- **Screenshots:** when a screen they show changes, retake them with `npm run site:screenshots` (`tests/site/`; it needs a Mapbox token, and a machine that can load ParkStay's photos: GitHub's runners could not). The docs' screenshots can also be retaken with the repository's token by the **Screenshots** workflow (`.github/workflows/screenshots.yml`: run it from the Actions tab or label a pull request `screenshots`; it uploads `docs/images/` as the `screenshots` artifact and pushes nothing). Then update the images' sizes and alt text in `site/index.html`; the site test checks the sizes.
 - **Copy:**
   - plain and non-technical, never the architecture;
   - provider-neutral: a provider is named only in its providers row and in the independence notice;

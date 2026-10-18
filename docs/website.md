@@ -99,10 +99,11 @@ its photos and copy to a person's own use, so they appear only in the app.
 
 `npm run site:screenshots` rebuilds and retakes them; it needs a Mapbox token. Retake them when a
 screen they show changes, then update each image's size and alt text in `site/index.html`.
-Without a token at hand, the **Screenshots** workflow (`.github/workflows/screenshots.yml`)
-retakes these and the documentation's screenshots with the repository's token: run it from the
-Actions tab, or add the `screenshots` label to a pull request, then review the images in its
-`screenshots` artifact and commit them. It pushes nothing itself.
+Take them on your own machine: they load ParkStay's photos live, and GitHub's runners could not
+load them. The documentation's screenshots, which show no photos, can also be retaken with the
+repository's token by the **Screenshots** workflow (`.github/workflows/screenshots.yml`): run it
+from the Actions tab, or add the `screenshots` label to a pull request, then review the images
+in its `screenshots` artifact and commit them. It pushes nothing itself.
 
 ## Keeping it in step with the app
 

@@ -1,9 +1,12 @@
 name: Screenshots
 
-# Retakes the documentation and website screenshots with the Mapbox token from the repository's
-# secrets, which a contributor's machine may not have. Run it from the Actions tab, or add the
-# `screenshots` label to a pull request. The images come back as the `screenshots` artifact, to
-# review and commit by hand: nothing is pushed from here.
+# Retakes the documentation's screenshots (docs/images/) with the Mapbox token from the
+# repository's secrets, which a contributor's machine may not have. Run it from the Actions tab,
+# or add the `screenshots` label to a pull request. The images come back as the `screenshots`
+# artifact, to review and commit by hand: nothing is pushed from here.
+#
+# Not the website's (`npm run site:screenshots`): they show ParkStay's own photos, loaded live,
+# and GitHub's runners could not load them (October 2026), so take those on your own machine.
 
 on:
   workflow_dispatch:
@@ -42,26 +45,17 @@ jobs:
       - name: Install xvfb
         run: command -v xvfb-run || (sudo apt-get update && sudo apt-get install -y xvfb)
 
-      # Both scripts rebuild the app with the token, run under xvfb themselves and never print it
+      # The script rebuilds the app with the token, runs under xvfb itself and never prints it
       - name: Retake the documentation screenshots
         run: npm run docs:screenshots
         env:
           MAPBOX_ACCESS_TOKEN: ${{ secrets.MAPBOX_ACCESS_TOKEN || vars.MAPBOX_ACCESS_TOKEN }}
 
-      - name: Retake the website screenshots
-        run: npm run site:screenshots
-        env:
-          MAPBOX_ACCESS_TOKEN: ${{ secrets.MAPBOX_ACCESS_TOKEN || vars.MAPBOX_ACCESS_TOKEN }}
-
-      # Always: the documentation's images are kept even when the website's run fails
       - name: Upload the screenshots
-        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: screenshots
-          path: |
-            docs/images/
-            site/assets/screens/
+          path: docs/images/
           retention-days: 7
 
       - name: Upload the runs' results (traces, logs)
