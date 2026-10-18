@@ -378,7 +378,7 @@ The stakeholder ran one search in their own browser and exported it as a HAR (Ch
   - a rate block per rate (`data-target="#RIA25-GPV04"`), with its name ("Best Available Rate (25% Deposit Required)"), price and a "Book" button whose `formaction` is the booking step, `/details/hotel/62607/arrival/…/RIA25/GPV04`. **WA Stay never requests or links to `/details/`.**
 - **An unavailable type:** the card has the class `unavailable` and "Unavailable on your dates", with no price and no rate.
 - **Rates seen:** `RIA25` (self-contained and family rooms, 25% deposit), `CAMPING` (campground), `HOSTS` (hostel bed). Campground and hostel bookings are paid in full (T&Cs 7(c)).
-- **In this sample** (28 Jun–1 Jul 2027, one adult), 33 types were free and 35 unavailable.
+- **In this sample** (28 Jun–1 Jul 2027, one adult), 34 types were free and 34 unavailable.
 - **No per-night detail.** The page answers for the whole stay. The calendar component can show nights, but only after a script call the page makes when the person asks for "Flexible Dates?", which was not captured.
 
 **The 68 room types**, by code (from the capture; names in RIA's words are kept in the seed):
