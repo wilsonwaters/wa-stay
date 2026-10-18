@@ -15,6 +15,7 @@ const DEFAULT_MESSAGES: Record<ApiErrorCode, string> = {
   AUTH_REQUIRED: 'Sign in to the provider first',
   ACCOUNT_BUSY: 'The provider account is in use by a snipe or hold',
   HOLD_EXPIRED: 'The hold has expired',
+  NOTICE_REQUIRED: "Read and accept the provider's notice first",
   NOT_IMPLEMENTED: 'Not available yet',
 };
 

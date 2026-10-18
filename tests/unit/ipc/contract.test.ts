@@ -214,7 +214,15 @@ describe('IPC contract', () => {
 
   it('providers: experiments and setExperiment (R17) take a provider, an experiment id and a boolean', () => {
     expect(Object.keys(contract.providers).sort()).toEqual(
-      ['accessStatus', 'experiments', 'list', 'setExperiment'].sort()
+      [
+        'accessStatus',
+        'experiments',
+        'list',
+        'setExperiment',
+        'notice',
+        'acceptNotice',
+        'withdrawNotice',
+      ].sort()
     );
     expect(contract.providers.experiments.channel).toBe('providers:experiments');
     expect(contract.providers.setExperiment.channel).toBe('providers:set-experiment');
@@ -234,6 +242,26 @@ describe('IPC contract', () => {
     expect(contract.providers.experiments.request.safeParse({ providerId: 'rac' }).success).toBe(
       true
     );
+  });
+
+  it('providers: notice, acceptNotice and withdrawNotice take a provider, and a version to accept', () => {
+    expect(contract.providers.notice.channel).toBe('providers:notice');
+    expect(contract.providers.acceptNotice.channel).toBe('providers:accept-notice');
+    expect(contract.providers.withdrawNotice.channel).toBe('providers:withdraw-notice');
+    for (const method of [contract.providers.notice, contract.providers.withdrawNotice]) {
+      expect(method.request.safeParse({ providerId: 'rottnest' }).success).toBe(true);
+      expect(method.request.safeParse({ providerId: 'Rottnest' }).success).toBe(false);
+    }
+    const accept = contract.providers.acceptNotice.request;
+    expect(accept.safeParse({ providerId: 'rottnest', version: 1 }).success).toBe(true);
+    for (const bad of [
+      { providerId: 'rottnest' },
+      { providerId: 'rottnest', version: 0 },
+      { providerId: 'rottnest', version: 1.5 },
+      { providerId: 'rottnest', version: '1' },
+    ]) {
+      expect(accept.safeParse(bad).success).toBe(false);
+    }
   });
 
   it('pays for holds in the app: snipes.openPayment and watches.openPayment take an id (V6)', () => {

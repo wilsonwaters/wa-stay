@@ -18,7 +18,12 @@ import { act } from '@testing-library/react';
 import { createMockWindowApi } from '../window-api';
 import { PARKSTAY_MANIFEST } from './manifests';
 
-export { BROWSE_ONLY_MANIFEST, FAKE_MANIFEST, PARKSTAY_MANIFEST } from './manifests';
+export {
+  BROWSE_ONLY_MANIFEST,
+  FAKE_MANIFEST,
+  PARKSTAY_MANIFEST,
+  ROTTNEST_MANIFEST,
+} from './manifests';
 
 /** A successful `APIResponse`. */
 export function ok<T>(data: T): APIResponse<T> {

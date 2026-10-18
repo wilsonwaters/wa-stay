@@ -50,7 +50,14 @@ M. Types, the core's gate, three IPC methods, a dialog and a Settings row.
 
 ## Completion criteria
 
-- [ ] Core tests: unaccepted, a watch run, a check and a bulk search send nothing (a recording client) and are refused or skipped; accepted, they run; withdraw stops them; a new version asks again.
-- [ ] IPC parity, handler and renderer tests (dialog, gating in each place, Settings row), with axe scans.
-- [ ] An e2e journey: Explore → dates → "Read Stay Rottnest's notice" → accept → counts appear; the request log is empty before acceptance.
-- [ ] The full gate passes.
+- [x] Core tests: unaccepted, a watch run, a check and a bulk search send nothing (a recording client) and are refused or skipped; accepted, they run; withdraw stops them; a new version asks again. (`tests/integration/provider-notices.test.ts`.)
+- [x] IPC parity, handler and renderer tests (dialog, gating in each place, Settings row). *Deviation:* no axe scans: the repository has no axe tooling (no `jest-axe`, nothing in e2e), so the tests assert roles, accessible names and descriptions, as the rest of the suite does.
+- [x] An e2e journey: Explore → dates → "Read Stay Rottnest's notice" → accept → counts appear; nothing is sent before acceptance (`tests/e2e/rottnest-notice.spec.ts` starts with no Stay Rottnest routes, so any request would be refused and logged), and a withdrawal in Settings offers the notice again.
+- [x] The full gate passes.
+
+## Notes from the build
+
+- *Bulk* reports an unaccepted provider as an error entry with the new `CatalogErrorCode` `notice` rather than as no entries, so Explore can tell it apart from "no answer".
+- *Watches* stay active while paused (a run records `ERROR` with the paused message and asks nothing), so they check again by themselves once the notice is accepted; *snipes* end `FAILED` on a poll and are armed again by hand, as after a provider block.
+- *Registry rule* "notice needs no account and no access gate": their signed-in check and queue would ask the provider outside the gate.
+- *Renderer:* withdrawing resets the provider's availability queries (`resetQueries`), since a failed refetch keeps the old data on screen.

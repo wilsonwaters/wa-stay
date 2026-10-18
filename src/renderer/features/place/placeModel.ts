@@ -178,11 +178,12 @@ export function formatOpensAt(iso: string, timeZone: string): string | null {
   )} ${period} ${part('timeZoneName')}`.trim();
 }
 
-export type CheckFailure = 'access-gate' | 'rate-limit' | 'other';
+export type CheckFailure = 'access-gate' | 'rate-limit' | 'notice' | 'other';
 
 /**
  * What a failed check means. The access gate only counts for a provider that has one
- * (`capabilities.accessGate`, §12.2); `RATE_LIMITED` is the provider's HTTP 429.
+ * (`capabilities.accessGate`, §12.2); `RATE_LIMITED` is the provider's HTTP 429;
+ * `NOTICE_REQUIRED` is a notice the person has not accepted (§12.36), so nothing was asked.
  */
 export function checkFailure(
   error: { code?: string } | null | undefined,
@@ -190,7 +191,13 @@ export function checkFailure(
 ): CheckFailure {
   if (error?.code === 'ACCESS_GATE' && manifest?.capabilities.accessGate) return 'access-gate';
   if (error?.code === 'RATE_LIMITED') return 'rate-limit';
+  if (error?.code === 'NOTICE_REQUIRED') return 'notice';
   return 'other';
+}
+
+/** What a check held back by the provider's notice says, and Explore's notice too. */
+export function noticeNeededMessage(shortName: string): string {
+  return `Read ${shortName}'s notice to check dates.`;
 }
 
 /**

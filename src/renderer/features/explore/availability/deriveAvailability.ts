@@ -29,6 +29,7 @@ export type AvailabilityState =
   | 'no-dates'
   | 'offline-booking'
   | 'check-dates'
+  | 'notice'
   | 'not-supported'
   | 'error'
   | 'loading'
@@ -148,7 +149,8 @@ function chosenCounts(
 /**
  * The place's availability state. Precedence, first match wins: `no-dates` (no stay),
  * `offline-booking` (not bookable online), `check-dates` (the provider checks one place at a
- * time but not in bulk), `not-supported` (no availability at all), `error`, `loading`, then
+ * time but not in bulk), `not-supported` (no availability at all), `notice` (its notice is not
+ * accepted, so it was not asked: `NOTICE_REQUIRED`), `error`, `loading`, then
  * from the provider's entry `available` (a unit free every night), `full` (no unit free every
  * night, some bookable or no total given) or `none-open` (a total of 0: not released, closed or
  * too far ahead), and `unknown` when the provider answered without this place.
@@ -172,6 +174,8 @@ export function deriveAvailability(
     case 'unsupported':
       return { state: 'not-supported' };
     case 'error':
+      // Not asked: the person has not accepted the provider's notice (§12.36)
+      if (input.errorCode === 'NOTICE_REQUIRED') return { state: 'notice' };
       return {
         state: 'error',
         queue: input.errorCode === 'ACCESS_GATE' && capabilities.accessGate === true,
@@ -263,6 +267,13 @@ export function availabilityLabel(
       return { pill: 'Not open', card: `No ${noun.many} open for these dates`, tone: 'neutral' };
     case 'check-dates':
       return { pill: 'Check dates', card: 'Check dates on the place page', tone: 'neutral' };
+    case 'notice':
+      // The notice is offered once, above the list
+      return {
+        pill: NO_STATE_PILL,
+        card: `Read ${shortName}'s notice to check dates`,
+        tone: 'neutral',
+      };
     case 'offline-booking':
       // The card already says "Info only".
       return { pill: 'Info only', card: null, tone: 'neutral' };
@@ -292,6 +303,7 @@ const RANK: Record<AvailabilityState, number> = {
   full: 1,
   'none-open': 2,
   'check-dates': 3,
+  notice: 3,
   'offline-booking': 4,
   'not-supported': 5,
   unknown: 6,

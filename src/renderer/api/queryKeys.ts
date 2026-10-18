@@ -25,6 +25,8 @@ export const queryKeys = {
     access: (providerId: string) => [...providers, 'access', providerId] as const,
     /** A provider's experiments: the stored choices and this run's state. */
     experiments: (providerId: string) => [...providers, 'experiments', providerId] as const,
+    /** Whether a provider's notice is accepted (`providers.notice`). */
+    notice: (providerId: string) => [...providers, 'notice', providerId] as const,
   },
   catalog: {
     all: catalog,

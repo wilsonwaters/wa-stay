@@ -9,7 +9,9 @@
  * carts or books: the person books on Stay Rottnest's own site. The stakeholder chose this
  * knowing clause 4 of Stay Rottnest's terms (automated software; `ai-state/research/rottnest-
  * terms.md` §9), and its limits are the terms review's: one request at a time, 60 s apart in
- * the background, watches every 30 minutes at most.
+ * the background, watches every 30 minutes at most. Before WA Stay sends Stay Rottnest
+ * anything, each person reads and accepts the notice below (§9.1): the core sends nothing
+ * until then (architecture-notes §12.36).
  */
 
 import type { ProviderManifest } from '@shared/types/provider.types';
@@ -61,5 +63,22 @@ export const rottnestManifest: ProviderManifest = {
     minRequestIntervalMs: 60_000,
     // The precincts are a seed; nothing is fetched when the catalogue syncs.
     catalogTtlHours: 24,
+  },
+  // Clause 4's words and what they mean for the person, before the first request (terms review
+  // §9.1). A change to what it says raises the version, so everyone reads it again.
+  notice: {
+    version: 1,
+    title: 'Before WA Stay checks Stay Rottnest',
+    body:
+      "Stay Rottnest's booking terms (clause 4, Use of Automated Software) say bookings may not be made or assisted by automated software, including programs used for web scraping or rate shopping.\n\n" +
+      'WA Stay checks Stay Rottnest automatically, so a booking you make after one of its checks or alerts could count as assisted.',
+    points: [
+      'If the Rottnest Island Authority reasonably suspects a booking was made with the help of automated software, it may cancel the booking without a refund, and block your internet connection from its website.',
+      'WA Stay only looks: it checks from your computer and your internet connection, a watch at most every 30 minutes, and it never holds, books or signs in for you. You book on Stay Rottnest yourself.',
+      'It does not check on Open Day mornings, and stops for at least 12 hours if Stay Rottnest turns a check away.',
+      "The risk is yours to take. If you'd rather not, book on Stay Rottnest's own website: WA Stay still shows its places and links to them.",
+      'You can withdraw this in Settings, under Accounts, at any time, and WA Stay stops checking at once.',
+    ],
+    confirmLabel: 'I understand, and I want WA Stay to check Stay Rottnest for me',
   },
 };

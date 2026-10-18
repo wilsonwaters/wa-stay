@@ -44,6 +44,7 @@ import { toStayQuery, type StayInput } from '@shared/types/stay.types';
 import { compareDates, eachNight, isCalendarDate, todayIn } from '@shared/utils/calendar-date';
 import { cleanUnitKinds } from '@shared/utils/unit-kinds';
 import type { WatchRepository } from '../../database/repositories';
+import { noticePausedMessage } from '../../providers/notices';
 import type { ProviderRegistry, ProviderWith } from '../../providers/registry';
 import {
   isAbortError,
@@ -121,6 +122,12 @@ export interface WatchServiceDeps {
    * WA Stay restarts, and until then no automatic hold is placed (default: never).
    */
   holdsTurningOff?: (providerId: string) => boolean;
+  /**
+   * Throws `NOTICE_REQUIRED` while the provider's notice is not accepted (`ProviderNotices`,
+   * §12.36): a watch is then neither created nor activated, and a run asks nothing (default:
+   * never throws).
+   */
+  assertNotice?: (providerId: string) => void;
   clock?: () => Date;
   /** For the jitter; returns [0, 1). */
   random?: () => number;
@@ -160,6 +167,7 @@ export class WatchService {
   private readonly events?: EventSink;
   private readonly accountState: (providerId: string) => AccountStatus['state'];
   private readonly holdsTurningOff: (providerId: string) => boolean;
+  private readonly assertNotice: (providerId: string) => void;
   private readonly clock: () => Date;
   private readonly random: () => number;
 
@@ -171,6 +179,7 @@ export class WatchService {
     this.events = deps.events;
     this.accountState = deps.accountState ?? (() => 'unknown');
     this.holdsTurningOff = deps.holdsTurningOff ?? (() => false);
+    this.assertNotice = deps.assertNotice ?? (() => undefined);
     this.clock = deps.clock ?? (() => new Date());
     this.random = deps.random ?? Math.random;
   }
@@ -178,11 +187,12 @@ export class WatchService {
   /**
    * Creates a watch. Throws `ProviderCapabilityError` (`CAPABILITY`) when the provider has no
    * watches, or no holds for `autoHold`; `VALIDATION` on `autoHold` while its holds are turning
-   * off (as a hold snipe is refused); `UnknownProviderError` for an unknown provider. The new
-   * watch is due at once.
+   * off (as a hold snipe is refused); `UnknownProviderError` for an unknown provider;
+   * `NOTICE_REQUIRED` while the provider's notice is not accepted. The new watch is due at once.
    */
   async create(userId: number, input: WatchInput): Promise<Watch> {
     const provider = this.providers.require(input.providerId, 'watches');
+    this.assertNotice(input.providerId);
     this.assertAutoHold(provider, input.autoHold);
     this.assertStay(provider, input.stay);
     const prepared: WatchInput = {
@@ -259,7 +269,8 @@ export class WatchService {
 
   /**
    * Activates a watch, due at once. A watch whose auto-hold placed a hold, or whose hold was
-   * paid for, is refused: it would hold the same nights again.
+   * paid for, is refused: it would hold the same nights again. So is one whose provider's
+   * notice is not accepted (`NOTICE_REQUIRED`).
    */
   async activate(id: number): Promise<void> {
     const watch = this.require(id);
@@ -271,6 +282,7 @@ export class WatchService {
           : 'This watch is already booked; create a new watch to look again'
       );
     }
+    if (this.providers.tryGet(watch.providerId)) this.assertNotice(watch.providerId);
     this.repo.activate(id, this.clock());
     this.changed(id);
   }
@@ -303,7 +315,9 @@ export class WatchService {
 
   /**
    * One check: availability, matches, notifications and (auto-hold) a hold. Persists the
-   * result and when the watch is next due, and returns what it found.
+   * result and when the watch is next due, and returns what it found. While the provider's
+   * notice is not accepted it asks nothing: the run is recorded as paused (an error naming
+   * the notice, `NOTICE_REQUIRED`), and the watch checks again at its next run once accepted.
    */
   async execute(watchId: number, options: WatchRunOptions = {}): Promise<WatchExecutionResult> {
     const { signal, manual = false } = options;
@@ -356,6 +370,21 @@ export class WatchService {
         this.repo.deactivate(watchId);
         this.emitChanged(watchId);
         return result({ expired: true, error: 'The arrival date has passed' });
+      }
+
+      // The person has not accepted the provider's notice (or withdrew it): nothing is asked
+      if (!this.noticeAccepted(watch.providerId)) {
+        const error = noticePausedMessage(manifest);
+        log.info(`Watch ${watchId}: paused, the notice of ${watch.providerId} is not accepted`);
+        this.repo.recordRun(watchId, {
+          result: WatchResult.ERROR,
+          found: false,
+          checkedAt,
+          nextCheckAt: nextCheck(),
+          error,
+        });
+        this.emitChanged(watchId);
+        return result({ error, errorCode: 'NOTICE_REQUIRED' });
       }
 
       // One request: every unit, night by night. Wanted units are picked here, by id, name
@@ -460,6 +489,15 @@ export class WatchService {
   private editedSince(before: Watch, manifest: Pick<ProviderManifest, 'stayFields'>): boolean {
     const now = this.repo.findById(before.id);
     return !now || checkedKey(now, manifest) !== checkedKey(before, manifest);
+  }
+
+  private noticeAccepted(providerId: string): boolean {
+    try {
+      this.assertNotice(providerId);
+      return true;
+    } catch {
+      return false;
+    }
   }
 
   private require(id: number): Watch {

@@ -1,5 +1,6 @@
 import { parkstayManifest } from '@main/providers/parkstay';
 import { racManifest } from '@main/providers/rac';
+import { rottnestManifest } from '@main/providers/rottnest';
 import { ProviderManifestSchema } from '@shared/types/provider.types';
 import { ACCOUNT_REQUIRED_MANIFEST } from '@tests/fixtures/renderer/snipes';
 import {
@@ -7,6 +8,7 @@ import {
   FAKE_MANIFEST,
   PARKSTAY_MANIFEST,
   RAC_MANIFEST,
+  ROTTNEST_MANIFEST,
 } from '@tests/utils/renderer/manifests';
 
 describe('renderer test manifests', () => {
@@ -37,10 +39,15 @@ describe('renderer test manifests', () => {
     expect(RAC_MANIFEST).toEqual(racManifest);
   });
 
+  it('give Stay Rottnest exactly the manifest main registers, its notice included', () => {
+    expect(ROTTNEST_MANIFEST).toEqual(rottnestManifest);
+  });
+
   it('are all valid manifests', () => {
     for (const manifest of [
       PARKSTAY_MANIFEST,
       RAC_MANIFEST,
+      ROTTNEST_MANIFEST,
       FAKE_MANIFEST,
       BROWSE_ONLY_MANIFEST,
       ACCOUNT_REQUIRED_MANIFEST,

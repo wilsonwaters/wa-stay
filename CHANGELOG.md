@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Stay Rottnest**, WA Stay's third provider: Rottnest Island's nine precincts on Explore, each with its villas, cottages, cabins, hostel rooms and campsites as types, a place's availability for your dates with the stay's price, Explore's free counts, and watches every 30 minutes at most that tell you when a type comes free. WA Stay only looks: you book on Stay Rottnest yourself, and it never holds, books or signs in. It doesn't check on Open Day mornings, and stops for at least 12 hours if Stay Rottnest turns a check away.
+- **Provider notices**: before WA Stay checks a provider whose terms put a risk on you (Stay Rottnest's rule on automated software, under which a booking may be cancelled without a refund), you read its notice and tick that you understand. Until then nothing is sent to it: Explore and the place page offer the notice, and its watches are paused. You can withdraw it in Settings → Accounts at any time, and checking stops at once.
+
 ## [2.1.0] - 2026-10-18
 
 ### Added

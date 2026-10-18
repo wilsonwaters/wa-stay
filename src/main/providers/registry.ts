@@ -110,6 +110,21 @@ const FLAG_RULES: readonly ManifestRule[] = [
     },
   },
   {
+    rule: 'notice needs no account and no access gate',
+    // The notice gates availability, watches and snipes (§12.36); an account's signed-in check
+    // and a queue would ask the provider outside it.
+    violation: ({ notice, capabilities: c }) => {
+      if (!notice) return undefined;
+      const outside = [
+        c.account !== 'none' ? `account ${c.account}` : '',
+        c.accessGate ? 'accessGate' : '',
+      ].filter(Boolean);
+      return outside.length
+        ? `a notice gates every request, but ${outside.join(' and ')} would ask outside it`
+        : undefined;
+    },
+  },
+  {
     rule: 'minRequestIntervalMs needs maxConcurrentRequests 1',
     // A paced provider's requests go one at a time (`sdk/pacing.ts`).
     violation: ({ limits }) =>

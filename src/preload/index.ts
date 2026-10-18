@@ -122,6 +122,9 @@ const api: WindowApi = {
     accessStatus: (providerId) => ({ providerId }),
     experiments: (providerId) => ({ providerId }),
     setExperiment: (providerId, experimentId, enabled) => ({ providerId, experimentId, enabled }),
+    notice: (providerId) => ({ providerId }),
+    acceptNotice: (providerId, version) => ({ providerId, version }),
+    withdrawNotice: (providerId) => ({ providerId }),
   }),
 
   catalog: bind('catalog', {

@@ -426,6 +426,7 @@ const BULK_ERROR_CODES: Record<CatalogErrorCode, string> = {
   timeout: 'TIMEOUT',
   http: 'PROVIDER_ERROR',
   parse: 'PROVIDER_ERROR',
+  notice: 'NOTICE_REQUIRED',
   unknown: 'PROVIDER_ERROR',
 };
 

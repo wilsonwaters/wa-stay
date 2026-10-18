@@ -186,8 +186,11 @@ export interface CatalogSearchResult {
   };
 }
 
-/** Why a provider's part of a cross-provider availability call failed. */
-export type CatalogErrorCode = 'access-gate' | 'timeout' | 'http' | 'parse' | 'unknown';
+/**
+ * Why a provider's part of a cross-provider availability call has no answer. `notice`: its notice is not accepted, so it
+ * was not asked (`NOTICE_REQUIRED`).
+ */
+export type CatalogErrorCode = 'access-gate' | 'timeout' | 'http' | 'parse' | 'notice' | 'unknown';
 
 export interface CatalogAvailabilityResult {
   entries: BulkAvailabilityEntry[];

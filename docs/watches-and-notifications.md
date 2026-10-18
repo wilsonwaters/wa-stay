@@ -111,6 +111,15 @@ Resorts asks for 10 seconds, so its requests go one at a time:
 
 ParkStay asks for no pause. [How RAC is paced](providers/rac/README.md#pacing).
 
+### A provider with a notice
+
+Some providers' terms put a risk on you for using WA Stay with them, and WA Stay asks you to read
+a notice before it checks them at all (Stay Rottnest's, about its rule on automated software).
+Until you accept it, a watch on that provider can't be created, and an existing one doesn't
+check: it reads "Paused: read and accept Stay Rottnest's notice in WA Stay." The new-watch flow
+shows the notice when you choose the provider. Once you accept it, paused watches check again at
+their next check. Withdrawing it in Settings → Accounts pauses them again at once.
+
 ### Automatic holds
 
 For a provider with holds (ParkStay; RAC only with its auto-cart experiment turned on,

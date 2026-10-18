@@ -84,6 +84,9 @@ describe('preload window.api', () => {
     await api.providers.accessStatus('parkstay');
     await api.providers.experiments('rac');
     await api.providers.setExperiment('rac', 'autoCart', true);
+    await api.providers.notice('rottnest');
+    await api.providers.acceptNotice('rottnest', 1);
+    await api.providers.withdrawNotice('rottnest');
     await api.catalog.search({ text: 'karri', limit: 50 });
     await api.catalog.get('parkstay:12:3');
     await api.catalog.availability(stay);
@@ -102,6 +105,9 @@ describe('preload window.api', () => {
       ['providers:access-status', { providerId: 'parkstay' }],
       ['providers:experiments', { providerId: 'rac' }],
       ['providers:set-experiment', { providerId: 'rac', experimentId: 'autoCart', enabled: true }],
+      ['providers:notice', { providerId: 'rottnest' }],
+      ['providers:accept-notice', { providerId: 'rottnest', version: 1 }],
+      ['providers:withdraw-notice', { providerId: 'rottnest' }],
       ['catalog:search', { text: 'karri', limit: 50 }],
       ['catalog:get', { key: 'parkstay:12:3' }],
       ['catalog:availability', { stay }],

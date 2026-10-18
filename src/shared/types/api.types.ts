@@ -40,6 +40,11 @@ export type ApiErrorCode =
   | 'ACCOUNT_BUSY'
   /** The hold has lapsed (or there is none to pay for): payment cannot open. */
   | 'HOLD_EXPIRED'
+  /**
+   * The provider's notice (`manifest.notice`) is not accepted, at its current version: WA Stay
+   * sends the provider nothing until the person reads and accepts it (`providers.acceptNotice`).
+   */
+  | 'NOTICE_REQUIRED'
   | 'NOT_IMPLEMENTED';
 
 // Generic API Response wrapper

@@ -35,16 +35,21 @@ export {
 } from './notifiers';
 export { useSetSetting, useSetting } from './settings';
 export {
+  useAcceptNotice,
   useAccessStatus,
   useProvider,
   useProviderExperiments,
+  useProviderNotice,
   useProviders,
   useProvidersWith,
   useSetExperiment,
+  useWithdrawNotice,
   type ProviderCapabilities,
   type ProviderCapability,
   type ProviderExperimentState,
   type ProviderManifest,
+  type ProviderNotice,
+  type ProviderNoticeStatus,
 } from './providers';
 export {
   NOTIFICATION_LIST_LIMIT,

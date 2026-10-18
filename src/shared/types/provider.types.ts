@@ -156,6 +156,26 @@ export interface ProviderExperiment {
 }
 
 /**
+ * What the person reads and accepts before WA Stay sends the provider anything
+ * (architecture-notes §12.36): a risk the provider's own terms put on them, such as Stay
+ * Rottnest's clause on automated software. Until it is accepted (at this `version`), WA Stay
+ * checks no availability there, and runs none of its watches or snipes. Plain text only: no
+ * markup and no links.
+ */
+export interface ProviderNotice {
+  /** A whole number from 1; a higher one asks everyone again. */
+  version: number;
+  /** The dialog's title, e.g. "Before WA Stay checks Stay Rottnest". */
+  title: string;
+  /** One or two short paragraphs, separated by a blank line. */
+  body: string;
+  /** What it means for the person, one point each. */
+  points: string[];
+  /** The checkbox the person ticks, e.g. "I understand". */
+  confirmLabel: string;
+}
+
+/**
  * How hard the app may use a provider (§12.30). Core services read them from the provider
  * context or the manifest; a manifest without `limits` gets `DEFAULT_PROVIDER_LIMITS`.
  */
@@ -334,6 +354,8 @@ export interface ProviderManifest {
    * experiment not turned on) it may stand alone.
    */
   holdRelease?: boolean;
+  /** What the person accepts before WA Stay checks the provider (`ProviderNotice`). */
+  notice?: ProviderNotice;
 }
 
 /** Values for a provider's `stayFields`, keyed by `StayFieldDescriptor.key`. */
@@ -662,6 +684,23 @@ export const ProviderExperimentSchema = z.object({
 assertTypeEquals<z.input<typeof ProviderExperimentSchema>, ProviderExperiment>(true);
 assertTypeEquals<z.output<typeof ProviderExperimentSchema>, ProviderExperiment>(true);
 
+/** A notice's text: plain words, never markup or a link (the renderer shows it as text). */
+const noticeText = (max: number) =>
+  nonEmpty
+    .max(max)
+    .refine((text) => !/[<>]/.test(text), 'A notice is plain text, without markup')
+    .refine((text) => !/\b(?:https?:\/\/|www\.)/i.test(text), 'A notice has no links');
+
+export const ProviderNoticeSchema = z.object({
+  version: z.number().int().min(1).max(1000),
+  title: noticeText(80),
+  body: noticeText(1200),
+  points: z.array(noticeText(400)).max(8),
+  confirmLabel: noticeText(120),
+});
+assertTypeEquals<z.input<typeof ProviderNoticeSchema>, ProviderNotice>(true);
+assertTypeEquals<z.output<typeof ProviderNoticeSchema>, ProviderNotice>(true);
+
 /** A `credentials` field's or confirmation's key: a letter, then letters and digits. */
 export const AccountKeySchema = z
   .string()
@@ -777,6 +816,7 @@ export const ProviderManifestSchema = z
       )
       .optional(),
     holdRelease: z.boolean().optional(),
+    notice: ProviderNoticeSchema.optional(),
   })
   // An experiment turns on capabilities that are off, and they are on only once it is applied
   // (`withExperiments`), by itself or by another applied experiment.

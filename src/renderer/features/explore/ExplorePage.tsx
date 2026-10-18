@@ -31,11 +31,13 @@ import {
   useCatalogUpdates,
   useProviders,
   useProvidersWith,
+  type ProviderManifest,
 } from '../../api';
 import type { PlaceLinkQuery, PlaceLinkState } from '../../app/routes';
 import { parseStayTypes } from '../../app/stayParams';
 import type { CardAvailability } from '../../components/LocationCard';
 import { hasMapLocation, placesLabel } from '../../components/locationFormat';
+import { ProviderNoticeDialog } from '../../components/providers/ProviderNoticeDialog';
 import { stayRangeLabel } from '../../components/nightGridModel';
 import { Button, Notice, Spinner, useAnnounce, type Guests } from '../../components/ui';
 import { cx } from '../../components/ui/cx';
@@ -661,9 +663,27 @@ export default function ExplorePage() {
 
   // ---- Notices -----------------------------------------------------------------------------
   // One notice per provider that failed or is slow, never one per card.
+  /** The provider whose notice is open (§12.36): it was not asked for availability. */
+  const [noticeFor, setNoticeFor] = useState<ProviderManifest | null>(null);
   const availabilityNotices = stay
     ? bulkProviders.map((manifest) => {
         const { id, shortName } = manifest;
+        // Not asked: its notice comes first. Accepting asks again by itself.
+        if (statuses[id] === 'error' && bulk.errors[id]?.code === 'NOTICE_REQUIRED') {
+          return (
+            <Notice
+              key={id}
+              tone="info"
+              actions={
+                <Button variant="secondary" size="sm" onClick={() => setNoticeFor(manifest)}>
+                  Read {shortName}&apos;s notice
+                </Button>
+              }
+            >
+              {shortName} checks dates once you&apos;ve read and accepted its notice.
+            </Notice>
+          );
+        }
         if (statuses[id] === 'error') {
           const queue = bulk.errors[id]?.code === 'ACCESS_GATE' && manifest.capabilities.accessGate;
           return (
@@ -904,6 +924,13 @@ export default function ExplorePage() {
           </Button>
         )}
       </div>
+      {noticeFor && (
+        <ProviderNoticeDialog
+          manifest={noticeFor}
+          onAccepted={() => setNoticeFor(null)}
+          onClose={() => setNoticeFor(null)}
+        />
+      )}
     </HighlightContext.Provider>
   );
 }

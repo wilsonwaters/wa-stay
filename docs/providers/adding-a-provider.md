@@ -266,6 +266,7 @@ export const exampleApiManifest: ProviderManifest = {
 | `releaseModes` | Site Sniper's release modes, when `capabilities.snipes` ([below](#release-modes)). |
 | `bulkAvailabilityStayFields` | What bulk availability depends on ([below](#bulk-availability-stay-fields)). |
 | `experiments` | What you ship switched off, for the person to turn on ([below](#experiments)). |
+| `notice` | What the person reads and accepts before the app sends you anything ([below](#notice)). |
 
 ### Location kinds
 
@@ -464,6 +465,41 @@ interface ProviderExperiment {
   experiment on, register `withExperiments(factory, ['autoCart'])`
   (`src/main/providers/experiments.ts`) instead of the factory: the contract suite runs on it
   as on any provider.
+
+### Notice
+
+When your provider's own terms put a risk on the person for using the app with it (Stay
+Rottnest's terms say a booking assisted by automated software may be cancelled without a
+refund), say so in a notice. The person reads it and ticks its checkbox once, before the app
+sends your provider anything.
+
+```ts
+interface ProviderNotice {
+  version: number; // a whole number from 1; raise it when what the notice says changes
+  title: string; // the dialog's title, at most 80 characters
+  body: string; // one or two short paragraphs, separated by a blank line
+  points: string[]; // what it means for the person, one point each, at most 8
+  confirmLabel: string; // the checkbox, e.g. 'I understand'
+}
+```
+
+- **Plain text only.** No markup and no links (`<`, `>`, `https://` and `www.` are refused): the
+  app shows it as text. Say what the terms say, what can happen, what the app does and doesn't
+  do, and that the person can withdraw.
+- **What waits for it.** Until the notice is accepted at its current `version`, the app asks
+  your provider nothing: a place's Check availability opens the notice first, Explore offers it
+  once above the list and its cards say why they have no count, a watch can't be created and an
+  existing one's run is paused ("Paused: read and accept {shortName}'s notice in WA Stay."), and
+  a snipe can't be armed. Your catalogue and a place's details are still asked for, so serve
+  them without asking your site (from a seed, as Stay Rottnest's precincts are).
+- **No account, no access gate.** Their signed-in check and queue would ask your site before
+  the notice: a manifest with a notice must have `account: 'none'` and `accessGate: false`
+  (`MANIFEST_RULES`).
+- **A new version asks again.** The acceptance counts only at the version it was given, so
+  raising `version` asks everyone to read it again before anything more is sent.
+- **The acceptance is not yours.** The app keeps it in your `provider_state` under
+  `core.notice`, which your `ctx.state` cannot reach. Withdrawing it in Settings → Accounts
+  stops every check at once and drops your provider's cached availability.
 
 ## 3. The provider context
 

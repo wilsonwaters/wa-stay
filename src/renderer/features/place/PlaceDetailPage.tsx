@@ -14,6 +14,7 @@ import {
 import { buildPath, PATTERNS, placeLinkState, ROUTES } from '../../app/routes';
 import { parseStayTypes, stayParamsQuery, type StayParams } from '../../app/stayParams';
 import { areaLine, kindLabel, placeNoun } from '../../components/locationFormat';
+import { useNoticeGate } from '../../components/providers/ProviderNoticeDialog';
 import {
   BackLink,
   Badge,
@@ -39,6 +40,7 @@ import {
 import {
   checkFailure,
   handoffPrefill,
+  noticeNeededMessage,
   placeKey,
   rateLimitedMessage,
   resolvePlaceLinks,
@@ -224,15 +226,21 @@ export default function PlaceDetailPage() {
   const summaryRef = useRef<HTMLParagraphElement>(null);
   /** The person pressed Check: focus and announce the result once it is on screen. */
   const awaiting = useRef(false);
+  // A provider with a notice the person has not accepted is asked nothing until they do
+  const noticeGate = useNoticeGate(manifest);
   const onCheck = () => {
     if (!currentStay) {
       setDatesError('Choose your check-in and check-out dates');
       return;
     }
     setDatesError(undefined);
-    awaiting.current = true;
-    if (sameStay(requested, currentStay)) void check.refetch();
-    else setRequested(currentStay);
+    const run = () => {
+      awaiting.current = true;
+      if (sameStay(requested, currentStay)) void check.refetch();
+      else setRequested(currentStay);
+    };
+    if (noticeGate.needed) noticeGate.ask(run);
+    else run();
   };
 
   useEffect(() => {
@@ -244,6 +252,8 @@ export default function PlaceDetailPage() {
         announce(`${shortName} has a waiting queue right now. Try again in a few minutes.`);
       } else if (kind === 'rate-limit') {
         announce(rateLimitedMessage(shortName));
+      } else if (kind === 'notice') {
+        announce(noticeNeededMessage(shortName));
       }
       // Anything else shows an alert, which announces itself.
       return;
@@ -408,6 +418,8 @@ export default function PlaceDetailPage() {
             checked={checked}
             failure={failure}
             onRetry={() => void check.refetch()}
+            // Accepting asks the check again by itself (its answer is dropped)
+            onReadNotice={() => noticeGate.ask()}
             links={links}
             watchHref={manifest?.capabilities.watches ? ROUTES.watchNew(prefill) : undefined}
             snipeHref={manifest?.capabilities.snipes ? ROUTES.snipeNew(prefill) : undefined}
@@ -447,6 +459,7 @@ export default function PlaceDetailPage() {
           {loaded && detail && <BookingRulesSection releaseInfo={detail.releaseInfo} />}
         </div>
       </div>
+      {noticeGate.dialog}
     </div>
   );
 }

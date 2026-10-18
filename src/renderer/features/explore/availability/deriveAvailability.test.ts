@@ -73,6 +73,12 @@ describe('deriveAvailability', () => {
         { ...answered, status: 'error', errorCode: 'ACCESS_GATE' },
         { state: 'error', queue: true },
       ],
+      [
+        "the provider's notice is not accepted, so it was not asked (§12.36)",
+        ONLINE,
+        { ...answered, status: 'error', errorCode: 'NOTICE_REQUIRED' },
+        { state: 'notice' },
+      ],
       ['still asking', ONLINE, { ...answered, status: 'loading' }, { state: 'loading' }],
       [
         'a unit free every night',
@@ -371,6 +377,14 @@ describe('availabilityLabel', () => {
 
   it('shows nothing without dates', () => {
     expect(label({ state: 'no-dates' })).toBeNull();
+  });
+
+  it("asks for the provider's notice on every card, calmly, and draws no count on the pill", () => {
+    expect(availabilityLabel({ state: 'notice' }, ['cabin'], 'Stay Rottnest')).toEqual({
+      pill: '–',
+      card: "Read Stay Rottnest's notice to check dates",
+      tone: 'neutral',
+    });
   });
 
   it('keeps a waiting queue calm on every card: the same words, no danger tone', () => {

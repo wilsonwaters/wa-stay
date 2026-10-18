@@ -57,6 +57,7 @@ import { compareDates, isCalendarDate, todayIn } from '@shared/utils/calendar-da
 import { cleanUnitKinds, isUnitKind } from '@shared/utils/unit-kinds';
 import { DEFAULT_SNIPE_POLL_INTERVAL_MS, DEFAULT_SNIPE_WINDOW_MS } from '@shared/constants';
 import type { SiteSniperRepository } from '../../database/repositories';
+import { noticeRequiredMessage } from '../../providers/notices';
 import type { ProviderRegistry, ProviderWith } from '../../providers/registry';
 import {
   AccessGateError,
@@ -150,6 +151,12 @@ export interface SnipeServiceDeps {
    * it alerts, and a new one is an alert snipe (default: never).
    */
   holdsTurningOff?: (providerId: string) => boolean;
+  /**
+   * Throws `NOTICE_REQUIRED` while the provider's notice is not accepted (`ProviderNotices`,
+   * §12.36): a snipe is then neither created nor armed, uses no queue, and a poll ends it
+   * FAILED having asked nothing (default: never throws).
+   */
+  assertNotice?: (providerId: string) => void;
   clock?: () => Date;
 }
 
@@ -202,6 +209,7 @@ export class SiteSniperService {
   private readonly events?: EventSink;
   private readonly accounts?: AccountGate;
   private readonly holdsTurningOff: (providerId: string) => boolean;
+  private readonly assertNotice: (providerId: string) => void;
   private readonly clock: () => Date;
 
   constructor(deps: SnipeServiceDeps) {
@@ -212,6 +220,7 @@ export class SiteSniperService {
     this.events = deps.events;
     this.accounts = deps.accounts;
     this.holdsTurningOff = deps.holdsTurningOff ?? (() => false);
+    this.assertNotice = deps.assertNotice ?? (() => undefined);
     this.clock = deps.clock ?? (() => new Date());
   }
 
@@ -219,11 +228,13 @@ export class SiteSniperService {
    * Creates a snipe. Throws `CAPABILITY` for a provider without snipes and `VALIDATION`
    * (with the field) for a release mode the provider does not support, bad dates, bad stay
    * fields, a release time the provider cannot work out (a scheduled release needs one,
-   * before check-in), or `hold` on a provider without holds. The action defaults to `hold`
-   * when the provider has holds, else `alert`; the window is clamped to the mode's limit.
+   * before check-in), or `hold` on a provider without holds, and `NOTICE_REQUIRED` while the
+   * provider's notice is not accepted. The action defaults to `hold` when the provider has
+   * holds, else `alert`; the window is clamped to the mode's limit.
    */
   async create(userId: number, input: SiteSnipeInput): Promise<SiteSnipe> {
     const provider = this.providers.require(input.providerId, 'snipes');
+    this.assertNotice(input.providerId);
     const action = input.action ?? (this.holdsOf(provider) ? 'hold' : 'alert');
     this.assertAction(provider, action);
     const unitKinds = cleanUnitKinds(input.unitKinds);
@@ -339,7 +350,8 @@ export class SiteSniperService {
 
   /**
    * Arms a snipe again. A HELD or BOOKED snipe is refused: it would hold the same nights a
-   * second time. An ALERTED one may be, as it holds nothing: its alert is cleared.
+   * second time. An ALERTED one may be, as it holds nothing: its alert is cleared. So is one
+   * whose provider's notice is not accepted (`NOTICE_REQUIRED`).
    */
   async activate(id: number): Promise<void> {
     const snipe = this.requireSnipe(id);
@@ -354,6 +366,7 @@ export class SiteSniperService {
     // A hold snipe on a provider whose holds need an account: AUTH_REQUIRED, and nothing is
     // armed. An alert never waits for a sign-in.
     const provider = this.providers.tryGet(snipe.providerId);
+    if (provider) this.assertNotice(snipe.providerId);
     if (snipe.action === 'hold' && provider && needsAccountForHolds(provider) && this.accounts) {
       await this.accounts.ensureForHolds(snipe.providerId);
       // Signed in now: the sign-in hint no longer applies
@@ -437,9 +450,12 @@ export class SiteSniperService {
       releaseAt,
       warmupAt: releaseAt && new Date(releaseAt.getTime() - snipe.leadTimeSeconds * 1000),
       windowEnd: releaseAt && new Date(releaseAt.getTime() + windowMs),
-      gate: this.usesGate(snipes, snipe.releaseMode, snipe.accessGateEnabled)
-        ? snipes.access
-        : undefined,
+      // No queue for a provider whose notice is not accepted: its poll ends the snipe instead
+      gate:
+        this.usesGate(snipes, snipe.releaseMode, snipe.accessGateEnabled) &&
+        this.noticeAccepted(snipe.providerId)
+          ? snipes.access
+          : undefined,
       pollIntervalMs: Math.max(snipe.pollIntervalMs, floor),
       timeZone: provider.manifest.timezone,
     };
@@ -534,6 +550,16 @@ export class SiteSniperService {
     }
     const { provider } = plan;
     const nextCheck = new Date(checkedAt.getTime() + plan.pollIntervalMs);
+
+    // The person has not accepted the provider's notice (or withdrew it): nothing is asked, and
+    // the snipe ends, to be armed again once it is accepted
+    if (!this.noticeAccepted(snipe.providerId)) {
+      const error = noticeRequiredMessage(provider.manifest);
+      log.info(`Snipe ${snipeId}: ended, the notice of ${snipe.providerId} is not accepted`);
+      this.repo.finish(snipeId, SnipeStatus.FAILED, SnipeResult.ERROR, error);
+      this.changed(snipeId);
+      return outcome('done', SnipeResult.ERROR, { error });
+    }
 
     try {
       if (this.repo.hasReachedMaxAttempts(snipeId)) {
@@ -924,6 +950,15 @@ export class SiteSniperService {
         `${provider.manifest.shortName} can't hold automatically, so choose an alert`,
         { issues: ['action'] }
       );
+    }
+  }
+
+  private noticeAccepted(providerId: string): boolean {
+    try {
+      this.assertNotice(providerId);
+      return true;
+    } catch {
+      return false;
     }
   }
 

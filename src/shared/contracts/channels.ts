@@ -77,6 +77,9 @@ export const CHANNELS = {
     accessStatus: 'providers:access-status',
     experiments: 'providers:experiments',
     setExperiment: 'providers:set-experiment',
+    notice: 'providers:notice',
+    acceptNotice: 'providers:accept-notice',
+    withdrawNotice: 'providers:withdraw-notice',
   },
   catalog: {
     search: 'catalog:search',
