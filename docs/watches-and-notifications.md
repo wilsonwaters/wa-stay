@@ -200,9 +200,12 @@ an RAC park, the sites of every category found, not the categories.
 | **Email** | Each notification, sent through your own email account (below). An alert that a watch found something, or that a snipe found the dates free, has a **Book on {provider}** link to the provider's public booking page for those dates (the nights it found, for some nights), so you can book from your phone. The link is never a cart or a checkout. An alert that a site is held says the hold is in WA Stay on the computer that placed it, and still gives the link. |
 
 What creates a notification: a watch finding sites (or some nights), a snipe finding the dates
-free (an alert, [Site Sniper](site-sniper.md#when-a-snipe-alerts)), a hold placed by a snipe or
-a watch, a payment confirmed (booked), the welcome notice after an upgrade, and errors that
-need your attention.
+free (an alert, [Site Sniper](site-sniper.md#when-a-snipe-alerts)), an Open Day plan's reminder
+(one for every plan due at that time with the same provider,
+[Site Sniper](site-sniper.md#stay-rottnests-open-days-plans); clicking it opens the plan, then
+the provider's booking page, and its email has the **Book on {provider}** link), a hold placed
+by a snipe or a watch, a payment confirmed (booked), the welcome notice after an upgrade, and
+errors that need your attention.
 
 Notifications and the record of emails sent are deleted automatically after 30 days (the
 retention job, 5 minutes after start and then daily).

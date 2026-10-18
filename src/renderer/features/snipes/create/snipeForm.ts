@@ -2,7 +2,8 @@
  * The new-snipe form: its values, the rules each step checks (zod, with the provider's own stay
  * field rules), and a blank form for a provider. Advanced timing is typed as text (seconds and
  * minutes, as people think of them) and becomes the contract's ms fields on submit. `action`
- * (alert or hold, `snipeAction.ts`) is chosen on the Release step.
+ * (alert or hold, `snipeAction.ts`) is chosen on the Release step; in a mode that only reminds
+ * it is an Open Day plan, which has no timing.
  */
 import { z } from 'zod';
 import {
@@ -28,7 +29,12 @@ import {
   stayFieldsFor,
 } from '../../../components/stay/stayFields';
 import { holdNeedsChoice } from '../../../components/stay/stayTypes';
-import { defaultSnipeAction, snipeHoldChoiceMessage, windowCapMinutes } from './snipeAction';
+import {
+  defaultSnipeAction,
+  remindsOnly,
+  snipeHoldChoiceMessage,
+  windowCapMinutes,
+} from './snipeAction';
 import { zonedInstant } from './zonedTime';
 
 const shape = z.object({
@@ -154,6 +160,11 @@ export function snipeFormSchema({
   return shape.superRefine((v, ctx) => {
     const issue = (path: (string | number)[], message: string) =>
       ctx.addIssue({ code: 'custom', path, message });
+    const checkName = () => {
+      if (!v.name.trim()) issue(['name'], 'Give the snipe a name');
+      else if (v.name.trim().length > 200) issue(['name'], 'Keep the name to 200 characters');
+      if (v.notes.length > 1000) issue(['notes'], 'Keep notes to 1,000 characters');
+    };
 
     if (!v.providerId) issue(['providerId'], 'Choose a provider');
     if (!v.location) issue(['location'], 'Choose a location');
@@ -181,6 +192,11 @@ export function snipeFormSchema({
         issue(['releaseDate'], 'Choose a release time in the future');
       else if (checkInAt(v.arrival, manifest.timezone) <= at.getTime())
         issue(['releaseDate'], 'Choose a release time before check-in');
+    }
+    // An Open Day plan (a mode that only reminds) has no timing to check
+    if (remindsOnly(manifest, v.releaseMode)) {
+      checkName();
+      return;
     }
     const whole = (text: string) => {
       const n = parseNumber(text);
@@ -210,40 +226,6 @@ export function snipeFormSchema({
     if (whole(v.maxAttempts) === undefined)
       issue(['maxAttempts'], 'Enter a whole number; 0 means no limit');
 
-    if (!v.name.trim()) issue(['name'], 'Give the snipe a name');
-    else if (v.name.trim().length > 200) issue(['name'], 'Keep the name to 200 characters');
-    if (v.notes.length > 1000) issue(['notes'], 'Keep notes to 1,000 characters');
+    checkName();
   });
-}
-
-/** The fields each step checks before moving on. */
-export function stepFields(
-  step: SnipeStepId,
-  manifest: ProviderManifest | undefined
-): SnipeFieldName[] {
-  switch (step) {
-    case 'provider':
-      return ['providerId'];
-    case 'location':
-      return ['location'];
-    case 'stay':
-      return [
-        'arrival',
-        'departure',
-        'adults',
-        ...snipeStayFields(manifest).map((field) => `stayParams.${field.key}` as const),
-      ];
-    case 'release':
-      return [
-        'releaseMode',
-        'releaseDate',
-        'action',
-        'leadTimeSeconds',
-        'pollIntervalSeconds',
-        'windowMinutes',
-        'maxAttempts',
-      ];
-    default:
-      return ['name', 'notes'];
-  }
 }

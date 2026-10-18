@@ -23,6 +23,12 @@ S.
 
 ## Completion criteria
 
-- [ ] Fake-clock tests, including across an Open Day move.
-- [ ] The copy guard.
-- [ ] The full gate passes.
+- [x] Fake-clock tests, including across an Open Day move.
+- [x] The copy guard.
+- [x] The full gate passes.
+
+## Notes from the build
+
+- The steps and checklist are in the manifest's `open_day` mode; `release-policy.ts` times the plan (the stay's Open Day at 8:30 am Perth, the 5/3 rule included) and refuses a stay the rules refuse or one on sale (`ALREADY_ON_SALE`).
+- The copy guard is `tests/unit/providers/rottnest/manifest.test.ts`: none of "free", "found", "held", "hold", "secured", "guaranteed", nor "devices", "browsers", "tabs", "phones", "several" or "more numbers".
+- The contract suite takes `releaseSample` (300 days ahead), as the policy refuses the default sample, on sale.

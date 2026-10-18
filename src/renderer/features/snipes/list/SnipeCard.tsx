@@ -77,7 +77,11 @@ export function SnipeCard({ snipe, manifest, today, place, placeLoading }: Snipe
           <p ref={status} tabIndex={-1} className="shrink-0 rounded-full">
             <VisuallyHidden>Status: </VisuallyHidden>
             <StatusPill
-              {...statusPillFor(snipe.status, heldUnitNoun(snipe, manifest, units.units))}
+              {...statusPillFor(
+                snipe.status,
+                heldUnitNoun(snipe, manifest, units.units),
+                snipe.action
+              )}
             />
           </p>
         </div>
@@ -123,8 +127,10 @@ export function SnipeCard({ snipe, manifest, today, place, placeLoading }: Snipe
         )}
         <div className="mt-auto flex flex-wrap items-center justify-between gap-x-3 gap-y-1 pt-1">
           <p className="text-sm text-fg-muted">
-            {compactProgress(timelineSteps(snipe))} ·{' '}
-            {snipe.attemptsCount > 0 ? attempts(snipe.attemptsCount) : 'No attempts yet'}
+            {compactProgress(timelineSteps(snipe))}
+            {/* An Open Day plan never checks, so it makes no attempts */}
+            {snipe.action !== 'remind' &&
+              ` · ${snipe.attemptsCount > 0 ? attempts(snipe.attemptsCount) : 'No attempts yet'}`}
           </p>
           <div className="ml-auto">
             <SnipeActionsBar

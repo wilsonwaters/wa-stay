@@ -20,6 +20,7 @@ import {
 import { ROTTNEST_SEARCH_TTL_MS } from '@main/providers/rottnest/availability';
 import { FixtureHttpClient } from '@main/testing/fixture-http-client';
 import type { StayQuery } from '@shared/types/provider.types';
+import { addDays, todayIn } from '@shared/utils/calendar-date';
 import { createTestProviderContext } from '@tests/utils/fake-provider';
 import { describeProviderContract } from '@tests/utils/provider-contract';
 
@@ -66,6 +67,15 @@ afterAll(() => fs.rmSync(UNEXPECTED_LOG, { force: true }));
 describeProviderContract('rottnest', () => ({
   provider: rottnestFactory(fixtureContext()),
   sample: { externalId: 'geordie-bay', stay: STAY },
+  // A plan is for a stay not on sale yet: 300 days on is always past the Open Days held so far
+  releaseSample: {
+    externalId: 'geordie-bay',
+    stay: {
+      arrival: addDays(todayIn('Australia/Perth'), 300),
+      departure: addDays(todayIn('Australia/Perth'), 302),
+      adults: 2,
+    },
+  },
   unknownExternalId: 'does-not-exist',
 }));
 

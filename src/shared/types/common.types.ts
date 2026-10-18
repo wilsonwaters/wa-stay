@@ -28,12 +28,19 @@ export enum SnipeResult {
   ERROR = 'error',
   /** An alert was sent: the dates were free, and nothing was held (§12.35). */
   ALERTED = 'alerted',
+  /** An Open Day plan sent its reminders: nothing was checked or held (§12.38). */
+  REMINDED = 'reminded',
 }
 
 export enum SnipeReleaseMode {
   DAILY_ROLLOVER = 'daily_rollover', // non-Ningaloo midnight AWST rollover
   SCHEDULED = 'scheduled', // explicit release datetime (Ningaloo 10:00 first Tue)
   CANCELLATION = 'cancellation', // no fixed release; poll for freed site
+  /**
+   * A release day the person goes to themselves (Stay Rottnest's Open Days, with their waiting
+   * room): a plan that only reminds (`remindOnly`), never checks (§12.38).
+   */
+  OPEN_DAY = 'open_day',
 }
 
 export enum SnipeStatus {
@@ -48,6 +55,8 @@ export enum SnipeStatus {
   DISABLED = 'disabled',
   /** The dates were free and the person was alerted; nothing is held (terminal, §12.35). */
   ALERTED = 'alerted',
+  /** An Open Day plan sent its reminders; nothing was checked or held (terminal, §12.38). */
+  REMINDED = 'reminded',
 }
 
 export enum NotificationType {
@@ -56,6 +65,8 @@ export enum NotificationType {
   SNIPE_BOOKED = 'snipe_booked',
   /** A snipe found the dates free and alerts with the booking page; nothing is held. */
   SNIPE_ALERT = 'snipe_alert',
+  /** An Open Day plan's reminder: when to be ready, and what to have to hand. */
+  SNIPE_REMINDER = 'snipe_reminder',
   BOOKING_CONFIRMED = 'booking_confirmed',
   ERROR = 'error',
   WARNING = 'warning',

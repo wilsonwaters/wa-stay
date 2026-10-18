@@ -15,7 +15,7 @@ import {
 import { useNow } from '../../hooks/useNow';
 import { SnipeCard } from './list/SnipeCard';
 import { NO_SNIPE_PROVIDER_DESCRIPTION, sniperNoun } from './shared/snipeNouns';
-import { sortSnipes } from './shared/snipeState';
+import { sortSnipes } from './shared/snipeOrder';
 import { HoldAlert, useStatusAnnouncements } from './shared/useStatusAnnouncements';
 
 /**

@@ -33,6 +33,7 @@ import { heldUnitNoun, statusPillFor } from '../shared/snipeState';
 import { useSnipeActions } from '../shared/useSnipeActions';
 import { usePlaceUnits } from '../shared/usePlaceUnits';
 import { HoldAlert, useStatusAnnouncements } from '../shared/useStatusAnnouncements';
+import { PlanSection } from './PlanSection';
 import { SnipeOutcome } from './SnipeOutcome';
 import { SnipeRecord, SnipeSummary } from './SnipeSummary';
 import { useLingering } from './useLingering';
@@ -130,7 +131,11 @@ function SnipeDetailView({ snipe, manifest, updating: fetching }: ViewProps) {
           >
             Status
             <StatusPill
-              {...statusPillFor(snipe.status, heldUnitNoun(snipe, manifest, units.units))}
+              {...statusPillFor(
+                snipe.status,
+                heldUnitNoun(snipe, manifest, units.units),
+                snipe.action
+              )}
             />
           </p>
           <ReleaseLine snipe={snipe} manifest={manifest} />
@@ -145,6 +150,7 @@ function SnipeDetailView({ snipe, manifest, updating: fetching }: ViewProps) {
           units={place.data?.units}
         />
       </div>
+      {manifest && <PlanSection snipe={snipe} manifest={manifest} now={now} />}
       {snipe.notes && (
         <section aria-labelledby="notes-heading" className="flex flex-col gap-2">
           <h2 id="notes-heading" className="text-xl font-semibold text-fg">

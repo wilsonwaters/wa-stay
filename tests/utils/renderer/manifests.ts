@@ -286,7 +286,7 @@ export const ROTTNEST_MANIFEST: ProviderManifest = {
     availability: true,
     bulkAvailability: true,
     watches: true,
-    snipes: false,
+    snipes: true,
     holds: false,
     bookingImport: false,
     accessGate: false,
@@ -298,6 +298,46 @@ export const ROTTNEST_MANIFEST: ProviderManifest = {
     minRequestIntervalMs: 60_000,
     catalogTtlHours: 24,
   },
+  releaseModes: [
+    {
+      id: 'open_day',
+      label: 'On its Open Day',
+      description:
+        "Stay Rottnest opens a whole month of stays at once, at 8:30 am on its Open Day. Site Sniper reminds you before then, so you're in the waiting room in time: you book on Stay Rottnest yourself.",
+      usesAccessGate: false,
+      remindOnly: true,
+      reminders: [
+        {
+          daysBefore: 1,
+          at: '18:00',
+          title: 'Open Day tomorrow',
+          body: "Stay Rottnest's waiting room opens at 6 am and bookings at 8:30 am, Perth time. Have your mobile for the passcode, your card and your plan ready.",
+        },
+        {
+          daysBefore: 0,
+          at: '06:00',
+          title: 'The waiting room is open',
+          body: "Everyone in Stay Rottnest's waiting room before 8:30 am gets a random place in the queue, so join when it suits you before then.",
+        },
+        {
+          daysBefore: 0,
+          at: '08:15',
+          title: '15 minutes to Open Day',
+          body: "Bookings open at 8:30 am. Join Stay Rottnest's waiting room now if you haven't: after 8:30 you join the back of the queue.",
+        },
+      ],
+      checklist: [
+        "Your choices in order: the room types and precincts you'd take, best first.",
+        'Dates that can move a little, in case your first choice goes.',
+        'Everyone in your party, within what the room type sleeps.',
+        'Your Stay Rottnest profile, with your details up to date.',
+        "Your own mobile, for the waiting room's passcode. Temporary or virtual numbers aren't accepted.",
+        'A Visa or Mastercard.',
+        'For a second unit in your name, a keyholder to nominate.',
+        'Only what you need: everyone else in the queue is hoping too.',
+      ],
+    },
+  ],
   notice: {
     version: 1,
     title: 'Before WA Stay checks Stay Rottnest',

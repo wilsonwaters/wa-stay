@@ -397,6 +397,16 @@ interface ReleaseModeDescriptor {
   usesAccessGate: boolean; // a snipe in this mode waits in the provider's queue
   maxWindowMinutes?: number; // the longest a snipe keeps trying after the release (1–1440)
   fields?: StayFieldDescriptor[]; // extra inputs this mode needs
+  remindOnly?: boolean; // a plan: it reminds before the release, and never checks
+  reminders?: ReleaseReminder[]; // a remindOnly mode's reminders
+  checklist?: string[]; // what to have ready, shown with them
+}
+
+interface ReleaseReminder {
+  daysBefore: number; // 0 for the release day
+  at: string; // 'HH:MM' in the provider's time zone
+  title: string;
+  body: string;
 }
 ```
 
@@ -409,6 +419,17 @@ whose `computeReleaseAt` gives an instant: a `cancellation` mode has no release 
 window, so it polls (at `pollFloorMs.continuous` at the fastest) until it ends some other way.
 ParkStay's modes are `daily_rollover`, `scheduled` and `cancellation`, with no cap. RAC's are
 `daily_rollover` and `scheduled`, each capped at 30 minutes, with a 10 s `pollFloorMs.window`.
+
+A mode with `remindOnly` is for a release where your terms keep WA Stay from checking, such as
+a queue that opens at a set time: a snipe in it is a plan (`action: 'remind'`). It asks your
+`computeReleaseAt` for the instant, as any mode does, then sends its `reminders` at their times
+before it (the release day's date in your time zone, less `daysBefore`, at `at`; one at or after
+the release is left out) as desktop alerts and emails, and ends **Reminders sent**. It never
+checks availability, waits in a queue, holds or reserves a night. A `remindOnly` mode needs
+reminders and no access gate, and only such a mode has reminders. When every mode is
+`remindOnly`, `snipes` doesn't need `availability`. Keep the words to what the person does:
+nothing in them should suggest that a plan finds, holds or secures anything. Stay Rottnest's
+one mode, `open_day`, is one.
 
 Without `holds`, every snipe of the provider is an alert: when the dates are free it ends
 **Alert sent** with a desktop alert and email that link to your booking page (the unit's
@@ -1582,6 +1603,10 @@ When dates become bookable, for Site Sniper (`release`). ParkStay: `release-poli
   window and continuously. Pick them for the provider's capacity, not yours.
 - `availability.check` can say when a stay not released yet opens: `release: { open: false,
   opensAt }`, with `opensAt` from the same policy (Site Sniper's release step shows it).
+- For a `remindOnly` mode the instant is the release the reminders count back from. Refuse a
+  stay already on sale with a `ProviderError` saying so: a plan for it would remind no one.
+  Site Sniper's release step shows such a mode's release from your booking rules
+  (`stayRules`, below) rather than a check, so give the rules a `release` too.
 
 ### Bookings
 
@@ -1817,12 +1842,14 @@ first listed place and a two-night stay 30 days ahead):
 | `search` catalogue | `searchArea` page after page over `searchBbox`; `searchText(searchText)` if there is one | Items inside the box (to 0.01°); a `nextCursor` that is a non-empty string, changes, and ends within 100 pages; an abort honoured on the first and the next page; `searchText` finds places of this provider, and honours an abort. |
 | `availability` | `check` for `sample` and for `unknownExternalId`; `search(stay)` if there is one | Nights only inside the stay, under the location key, with a `checkedAt` date; every `bookingUrl` (the place's and each unit's) https on your own site, as the core takes it (`bookingLinkViolations`); an unknown place rejects with a `ProviderError`; `search`'s keys name the provider; both honour an abort. |
 | `access` | `status()`, `onStatus()` and its unsubscribe, `holdOpen()` released twice, `ensure()` | The status names the provider; `ensure` honours an abort. |
-| `release` | `computeReleaseAt` for every release mode | A `Date` or `null`; `pollFloorMs` above 0; an abort honoured. |
+| `release` | `computeReleaseAt` for every release mode, for `releaseSample` (default `sample`) | A `Date` or `null`; `pollFloorMs` above 0; an abort honoured. |
 | `holds` | `create({ externalId, stay })`, only with a signal aborted before the call or at once after it starts | It rejects with an `AbortError`. Nothing about a hold's answer is checked, and no hold is placed: test refusals, the answer's shape and `bookedReference` yourself, on recorded responses or a loopback server, as the example does. |
 | `auth` | Nothing: `isSignedIn` is never called | `isSignedIn` is a function; a `browser-session` sign-in has an https `signInUrl` and https `allowedOrigins`. Test `isSignedIn`'s answers yourself. |
 | `bookings`, `dispose` | Nothing | Nothing. |
 
 For a browser provider, pass `openPages`: after every test its browser must have no page open.
+A policy that refuses a stay already on sale (a `remindOnly` mode's) needs `releaseSample`, a
+place and stay whose release is still to come.
 
 Register the provider as the app does, in a fresh registry, on recorded responses:
 

@@ -2,7 +2,7 @@
  * The place page's booking rules for the dates in the card (`catalog.stayRules`), for a
  * provider that has them (Stay Rottnest): a refusal with why and dates to try, which set the
  * card's dates when pressed; a stay the rules allow, with its notes; a stay not on sale yet,
- * with when it opens. ParkStay, with no rules, shows none of it.
+ * with when it opens (and Site Sniper's hand-off, which only sets reminders there). ParkStay, with no rules, shows none of it.
  */
 import { configure, screen, waitFor, within } from '@testing-library/react';
 import { placeDetail } from '../../../../tests/fixtures/catalog/place-detail';
@@ -105,9 +105,15 @@ describe("Place page: the provider's booking rules", () => {
     );
   });
 
-  it('a stay not on sale yet says when it opens', async () => {
+  it('a stay not on sale yet says when it opens, and Site Sniper sets reminders for it', async () => {
     setup(() => NOT_YET);
     expect(await within(card()).findByText(NOT_YET.release!.text)).toBeVisible();
+    // Every Stay Rottnest release mode only reminds (an Open Day plan): no "Snipe a …"
+    const plan = within(card()).getByRole('link', { name: 'Set release reminders, coming soon' });
+    expect(plan.getAttribute('href')).toMatch(
+      /^#\/site-sniper\/new\?provider=rottnest&location=geordie-bay&arrival=2099-12-10&departure=2099-12-12/
+    );
+    expect(within(card()).queryByRole('link', { name: /^Snipe a/ })).toBeNull();
   });
 
   it('a provider without rules (main answers CAPABILITY) shows none of it', async () => {

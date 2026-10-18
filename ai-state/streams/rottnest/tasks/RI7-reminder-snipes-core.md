@@ -40,6 +40,15 @@ L.
 
 ## Completion criteria
 
-- [ ] Snipe, scheduler (fake timers) and notification tests.
-- [ ] Existing snipe tests unchanged.
-- [ ] The full gate passes.
+- [x] Snipe, scheduler (fake timers) and notification tests.
+- [x] Existing snipe tests unchanged.
+- [x] The full gate passes.
+
+## Notes from the build
+
+- *Deviation:* the reminders and the checklist are the release mode's data in the manifest (`ReleaseModeDescriptor.reminders`, `checklist`), not `ReleasePolicy.reminders()` and `checklist()`: they are the same for every stay, and the renderer shows them before a plan exists. `reminderSteps` (`src/shared/utils/release-reminders.ts`) turns them into instants for main and the renderer alike. The registry rule is the schema's: a `remindOnly` mode needs reminders (and no access gate), and only such a mode has them.
+- A plan can't be armed again once its release has passed (`activate` refuses it); before then it can. A REMINDED plan is terminal.
+- A missed step: only the latest due one is sent, and only within 30 minutes of the release (`REMINDER_LATE_MS`); every due step is recorded.
+- Run now answers `PENDING` ("An Open Day plan only reminds you: it never checks").
+- *Not built:* "Search on {shortName}" and the checklist in the email; the email carries "Book on {shortName}" with the plan's booking link, as alerts do.
+- Tests: `tests/unit/scheduler/plan-reminders.test.ts` (the real core and provider on fake timers), the plan cases in `tests/unit/core/notifications/notification-snipe-alert.test.ts`.

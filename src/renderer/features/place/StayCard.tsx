@@ -63,6 +63,11 @@ export interface StayCardProps {
   /** The create-flow hand-offs, when the provider offers them. */
   watchHref?: string;
   snipeHref?: string;
+  /**
+   * Site Sniper only plans for releases here (every release mode only reminds, §12.38): the
+   * hand-off reads "Set release reminders", not "Snipe a site".
+   */
+  snipeRemindsOnly?: boolean;
   /** What the place's units are called: "Snipe a site". */
   unitNoun: UnitNoun;
 }
@@ -145,8 +150,10 @@ export function StayCard({
   links,
   watchHref,
   snipeHref,
+  snipeRemindsOnly = false,
   unitNoun,
 }: StayCardProps) {
+  const snipeLabel = snipeRemindsOnly ? 'Set release reminders' : `Snipe a ${unitNoun.one}`;
   const headingId = useId();
   const bookIsNext = checked || ability.kind === 'unavailable';
   const extraLinks: ReactNode[] = [];
@@ -248,11 +255,11 @@ export function StayCard({
             >
               <CalendarClock size={18} aria-hidden="true" />
               {/* The name comes whole from the hidden text: "Snipe a cabin, coming soon". */}
-              <span aria-hidden="true">Snipe a {unitNoun.one}</span>
+              <span aria-hidden="true">{snipeLabel}</span>
               <span aria-hidden="true">
                 <Badge tone="sun">Soon</Badge>
               </span>
-              <VisuallyHidden>Snipe a {unitNoun.one}, coming soon</VisuallyHidden>
+              <VisuallyHidden>{snipeLabel}, coming soon</VisuallyHidden>
             </Link>
           )}
         </div>

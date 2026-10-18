@@ -296,6 +296,29 @@ export interface ReleaseModeDescriptor {
   maxWindowMinutes?: number;
   /** Extra inputs this mode needs. */
   fields?: StayFieldDescriptor[];
+  /**
+   * The mode only reminds (§12.38): a snipe in it is an Open Day plan (`remind`), sent its
+   * `reminders` before the release and never checking availability, holding or reserving a
+   * night. Needs `reminders`.
+   */
+  remindOnly?: boolean;
+  /** What a plan in this mode sends, before its release, in the provider's time zone. */
+  reminders?: ReleaseReminder[];
+  /** What to have ready for the release, one item each, shown with the plan. */
+  checklist?: string[];
+}
+
+/**
+ * One of a reminder-only mode's reminders: sent `daysBefore` days before the release day, at
+ * `at` (`HH:MM`) where the provider is, with its own words. Plain text.
+ */
+export interface ReleaseReminder {
+  /** 0 is the release day itself. */
+  daysBefore: number;
+  /** Local time, `HH:MM`. */
+  at: string;
+  title: string;
+  body: string;
 }
 
 /**
@@ -703,14 +726,58 @@ const uniqueBy =
   (items: T[]): boolean =>
     new Set(items.map(key)).size === items.length;
 
-export const ReleaseModeDescriptorSchema = z.object({
-  id: z.string().regex(/^[a-z][a-z0-9_-]*$/, 'Release mode ids are lower-case'),
-  label: nonEmpty,
-  description: nonEmpty,
-  usesAccessGate: z.boolean(),
-  maxWindowMinutes: z.number().int().min(1).max(1440).optional(),
-  fields: z.array(StayFieldDescriptorSchema).optional(),
+/** Words shown as text: no markup and no links (a notice, a reminder, a checklist). */
+const plainText = (max: number) =>
+  nonEmpty
+    .max(max)
+    .refine((text) => !/[<>]/.test(text), 'Plain text, without markup')
+    .refine((text) => !/\b(?:https?:\/\/|www\.)/i.test(text), 'No links');
+
+export const ReleaseReminderSchema = z.object({
+  daysBefore: z.number().int().min(0).max(14),
+  at: z.string().regex(/^(?:[01]\d|2[0-3]):[0-5]\d$/, 'A local time, HH:MM'),
+  title: plainText(80),
+  body: plainText(400),
 });
+assertTypeEquals<z.input<typeof ReleaseReminderSchema>, ReleaseReminder>(true);
+assertTypeEquals<z.output<typeof ReleaseReminderSchema>, ReleaseReminder>(true);
+
+export const ReleaseModeDescriptorSchema = z
+  .object({
+    id: z.string().regex(/^[a-z][a-z0-9_-]*$/, 'Release mode ids are lower-case'),
+    label: nonEmpty,
+    description: nonEmpty,
+    usesAccessGate: z.boolean(),
+    maxWindowMinutes: z.number().int().min(1).max(1440).optional(),
+    fields: z.array(StayFieldDescriptorSchema).optional(),
+    remindOnly: z.boolean().optional(),
+    reminders: z.array(ReleaseReminderSchema).max(6).optional(),
+    checklist: z.array(plainText(200)).max(12).optional(),
+  })
+  // A mode that only reminds has reminders and waits in no queue; only it has reminders
+  .superRefine((mode, ctx) => {
+    if (mode.remindOnly && !mode.reminders?.length) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['reminders'],
+        message: 'A remindOnly mode needs reminders',
+      });
+    }
+    if (mode.remindOnly && mode.usesAccessGate) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['usesAccessGate'],
+        message: 'A remindOnly mode waits in no access gate',
+      });
+    }
+    if (!mode.remindOnly && mode.reminders?.length) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['reminders'],
+        message: 'Only a remindOnly mode has reminders',
+      });
+    }
+  });
 assertTypeEquals<z.input<typeof ReleaseModeDescriptorSchema>, ReleaseModeDescriptor>(true);
 assertTypeEquals<z.output<typeof ReleaseModeDescriptorSchema>, ReleaseModeDescriptor>(true);
 

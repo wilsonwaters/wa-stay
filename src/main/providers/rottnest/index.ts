@@ -11,6 +11,7 @@
  * - `availability.ts` and `results-page.ts`: the shared search and its reading;
  * - `open-days.ts`: Stay Rottnest's Open Days, for the client's Open Day pause;
  * - `release.ts`: whether a stay is on sale yet, and when it opens (the 5/3 rule included);
+ * - `release-policy.ts`: Site Sniper's Open Day plans, which only remind (`open_day` mode);
  * - `rules.ts`, with `booking-guides.ts` and `public-holidays.ts`: Stay Rottnest's published
  *   booking rules (`stayRules`), so a stay they refuse, or one not on sale yet, is never asked;
  * - `links.ts`: Stay Rottnest's own pages, never its booking step;
@@ -40,6 +41,7 @@ import { RottnestClient } from './client';
 import { rottnestLinks } from './links';
 import { rottnestManifest } from './manifest';
 import { describeOpenDays } from './release';
+import { createRottnestReleasePolicy } from './release-policy';
 import { createRottnestRules } from './rules';
 
 export { ROTTNEST_BOOKINGS_URL, ROTTNEST_SITE_URL, rottnestLinks, searchUrl } from './links';
@@ -69,6 +71,8 @@ export function createRottnestModules(ctx: ProviderContext): ProviderModules {
     }),
     availability: { check: availability.check, search: availability.search },
     stayRules,
+    // Open Day plans only: reminders, never a check at the release
+    release: createRottnestReleasePolicy(ctx, stayRules),
     async dispose() {
       availability.dispose();
     },

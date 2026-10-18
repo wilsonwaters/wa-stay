@@ -1,6 +1,6 @@
 import { CircleCheck, Clock } from 'lucide-react';
 import type { StayRulesVerdict, StaySuggestion } from '../../../shared/types/provider.types';
-import { Button, Notice } from '../../components/ui';
+import { Button, Notice } from '../ui';
 
 /** "8–15 Dec", or "29 Nov – 3 Dec" across months. */
 export function suggestionLabel({ arrival, departure }: StaySuggestion): string {

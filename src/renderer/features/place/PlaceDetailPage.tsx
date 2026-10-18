@@ -49,7 +49,7 @@ import {
   stayQueryOf,
 } from './placeModel';
 import { MAX_NIGHTS, StayCard, type CheckAbility } from './StayCard';
-import { StayRulesPanel } from './StayRulesPanel';
+import { StayRulesPanel } from '../../components/stay/StayRulesPanel';
 import { usePlaceStay } from './usePlaceStay';
 
 /** After this long, a check says it is still going (EQ7: a busy DBCA queue can delay it). */
@@ -436,6 +436,10 @@ export default function PlaceDetailPage() {
             links={links}
             watchHref={manifest?.capabilities.watches ? ROUTES.watchNew(prefill) : undefined}
             snipeHref={manifest?.capabilities.snipes ? ROUTES.snipeNew(prefill) : undefined}
+            snipeRemindsOnly={Boolean(
+              manifest?.releaseModes?.length &&
+              manifest.releaseModes.every((mode) => mode.remindOnly)
+            )}
             unitNoun={noun}
           />
         </div>

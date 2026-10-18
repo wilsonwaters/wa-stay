@@ -45,8 +45,8 @@ export const rottnestManifest: ProviderManifest = {
     // Explore's free counts: the same search, one entry per precinct.
     bulkAvailability: true,
     watches: true,
-    // Open Day plans (reminders) come with the Open Day calendar; never a release-instant check.
-    snipes: false,
+    // Open Day plans: reminders before an Open Day, never a check at the release (§9.9).
+    snipes: true,
     // Never: no hold, cart or booking on Stay Rottnest (terms review §9.2).
     holds: false,
     bookingImport: false,
@@ -64,6 +64,49 @@ export const rottnestManifest: ProviderManifest = {
     // The precincts are a seed; nothing is fetched when the catalogue syncs.
     catalogTtlHours: 24,
   },
+  // Site Sniper's only mode: a plan that reminds before the Open Day opening the stay. The
+  // waiting room gives everyone in it before 8:30 a random place, so nothing is gained by
+  // checking at the release, where RIA's defences are strongest (terms review §9.9).
+  releaseModes: [
+    {
+      id: 'open_day',
+      label: 'On its Open Day',
+      description:
+        "Stay Rottnest opens a whole month of stays at once, at 8:30 am on its Open Day. Site Sniper reminds you before then, so you're in the waiting room in time: you book on Stay Rottnest yourself.",
+      usesAccessGate: false,
+      remindOnly: true,
+      reminders: [
+        {
+          daysBefore: 1,
+          at: '18:00',
+          title: 'Open Day tomorrow',
+          body: "Stay Rottnest's waiting room opens at 6 am and bookings at 8:30 am, Perth time. Have your mobile for the passcode, your card and your plan ready.",
+        },
+        {
+          daysBefore: 0,
+          at: '06:00',
+          title: 'The waiting room is open',
+          body: "Everyone in Stay Rottnest's waiting room before 8:30 am gets a random place in the queue, so join when it suits you before then.",
+        },
+        {
+          daysBefore: 0,
+          at: '08:15',
+          title: '15 minutes to Open Day',
+          body: "Bookings open at 8:30 am. Join Stay Rottnest's waiting room now if you haven't: after 8:30 you join the back of the queue.",
+        },
+      ],
+      checklist: [
+        "Your choices in order: the room types and precincts you'd take, best first.",
+        'Dates that can move a little, in case your first choice goes.',
+        'Everyone in your party, within what the room type sleeps.',
+        'Your Stay Rottnest profile, with your details up to date.',
+        "Your own mobile, for the waiting room's passcode. Temporary or virtual numbers aren't accepted.",
+        'A Visa or Mastercard.',
+        'For a second unit in your name, a keyholder to nominate.',
+        'Only what you need: everyone else in the queue is hoping too.',
+      ],
+    },
+  ],
   // Clause 4's words and what they mean for the person, before the first request (terms review
   // §9.1). A change to what it says raises the version, so everyone reads it again.
   notice: {

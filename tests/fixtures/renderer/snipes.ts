@@ -150,6 +150,33 @@ export function makeAlertedSnipe(overrides: Partial<SiteSnipe> = {}): SiteSnipe 
   });
 }
 
+/** Wed 4 Nov 2099, 8:30 am Perth: the Open Day of `makePlan`'s stay. */
+export const PLAN_OPEN_DAY = new Date('2099-11-04T00:30:00.000Z');
+
+/**
+ * An Open Day plan (§12.38): Stay Rottnest's Geordie Bay for Mon 6 – Wed 8 Jul 2099, reminding
+ * before its Open Day, armed, with no reminder sent yet.
+ */
+export function makePlan(overrides: Partial<SiteSnipe> = {}): SiteSnipe {
+  return makeSnipe({
+    providerId: 'rottnest',
+    location: { externalId: 'geordie-bay', name: 'Geordie Bay', areaName: 'Rottnest Island' },
+    name: 'Geordie Bay in July',
+    stay: {
+      arrival: '2099-07-06',
+      departure: '2099-07-08',
+      adults: 2,
+      children: 0,
+      infants: 0,
+      concessions: 0,
+    },
+    releaseMode: SnipeReleaseMode.OPEN_DAY,
+    action: 'remind',
+    releaseAt: PLAN_OPEN_DAY,
+    ...overrides,
+  });
+}
+
 /** The answer of `catalog.checkLocation` with this release, for the Release step's preview. */
 export function checkLocationWith(release: { open: boolean; opensAt?: string; refused?: string }) {
   return jest.fn().mockResolvedValue({

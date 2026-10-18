@@ -1,12 +1,13 @@
-import { CalendarClock, Clock, Search } from 'lucide-react';
+import { AlarmClock, CalendarClock, Clock, Search } from 'lucide-react';
 import type { ProviderManifest } from '../../../../shared/types/provider.types';
 import type { SiteSnipe } from '../../../../shared/types/site-sniper.types';
 import { Countdown } from '../../../components/Countdown';
 import { timeInZone } from '../../../components/timeFormat';
 import { cx } from '../../../components/ui/cx';
-import { useHasPassed } from '../../../hooks/useNow';
+import { useHasPassed, useNow } from '../../../hooks/useNow';
 import { RELEASE_UNKNOWN } from '../create/releasePreview';
-import { releaseLineFor } from './snipeState';
+import { nextReminder } from './planSteps';
+import { isRunning, releaseLineFor } from './snipeState';
 
 export interface ReleaseLineProps {
   snipe: SiteSnipe;
@@ -17,9 +18,28 @@ export interface ReleaseLineProps {
 /**
  * When the snipe's sites are released: a countdown while it runs ("Opens in 1d 2h"; "Opening
  * now" once the time has come, never a negative count), "Watching for cancellations", a paused
- * snipe's release time, or that the time is unknown. Only the countdown ticks.
+ * snipe's release time, or that the time is unknown. Only the countdown ticks. A running Open
+ * Day plan also says its next reminder ("Next reminder Tue 3 Nov, 6:00 pm AWST: Open Day
+ * tomorrow").
  */
 export function ReleaseLine({ snipe, manifest, className }: ReleaseLineProps) {
+  const now = useNow(60_000);
+  const next = isRunning(snipe) ? nextReminder(snipe, manifest, now) : undefined;
+  const zone = manifest?.timezone ?? 'Australia/Perth';
+  const line = <Line snipe={snipe} manifest={manifest} className={className} />;
+  if (!next) return line;
+  return (
+    <>
+      {line}
+      <p className={cx('flex items-center gap-1.5 text-sm text-fg-secondary', className)}>
+        <AlarmClock size={16} aria-hidden="true" />
+        Next reminder {timeInZone(next.at, zone, now)}: {next.title}
+      </p>
+    </>
+  );
+}
+
+function Line({ snipe, manifest, className }: ReleaseLineProps) {
   const line = releaseLineFor(snipe);
   const at = line.kind === 'countdown' ? line.at : undefined;
   const opened = useHasPassed(at);

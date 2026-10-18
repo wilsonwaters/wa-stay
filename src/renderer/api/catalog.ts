@@ -25,6 +25,7 @@ import type {
   StayQuery,
   StayRulesVerdict,
 } from '../../shared/types/provider.types';
+import type { CatalogStayRulesOptions } from '../../shared/contracts/catalog';
 import { catalogSearchArea, clampBbox } from '../../shared/utils/catalog-area';
 import { parseLocationKey } from '../../shared/utils/location-key';
 import { stayKeyFor } from '../../shared/utils/stay-key';
@@ -333,17 +334,31 @@ export function useLocationCheck(key: string | null, stay: StayQuery | null) {
 }
 
 /**
- * `catalog.stayRules(key, stay)`: what the place's provider's published booking rules say
- * about the stay, worked out in main without asking the provider: allowed or refused (why,
- * and dates to try instead), its notes, and whether it is on sale yet. `null` for a provider
- * that has no rules (`CAPABILITY`). Asks only once there is a stay.
+ * `catalog.stayRules(key, stay, options)`: what the place's provider's published booking rules
+ * say about the stay (for the units or stay types in `options`, when chosen), worked out in
+ * main without asking the provider: allowed or refused (why, and dates to try instead), its
+ * notes, and whether it is on sale yet. `null` for a provider that has no rules
+ * (`CAPABILITY`). Asks only once there is a stay.
  */
-export function useStayRules(key: string | null, stay: StayQuery | null) {
+export function useStayRules(
+  key: string | null,
+  stay: StayQuery | null,
+  options: CatalogStayRulesOptions = {}
+) {
+  const { unitIds, unitKinds } = options;
+  const chosen: CatalogStayRulesOptions = {
+    ...(unitIds?.length ? { unitIds } : {}),
+    ...(unitKinds?.length ? { unitKinds } : {}),
+  };
   return useQuery<StayRulesVerdict | null>({
-    queryKey: queryKeys.catalog.stayRules(key ?? '', stay),
+    queryKey: queryKeys.catalog.stayRules(key ?? '', stay, chosen),
     queryFn: async () => {
       try {
-        return await unwrap((api) => api.catalog.stayRules(key as string, stay as StayQuery));
+        // The units and stay types only when chosen
+        const options: [CatalogStayRulesOptions?] = Object.keys(chosen).length ? [chosen] : [];
+        return await unwrap((api) =>
+          api.catalog.stayRules(key as string, stay as StayQuery, ...options)
+        );
       } catch (error) {
         if (toApiError(error).code === 'CAPABILITY') return null;
         throw error;
