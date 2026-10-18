@@ -8,15 +8,21 @@ import {
   ParkStayClient,
   toParkStayDate,
 } from '@main/providers/parkstay/client';
-import { parkstayApiHeaders, queueApiHeaders } from '@main/providers/parkstay/headers';
+import {
+  parkstayApiHeaders,
+  parkstayPageHeaders,
+  queueApiHeaders,
+} from '@main/providers/parkstay/headers';
 import { parkstayLinks } from '@main/providers/parkstay/links';
 import {
   AccessGateError,
+  browserIdentity,
   CHROME_USER_AGENT,
   isAbortError,
   NodeHttpClient,
   ProviderHttpError,
   ProviderParseError,
+  secChUaPlatform,
 } from '@main/providers/sdk';
 import {
   readParkStayFixture,
@@ -54,6 +60,20 @@ describe('ParkStay headers', () => {
       expect(headers['User-Agent']).toMatch(/Chrome\/\d+/);
       expect(headers['User-Agent']).not.toMatch(/axios|python|curl|java|httpclient|node/i);
       expect(headers.Referer).toBe('https://parkstay.dbca.wa.gov.au/');
+    }
+  });
+
+  it("present the SDK's browser identity: Chromium's own brand list, this OS and the app's languages", () => {
+    const identity = browserIdentity();
+    for (const headers of [parkstayApiHeaders(), parkstayPageHeaders(), queueApiHeaders()]) {
+      expect(headers).toMatchObject({
+        'User-Agent': identity.userAgent,
+        'Accept-Language': 'en-AU,en;q=0.9,en-US;q=0.8',
+        'sec-ch-ua': identity.brands,
+        'sec-ch-ua-mobile': '?0',
+        'sec-ch-ua-platform': secChUaPlatform(process.platform),
+      });
+      expect(headers['sec-ch-ua']).not.toMatch(/Google Chrome/);
     }
   });
 

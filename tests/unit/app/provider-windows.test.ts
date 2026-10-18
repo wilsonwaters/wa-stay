@@ -16,7 +16,7 @@ import type { BrowserWindow } from 'electron';
 import { isProviderWindow, ProviderWindows } from '@main/app/provider-windows';
 import type { ProviderWindowRequest } from '@main/core/accounts/ports';
 import { ElectronSessionHttpClient } from '@main/providers/sdk/http-electron';
-import { CHROME_USER_AGENT, chromeUserAgent } from '@main/providers/sdk';
+import { ACCEPT_LANGUAGES, CHROME_USER_AGENT, chromeUserAgent } from '@main/providers/sdk';
 import { PARKSTAY_SIGN_IN_ORIGINS, PARKSTAY_SIGN_IN_URL } from '@main/providers/parkstay/auth';
 import { toApiError } from '@main/providers/sdk/errors';
 import { logger } from '@main/utils/logger';
@@ -124,17 +124,29 @@ describe('ProviderWindows', () => {
     expect(isProviderWindow(main.webContents)).toBe(false);
   });
 
-  it('uses the partition the provider’s HTTP client uses, with the same user agent', () => {
+  it('uses the partition the provider’s HTTP client uses, with the same user agent and languages', () => {
     const client = new ElectronSessionHttpClient({ providerId: 'parkstay' });
     windows.open(SIGN_IN);
 
     expect(lastWindow().options.webPreferences.partition).toBe(client.partition);
-    expect(partitionSession().setUserAgent).toHaveBeenLastCalledWith(client.userAgent);
+    expect(partitionSession().setUserAgent).toHaveBeenLastCalledWith(
+      client.userAgent,
+      client.identity.acceptLanguages
+    );
     expect(client.userAgent).toBe(CHROME_USER_AGENT); // no process.versions.chrome in Jest
+    expect(client.identity.acceptLanguages).toBe(ACCEPT_LANGUAGES);
 
-    const electron120 = new ProviderWindows({ devTools: false, chromeMajor: '120' });
+    const electron120 = new ProviderWindows({
+      devTools: false,
+      chromeMajor: '120',
+      platform: 'win32',
+    });
     electron120.open({ ...SIGN_IN, providerId: 'other' });
-    expect(partitionSession('other').setUserAgent).toHaveBeenCalledWith(chromeUserAgent('120'));
+    expect(partitionSession('other').setUserAgent).toHaveBeenCalledWith(
+      chromeUserAgent('120', 'win32'),
+      ACCEPT_LANGUAGES
+    );
+    expect(chromeUserAgent('120', 'win32')).toContain('(Windows NT 10.0; Win64; x64)');
     expect(lastWindow().options.webPreferences.devTools).toBe(false);
     electron120.closeAll();
   });

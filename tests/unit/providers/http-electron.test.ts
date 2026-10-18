@@ -8,10 +8,10 @@
 import { EventEmitter } from 'events';
 import { ElectronSessionHttpClient, providerPartition } from '@main/providers/sdk/http-electron';
 import {
+  ACCEPT_LANGUAGES,
+  browserIdentity,
   CHROME_MAJOR_VERSION,
   CHROME_USER_AGENT,
-  chromeBrands,
-  chromeUserAgent,
   isAbortError,
   runtimeChromeMajor,
   ProviderHttpError,
@@ -118,7 +118,7 @@ describe('ElectronSessionHttpClient', () => {
     expect(providerPartition('rac')).toBe('persist:provider-rac');
   });
 
-  it('sets the Chrome user agent on the partition exactly once', async () => {
+  it('sets the Chrome user agent and the languages on the partition exactly once', async () => {
     script(json({ ok: true }));
     const client = new ElectronSessionHttpClient({ providerId: 'parkstay' });
     await client.getJson('https://parkstay.dbca.wa.gov.au/api/a');
@@ -128,30 +128,54 @@ describe('ElectronSessionHttpClient', () => {
 
     expect(ses.setUserAgent).toHaveBeenCalledTimes(1);
     // Outside Electron there is no process.versions.chrome: the fixed version is used
-    expect(ses.setUserAgent).toHaveBeenCalledWith(CHROME_USER_AGENT);
+    expect(ses.setUserAgent).toHaveBeenCalledWith(CHROME_USER_AGENT, ACCEPT_LANGUAGES);
+    expect(ACCEPT_LANGUAGES).toBe('en-AU,en,en-US');
     expect(client.userAgent).toBe(CHROME_USER_AGENT);
+    expect(client.identity).toEqual(browserIdentity());
     expect(CHROME_USER_AGENT).toMatch(/Chrome\/\d+/);
     expect(CHROME_USER_AGENT).not.toMatch(/axios|python|curl|java|httpclient|electron/i);
   });
 
-  it("presents the Chromium version Electron runs, rewriting a provider's User-Agent and sec-ch-ua", async () => {
-    const requests = script(json({ ok: true }));
-    const client = new ElectronSessionHttpClient({ providerId: 'parkstay', chromeMajor: '120' });
+  it("presents Electron's Chromium on this OS, rewriting a provider's user agent, client hints and languages", async () => {
+    const requests = script(json({ ok: true }), json({ ok: true }));
+    const client = new ElectronSessionHttpClient({
+      providerId: 'parkstay',
+      chromeMajor: '152',
+      platform: 'darwin',
+    });
 
     await client.getJson('https://parkstay.dbca.wa.gov.au/api/a', {
       headers: {
         'User-Agent': CHROME_USER_AGENT,
-        'sec-ch-ua': chromeBrands('131'),
+        'Accept-Language': 'en-US',
+        'sec-ch-ua': '"Google Chrome";v="131", "Chromium";v="131", "Not_A Brand";v="24"',
+        'sec-ch-ua-mobile': '?1',
         'sec-ch-ua-platform': '"Windows"',
+        Accept: 'application/json',
       },
     });
 
-    expect(client.userAgent).toBe(chromeUserAgent('120'));
-    expect(ses.setUserAgent).toHaveBeenCalledWith(chromeUserAgent('120'));
-    expect(requests[0].options.headers).toMatchObject({
-      'user-agent': chromeUserAgent('120'),
-      'sec-ch-ua': chromeBrands('120'),
-      'sec-ch-ua-platform': '"Windows"',
+    const macChrome152 =
+      'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36';
+    expect(client.userAgent).toBe(macChrome152);
+    expect(ses.setUserAgent).toHaveBeenCalledWith(macChrome152, 'en-AU,en,en-US');
+    expect(requests[0].options.headers).toEqual({
+      'user-agent': macChrome152,
+      'accept-language': 'en-AU,en;q=0.9,en-US;q=0.8',
+      'sec-ch-ua': '"Not?A_Brand";v="24", "Chromium";v="152"',
+      'sec-ch-ua-mobile': '?0',
+      'sec-ch-ua-platform': '"macOS"',
+      accept: 'application/json',
+    });
+
+    // A request without them gets the user agent only: Chromium adds the partition's
+    // Accept-Language itself, and no client hints
+    await client.getJson('https://parkstay.dbca.wa.gov.au/api/b', {
+      headers: { Accept: 'text/html' },
+    });
+    expect(requests[1].options.headers).toEqual({
+      'user-agent': macChrome152,
+      accept: 'text/html',
     });
   });
 
