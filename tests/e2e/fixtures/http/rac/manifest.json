@@ -11,6 +11,51 @@
       "file": "book-now-margaret-river.html"
     },
     {
+      "method": "GET",
+      "path": "/bookings/",
+      "file": "parks-page.html"
+    },
+    {
+      "method": "GET",
+      "path": "/busselton/",
+      "file": "park-home.html"
+    },
+    {
+      "method": "GET",
+      "path": "/cable-beach/",
+      "file": "park-home.html"
+    },
+    {
+      "method": "GET",
+      "path": "/cervantes/",
+      "file": "park-home.html"
+    },
+    {
+      "method": "GET",
+      "path": "/esperance/",
+      "file": "park-home.html"
+    },
+    {
+      "method": "GET",
+      "path": "/exmouth/",
+      "file": "park-home.html"
+    },
+    {
+      "method": "GET",
+      "path": "/karri-valley/",
+      "file": "park-home.html"
+    },
+    {
+      "method": "GET",
+      "path": "/margaret-river/",
+      "file": "park-home.html"
+    },
+    {
+      "method": "GET",
+      "path": "/monkey-mia/",
+      "file": "park-home.html"
+    },
+    {
       "method": "POST",
       "path": "/wp-content/themes/parks-and-resorts/template-parts/components/booking-engine/availability-ajax.php",
       "form": {

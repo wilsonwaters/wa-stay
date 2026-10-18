@@ -1589,7 +1589,10 @@ may wait: for each request the call counts, the bound adds the gap before it (1 
 person's requests, the provider's own interval for background ones) and a 10 s allowance. A
 place's detail and its check count 2 requests (their own and one already in flight ahead of
 them), so a paced provider's bulk `search` must send its requests one after another, never all
-at once: a place page opened meanwhile then waits for one of them, not the whole search. Explore's
+at once: a place page opened meanwhile then waits for one of them, not the whole search. A detail
+that sends more than one request of its own must bound the others itself, so the whole detail
+still answers within that time: for example, by sending an optional request only once the
+essential one has answered, and giving it up after a set time, answering without it. Explore's
 availability (bulk `availability.search`) and a `full` catalogue sync count one per stored place,
 and at least 1. With a 10 s interval and 8 places, Explore's availability gets
 20 s + 8 × 11 s = 108 s, and a sync 60 s + 8 × 20 s = 220 s. A hold's release counts 2

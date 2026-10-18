@@ -270,14 +270,16 @@ Open Settings from the account menu (top right).
   going.
 - **Your data stays on your computer**, in `%APPDATA%\WA Stay` on Windows. Your RAC member
   number is kept there encrypted, and WA Stay never sends it. WA Stay talks to the providers
-  (ParkStay, the DBCA queue, RAC) and the sites that host their photos (RAC's come from NewBook,
-  its booking system), Mapbox for the map (the Mapbox map library also sends Mapbox its standard
+  (ParkStay, the DBCA queue, RAC) and the sites that host their photos (RAC's come from RAC's
+  own site and from NewBook, its booking system), Mapbox for the map (the Mapbox map library also sends Mapbox its standard
   usage events), GitHub for updates, and your own email server if you set one up. WA Stay
   itself has no account, no cloud service and no analytics.
 - **What WA Stay sends RAC, and how often.** Only what it needs for the places and dates you
-  look at, watch or snipe, one request at a time: when you open a park, its book-now page (at
-  Exmouth, Karri Valley and Monkey Mia, an availability request instead, which lists their
-  cabins and sites), and one availability request for a park and stay. With the auto-cart
+  look at, watch or snipe, one request at a time: once a day, RAC's page of parks, for each
+  park's photo on Explore; when you open a park, its own page, for RAC's description and photo,
+  and its book-now page (at Exmouth, Karri Valley and Monkey Mia, an availability request
+  instead, which lists their cabins and sites); and one availability request for a park and
+  stay. With the auto-cart
   turned on, a hold also reads the park's cart page and opens one cart address, and letting it
   go sends RAC's own "remove" request. Watches and snipes check in the
   background, at least 10 seconds apart: a watch no more often than every 15 minutes, and a

@@ -1,10 +1,12 @@
 /**
  * RAC Parks & Resorts on Explore, network-free: with ParkStay and RAC registered, the Provider
- * chip's "RAC Parks & Resorts" leaves RAC's eight open parks (its seed: the catalogue sync
- * sends nothing), each card with RAC's badge. RAC Margaret River Nature Park's page lists its
- * categories (its dorms and its safari tent) from the trimmed book-now page in
- * `tests/e2e/fixtures/http/rac/`, as types of spot ("Bookable as 5 spot types"), never as a
- * count of spots: each category stands for several. Fixture mode refuses no request.
+ * chip's "RAC Parks & Resorts" leaves RAC's eight open parks (its seed, with each card's photo
+ * from RAC's parks page: the catalogue sync's one request), each card with RAC's badge. RAC
+ * Margaret River Nature Park's page lists its categories (its dorms and its safari tent) from
+ * the trimmed book-now page in `tests/e2e/fixtures/http/rac/`, as types of spot ("Bookable as
+ * 5 spot types"), never as a count of spots: each category stands for several; its About is
+ * the park's intro from its home page (the synthetic `park-home.html`, made-up words). Fixture
+ * mode refuses no request but the photos, which it never loads.
  */
 
 import { expect, test, withoutGuardedRequests, withoutRemoteImages } from './support/wa-stay';
@@ -66,6 +68,17 @@ test('the Provider chip shows RAC’s eight parks, and a park’s page lists its
   ]) {
     await expect(spots.getByRole('listitem').filter({ hasText: category })).toBeVisible();
   }
+
+  // About: RAC's own introduction to the park, from its home page (made up here), with its link
+  const about = window.getByRole('region', { name: 'About' });
+  await expect(
+    about.getByText(/^Made-up introduction, standing in for the park's own words on RAC's site\./)
+  ).toBeVisible();
+  await expect(about.getByRole('link', { name: 'made-up link' })).toHaveAttribute(
+    'href',
+    'https://parksandresorts.rac.com.au/margaret-river/contact-us/'
+  );
+  await expect(about.getByText('No description yet.')).toHaveCount(0);
 
   // Nothing left the fixture: no request was refused
   const requests = wa.unexpectedRequests();

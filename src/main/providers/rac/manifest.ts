@@ -102,7 +102,7 @@ export const racManifest: ProviderManifest = {
     // Terms rules 2 and 4: one request at a time, at least 10 s apart (robots.txt asks for it).
     maxConcurrentRequests: 1,
     minRequestIntervalMs: 10_000,
-    // The parks are a seed; nothing is fetched when the catalogue syncs.
+    // The parks are a seed; a sync reads one page, RAC's parks page, for their card photos.
     catalogTtlHours: 24,
   },
   stayFields: [

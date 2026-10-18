@@ -1,7 +1,8 @@
 /**
  * The RAC client (`src/main/providers/rac/client.ts`), on a recording HTTP client that never
  * sends anything: RAC's host only, redirects by hand on that host only, the headers RAC's own
- * pages send and never a User-Agent, one request at a time, and the block: a 403, a 429 or
+ * pages send and never a User-Agent, one request at a time (a page may wait in its turn for
+ * what it is `ready` on, and is sent only if that resolves), and the block: a 403, a 429 or
  * Cloudflare's challenge rejects with a non-retryable `ProviderHttpError` (403 or 429) and stops
  * every request for 30 minutes, kept in the provider's state; a 5xx does not. Blocks in a row
  * double the cool-down up to a day, and a longer `Retry-After` is honoured, up to a day.
@@ -215,6 +216,64 @@ describe('RacClient: host and headers', () => {
     const error = await client.getPage('/a/', { signal: controller.signal }).catch((e) => e);
     expect(isAbortError(error)).toBe(true);
     expect(http.requests).toHaveLength(0);
+  });
+
+  it('waits for what a page is ready on in its turn, keeping its place, and sends it only if that resolves', async () => {
+    const client = makeClient((hop) => ({ body: PAGE, delayMs: hop.url.endsWith('/a/') ? 20 : 0 }));
+    const order: string[] = [];
+    const first = client.getPage('/a/');
+    // Ready once /a/ has answered: asked only when its turn comes, after /a/
+    const second = client.getPage('/b/', {
+      ready: async () => {
+        order.push(`ready after ${http.requests.length} sent`);
+        await first;
+      },
+    });
+    const third = client.getPage('/c/');
+    await Promise.all([first, second, third]);
+    expect(order).toEqual(['ready after 1 sent']);
+    expect(http.requests.map((r) => r.url)).toEqual([`${RAC}/a/`, `${RAC}/b/`, `${RAC}/c/`]);
+    expect(http.peakInFlight).toBe(1);
+  });
+
+  it('sends nothing for a page whose ready rejects, rejecting with its error; the next one goes on', async () => {
+    const client = makeClient();
+    const refused = new Error('the categories were not read');
+    const page = client.getPage('/b/', { ready: () => Promise.reject(refused) });
+    const next = client.getPage('/c/');
+    expect(await page.catch((e: unknown) => e)).toBe(refused);
+    await next;
+    expect(http.requests.map((r) => r.url)).toEqual([`${RAC}/c/`]);
+  });
+
+  it('sends nothing for a page aborted while it waits on ready', async () => {
+    const client = makeClient();
+    const controller = new AbortController();
+    let release!: () => void;
+    const page = client.getPage('/b/', {
+      signal: controller.signal,
+      ready: () => new Promise<void>((resolve) => (release = resolve)),
+    });
+    await Promise.resolve();
+    controller.abort();
+    expect(isAbortError(await page.catch((e: unknown) => e))).toBe(true);
+    release();
+    await client.getPage('/c/');
+    expect(http.requests.map((r) => r.url)).toEqual([`${RAC}/c/`]);
+  });
+
+  it('frees its turn when aborted while what it is ready on never settles', async () => {
+    const client = makeClient();
+    const controller = new AbortController();
+    const page = client.getPage('/b/', {
+      signal: controller.signal,
+      ready: () => new Promise<void>(() => undefined),
+    });
+    await Promise.resolve();
+    controller.abort();
+    expect(isAbortError(await page.catch((e: unknown) => e))).toBe(true);
+    await client.getPage('/c/');
+    expect(http.requests.map((r) => r.url)).toEqual([`${RAC}/c/`]);
   });
 });
 
