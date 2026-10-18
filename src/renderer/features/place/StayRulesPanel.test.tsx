@@ -103,6 +103,8 @@ describe("Place page: the provider's booking rules", () => {
     expect(rules()).toHaveTextContent(
       "You'd arrive on a public holiday (Boxing Day, 26 Dec 2099)."
     );
+    // On sale: Site Sniper only sets release reminders here, so it offers none
+    expect(within(card()).queryByRole('link', { name: /release reminders/ })).toBeNull();
   });
 
   it('a stay not on sale yet says when it opens, and Site Sniper sets reminders for it', async () => {

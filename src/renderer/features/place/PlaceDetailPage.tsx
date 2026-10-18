@@ -232,6 +232,10 @@ export default function PlaceDetailPage() {
   const noticeGate = useNoticeGate(manifest);
   // What the provider's booking rules say about the dates in the card (no request to it)
   const stayRules = useStayRules(manifest ? key : null, currentStay);
+  // Site Sniper only plans for releases here: every release mode only reminds (§12.38)
+  const remindsOnly = Boolean(
+    manifest?.releaseModes?.length && manifest.releaseModes.every((mode) => mode.remindOnly)
+  );
   const onCheck = () => {
     if (!currentStay) {
       setDatesError('Choose your check-in and check-out dates');
@@ -435,11 +439,13 @@ export default function PlaceDetailPage() {
             }
             links={links}
             watchHref={manifest?.capabilities.watches ? ROUTES.watchNew(prefill) : undefined}
-            snipeHref={manifest?.capabilities.snipes ? ROUTES.snipeNew(prefill) : undefined}
-            snipeRemindsOnly={Boolean(
-              manifest?.releaseModes?.length &&
-              manifest.releaseModes.every((mode) => mode.remindOnly)
-            )}
+            snipeHref={
+              // Reminders only for dates not yet on sale: a plan for any other is refused
+              manifest?.capabilities.snipes && !(remindsOnly && stayRules.data?.release?.open)
+                ? ROUTES.snipeNew(prefill)
+                : undefined
+            }
+            snipeRemindsOnly={remindsOnly}
             unitNoun={noun}
           />
         </div>

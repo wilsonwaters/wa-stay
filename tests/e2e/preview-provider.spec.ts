@@ -9,6 +9,8 @@
  * It launches the built app as every journey does (network-free fixture mode, a temp profile)
  * with only that provider registered, and checks that:
  * - Explore lists its places;
+ * - a provider with a notice (`manifest.notice`) offers it in Settings → Accounts, where it is
+ *   read and accepted as a person would, before anything below asks the provider;
  * - with dates (two nights from `PREVIEW_ARRIVAL`, by default tomorrow in the provider's time
  *   zone, set through Explore's address), Explore shows the provider's free counts without an
  *   error, when it has `bulkAvailability`;
@@ -123,6 +125,26 @@ test.describe('preview a provider', () => {
       throw new Error(
         `PREVIEW_ARRIVAL must be a date (YYYY-MM-DD) from today (${today} in ${manifest.timezone}) on, not "${ARRIVAL}"`
       );
+    }
+    // A provider with a notice is asked nothing until it is accepted: accept it as a person
+    // would, in Settings → Accounts
+    const { notice } = manifest;
+    if (notice) {
+      await chooseAccountMenuItem(window, 'Settings');
+      const row = window
+        .getByRole('list', { name: 'Provider accounts' })
+        .getByRole('listitem')
+        .filter({ has: window.getByRole('heading', { level: 3, name: manifest.name }) });
+      await row.getByRole('button', { name: 'Read the notice' }).click();
+      const dialog = window.getByRole('dialog', { name: notice.title });
+      await dialog.getByRole('checkbox', { name: notice.confirmLabel }).check();
+      await dialog.getByRole('button', { name: 'Continue' }).click();
+      await step(
+        `${shortName}'s notice was not accepted`,
+        () => expect(row.getByText(/^Notice accepted on /)).toBeVisible(),
+        'notice'
+      );
+      await screenshot(window, testInfo, 'notice');
     }
     const arrival = ARRIVAL || addDays(today, 1);
     const departure = addDays(arrival, 2);

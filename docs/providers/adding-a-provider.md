@@ -1958,6 +1958,8 @@ app as the smoke tests do (fixture mode, a temp profile, no network) with only y
 registered, and checks that:
 
 - Explore lists its places;
+- a provider with a [notice](#notice) offers it in Settings → Accounts, where the preview reads
+  and accepts it, as a person would, before it asks the provider anything;
 - with dates (two nights from `PREVIEW_ARRIVAL`, by default tomorrow in the provider's time
   zone, set through Explore's address), Explore shows its free counts without an error, when it
   has `bulkAvailability`;

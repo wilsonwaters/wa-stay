@@ -91,7 +91,8 @@ snipe in it is a **plan**:
   opens a watch for the same stay. A plan can't be armed again once its Open Day has passed.
 
 A plan makes no attempts and has no timing or **Run now**; its card and page say its next
-reminder. The place page's Site Sniper button reads **Set release reminders** for Stay Rottnest.
+reminder. The place page's Site Sniper button reads **Set release reminders** for Stay Rottnest, for
+dates not yet on sale.
 
 ## Creating a snipe
 
