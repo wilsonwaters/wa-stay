@@ -11,8 +11,10 @@
  * - **Counts** (RS12: free units, no total), from the same mapping as `check`, category by
  *   category (`unitsOf`, which also marks the nights a school-holiday release still holds back
  *   `not-released`, as `check` does):
- *   - `availableUnits`: the sum of `stay_through_sites_available` over the categories free for
- *     the whole stay (`fullyAvailable`); the others add nothing;
+ *   - `availableUnits`: the sum of the units the categories free for the whole stay
+ *     (`fullyAvailable`) stand for, each its `freeCount` (the whole number of its
+ *     `stay_through_sites_available`, `mapping.ts`), added up by `freeUnitsOf` as the place page
+ *     and a watch add them; the others add nothing;
  *   - `bookableUnits`: left out while any category can be booked online for these dates at
  *     all, free or not (`isBookable`: a night `check` gives it that is neither closed nor not
  *     released), because RAC gives no total of physical sites; 0 when none can: every category
@@ -46,6 +48,7 @@ import {
   type UnitAvailability,
   type UnitKind,
 } from '@shared/types/provider.types';
+import { freeUnitsOf } from '@shared/utils/free-units';
 import { makeLocationKey } from '@shared/utils/location-key';
 import type { ProviderContext } from '../sdk/context';
 import {
@@ -64,11 +67,6 @@ import { RAC_PARKS, type RacPark } from './parks';
 export interface RacBulkDeps {
   ctx: Pick<ProviderContext, 'id' | 'manifest' | 'logger'>;
   availability: Pick<RacAvailability, 'categories' | 'unitsOf'>;
-}
-
-/** A count from RAC as whole units: anything else is none. */
-function wholeUnits(value: number | undefined): number {
-  return value !== undefined && Number.isFinite(value) && value > 0 ? Math.floor(value) : 0;
 }
 
 /**
@@ -90,29 +88,28 @@ function countsOf({ free, bookable }: Tally): { availableUnits: number; bookable
 }
 
 /**
- * The park's entry for the stay, from its categories and their units as `check` gives them
- * (`unitsOf`, the same order).
+ * The park's entry for the stay, from its categories' units as `check` gives them (`unitsOf`):
+ * the free ones by the sites they stand for (`freeUnitsOf`), as the place page and a watch
+ * count them.
  */
 export function parkEntry(
   providerId: string,
   park: RacPark,
-  categories: readonly RawCategory[],
   units: readonly UnitAvailability[]
 ): BulkAvailabilityEntry {
   const kinds = new Map<UnitKind, Tally>(
     park.unitKinds.map((kind) => [kind, { free: 0, bookable: false }])
   );
   const all: Tally = { free: 0, bookable: false };
-  categories.forEach((category, i) => {
-    const unit = units[i];
-    const free = unit.fullyAvailable ? wholeUnits(category.stay_through_sites_available) : 0;
+  for (const unit of units) {
+    const free = unit.fullyAvailable ? freeUnitsOf(unit) : 0;
     const bookable = isBookable(unit);
     const kind = unit.unitKind ?? 'other';
     const tally = kinds.get(kind) ?? { free: 0, bookable: false };
     kinds.set(kind, { free: tally.free + free, bookable: tally.bookable || bookable });
     all.free += free;
     all.bookable ||= bookable;
-  });
+  }
   const byKind: NonNullable<BulkAvailabilityEntry['byKind']> = {};
   for (const kind of UNIT_KINDS) {
     const tally = kinds.get(kind);
@@ -203,7 +200,7 @@ export function createRacBulkSearch({
         }
         // Nights held back for a school-holiday release are not open here either, as in `check`
         const units = await availability.unitsOf(park, stay, categories);
-        entries.push(parkEntry(ctx.id, park, categories, units));
+        entries.push(parkEntry(ctx.id, park, units));
       }
     } finally {
       if (current === run) current = undefined;

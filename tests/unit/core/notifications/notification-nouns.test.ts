@@ -141,6 +141,25 @@ describe('alert nouns', () => {
     });
   });
 
+  it('counts the units the matches stand for, in Explore\'s words: "Found 51 sites free …", not one per category', async () => {
+    const watch = watchAt('parks', 'Busselton');
+    await service.notifyWatchFound(watch, [{ ...match('cat:4', 'campsite'), freeCount: 51 }]);
+    expect(await last()).toMatchObject({
+      title: 'Sites available at Busselton',
+      message: expect.stringMatching(/^Found 51 sites free at Busselton for /),
+    });
+    await service.notifyWatchFound(watch, [
+      { ...match('cat:4', 'campsite'), freeCount: 51 },
+      { ...match('cat:12', 'cabin'), freeCount: 3 },
+    ]);
+    expect((await last()).message).toMatch(/^Found 54 spots free at Busselton for /);
+    await service.notifyWatchFound(watch, [{ ...match('cat:9', 'cabin'), freeCount: 1 }]);
+    expect((await last()).message).toMatch(/^Found 1 cabin free at Busselton for /);
+    // Matches with no count (a provider whose units are one each) are one each, "available"
+    await service.notifyWatchFound(watch, [match('1', 'cabin'), match('2', 'cabin')]);
+    expect((await last()).message).toMatch(/^Found 2 cabins available at Busselton for /);
+  });
+
   it('falls back from the units to the stay types, then to the provider’s default', async () => {
     // Units with no kind: the watch's stay types
     await service.notifyWatchFound(watchAt('parks', 'Busselton', { unitKinds: ['room'] }), [

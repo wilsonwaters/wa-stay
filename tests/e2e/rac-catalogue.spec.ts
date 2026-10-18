@@ -3,7 +3,8 @@
  * chip's "RAC Parks & Resorts" leaves RAC's eight open parks (its seed: the catalogue sync
  * sends nothing), each card with RAC's badge. RAC Margaret River Nature Park's page lists its
  * categories (its dorms and its safari tent) from the trimmed book-now page in
- * `tests/e2e/fixtures/http/rac/`. Fixture mode refuses no request.
+ * `tests/e2e/fixtures/http/rac/`, as types of spot ("Bookable as 5 spot types"), never as a
+ * count of spots: each category stands for several. Fixture mode refuses no request.
  */
 
 import { expect, test, withoutGuardedRequests, withoutRemoteImages } from './support/wa-stay';
@@ -51,9 +52,11 @@ test('the Provider chip shows RAC’s eight parks, and a park’s page lists its
   await expect(
     window.getByRole('heading', { level: 1, name: 'RAC Margaret River Nature Park' })
   ).toBeVisible();
-  // Dorms, a safari tent, a lodge and a site: units of several kinds are "spots" (R9)
+  // Dorms, a safari tent, a lodge and a site: units of several kinds are "spots" (R9), and
+  // each is a category, a type of spot, not one spot
   const spots = window.getByRole('region', { name: 'Spots' });
-  await spots.getByRole('button', { name: 'Show all 5 spots' }).click();
+  await expect(spots.getByText('Bookable as 5 spot types', { exact: true })).toBeVisible();
+  await spots.getByRole('button', { name: 'Show all 5 spot types' }).click();
   for (const category of [
     'Dorm Room - Sleeps 26',
     'Dorm Room - Sleeps 5',

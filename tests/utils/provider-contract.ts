@@ -12,7 +12,8 @@
  * unit's `bookingUrl`) is on the provider's own site (`bookingLinkViolations`, the core's
  * `isProviderBookingLink`), and that a stay under a unit's minimum is refused: the unit is
  * not `fullyAvailable` and its nights with room are `min-stay`, never `available`
- * (`stayRuleViolations`). Modules the
+ * (`stayRuleViolations`), and that free counts are whole numbers on every unit or none
+ * (`freeCountViolations`). Modules the
  * provider does not have are skipped. For a
  * browser-driven provider, `openPages` lets it check that no call leaves a page open.
  *
@@ -281,6 +282,35 @@ export function stayRuleViolations(
   return violations;
 }
 
+/**
+ * What is wrong with the free counts of a check's answer, as messages ([] when nothing). A
+ * unit's `freeCount` (the units it stands for that are free for the whole stay) is a whole
+ * number: at least 1 when the unit is `fullyAvailable`, else 0. A provider sets it on every unit
+ * of a check or on none, so a count of what is free can tell whether the provider has a total
+ * ("2 of 5 sites free") or not ("51 spots free").
+ */
+export function freeCountViolations(result: Pick<LocationAvailability, 'units'>): string[] {
+  const violations: string[] = [];
+  const counted = result.units.filter((unit) => unit.freeCount !== undefined);
+  if (counted.length > 0 && counted.length < result.units.length) {
+    const missing = result.units.filter((unit) => unit.freeCount === undefined);
+    violations.push(
+      `units ${missing.map((unit) => unit.unitId).join(', ')} have no freeCount, but others do`
+    );
+  }
+  for (const unit of counted) {
+    const count = unit.freeCount;
+    if (typeof count !== 'number' || !Number.isInteger(count) || count < 0) {
+      violations.push(`unit ${unit.unitId}'s freeCount ${String(count)} is not a whole number`);
+    } else if (unit.fullyAvailable && count < 1) {
+      violations.push(`unit ${unit.unitId} is fullyAvailable with freeCount ${count}`);
+    } else if (!unit.fullyAvailable && count !== 0) {
+      violations.push(`unit ${unit.unitId} is not fullyAvailable, but its freeCount is ${count}`);
+    }
+  }
+  return violations;
+}
+
 /** A promise that rejects with an AbortError (the caller aborted). */
 async function expectAbort(run: (signal: AbortSignal) => Promise<unknown>): Promise<void> {
   const before = new AbortController();
@@ -493,6 +523,12 @@ export function describeProviderContract(
         if (!provider.availability) return;
         const result = await provider.availability.check(externalId, stay);
         expect(stayRuleViolations(stay, result)).toEqual([]);
+      });
+
+      it('counts free units as whole numbers, on every unit or none (freeCount)', async () => {
+        if (!provider.availability) return;
+        const result = await provider.availability.check(externalId, stay);
+        expect(freeCountViolations(result)).toEqual([]);
       });
 
       it('searches with keys of this provider', async () => {

@@ -401,6 +401,16 @@ export interface UnitAvailability {
   nights: NightStatus[];
   /** Every night of the stay is available, and the stay meets the unit's stay rules. */
   fullyAvailable: boolean;
+  /**
+   * How many units this entry stands for that are free for the whole stay, when it stands for
+   * several that are booked alike (RAC: a category, by how many of its sites are free for the
+   * whole stay): a whole number, at least 1 when `fullyAvailable`, else 0. Left out, the entry
+   * is one unit. Every count of what is free for a stay (Explore, the place page, a watch and
+   * its alert) adds it up (`freeUnitsOf`, `src/shared/utils/free-units.ts`). A provider that
+   * sets it gives no total of its units, so those counts give no "of M"; set it on every unit
+   * of a check, or on none.
+   */
+  freeCount?: number;
   /** Price for the whole stay, when known. */
   total?: number;
   /**
