@@ -1,6 +1,7 @@
 /**
- * The eight open RAC Parks & Resorts parks: facts only, so the catalogue sync sends nothing
- * (terms rule 2). No photo, description or other copy of RAC's is kept here (rule 6).
+ * The eight open RAC Parks & Resorts parks: facts only, so listing them needs no request per
+ * park (terms rule 2; a sync reads one page, RAC's parks page, for their card photos:
+ * `park-pages.ts`). No photo, description or other copy of RAC's is kept here (rule 6).
  *
  * Sources (research of 16 Oct 2026, `ai-state/research/rac-booking-flow.md` §1, §2 and §5):
  * each park's book-now page (`blog_id`, which widget it uses, its category types), its

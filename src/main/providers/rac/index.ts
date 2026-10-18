@@ -10,9 +10,11 @@
  * and give the client cart access.
  *
  * - `manifest.ts`: who RAC is, what the module does, and its limits;
- * - `parks.ts`: the parks, as a seed of facts (no request per sync);
+ * - `parks.ts`: the parks, as a seed of facts;
  * - `catalog.ts` and `book-now.ts`: the catalogue, and a park's categories from its book-now
  *   page (a native park's from one availability POST); `unit-kinds.ts`: what each category is;
+ *   `park-pages.ts`: the parks' card photos (RAC's parks page, once per sync) and a park's own
+ *   photos and intro (its home page, with its detail);
  * - `availability.ts` and `mapping.ts`: a stay's availability, from RAC's availability answer;
  * - `bulk.ts`: Explore's free counts, one POST per park;
  * - `release-policy.ts` and `release-calendar.ts`: when a stay opens (the rolling 364-day
@@ -29,17 +31,19 @@
  * addresses automated access, and robots.txt allows every path with a 10 s crawl delay; the
  * site's terms limit its use to "personal non-commercial home use". So the module:
  * 1. talks only to RAC's own host, for the person's own trip, from their own computer;
- * 2. sends at most one background request every 10 s, and none when the catalogue syncs (what
- *    the person asks for, such as Explore's dates, goes 1 s after the request before it);
+ * 2. sends at most one background request every 10 s, and one when the catalogue syncs (RAC's
+ *    parks page, for the cards' photos); what the person asks for, such as Explore's dates or a
+ *    park's page, goes 1 s after the request before it;
  * 3. lets watches run every 15 minutes at most, and a snipe check every 10 s for at most 30
  *    minutes after its release (no faster near a release);
  * 4. sends one request at a time, on one session;
  * 5. never answers or works around a bot check: a block stops every request for 30 minutes,
  *    longer for blocks in a row or when RAC asks (up to a day);
- * 6. shows facts (names, categories) and links to RAC's pages; RAC's photos and descriptions
- *    are fetched live and shown only in the app;
+ * 6. shows facts (names, categories) and links to RAC's pages; RAC's photos and its words about
+ *    a park are fetched live, shown as RAC publishes them and only in the app;
  * 7. keeps nothing of RAC's in the repository's fixtures but trimmed facts (a test checks it);
- *    the cart's fixtures are synthetic, written from RAC's scripts (no cart was ever opened);
+ *    the cart's fixtures are synthetic, written from RAC's scripts (no cart was ever opened),
+ *    and so are the parks page and home pages, with made-up words and photo addresses;
  * 8. leaves payment and acceptance to the person: the cart guard refuses checkout, card and
  *    NewBook calls, and the auto-cart sends one GET of the cart address and nothing more;
  * 10. never cancels or changes a booking: there is no bookings module, and a release takes out

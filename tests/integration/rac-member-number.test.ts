@@ -104,6 +104,9 @@ function racAnswer(hop: HopRequest): HopAnswer {
   if (hop.method === 'GET' && url.pathname === '/busselton/book-now/') {
     return { body: read('book-now-busselton.html'), headers: { 'content-type': 'text/html' } };
   }
+  if (hop.method === 'GET' && url.pathname === '/bookings/') {
+    return { body: read('parks-page.html'), headers: { 'content-type': 'text/html' } };
+  }
   if (hop.method === 'POST' && url.pathname === RAC_AVAILABILITY_PATH) {
     const form = new URLSearchParams(hop.body);
     const park = RAC_PARKS.find((p) => String(p.blogId) === form.get('blog_id'));
@@ -157,6 +160,18 @@ describe('an RAC member number in the app', () => {
     expect(predicate()).toBe(true);
   };
   const snipeOf = (id: number) => container.repositories.snipes.findById(id)!;
+
+  /**
+   * The catalogue sync. Its one request, RAC's parks page (for the cards' photos, before any
+   * number is saved), is set aside: what follows counts from there.
+   */
+  async function sync(): Promise<void> {
+    await container.catalogService.sync('rac');
+    expect(http.requests.map((r) => [r.method, new URL(r.url).pathname])).toEqual([
+      ['GET', '/bookings/'],
+    ]);
+    http.requests.splice(0);
+  }
 
   function start(now = NOW): void {
     fakeDateOnly(now);
@@ -214,7 +229,7 @@ describe('an RAC member number in the app', () => {
 
   it('is in no RAC request, log line, IPC answer, alert or email; only member prices show it was saved', async () => {
     start();
-    await container.catalogService.sync('rac');
+    await sync();
     const responses: unknown[] = [];
     const answer = async <T>(pending: Promise<APIResponse<T>>): Promise<T> => {
       const response = await pending;
@@ -343,7 +358,7 @@ describe('an RAC member number in the app', () => {
 
   it('asks RAC again after each change, priced for the person as they are now; two quick replaces end with the last', async () => {
     start();
-    await container.catalogService.sync('rac');
+    await sync();
     await expect(price()).resolves.toEqual({ total: 150, note: undefined });
     expect(http.requests).toHaveLength(1);
     await expect(price()).resolves.toEqual({ total: 150, note: undefined });
@@ -438,7 +453,7 @@ describe('an RAC member number in the app', () => {
 
   it('an unreadable number (data copied to another computer) counts as none: public prices, and Settings asks for it again', async () => {
     start();
-    await container.catalogService.sync('rac');
+    await sync();
     await ok(save(NUMBER));
     await expect(price()).resolves.toEqual({ total: 136, note: 'RAC member rate' });
     // Another computer's vault can't open the envelope

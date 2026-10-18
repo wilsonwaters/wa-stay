@@ -1,7 +1,8 @@
 /**
  * A park's book-now page, `GET /<slug>/book-now/`, for the five parks on RAC's own widget: its
- * categories, which the place page shows as units. The page is rendered on the server
- * (WordPress), so its HTML is the only source; no request beyond it is needed.
+ * categories, which the place page shows as units, and their photos, which it shows after the
+ * park's own photos from its home page (`park-pages.ts`). The page is rendered on the server
+ * (WordPress), so its HTML is the only source of the categories.
  *
  * - **Categories.** One `div.accommodation-item` each, its facts in attributes: `data-cat-id`
  *   (NewBook's category id), `data-cat-type-id`, `data-max-guests`, `data-max-animals` (0: no
@@ -21,12 +22,13 @@
  *
  * The page is parsed with sanitize-html's parser (htmlparser2), through its open, close and
  * text hooks: no other HTML library. The small element tree (`parseHtml`, `findAll`,
- * `hasClass`, `textOf`) is shared with the cart page's reader (`cart-page.ts`).
+ * `hasClass`, `textOf`) is shared with the cart page's reader (`cart-page.ts`) and the park
+ * pages' (`park-pages.ts`), which also checks its accommodation photos with `racImageUrl`.
  */
 
 import sanitizeHtml from 'sanitize-html';
 
-/** NewBook's image host, where RAC's category photos are. */
+/** NewBook's image host, where RAC's category photos are (a park's own are on RAC's host). */
 export const RAC_IMAGE_HOST = 'driveau.newbook.cloud';
 
 export interface BookNowCategory {

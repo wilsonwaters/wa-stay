@@ -42,17 +42,17 @@ answer an availability request with JSON, so no browser is driven.
 | `experiments`                | `autoCart` "Put stays in my RAC cart automatically", off by default; it turns on `holds` ([below](#the-auto-cart-experiment))                                                                                                                                                                                                                |
 | `holdRelease`                | `true`: with the experiment on, "Let it go" takes the stay out of the cart                                                                                                                                                                                                                                                                   |
 
-| Capability                        |                                                       | Module                                                                                                                                                                                                                                         |
-| --------------------------------- | ----------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `catalog` (`catalogMode: 'full'`) | yes                                                   | `parks.ts` (the eight parks, a seed of facts: nothing is requested when the catalogue syncs) and `catalog.ts`; a park's categories from its book-now page (`book-now.ts`) or, at a park on NewBook's own engine, from one availability request |
-| `availability`                    | yes                                                   | `availability.ts` and `mapping.ts`: one request per park and stay, every category night by night, with prices and RAC's stay rules                                                                                                             |
-| `bulkAvailability`                | yes                                                   | `bulk.ts`: Explore's free counts, one request per park                                                                                                                                                                                         |
-| `watches`                         | yes                                                   | uses `availability`                                                                                                                                                                                                                            |
-| `snipes`                          | yes (Site Sniper is marked "coming soon")             | `release-policy.ts` and `release-calendar.ts`; RAC snipes alert (with the auto-cart experiment on, they can hold)                                                                                                                              |
-| `holds`                           | off by default: the `autoCart` experiment turns it on | `holds.ts` (the cart), `cart-page.ts` (reading the cart page), and `cart-guard.ts` (what any request may be)                                                                                                                                   |
-| `accessGate`                      | no                                                    | RAC has no queue                                                                                                                                                                                                                               |
-| `bookingImport`                   | no                                                    | WA Stay never cancels or changes an RAC booking                                                                                                                                                                                                |
-| `account`                         | `optional`                                            | `auth.ts` and `membership.ts`: the person's own RAC member number ([below](#the-member-number))                                                                                                                                                |
+| Capability                        |                                                       | Module                                                                                                                                                                                                                                                                                                                                      |
+| --------------------------------- | ----------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `catalog` (`catalogMode: 'full'`) | yes                                                   | `parks.ts` (the eight parks, a seed of facts) and `catalog.ts`; the parks' card photos from RAC's parks page, one request per sync, and a park's own photos and intro from its home page (`park-pages.ts`); a park's categories from its book-now page (`book-now.ts`) or, at a park on NewBook's own engine, from one availability request |
+| `availability`                    | yes                                                   | `availability.ts` and `mapping.ts`: one request per park and stay, every category night by night, with prices and RAC's stay rules                                                                                                                                                                                                          |
+| `bulkAvailability`                | yes                                                   | `bulk.ts`: Explore's free counts, one request per park                                                                                                                                                                                                                                                                                      |
+| `watches`                         | yes                                                   | uses `availability`                                                                                                                                                                                                                                                                                                                         |
+| `snipes`                          | yes (Site Sniper is marked "coming soon")             | `release-policy.ts` and `release-calendar.ts`; RAC snipes alert (with the auto-cart experiment on, they can hold)                                                                                                                                                                                                                           |
+| `holds`                           | off by default: the `autoCart` experiment turns it on | `holds.ts` (the cart), `cart-page.ts` (reading the cart page), and `cart-guard.ts` (what any request may be)                                                                                                                                                                                                                                |
+| `accessGate`                      | no                                                    | RAC has no queue                                                                                                                                                                                                                                                                                                                            |
+| `bookingImport`                   | no                                                    | WA Stay never cancels or changes an RAC booking                                                                                                                                                                                                                                                                                             |
+| `account`                         | `optional`                                            | `auth.ts` and `membership.ts`: the person's own RAC member number ([below](#the-member-number))                                                                                                                                                                                                                                             |
 
 `links.ts` gives every link: a park's home page ("View on RAC"), and its booking pages ("Book on
 RAC", [below](#availability)). There is no link to manage a booking: that needs the park's own
@@ -81,8 +81,19 @@ Resorts' own host.
 
 A park is `rac:<slug>`, its slug being its path on RAC's site (`/busselton/`). The slug is stored
 in watches and snipes, so it never changes. Each park's facts (its WordPress site id, address,
-coordinates, stay types and release hour) were read from RAC's pages by hand; the catalogue sync
-sends nothing.
+coordinates, stay types and release hour) were read from RAC's pages by hand. The catalogue sync
+sends one request, for RAC's parks page (`/bookings/`), whose grid shows every park with a photo:
+each park's photo is its card's on Explore. When that page can't be read (an error, a block, a
+new layout), the parks are listed with the photos read before, or with none; the sync never fails
+for it.
+
+A park's page (its detail) reads the park's home page (`/<slug>/`) as well as its categories: the
+paragraphs under its heading ("Welcome to RAC Busselton Holiday Park") are its About, RAC's own
+words with their links, and its banner photo comes first in its photos. Both requests are queued
+at once, so a park's page opened while Explore's counts are on their way waits for one of
+Explore's requests, not one between its own two. A home page that can't be read, or shows no
+intro or photo, never fails the page: the intro stored before stays, and the card's photo stands
+in for the park's.
 
 ## Stay types
 
@@ -105,7 +116,8 @@ The five parks on RAC's own booking widget list their categories on their book-n
 guests, pets, equipment, features and photos. Exmouth, Karri Valley and Monkey Mia use NewBook's
 own engine, whose page lists nothing until it is searched, so their categories come from one
 availability request for a near stay (one night, two weeks ahead, two adults); nothing of that
-stay's availability or prices is kept.
+stay's availability or prices is kept. Their accommodation photos come from their home page's
+accommodation grid instead.
 
 ## Availability
 
@@ -155,7 +167,8 @@ for those dates at all (not released yet, or closed) reads "Not open". The count
 RAC's site asks for 10 seconds between automated requests, so the core paces the module
 (`limits.minRequestIntervalMs`): one RAC request at a time, and
 
-- **in the background** (a watch's check, a snipe's checks), each request starts at least 10 s
+- **in the background** (a watch's check, a snipe's checks, the catalogue sync), each request
+  starts at least 10 s
   after the one before ended;
 - **what the person starts** (a place page, Explore's dates, "Check now", and with the
   auto-cart on, putting a stay in the cart or letting it go) goes first, 1 s after the request
@@ -163,7 +176,8 @@ RAC's site asks for 10 seconds between automated requests, so the core paces the
   Explore says "Still checking RAC…" meanwhile. A place page opened during them waits for one
   request at most.
 
-The catalogue sync sends nothing, and saving a member number sends nothing either.
+The catalogue sync sends one request a day, in the background (RAC's parks page, for the cards'
+photos), and saving a member number sends nothing.
 
 **A block stops everything.** A 403, a 429 or Cloudflare's challenge page stops every RAC request
 for 30 minutes ("RAC Parks & Resorts turned the request away (HTTP 429). WA Stay won't ask again
@@ -318,12 +332,14 @@ with a 10-second delay; the site's terms limit its use to personal, non-commerci
 Stay:
 
 - asks only RAC Parks & Resorts' own host, for the person's own trip, from their own computer;
-- sends one request at a time, at most one every 10 seconds in the background, and nothing when
-  the catalogue syncs;
+- sends one request at a time, at most one every 10 seconds in the background, and one when the
+  catalogue syncs (RAC's parks page, for the cards' photos);
 - checks watches every 15 minutes at most, and a snipe's release every 10 seconds for at most 30
   minutes;
 - never answers or works around a bot check: a block stops every request for a while;
-- shows facts (park names, categories, availability, prices) and links to RAC's own pages;
+- shows facts (park names, categories, availability, prices) and links to RAC's own pages, and
+  RAC's own photos and words about a park, fetched live and shown as RAC publishes them, only in
+  the app ([below](#data-and-images));
 - never cancels or changes a booking, and a release takes out only a stay the cart still holds;
 - with the auto-cart experiment on only, puts at most one stay in the cart at a time, lets it go
   when the person declines or closes the payment window, and never checks out, agrees to RAC's
@@ -346,22 +362,41 @@ The people who use it book on RAC's own pages, under RAC's terms:
 
 ## Data and images
 
-The park facts are a seed in the code; nothing of RAC's copy is kept in it. A park's categories,
-features, notices and photos are fetched live from RAC's book-now page when someone opens the
-park, cached for 6 hours like any detail, and shown only in the app. Photos come from NewBook's
-image host (RAC's booking engine), hot-linked and never stored or redistributed. Notices are
-RAC's dated booking notes (minimum stays over a holiday), kept only until their last day.
+The park facts are a seed in the code; nothing of RAC's copy is kept in it. What WA Stay shows of
+RAC's own photos and words is fetched live, shown as RAC publishes it, with the link to RAC's
+page ("More information"), and only in the app:
+
+- **On Explore**, each park's card shows its photo from RAC's parks page (`/bookings/`), read
+  once a day by the catalogue sync. Only the photo's address is stored, in the person's own
+  catalogue (and in the provider's state, for a day the page can't be read).
+- **On a park's page**, its About is the intro of its home page (`/<slug>/`), RAC's own
+  paragraphs and links, sanitised in main; its photos are its home page's banner photo, then its
+  categories' photos (the book-now page's gallery, or at a park on NewBook's own engine, its home
+  page's accommodation grid). The core caches the page for 6 hours like any detail, and derives
+  the park's summary (for search) from the intro. A park's categories, features and notices come
+  from its book-now page; notices are RAC's dated booking notes (minimum stays over a holiday),
+  kept only until their last day.
+
+A park's own photos are kept only when they are https on RAC's host under WordPress's uploads
+(`/wp-content/uploads/`), and its categories' only on NewBook's image host (RAC's booking
+engine). The app's window loads them as it shows them (hot-linked, lazily, with no referrer);
+they are never stored or redistributed.
 
 Nothing of RAC's is in the repository or on the website: the test fixtures are trimmed to facts,
-with placeholder photo addresses and descriptions, and the documentation and website screenshots
-show ParkStay only. RAC's monogram is plain text on the app's own colour; there is no RAC logo.
+with placeholder photo addresses and descriptions, the park pages (`parks-page.html`,
+`park-home.html`) are synthetic, with made-up words and photo addresses, and the documentation and
+website screenshots show ParkStay only. RAC's monogram is plain text on the app's own colour;
+there is no RAC logo.
 
 ## Tests
 
 - `tests/unit/providers/rac/`: the manifest, the client (one host, redirects by hand, blocks and
-  their pause), book-now pages, stay types, the member number's form, members' tariffs, free
-  counts (`free-count.test.ts`), the release calendar and the release policy (on a fake clock).
-- `tests/integration/rac-provider.test.ts`: the provider contract suite and the catalogue;
+  their pause), book-now pages, the park pages (`park-pages.test.ts`: the parks page's photos, a
+  home page's photos, intro and accommodation photos), stay types, the member number's form,
+  members' tariffs, free counts (`free-count.test.ts`), the release calendar and the release
+  policy (on a fake clock).
+- `tests/integration/rac-provider.test.ts`: the provider contract suite and the catalogue (the
+  cards' photos, a park's intro and photos, and what stands in when their pages fail);
   `rac-availability.test.ts` (every code and refusal), `rac-watch.test.ts`, `rac-snipes.test.ts`,
   `rac-member-rates.test.ts` and `rac-member-number.test.ts` (the number is in no request, log
   line, IPC answer, alert or email); `rac-explore-ipc.test.ts` and `rac-snipes-ipc.test.ts`
@@ -379,7 +414,7 @@ show ParkStay only. RAC's monogram is plain text on the app's own colour; there 
   and "Pay now" reaching only the guarded cart page).
 - `tests/unit/docs/rac-endpoints-doc.test.ts`: every row in [endpoints](endpoints.md) has a
   status, and every path the module requests is documented.
-- The Electron smoke tests: RAC's parks on Explore and a park's categories
+- The Electron smoke tests: RAC's parks on Explore and a park's categories and About
   (`rac-catalogue.spec.ts`), its free counts on Explore and the park's page
   (`rac-explore.spec.ts`), a watch and its count (`rac-watch.spec.ts`) and the member number
   (`rac-member-number.spec.ts`), from the recorded answers in `tests/e2e/fixtures/http/rac/`
@@ -389,5 +424,6 @@ show ParkStay only. RAC's monogram is plain text on the app's own colour; there 
   (`xvfb-run -a` on Linux).
 
 The recorded answers were trimmed from anonymous, read-only requests; the cart's fixtures
-(`tests/fixtures/providers/rac/cart/`) are synthetic, written from RAC's scripts. No test or
+(`tests/fixtures/providers/rac/cart/`) are synthetic, written from RAC's scripts, and so are the
+park pages, with made-up words and photo addresses. No test or
 agent run ever places a cart, hold, booking or payment with RAC, or sends a member number.

@@ -1,8 +1,11 @@
 /**
  * RAC Parks & Resorts (`src/main/providers/rac/`): the provider contract suite (availability and
- * watches on), the catalogue (the seed, sent nothing), a park's detail from its trimmed
+ * watches on), the catalogue (the seed, with each park's card photo from RAC's parks page, one
+ * GET per sync, and the photos read before when it fails), a park's detail from its trimmed
  * book-now page in `tests/fixtures/providers/rac/` (a native park's from one availability
- * POST, cached by the core for 6 h), and the terms rules a request can break: RAC's host only
+ * POST, cached by the core for 6 h) and its home page (its own photos and intro, from the
+ * synthetic `park-home.html`, and what stands in when it fails), and the terms rules a request
+ * can break: RAC's host only
  * (rule 1), one request at a time 10 s apart (rules 2 and 4), the block cool-down on the
  * synthetic 403, 429 and challenge pages (rule 5). RAC's bulk availability (Explore's free
  * counts, `bulk.ts`): its counts agree with `check` on every recorded answer, its
@@ -26,6 +29,7 @@ import {
   type HopRequest,
   type ProviderContext,
 } from '@main/providers/sdk';
+import { sanitizeProviderHtml } from '@main/providers/sdk/html';
 import { INTERACTIVE_REQUEST_GAP_MS, currentRequestPriority } from '@main/providers/sdk/pacing';
 import { DEFAULT_CATALOG_TIMINGS } from '@main/core/catalog/location-catalog.service';
 import { pacedDeadlineMs } from '@main/core/catalog/catalog-helpers';
@@ -34,7 +38,14 @@ import { LocationCatalogService } from '@main/core/catalog/location-catalog.serv
 import { openDatabase } from '@main/database/connection';
 import { LocationRepository, ProviderStateRepository } from '@main/database/repositories';
 import { withExperiments } from '@main/providers/experiments';
-import { RAC_AUTO_CART_EXPERIMENT, RAC_PARKS, racFactory, racManifest } from '@main/providers/rac';
+import {
+  RAC_AUTO_CART_EXPERIMENT,
+  RAC_PARKS,
+  racFactory,
+  racLinks,
+  racManifest,
+} from '@main/providers/rac';
+import { toLocationSummary } from '@main/providers/rac/catalog';
 import { racPark, type RacPark } from '@main/providers/rac/parks';
 import { RAC_AVAILABILITY_PATH } from '@main/providers/rac/availability';
 import { RAC_BLOCK_STATE_KEY, RacClient } from '@main/providers/rac/client';
@@ -75,6 +86,25 @@ const releaseInfo = (hour: number) =>
   `RAC's release days at ${hour} am AWST, 48 hours earlier for members.`;
 const placeholder = (n: number) =>
   `https://driveau.newbook.cloud/crop_800_450/instances_00000000000000000000000000000000_${n}.jpg`;
+/** A park's own photo, made up, as the synthetic park pages write it. */
+const parkPhoto = (site: number, n: number) =>
+  `${RAC}/wp-content/uploads/sites/${site}/0000/00/placeholder-${n}.jpg`;
+/** Each park's card photo in `parks-page.html`: its WordPress site id is in it. */
+const cardPhoto = (park: RacPark) => parkPhoto(park.blogId, park.blogId);
+/** The synthetic home page's intro (`park-home.html`), read at a park's page `pageUrl`. */
+const homeIntro = (pageUrl: string) =>
+  "<p>Made-up introduction, standing in for the park's own words on RAC's site. Its " +
+  `<a href="${pageUrl}contact-us/" target="_blank" rel="noopener noreferrer">made-up link</a> ` +
+  "reads against the park's page.</p>" +
+  '<p>Made-up second paragraph, with <strong>made-up emphasis</strong> &amp; more.</p>';
+/** The intro as the core gives it: sanitised again in main (its link's attributes reordered). */
+const coreIntro = (pageUrl: string) => sanitizeProviderHtml(homeIntro(pageUrl), RAC);
+/** The synthetic home page's hero photos, and its accommodation grid's. */
+const HOME_PHOTOS = [parkPhoto(0, 1), parkPhoto(0, 2)];
+const HOME_ACCOMMODATION_PHOTOS = [101, 102, 103, 104].map(placeholder);
+/** A park's home page, `/<slug>/`, and RAC's parks page. */
+const isHomePage = (url: string) => /^https:\/\/[^/]+\/[a-z-]+\/$/.test(url);
+const isParksPage = (url: string) => new URL(url).pathname === '/bookings/';
 
 /** A test context (in-memory state, a fixed clock) whose HTTP answers from the fixtures. */
 function fixtureContext(overrides: Partial<Omit<ProviderContext, 'id'>> = {}): ProviderContext {
@@ -105,13 +135,25 @@ function sendingContext(overrides: Partial<Omit<ProviderContext, 'id'>> = {}) {
   return { ctx: fixtureContext({ http, ...overrides }), sent };
 }
 
-/** A test context whose HTTP only records: every request answers `body`. */
+const page = (name: string) => fs.readFileSync(path.join(RAC_FIXTURES, name), 'utf8');
+
+/**
+ * A test context whose HTTP only records: a park's home page answers the synthetic
+ * `park-home.html` and RAC's parks page `parks-page.html`; every other request answers `body`.
+ */
 function recordingContext(body = '<html></html>') {
-  const http = new RecordingHttpClient({ providerId: 'rac', respond: () => ({ body }) });
+  const http = new RecordingHttpClient({
+    providerId: 'rac',
+    respond: (hop) => ({
+      body: isHomePage(hop.url)
+        ? page('park-home.html')
+        : isParksPage(hop.url)
+          ? page('parks-page.html')
+          : body,
+    }),
+  });
   return { http, ctx: createTestProviderContext(racManifest, { http, clock: () => NOW }) };
 }
-
-const page = (name: string) => fs.readFileSync(path.join(RAC_FIXTURES, name), 'utf8');
 
 afterAll(() => fs.rmSync(UNEXPECTED_LOG, { force: true }));
 
@@ -168,7 +210,7 @@ describe('RAC Parks & Resorts', () => {
   const provider = registry.require('rac', 'catalog');
 
   describe('listLocations', () => {
-    it('lists the eight parks from the seed: keys, coordinates, areas and unit kinds', async () => {
+    it("lists the eight parks from the seed: keys, coordinates, areas, unit kinds and RAC's photo", async () => {
       const parks = await provider.catalog.listLocations!();
       expect(parks).toHaveLength(8);
       expect(parks.map((p) => [p.key, p.name, p.area, p.unitKinds])).toEqual([
@@ -231,12 +273,14 @@ describe('RAC Parks & Resorts', () => {
         lat: -33.6611769,
         lng: 115.2487607,
         area: { name: 'Busselton', region: 'South West' },
-        imageUrls: [],
+        imageUrls: [parkPhoto(6, 6)],
         amenities: [],
         unitKinds: ['campsite', 'cabin'],
         infoUrl: `${RAC}/busselton/`,
         bookingUrl: `${RAC}/busselton/book-now/`,
       });
+      // Each park's card photo from RAC's parks page (Ningaloo's is not listed)
+      expect(parks.map((p) => p.imageUrls)).toEqual(RAC_PARKS.map((park) => [cardPhoto(park)]));
       for (const park of parks) {
         expect(park).not.toHaveProperty('summary');
         expect(park.lat).toBeLessThan(-13);
@@ -246,10 +290,140 @@ describe('RAC Parks & Resorts', () => {
       }
     });
 
-    it('sends nothing (terms rule 2: no request per sync)', async () => {
+    it("sends one GET, of RAC's parks page, for HTML, in the background (terms rule 2: one request per sync)", async () => {
       const { http, ctx } = recordingContext();
       await racFactory(ctx).catalog!.listLocations!();
+      expect(http.requests.map((r) => [r.method, r.url, r.headers])).toEqual([
+        ['GET', `${RAC}/bookings/`, { accept: 'text/html' }],
+      ]);
+    });
+
+    /** The provider on a recording client that answers RAC's parks page with `parks`. */
+    function syncing(parks: HopAnswer | (() => HopAnswer), state = new InMemoryKeyValueStore()) {
+      const http = new RecordingHttpClient({
+        providerId: 'rac',
+        respond: () => (typeof parks === 'function' ? parks() : parks),
+      });
+      const logger = createMemoryLogger();
+      const ctx = createTestProviderContext(racManifest, { http, state, logger, clock: () => NOW });
+      return { http, logger, state, catalog: racFactory(ctx).catalog! };
+    }
+    const warnings = (logger: ReturnType<typeof createMemoryLogger>) =>
+      logger.lines.filter((line) => line.level === 'warn').map((line) => line.message);
+    const photosOf = (parks: Array<{ imageUrls: string[] }>) => parks.map((p) => p.imageUrls);
+    const ALL_PHOTOS = RAC_PARKS.map((park) => [cardPhoto(park)]);
+    const NO_PHOTOS = RAC_PARKS.map(() => []);
+
+    it.each<[string, HopAnswer, RegExp]>([
+      ['an error (HTTP 500)', { status: 500, body: '' }, /HTTP 500/],
+      [
+        'a page with none of the parks (a redesign)',
+        { body: '<html></html>' },
+        /none of the parks/,
+      ],
+      [
+        'a block (HTTP 429)',
+        { status: 429, body: page('blocked-429.html') },
+        /turned the request away/,
+      ],
+    ])(
+      'keeps the photos read before when the parks page fails: %s, and never fails the sync',
+      async (_, failure, why) => {
+        let answer: HopAnswer = { body: page('parks-page.html') };
+        const first = syncing(() => answer);
+        expect(photosOf(await first.catalog.listLocations!())).toEqual(ALL_PHOTOS);
+        expect(await first.state.get('catalog.parkPhotos')).toEqual(
+          Object.fromEntries(RAC_PARKS.map((park) => [park.slug, cardPhoto(park)]))
+        );
+
+        answer = failure;
+        const parks = await first.catalog.listLocations!();
+        expect(parks).toHaveLength(8);
+        expect(photosOf(parks)).toEqual(ALL_PHOTOS);
+        // One warning says why (a block also has the client's own)
+        const said = warnings(first.logger).filter((line) => line.startsWith('No park photos'));
+        expect(said).toEqual([
+          expect.stringMatching(
+            /^No park photos from \/bookings\/: [^;]*[^.]; the photos read before are kept$/
+          ),
+        ]);
+        expect(said[0]).toMatch(why);
+        // A second context on the same state (a restart) keeps them too; after a block it
+        // sends nothing in the cool-down
+        const restarted = syncing(failure, first.state);
+        expect(photosOf(await restarted.catalog.listLocations!())).toEqual(ALL_PHOTOS);
+        expect(restarted.http.requests).toHaveLength(failure.status === 429 ? 0 : 1);
+      }
+    );
+
+    it('lists the parks without photos when the parks page fails and none were read before', async () => {
+      const { catalog, logger, state } = syncing({ status: 503, body: '' });
+      const parks = await catalog.listLocations!();
+      expect(parks.map((p) => p.key)).toEqual(RAC_PARKS.map((park) => `rac:${park.slug}`));
+      expect(photosOf(parks)).toEqual(NO_PHOTOS);
+      expect(warnings(logger)).toEqual([
+        expect.stringMatching(
+          /^No park photos from \/bookings\/: .*; the parks are listed without$/
+        ),
+      ]);
+      expect(await state.get('catalog.parkPhotos')).toBeUndefined();
+    });
+
+    it("reads again what it kept, so a photo kept that is not RAC's is dropped", async () => {
+      const state = new InMemoryKeyValueStore();
+      await state.set('catalog.parkPhotos', {
+        busselton: cardPhoto(racPark('busselton')!),
+        esperance: 'https://example.com/wp-content/uploads/sites/10/0000/00/placeholder-10.jpg',
+        exmouth: placeholder(3),
+        cervantes: 42,
+        ningaloo: parkPhoto(4, 4),
+      });
+      const { catalog } = syncing({ status: 500, body: '' }, state);
+      const parks = await catalog.listLocations!();
+      expect(
+        parks.filter((p) => p.imageUrls.length > 0).map((p) => [p.externalId, p.imageUrls])
+      ).toEqual([['busselton', [cardPhoto(racPark('busselton')!)]]]);
+      // Something that is no record at all counts as none
+      await state.set('catalog.parkPhotos', ['not', 'a', 'record']);
+      expect(photosOf(await catalog.listLocations!())).toEqual(NO_PHOTOS);
+    });
+
+    it('gives a park missing from the page no photo, and keeps only the parks the page shows', async () => {
+      const without = page('parks-page.html').replace(
+        /<div class="park-grid-block__parks__item">(?:(?!<\/div>\s*<div class="park-grid-block__parks__item">)[\s\S])*?\/esperance\/book-now\/[\s\S]*?<\/a>\s*<\/div>/,
+        ''
+      );
+      expect(without).not.toContain('/esperance/book-now/');
+      const { catalog, state } = syncing({ body: without });
+      const parks = await catalog.listLocations!();
+      expect(parks.find((p) => p.externalId === 'esperance')?.imageUrls).toEqual([]);
+      expect(parks.filter((p) => p.imageUrls.length > 0)).toHaveLength(7);
+      expect(Object.keys((await state.get<object>('catalog.parkPhotos')) ?? {})).toHaveLength(7);
+    });
+
+    it('rejects an aborted sync, before or during its request, keeping nothing', async () => {
+      const { catalog, http, state } = syncing({ body: page('parks-page.html') });
+      const aborted = new AbortController();
+      aborted.abort();
+      const before = await catalog.listLocations!(aborted.signal).catch((e: unknown) => e);
+      expect(isAbortError(before)).toBe(true);
       expect(http.requests).toHaveLength(0);
+
+      const slow = new RecordingHttpClient({
+        providerId: 'rac',
+        delayMs: 1_000,
+        respond: () => ({ body: page('parks-page.html') }),
+      });
+      const slowCatalog = racFactory(
+        createTestProviderContext(racManifest, { http: slow, state, clock: () => NOW })
+      ).catalog!;
+      const controller = new AbortController();
+      const listing = slowCatalog.listLocations!(controller.signal);
+      setTimeout(() => controller.abort(), 10);
+      const during = await listing.catch((e: unknown) => e);
+      expect(isAbortError(during)).toBe(true);
+      expect(slow.requests).toHaveLength(1);
+      expect(await state.get('catalog.parkPhotos')).toBeUndefined();
     });
   });
 
@@ -294,8 +468,14 @@ describe('RAC Parks & Resorts', () => {
       expect(detail.units[0]).toMatchObject({ maxPeople: 4 });
       expect(detail.units[0].equipment).toBeUndefined();
       expect(detail.units[0].amenities).not.toContain('Pets allowed (up to 2)');
-      // The gallery's photos, fetched live, the placeholders here
-      expect(detail.imageUrls).toEqual(Array.from({ length: 12 }, (_, i) => placeholder(i + 1)));
+      // The park's own photos from its home page first, then the gallery's, fetched live: the
+      // placeholders here
+      expect(detail.imageUrls).toEqual([
+        ...HOME_PHOTOS,
+        ...Array.from({ length: 12 }, (_, i) => placeholder(i + 1)),
+      ]);
+      // RAC's own words about the park, from its home page, for About
+      expect(detail.descriptionHtml).toBe(homeIntro(`${RAC}/busselton/`));
       expect(detail.releaseInfo).toBe(releaseInfo(8));
       expect(detail.fetchedAt).toBe(NOW.toISOString());
       // Each unit is a category of sites or cabins, so the place page lists types, not a count
@@ -351,7 +531,9 @@ describe('RAC Parks & Resorts', () => {
         const detail = await racFactory(ctx).catalog!.getLocation(slug);
         expect(detail).toMatchObject({
           key: `rac:${slug}`,
-          imageUrls: [],
+          // Its own photos, then its home page's accommodation photos (its book-now page has none)
+          imageUrls: [...HOME_PHOTOS, ...HOME_ACCOMMODATION_PHOTOS],
+          descriptionHtml: homeIntro(`${RAC}/${slug}/`),
           releaseInfo: releaseInfo(hour),
           infoUrl: `${RAC}/${slug}/`,
         });
@@ -365,9 +547,12 @@ describe('RAC Parks & Resorts', () => {
         const listed = new Set(detail.units.map((u) => u.unitKind));
         expect(UNIT_KINDS.filter((kind) => listed.has(kind))).toEqual(kinds);
         expect(RAC_PARKS.find((park) => park.slug === slug)!.unitKinds).toEqual(kinds);
-        // One POST: 1 night, 14 days after today in Perth (17 Oct), for 2 adults
-        expect(sent).toHaveLength(1);
-        expect(sent[0].url).toBe(`${RAC}${RAC_AVAILABILITY_PATH}`);
+        // One POST: 1 night, 14 days after today in Perth (17 Oct), for 2 adults; then the
+        // park's home page
+        expect(sent.map((r) => [r.method, r.url])).toEqual([
+          ['POST', `${RAC}${RAC_AVAILABILITY_PATH}`],
+          ['GET', `${RAC}/${slug}/`],
+        ]);
         expect(Object.fromEntries(new URLSearchParams(sent[0].body))).toMatchObject({
           blog_id: String(blogId),
           available_from: '31 Oct 2026',
@@ -422,15 +607,24 @@ describe('RAC Parks & Resorts', () => {
       });
       try {
         await catalog.sync('rac');
-        // Syncing the seed sends nothing
-        expect(sent).toHaveLength(0);
+        // Syncing the seed reads RAC's parks page only, for the cards' photos
+        expect(sent.map((r) => [r.method, r.url])).toEqual([['GET', `${RAC}/bookings/`]]);
+        const card = catalog.search({ text: 'Karri Valley' }).items[0];
+        expect(card.imageUrls).toEqual([cardPhoto(racPark('karri-valley')!)]);
         const first = await catalog.get('rac:karri-valley');
         expect(first.units).toHaveLength(12);
+        expect(first.descriptionHtml).toBe(coreIntro(`${RAC}/karri-valley/`));
         expect(posts()).toBe(1);
+        expect(sent).toHaveLength(3);
+        // The core derives the card's summary from the intro (FTS), RAC's words, kept locally
+        expect(catalog.search({ text: 'Made-up introduction' }).items[0]?.key).toBe(
+          'rac:karri-valley'
+        );
         now = new Date(NOW.getTime() + 5 * 3_600_000);
         const again = await catalog.get('rac:karri-valley');
         expect(again.units).toEqual(first.units);
-        expect(sent).toHaveLength(1);
+        expect(again.descriptionHtml).toBe(first.descriptionHtml);
+        expect(sent).toHaveLength(3);
       } finally {
         catalog.stop();
         db.close();
@@ -484,12 +678,128 @@ describe('RAC Parks & Resorts', () => {
       }
     );
 
-    it("asks only the park's book-now page on RAC, for HTML", async () => {
+    it("asks only the park's book-now page, then its home page, on RAC, for HTML", async () => {
       const { http, ctx } = recordingContext(page('book-now-busselton.html'));
       await racFactory(ctx).catalog!.getLocation('busselton');
       expect(http.requests.map((r) => [r.method, r.url, r.headers])).toEqual([
         ['GET', `${RAC}/busselton/book-now/`, { accept: 'text/html' }],
+        ['GET', `${RAC}/busselton/`, { accept: 'text/html' }],
       ]);
+    });
+
+    describe("a park's home page", () => {
+      /** A provider whose park home pages answer `home`, and the rest from the fixtures. */
+      function withHome(home: HopAnswer) {
+        const http = new RecordingHttpClient({
+          providerId: 'rac',
+          respond: (hop) => {
+            if (isHomePage(hop.url)) return home;
+            if (hop.method === 'POST')
+              return { body: page('availability-monkey-mia-2026-10-31-1n.json') };
+            return { body: page('book-now-busselton.html') };
+          },
+        });
+        const logger = createMemoryLogger();
+        const ctx = createTestProviderContext(racManifest, { http, logger, clock: () => NOW });
+        return { http, logger, catalog: racFactory(ctx).catalog! };
+      }
+      const warnings = (logger: ReturnType<typeof createMemoryLogger>) =>
+        logger.lines.filter((line) => line.level === 'warn').map((line) => line.message);
+      /** What the core knows of Busselton: its stored card, and the detail it stored before. */
+      const known = (slug: string, card: string[], kept?: string) => {
+        const summary = { ...toLocationSummary('rac', racPark(slug)!, racLinks), imageUrls: card };
+        return {
+          summary,
+          previous: { ...summary, units: [], ...(kept ? { descriptionHtml: kept } : {}) },
+        };
+      };
+      const CARD = cardPhoto(racPark('busselton')!);
+
+      it.each<[string, HopAnswer, RegExp]>([
+        [
+          'an error (HTTP 500)',
+          { status: 500, body: '' },
+          /no intro or photos from \/busselton\/: .*HTTP 500/,
+        ],
+        [
+          'a page in another shape',
+          { body: '<html><body><h1>Hello</h1></body></html>' },
+          /shows no intro or photo \(a new layout\?\)$/,
+        ],
+      ])(
+        'that fails (%s) keeps the intro stored before, puts the card photo first, and still lists the categories',
+        async (_, home, why) => {
+          const { catalog, logger } = withHome(home);
+          const detail = await catalog.getLocation(
+            'busselton',
+            undefined,
+            known('busselton', [CARD], '<p>Kept.</p>')
+          );
+          expect(detail.units).toHaveLength(6);
+          expect(detail.descriptionHtml).toBe('<p>Kept.</p>');
+          expect(detail.imageUrls).toEqual([
+            CARD,
+            ...Array.from({ length: 12 }, (_, i) => placeholder(i + 1)),
+          ]);
+          expect(warnings(logger)).toEqual([expect.stringMatching(why)]);
+          expect(warnings(logger)[0]).toMatch(/^RAC Busselton Holiday Park: /);
+        }
+      );
+
+      it('that fails at a native park, with nothing known before, leaves the park without words or photos', async () => {
+        const { catalog, logger } = withHome({ status: 500, body: '' });
+        const detail = await catalog.getLocation('monkey-mia');
+        expect(detail.units.length).toBeGreaterThan(0);
+        expect(detail.descriptionHtml).toBeUndefined();
+        expect(detail.imageUrls).toEqual([]);
+        expect(warnings(logger)).toHaveLength(1);
+      });
+
+      it("never takes what another park stored, or a card photo that is not RAC's", async () => {
+        const { catalog } = withHome({ status: 500, body: '' });
+        const other = known('esperance', [cardPhoto(racPark('esperance')!)], '<p>Esperance.</p>');
+        expect(await catalog.getLocation('busselton', undefined, other)).not.toHaveProperty(
+          'descriptionHtml'
+        );
+        const strange = known('busselton', [placeholder(1), 'https://example.com/a.jpg'], ' ');
+        const detail = await catalog.getLocation('busselton', undefined, strange);
+        expect(detail.descriptionHtml).toBeUndefined();
+        // The gallery's own first photo is there once, as the gallery's
+        expect(detail.imageUrls).toEqual(Array.from({ length: 12 }, (_, i) => placeholder(i + 1)));
+      });
+
+      it('with only some of it keeps what it has: its intro, and the card photo for its own', async () => {
+        const intro = '<div><h1>Welcome</h1><p>Made-up words.</p></div>';
+        const { catalog, logger } = withHome({ body: intro });
+        const detail = await catalog.getLocation(
+          'busselton',
+          undefined,
+          known('busselton', [CARD])
+        );
+        expect(detail.descriptionHtml).toBe('<p>Made-up words.</p>');
+        expect(detail.imageUrls[0]).toBe(CARD);
+        expect(warnings(logger)).toEqual([
+          'RAC Busselton Holiday Park: /busselton/ shows no photo (a new layout?)',
+        ]);
+      });
+
+      it('aborted while it waits, rejects the detail: nothing stands in for it', async () => {
+        const http = new RecordingHttpClient({
+          providerId: 'rac',
+          delayMs: 1_000,
+          respond: () => ({ body: page('book-now-busselton.html') }),
+        });
+        const catalog = racFactory(
+          createTestProviderContext(racManifest, { http, clock: () => NOW })
+        ).catalog!;
+        const controller = new AbortController();
+        const opening = catalog.getLocation('busselton', controller.signal);
+        setTimeout(() => controller.abort(), 10);
+        const error = await opening.catch((e: unknown) => e);
+        expect(isAbortError(error)).toBe(true);
+        // The book-now page was on the wire; the home page never left
+        expect(http.requests.map((r) => r.url)).toEqual([`${RAC}/busselton/book-now/`]);
+      });
     });
 
     it('rejects a page with no category (a redesign) with a ProviderParseError', async () => {
@@ -550,11 +860,21 @@ describe('RAC terms rules', () => {
       catalog.getLocation('busselton'),
       catalog.getLocation('margaret-river'),
     ]);
-    await jest.advanceTimersByTimeAsync(60_000);
+    await jest.advanceTimersByTimeAsync(90_000);
     await both;
-    expect(inner.requests).toHaveLength(2);
+    // Each park's book-now page and home page, one at a time, 10 s apart in the background
+    expect(inner.requests.map((r) => new URL(r.url).pathname)).toEqual([
+      '/busselton/book-now/',
+      '/busselton/',
+      '/margaret-river/book-now/',
+      '/margaret-river/',
+    ]);
     expect(inner.peakInFlight).toBe(1);
-    expect(inner.requests[1].sentAt - inner.requests[0].endedAt!).toBeGreaterThanOrEqual(10_000);
+    for (let i = 1; i < inner.requests.length; i++) {
+      expect(inner.requests[i].sentAt - inner.requests[i - 1].endedAt!).toBeGreaterThanOrEqual(
+        10_000
+      );
+    }
   });
 
   it('rule 3: watches every 15 minutes at most', () => {
@@ -619,8 +939,13 @@ describe('RAC bulk availability', () => {
   const ANSWER_FILES: Readonly<Record<string, string>> = Object.fromEntries(
     RAC_PARKS.map((park) => [park.slug, `availability-${park.slug}-2026-11-06-2n.json`])
   );
-  /** Answers a POST with its park's answer, and a book-now GET with Busselton's page. */
+  /**
+   * Answers a POST with its park's answer, a home page and RAC's parks page with theirs, and a
+   * book-now GET with Busselton's page.
+   */
   const byPark = (hop: HopRequest): HopAnswer => {
+    if (hop.method === 'GET' && isHomePage(hop.url)) return { body: page('park-home.html') };
+    if (hop.method === 'GET' && isParksPage(hop.url)) return { body: page('parks-page.html') };
     if (hop.method === 'GET') return { body: page('book-now-busselton.html') };
     const park = parkOf(hop.body);
     return park ? { body: page(ANSWER_FILES[park.slug]) } : { status: 404, body: '' };
@@ -1239,9 +1564,16 @@ describe('RAC bulk availability', () => {
         events: { emit: () => undefined },
         logger: createMemoryLogger(),
       });
-      await catalog.sync('rac');
-      // The seed: nothing sent
-      expect(inner.requests).toHaveLength(0);
+      const synced = catalog.sync('rac');
+      // Past its answer and any gap after it, so each test starts on an idle queue
+      await jest.advanceTimersByTimeAsync(delayMs + 10 * SECOND);
+      await synced;
+      // The seed, and one GET of RAC's parks page in the background, for the cards' photos
+      expect(inner.requests.map((r) => [r.method, r.url])).toEqual([['GET', `${RAC}/bookings/`]]);
+      expect(priorities).toEqual(['background']);
+      // The tests below count from here
+      inner.requests.splice(0);
+      priorities.splice(0);
       return { inner, catalog, priorities };
     }
 
@@ -1341,24 +1673,27 @@ describe('RAC bulk availability', () => {
       const checked = track(catalog.checkLocation('rac:busselton', STAY));
       await settle(explored, opened, checked);
 
-      // Cervantes ends at 26 s; the detail goes 1 s later (35 s), then the check (44 s)
+      // Cervantes ends at 26 s; the detail's two pages go 1 s apart (35 s, 44 s), queued together
+      // ahead of the search's next POST, then the check (53 s)
       expect(opened.error).toBeUndefined();
       expect(opened.value?.units.length).toBeGreaterThan(0);
-      expect(Math.round(opened.ms!)).toBe(15 * SECOND);
+      expect(opened.value?.descriptionHtml).toBe(coreIntro(`${RAC}/busselton/`));
+      expect(Math.round(opened.ms!)).toBe(24 * SECOND);
       expect(opened.ms).toBeLessThan(DETAIL_DEADLINE_MS);
       expect(checked.error).toBeUndefined();
       expect(checked.value?.units.length).toBeGreaterThan(0);
-      expect(Math.round(checked.ms!)).toBe(24 * SECOND);
+      expect(Math.round(checked.ms!)).toBe(33 * SECOND);
       expect(checked.ms).toBeLessThan(CHECK_DEADLINE_MS);
-      // The search's own POSTs resume after them: 10 requests of 8 s and 9 gaps
+      // The search's own POSTs resume after them: 11 requests of 8 s and 10 gaps
       expect(explored.value?.errors).toEqual([]);
       expect(explored.value?.entries).toHaveLength(8);
-      expect(Math.round(explored.ms!)).toBe(89 * SECOND);
+      expect(Math.round(explored.ms!)).toBe(98 * SECOND);
       expect(explored.ms).toBeLessThan(BULK_DEADLINE_MS);
       expect(inner.requests.map((r) => r.method)).toEqual([
         'POST',
         'POST',
         'POST',
+        'GET',
         'GET',
         'POST',
         'POST',
