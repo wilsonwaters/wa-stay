@@ -17,6 +17,7 @@ import type {
   CatalogSearchResult,
   LocationSummary,
 } from '../../../shared/types/catalog.types';
+import { unitNounFrom } from '../../../shared/utils/unit-noun';
 import {
   normaliseCatalogQuery,
   stayKey,
@@ -31,8 +32,8 @@ import {
   useProviders,
   useProvidersWith,
 } from '../../api';
-import type { PlaceLinkState } from '../../app/routes';
-import type { StayParams } from '../../app/stayParams';
+import type { PlaceLinkQuery, PlaceLinkState } from '../../app/routes';
+import { parseStayTypes } from '../../app/stayParams';
 import type { CardAvailability } from '../../components/LocationCard';
 import { hasMapLocation, placesLabel } from '../../components/locationFormat';
 import { stayRangeLabel } from '../../components/nightGridModel';
@@ -41,8 +42,10 @@ import { cx } from '../../components/ui/cx';
 import { useMinWidth } from '../../components/ui/useMinWidth';
 import {
   availabilityLabel,
+  countedKinds,
   deriveAvailability,
   sortByAvailability,
+  type AvailabilityState,
   type PlaceAvailability,
 } from './availability/deriveAvailability';
 import { exploreStay } from './availability/stay';
@@ -82,6 +85,8 @@ export const SLOW_AVAILABILITY_MS = 10_000;
 /** The map's area is sent to main once the map has stayed still this long (search mode). */
 export const AREA_SEARCH_DEBOUNCE_MS = 500;
 const ALL_PLACES: PlaceAvailability = { state: 'no-dates' };
+/** The states in which a place's units were counted for the stay. */
+const COUNTED = new Set<AvailabilityState>(['available', 'full', 'none-open']);
 const HEADER_HEIGHT = 64;
 
 const unique = (values: Iterable<string | undefined>) =>
@@ -151,17 +156,24 @@ export default function ExplorePage() {
 
   const { params, update, setCamera } = useExploreParams(known);
 
-  // A place's detail page opens with Explore's stay, and Back on it returns here as it was.
+  // The stay types chosen, the same array until they change (not at each camera move), so the
+  // cards' links and availability keep.
+  const stayTypesKey = params.stayTypes.join(',');
+  const stayTypes = useMemo(() => parseStayTypes(stayTypesKey), [stayTypesKey]);
+
+  // A place's detail page opens with Explore's stay and stay types, and Back on it returns here
+  // as it was.
   const { search: currentSearch } = useLocation();
-  const detailStay = useMemo<Partial<StayParams>>(
+  const detailStay = useMemo<PlaceLinkQuery>(
     () => ({
       arrival: params.arrival,
       departure: params.departure,
       adults: params.adults,
       children: params.children,
       infants: params.infants,
+      stayTypes,
     }),
-    [params.arrival, params.departure, params.adults, params.children, params.infants]
+    [params.arrival, params.departure, params.adults, params.children, params.infants, stayTypes]
   );
   const detailState = useMemo<PlaceLinkState>(
     () => ({ from: 'explore', search: currentSearch }),
@@ -171,14 +183,18 @@ export default function ExplorePage() {
   const filters: ExploreFilters = useMemo(
     () => ({
       providerIds: params.providers,
-      kinds: params.kinds,
+      stayTypes,
       regions: params.regions,
       amenities: params.amenities,
       bookingModes: params.online ? ['online'] : [],
     }),
-    [params.providers, params.kinds, params.regions, params.amenities, params.online]
+    [params.providers, stayTypes, params.regions, params.amenities, params.online]
   );
-  const query: CatalogQuery = useMemo(() => ({ text: params.q, ...filters }), [params.q, filters]);
+  // Main filters by unit kind (`unitKinds`), as the chip counts do here.
+  const query: CatalogQuery = useMemo(() => {
+    const { stayTypes: unitKinds, ...rest } = filters;
+    return { text: params.q, ...rest, unitKinds };
+  }, [params.q, filters]);
   const queryKey = JSON.stringify(normaliseCatalogQuery(query));
   const searching = Boolean(params.q) || hasActiveFilters(params);
 
@@ -298,11 +314,12 @@ export default function ExplorePage() {
           status: statuses[item.providerId],
           errorCode: bulk.errors[item.providerId]?.code,
           entry: bulk.byKey.get(item.key),
+          stayTypes,
         })
       );
     }
     return out;
-  }, [stay, results, manifests, statuses, bulk.errors, bulk.byKey]);
+  }, [stay, results, manifests, statuses, bulk.errors, bulk.byKey, stayTypes]);
 
   /** How each result's availability reads on its card and its map pill. */
   const { cardAvailability, pinAvailability } = useMemo(() => {
@@ -312,7 +329,7 @@ export default function ExplorePage() {
     for (const item of results) {
       const availability = placeAvailability.get(item.key) ?? ALL_PLACES;
       const shortName = manifests.get(item.providerId)?.shortName ?? item.providerId;
-      const label = availabilityLabel(availability, item.kind, shortName);
+      const label = availabilityLabel(availability, countedKinds(item, stayTypes), shortName);
       if (!label) continue;
       pins.set(item.key, { state: availability.state, pill: label.pill });
       if (label.card === null) continue;
@@ -324,7 +341,7 @@ export default function ExplorePage() {
       );
     }
     return { cardAvailability: cards, pinAvailability: pins };
-  }, [placeAvailability, results, manifests]);
+  }, [placeAvailability, results, manifests, stayTypes]);
 
   const isAvailable = useCallback(
     (item: LocationSummary) => placeAvailability?.get(item.key)?.state === 'available',
@@ -343,6 +360,14 @@ export default function ExplorePage() {
     () => (placeAvailability ? visible.filter(isAvailable).length : 0),
     [placeAvailability, visible, isAvailable]
   );
+  // What the units counted are called, in the announcement and the empty state: by the kinds
+  // the places whose units were counted count, else the stay types chosen ("sites", "spots").
+  const countedNoun = useMemo(() => {
+    const kinds = visible
+      .filter((item) => COUNTED.has(placeAvailability?.get(item.key)?.state ?? 'unknown'))
+      .flatMap((item) => countedKinds(item, stayTypes));
+    return unitNounFrom(kinds, stayTypes);
+  }, [visible, placeAvailability, stayTypes]);
   const availabilityNote =
     !stay || bulkProviders.length === 0
       ? undefined
@@ -482,7 +507,7 @@ export default function ExplorePage() {
   // ---- Actions ---------------------------------------------------------------------------
   const NO_FILTERS = {
     providers: [],
-    kinds: [],
+    stayTypes: [],
     regions: [],
     amenities: [],
     online: false,
@@ -539,7 +564,9 @@ export default function ExplorePage() {
   } else if (result.items.length === 0) state = { kind: 'no-matches' };
   else if (area && visible.length === 0) state = { kind: 'empty-area' };
   else if (availableOnly && shownPlaces.length === 0 && range) {
-    state = checking ? { kind: 'checking' } : { kind: 'none-available', range, checked: answered };
+    state = checking
+      ? { kind: 'checking' }
+      : { kind: 'none-available', range, checked: answered, noun: countedNoun };
   } else state = { kind: 'results' };
 
   const scrollMemory = useExploreScrollMemory(state.kind === 'results');
@@ -572,7 +599,7 @@ export default function ExplorePage() {
   // ---- Announce availability once it settles for a stay, and each provider that failed ----
   const settledMessage =
     stay && range && epoch !== null && bulkProviders.length > 0 && !checking && answered
-      ? `${availableCount} of ${visible.length} places have sites available for ${range}`
+      ? `${availableCount} of ${visible.length} places have ${countedNoun.many} available for ${range}`
       : null;
   const announcedStay = useRef<string | null>(null);
   useEffect(() => {
@@ -765,7 +792,7 @@ export default function ExplorePage() {
             <FilterRow
               params={params}
               facets={facets}
-              showKinds={facets.kinds.length > 1}
+              showStayTypes={facets.stayTypes.length > 1}
               onChange={updateSearch}
               onClearAll={clearFilters}
               availableOnlyUnavailable={availableOnlyUnavailable}

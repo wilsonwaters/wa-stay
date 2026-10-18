@@ -1,9 +1,11 @@
 /**
- * createLimiter and mapWithConcurrency: the cap holds, queued work starts in call order,
- * and results keep input order.
+ * createLimiter and mapWithConcurrency: the cap holds, queued work starts in call order
+ * (interactive before background, call order within each), a queued task runs in its
+ * caller's async context, and results keep input order.
  */
 
-import { createLimiter, mapWithConcurrency } from '@main/providers/sdk';
+import { AsyncLocalStorage } from 'async_hooks';
+import { createLimiter, mapWithConcurrency, withRequestPriority } from '@main/providers/sdk';
 
 interface Deferred {
   promise: Promise<void>;
@@ -69,6 +71,67 @@ describe('createLimiter', () => {
     await expect(failing).rejects.toThrow('nope');
     await expect(throwing).rejects.toThrow('sync');
     await expect(after).resolves.toBe('ran');
+  });
+
+  it("runs a queued task in its caller's async context, not in that of the task whose end starts it", async () => {
+    const limit = createLimiter(1);
+    const caller = new AsyncLocalStorage<string>();
+    const gate = deferred();
+    const seen: Array<string | undefined> = [];
+    const first = caller.run('first', () =>
+      limit(async () => {
+        seen.push(caller.getStore());
+        await gate.promise;
+      })
+    );
+    const second = caller.run('second', () => limit(async () => seen.push(caller.getStore())));
+    const third = limit(async () => seen.push(caller.getStore()));
+
+    gate.resolve();
+    await Promise.all([first, second, third]);
+    expect(seen).toEqual(['first', 'second', undefined]);
+  });
+
+  it('starts queued interactive tasks before queued background ones, each in call order', async () => {
+    const limit = createLimiter(1);
+    const gate = deferred();
+    const started: string[] = [];
+    const task = (name: string) => () => {
+      started.push(name);
+      return name === 'running' ? gate.promise : Promise.resolve();
+    };
+    const all = [
+      limit(task('running')),
+      limit(task('bg1')),
+      withRequestPriority('interactive', () => limit(task('now1'))),
+      limit(task('bg2')),
+      withRequestPriority('interactive', () => limit(task('now2'))),
+      // The innermost scope is the one read
+      withRequestPriority('interactive', () =>
+        withRequestPriority('background', () => limit(task('bg3')))
+      ),
+    ];
+    expect(limit.pendingCount).toBe(5);
+
+    gate.resolve();
+    await Promise.all(all);
+    expect(started).toEqual(['running', 'now1', 'now2', 'bg1', 'bg2', 'bg3']);
+    expect(limit.pendingCount).toBe(0);
+  });
+
+  it('is first in, first out when no priority is set (background)', async () => {
+    const limit = createLimiter(2);
+    const gates = Array.from({ length: 6 }, deferred);
+    const started: number[] = [];
+    const all = gates.map((gate, i) =>
+      limit(() => {
+        started.push(i);
+        return gate.promise;
+      })
+    );
+    for (const gate of [...gates].reverse()) gate.resolve();
+    await Promise.all(all);
+    expect(started).toEqual([0, 1, 2, 3, 4, 5]);
   });
 
   it('rejects a concurrency below 1', () => {

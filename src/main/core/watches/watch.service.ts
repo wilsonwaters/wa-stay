@@ -8,7 +8,18 @@
  *
  * Auto-hold (PQ4, architecture-notes §12.4): on a full match, a watch with `autoHold` places
  * one hold on the first matching unit through `provider.holds`, behind the same
- * one-booking-per-night guard as snipes, and stops. Payment stays a human step.
+ * one-booking-per-night guard as snipes, and stops. Payment stays a human step. It never
+ * picks between stay types: a watch with no units named whose wanted units are of more than
+ * one kind (`kindsAmbiguous`) notifies with a note instead. Nor does it hold while the
+ * provider's holds are turning off (an experiment turned off, until the restart: §12.35), and
+ * a watch cannot be set to hold then. `holds.create` runs at interactive priority (R18): a hold
+ * is one booking attempt the person opted into, even inside a background check.
+ *
+ * Booking links (brief R6, R7; `booking-link.ts`): each alert carries the provider's booking
+ * page for what it found (the first full match, or the longest partial run with its dates),
+ * and every watch read (`get`, `list`, `watch:updated`) derives `bookingLink` the same way from
+ * the stored units while the result is found or partly found for the stay's own nights. The
+ * link is never stored.
  *
  * `execute` never throws for a failed check (only `NOT_FOUND`); after its `signal` aborts it
  * writes nothing, except a hold the provider already placed.
@@ -18,6 +29,7 @@ import {
   type AccountStatus,
   type ApiErrorCode,
   type Watch,
+  type WatchBookingLink,
   type WatchExecutionResult,
   type WatchHold,
   type WatchInput,
@@ -27,22 +39,65 @@ import {
 } from '@shared/types';
 import type { EventSink } from '@shared/contracts/events';
 import { WatchResult } from '@shared/types/common.types';
-import type { StayFieldUse } from '@shared/types/provider.types';
+import type { ProviderManifest, StayFieldUse } from '@shared/types/provider.types';
 import { toStayQuery, type StayInput } from '@shared/types/stay.types';
-import { compareDates, isCalendarDate, todayIn } from '@shared/utils/calendar-date';
+import { compareDates, eachNight, isCalendarDate, todayIn } from '@shared/utils/calendar-date';
+import { cleanUnitKinds } from '@shared/utils/unit-kinds';
 import type { WatchRepository } from '../../database/repositories';
 import type { ProviderRegistry, ProviderWith } from '../../providers/registry';
-import { isAbortError, ProviderCapabilityError, toApiError } from '../../providers/sdk/errors';
+import {
+  isAbortError,
+  isProviderBlock,
+  ProviderCapabilityError,
+  toApiError,
+} from '../../providers/sdk/errors';
+import { withRequestPriority } from '../../providers/sdk/pacing';
 import type { HoldSuccess } from '../../providers/sdk/provider';
+import { matchedStayLink } from '../booking-link';
 import { AppError } from '../../utils/app-error';
 import { logger } from '../../utils/logger';
 import type { NightGuard } from '../holds/night-guard';
 import type { NotificationService } from '../notifications/notification.service';
 import { resolveStayParams } from '../stay-params';
-import { fullMatches, partialMatches, wantedUnits } from './matching';
+import { fullMatches, kindsAmbiguous, longestRun, partialMatches, wantedUnits } from './matching';
 import { effectiveIntervalMinutes, nextCheckAt } from './next-check';
 
 const log = logger.child({ module: 'watches' });
+
+/**
+ * A check's answer, or failure, that was about the watch before an edit: nothing of it is
+ * kept (a provider's block aside), and the watch is due again since the edit.
+ */
+export const WATCH_EDITED_DURING_CHECK =
+  'The watch was changed while it was being checked. It checks again now.';
+
+/**
+ * What a check asks about: the place, the stay, the units, the stay types and the stay fields
+ * a check uses (every one but a field only for holds or snipes, which turning automatic holds
+ * on may fill in with its default), in a stable order. An edit to any of them makes the watch
+ * due at once (`update`).
+ */
+function checkedKey(watch: Watch, manifest: Pick<ProviderManifest, 'stayFields'>): string {
+  const notChecked = new Set(
+    (manifest.stayFields ?? [])
+      .filter((field) => !field.appliesTo.some((use) => use === 'watch' || use === 'availability'))
+      .map((field) => field.key)
+  );
+  const params = Object.entries(watch.stayParams)
+    .filter(([key]) => !notChecked.has(key))
+    .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0));
+  return JSON.stringify([
+    watch.location.externalId,
+    watch.stay,
+    watch.unitIds,
+    watch.unitKinds,
+    params,
+  ]);
+}
+
+/** Why an automatic hold was not placed at a place with more than one stay type. */
+const MIXED_KINDS_NOTE =
+  'Not held automatically: this place has more than one stay type. Choose one stay type or units to let WA Stay hold one.';
 
 /** The provider a watch runs on: one with availability. */
 export type WatchProvider = ProviderWith<'watches'>;
@@ -61,6 +116,11 @@ export interface WatchServiceDeps {
   events?: EventSink;
   /** The provider account's sign-in state (`provider_accounts.status` until V6). */
   accountState?: (providerId: string) => AccountStatus['state'];
+  /**
+   * The provider's holds are on through an experiment the person has turned off: they go when
+   * WA Stay restarts, and until then no automatic hold is placed (default: never).
+   */
+  holdsTurningOff?: (providerId: string) => boolean;
   clock?: () => Date;
   /** For the jitter; returns [0, 1). */
   random?: () => number;
@@ -81,6 +141,17 @@ function needsAccountForHolds(requirement: string): boolean {
   return requirement === 'required' || requirement === 'required-for-holds';
 }
 
+/** Whether the stored units' nights are exactly the stay's nights. */
+function coversStayNights(
+  units: NonNullable<Watch['lastAvailability']>,
+  stay: Watch['stay']
+): boolean {
+  if (!isCalendarDate(stay.arrival) || !isCalendarDate(stay.departure)) return false;
+  const stayNights = eachNight(stay.arrival, stay.departure);
+  const stored = new Set(units.flatMap((unit) => unit.nights.map((night) => night.date)));
+  return stored.size === stayNights.length && stayNights.every((night) => stored.has(night));
+}
+
 export class WatchService {
   private readonly repo: WatchRepository;
   private readonly providers: ProviderRegistry;
@@ -88,6 +159,7 @@ export class WatchService {
   private readonly nightGuard: NightGuard;
   private readonly events?: EventSink;
   private readonly accountState: (providerId: string) => AccountStatus['state'];
+  private readonly holdsTurningOff: (providerId: string) => boolean;
   private readonly clock: () => Date;
   private readonly random: () => number;
 
@@ -98,14 +170,16 @@ export class WatchService {
     this.nightGuard = deps.nightGuard;
     this.events = deps.events;
     this.accountState = deps.accountState ?? (() => 'unknown');
+    this.holdsTurningOff = deps.holdsTurningOff ?? (() => false);
     this.clock = deps.clock ?? (() => new Date());
     this.random = deps.random ?? Math.random;
   }
 
   /**
    * Creates a watch. Throws `ProviderCapabilityError` (`CAPABILITY`) when the provider has no
-   * watches, or no holds for `autoHold`; `UnknownProviderError` for an unknown provider. The
-   * new watch is due at once.
+   * watches, or no holds for `autoHold`; `VALIDATION` on `autoHold` while its holds are turning
+   * off (as a hold snipe is refused); `UnknownProviderError` for an unknown provider. The new
+   * watch is due at once.
    */
   async create(userId: number, input: WatchInput): Promise<Watch> {
     const provider = this.providers.require(input.providerId, 'watches');
@@ -113,6 +187,7 @@ export class WatchService {
     this.assertStay(provider, input.stay);
     const prepared: WatchInput = {
       ...input,
+      unitKinds: cleanUnitKinds(input.unitKinds),
       stayParams: resolveStayParams(
         provider.manifest,
         stayFieldUses(input.autoHold === true),
@@ -125,24 +200,29 @@ export class WatchService {
   }
 
   async get(id: number): Promise<Watch | null> {
-    return this.repo.findById(id);
+    const watch = this.repo.findById(id);
+    return watch ? this.present(watch) : null;
   }
 
   async list(userId: number, filter: WatchListFilter = {}): Promise<Watch[]> {
-    return this.repo.findByUserId(userId, filter);
+    return this.repo.findByUserId(userId, filter).map((watch) => this.present(watch));
   }
 
   /**
-   * Updates a watch. A change to what is checked (location, stay, units, stay fields) or to
-   * the interval makes it due at once.
+   * Updates a watch. A change to what is checked (location, stay, units, stay types, stay
+   * fields) or to the interval makes it due at once.
    */
   async update(id: number, updates: WatchUpdate): Promise<Watch> {
     const watch = this.require(id);
     const provider = this.providers.require(watch.providerId, 'watches');
     const autoHold = updates.autoHold ?? watch.autoHold;
-    if (updates.autoHold !== undefined) this.assertAutoHold(provider, updates.autoHold);
+    // A watch that holds already may keep doing so (as a hold snipe keeps its action)
+    if (updates.autoHold !== undefined) {
+      this.assertAutoHold(provider, updates.autoHold, { turningOn: !watch.autoHold });
+    }
     if (updates.stay) this.assertStay(provider, updates.stay);
     const prepared: WatchUpdate = { ...updates };
+    if (updates.unitKinds !== undefined) prepared.unitKinds = cleanUnitKinds(updates.unitKinds);
     if (updates.stayParams !== undefined || updates.autoHold !== undefined) {
       prepared.stayParams = resolveStayParams(
         provider.manifest,
@@ -151,10 +231,16 @@ export class WatchService {
       );
     }
     this.repo.update(id, prepared);
+    // Another place: the stored check (result, units) was the old place's, and would give the
+    // new one the old place's booking link, even while the watch is paused and not checked
+    if (updates.location && updates.location.externalId !== watch.location.externalId) {
+      this.repo.forgetLastCheck(id);
+    }
     const reschedule =
       updates.location !== undefined ||
       updates.stay !== undefined ||
       updates.unitIds !== undefined ||
+      updates.unitKinds !== undefined ||
       updates.stayParams !== undefined ||
       updates.checkIntervalMinutes !== undefined;
     if (reschedule) this.repo.setNextCheckAt(id, this.clock());
@@ -165,7 +251,9 @@ export class WatchService {
   async delete(id: number): Promise<boolean> {
     const last = this.repo.findById(id);
     const deleted = this.repo.deleteById(id);
-    if (deleted && last) this.events?.emit('watch:updated', { ...last, isActive: false });
+    if (deleted && last) {
+      this.events?.emit('watch:updated', this.present({ ...last, isActive: false }));
+    }
     return deleted;
   }
 
@@ -271,13 +359,17 @@ export class WatchService {
       }
 
       // One request: every unit, night by night. Wanted units are picked here, by id, name
-      // or an earlier id the provider recognises (`knownUnitIds` → `aliases`).
+      // or an earlier id the provider recognises (`knownUnitIds` → `aliases`), or by kind.
       const availability = await provider.availability.check(
         watch.location.externalId,
         toStayQuery(watch.stay, watch.stayParams),
         { signal, ...(watch.unitIds.length > 0 ? { knownUnitIds: [...watch.unitIds] } : {}) }
       );
       if (signal?.aborted) return result({ error: 'The check was stopped' });
+      // Edited while the provider answered (another place, stay, units, stay types or stay
+      // fields): the answer is about what the watch was, so nothing of it is kept or sent.
+      // The edit made the watch due at once, so the next check asks about what it is now.
+      if (this.editedSince(watch, manifest)) return result({ error: WATCH_EDITED_DURING_CHECK });
 
       const units = wantedUnits(watch, availability.units);
       const full = fullMatches(watch, units);
@@ -301,21 +393,26 @@ export class WatchService {
 
       let hold: WatchHold | undefined;
       if (full.length > 0) {
+        // The booking page for the unit an automatic hold takes, the first full match
+        const link = matchedStayLink(provider, watch, full[0], units)?.url;
         const outcome = watch.autoHold
-          ? await this.autoHold(watch, provider, full[0], signal)
+          ? await this.autoHold(watch, provider, full[0], kindsAmbiguous(watch, units), signal)
           : { note: undefined };
         hold = outcome.hold;
         // An automatic hold that was not placed says why (the run itself succeeded)
         if (!hold && outcome.note) this.repo.setLastError(watchId, outcome.note);
         if (hold) {
-          await this.notifications.notifyWatchHeld(watch, hold, full[0].unitName);
+          await this.notifications.notifyWatchHeld(watch, hold, full[0], link);
         } else {
           if (signal?.aborted) return result({ error: 'The check was stopped' });
-          await this.notifications.notifyWatchFound(watch, full, outcome.note);
+          await this.notifications.notifyWatchFound(watch, full, outcome.note, link);
           if (watch.notifyOnly) this.repo.deactivate(watchId);
         }
       } else if (partial.length > 0) {
-        await this.notifications.notifyWatchPartialFound(watch, partial);
+        // The run the alert names, with its own dates
+        const run = longestRun(partial);
+        const link = run ? matchedStayLink(provider, watch, run, units)?.url : undefined;
+        await this.notifications.notifyWatchPartialFound(watch, partial, link);
         if (watch.notifyOnly) this.repo.deactivate(watchId);
       }
 
@@ -331,6 +428,13 @@ export class WatchService {
     } catch (error) {
       if (signal?.aborted || isAbortError(error)) {
         return result({ error: 'The check was stopped' });
+      }
+      // Edited while the provider answered: the failure was about what the watch was, so it
+      // is not kept, and the watch (due again since the edit) checks what it is now. A block
+      // (HTTP 403 or 429) is the provider's whatever was asked, so it is kept, and the next
+      // check waits the watch's interval rather than asking again at once.
+      if (!isProviderBlock(error) && this.editedSince(watch, manifest)) {
+        return result({ error: WATCH_EDITED_DURING_CHECK });
       }
       const { code, message } = toApiError(error);
       // A provider behind its queue is an error for this run: watches never wait in a queue.
@@ -349,6 +453,15 @@ export class WatchService {
 
   // ---- internal helpers -------------------------------------------------------
 
+  /**
+   * Whether what a check asks about (`checkedKey`) has changed since `before` was read, or the
+   * watch is gone.
+   */
+  private editedSince(before: Watch, manifest: Pick<ProviderManifest, 'stayFields'>): boolean {
+    const now = this.repo.findById(before.id);
+    return !now || checkedKey(now, manifest) !== checkedKey(before, manifest);
+  }
+
   private require(id: number): Watch {
     const watch = this.repo.findById(id);
     if (!watch) throw new AppError('NOT_FOUND', 'Watch not found');
@@ -361,20 +474,77 @@ export class WatchService {
    */
   private emitChanged(id: number): void {
     const watch = this.repo.findById(id);
-    if (watch) this.events?.emit('watch:updated', watch);
+    if (watch) this.events?.emit('watch:updated', this.present(watch));
   }
 
   /** Emits `watch:updated` with the stored watch, and returns it. */
   private changed(id: number): Watch {
-    const watch = this.repo.findById(id);
-    if (!watch) throw new AppError('NOT_FOUND', 'Watch not found');
+    const stored = this.repo.findById(id);
+    if (!stored) throw new AppError('NOT_FOUND', 'Watch not found');
+    const watch = this.present(stored);
     this.events?.emit('watch:updated', watch);
     return watch;
   }
 
-  private assertAutoHold(provider: WatchProvider, autoHold: boolean | undefined): void {
-    if (autoHold && provider.manifest.capabilities.holds !== true) {
-      throw new ProviderCapabilityError(provider.manifest.id, 'holds');
+  /**
+   * The watch as the renderer gets it: with its booking link, when it has one. A stored check
+   * that cannot be read (a malformed row) gives no link, never a failed read.
+   */
+  private present(watch: Watch): Watch {
+    let bookingLink: WatchBookingLink | undefined;
+    try {
+      bookingLink = this.bookingLinkOf(watch);
+    } catch (error) {
+      log.debug(
+        `Watch ${watch.id}: no booking link, its last check could not be read (${error instanceof Error ? error.name : 'error'})`
+      );
+    }
+    return bookingLink ? { ...watch, bookingLink } : watch;
+  }
+
+  /**
+   * The booking link for what the last check found, from its stored units, as the alert had
+   * it: for a found watch the first full match, for a partly found one the longest run. None
+   * for any other result, for stored nights that are not the stay's (the stay was edited
+   * since), or for a provider that is no longer registered.
+   */
+  private bookingLinkOf(watch: Watch): WatchBookingLink | undefined {
+    const { lastResult, lastAvailability } = watch;
+    if (lastResult !== WatchResult.FOUND && lastResult !== WatchResult.PARTIAL_FOUND) {
+      return undefined;
+    }
+    if (!lastAvailability || !coversStayNights(lastAvailability, watch.stay)) return undefined;
+    const provider = this.providers.tryGet(watch.providerId);
+    if (!provider) return undefined;
+    const units = wantedUnits(watch, lastAvailability);
+    const match =
+      lastResult === WatchResult.FOUND
+        ? fullMatches(watch, units)[0]
+        : longestRun(partialMatches(watch, units));
+    // Quiet: this runs on every read; the alert already logged what it refused
+    return match ? matchedStayLink(provider, watch, match, units, { quiet: true }) : undefined;
+  }
+
+  /**
+   * `autoHold` needs the provider's holds (`CAPABILITY`). Turning it on (a new watch, or an
+   * edit from off) also needs holds that are not turning off: `VALIDATION` on `autoHold` then,
+   * as a new hold snipe is refused (`assertAction`), since the watch would hold nothing before
+   * the restart.
+   */
+  private assertAutoHold(
+    provider: WatchProvider,
+    autoHold: boolean | undefined,
+    { turningOn = true }: { turningOn?: boolean } = {}
+  ): void {
+    if (!autoHold) return;
+    const { id, shortName, capabilities } = provider.manifest;
+    if (capabilities.holds !== true) throw new ProviderCapabilityError(id, 'holds');
+    if (turningOn && this.holdsTurningOff(id)) {
+      throw new AppError(
+        'VALIDATION',
+        `Automatic holds on ${shortName} are turning off, so turn off the automatic hold`,
+        { issues: ['autoHold'] }
+      );
     }
   }
 
@@ -421,18 +591,32 @@ export class WatchService {
 
   /**
    * Places the auto-hold on `match`'s unit, or says (as a sentence for the found notification)
-   * why it did not.
+   * why it did not. `mixedKinds`: the watch names no units and wants units of more than one
+   * kind, so it holds nothing.
    */
   private async autoHold(
     watch: Watch,
     provider: WatchProvider,
     match: WatchMatch,
+    mixedKinds: boolean,
     signal: AbortSignal | undefined
   ): Promise<{ hold?: WatchHold; note?: string }> {
     const { manifest } = provider;
     const signInNote = `Sign in to ${manifest.shortName} to enable automatic holds`;
     if (!provider.holds || manifest.capabilities.holds !== true) {
-      return { note: `${manifest.shortName} cannot hold sites automatically` };
+      return { note: `${manifest.shortName} cannot hold automatically` };
+    }
+    if (this.holdsTurningOff(watch.providerId)) {
+      log.info(
+        `Watch ${watch.id}: no automatic hold, holds on ${watch.providerId} are turning off`
+      );
+      return {
+        note: `Automatic holds on ${manifest.shortName} are turning off. Restart WA Stay.`,
+      };
+    }
+    if (mixedKinds) {
+      log.info(`Watch ${watch.id}: no automatic hold, more than one stay type`);
+      return { note: MIXED_KINDS_NOTE };
     }
     if (
       needsAccountForHolds(manifest.capabilities.account) &&
@@ -457,14 +641,18 @@ export class WatchService {
       };
     }
 
+    const holds = provider.holds;
     try {
-      const hold = await provider.holds.create(
-        {
-          externalId: watch.location.externalId,
-          unitId: match.unitId,
-          stay: toStayQuery(watch.stay, watch.stayParams),
-        },
-        signal
+      // Interactive (R18): the hold goes ahead of the provider's background requests
+      const hold = await withRequestPriority('interactive', () =>
+        holds.create(
+          {
+            externalId: watch.location.externalId,
+            unitId: match.unitId,
+            stay: toStayQuery(watch.stay, watch.stayParams),
+          },
+          signal
+        )
       );
       if (!hold.ok) {
         log.info(`Watch ${watch.id}: automatic hold refused (${hold.reason})`);
@@ -481,6 +669,7 @@ export class WatchService {
         this.repo.markHeld(watch.id, {
           reference: placed.reference,
           expiresAt: hold.expiresAt,
+          ...(placed.expiresEstimated ? { expiresEstimated: true } : {}),
           unitId: placed.unitId,
           paymentUrl: placed.paymentUrl,
         });
@@ -501,6 +690,7 @@ export class WatchService {
     return {
       reference: hold.reference,
       expiresAt: hold.expiresAt.toISOString(),
+      ...(hold.expiresAtEstimated === true ? { expiresEstimated: true } : {}),
       unitId: hold.unitId ?? match.unitId,
       paymentUrl: provider.holds?.paymentUrl(hold) ?? provider.manifest.website,
     };

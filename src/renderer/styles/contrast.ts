@@ -60,7 +60,12 @@ export const CONTRAST_PAIRS: readonly ContrastPair[] = [
   pair('fg-inverse', 'brand', 'text', 'Text on a solid brand fill (checked control)'),
   pair('warning-fg', 'warning-subtle', 'text', 'Warning notice, not-yet-released nights'),
   pair('warning-fg', 'sun-subtle', 'text', '"Soon" pill, sun badge'),
-  pair('warning-fg', 'surface', 'text', 'Release times and warning text on cards'),
+  pair(
+    'warning-fg',
+    'surface',
+    'text',
+    'Release times, warning text on cards, nights refused by stay rules'
+  ),
   pair('available-fg', 'available-subtle', 'text', 'Available badge and notice'),
   pair('available-fg', 'surface', 'text', 'Available text on cards and tables'),
   pair('available', 'available-subtle', 'text', 'Available night glyph'),

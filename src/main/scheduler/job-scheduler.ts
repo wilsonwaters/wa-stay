@@ -130,6 +130,16 @@ export class JobScheduler {
     this.watchLoop.kick();
   }
 
+  /**
+   * Re-arms the provider's snipes that time their release from what changed (the person's
+   * saved details for it; `SnipeRunner.rearmProvider`), so each asks for its instant again.
+   * Nothing for other providers, the watches or the retention job.
+   */
+  rearmSnipes(providerId: string): void {
+    if (!this.running) return;
+    this.snipeRunner.rearmProvider(providerId);
+  }
+
   // ---- retention ----------------------------------------------------------------
 
   /** Deletes old notifications and delivery logs now, or joins the run in flight. */

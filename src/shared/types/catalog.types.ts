@@ -11,10 +11,12 @@ import {
   BookingModeSchema,
   LocationKindSchema,
   ProviderIdSchema,
+  UnitKindSchema,
   type BookingMode,
   type BulkAvailabilityEntry,
   type LocationKind,
   type ProviderId,
+  type UnitKind,
 } from './provider.types';
 
 export interface LocationSummary {
@@ -32,6 +34,11 @@ export interface LocationSummary {
   /** Absolute https URLs. */
   imageUrls: string[];
   amenities: string[];
+  /**
+   * What a person can sleep in here, one or more. A provider may leave it out: the catalogue
+   * then derives it from `kind` (`deriveUnitKinds`), so every location main returns has it.
+   */
+  unitKinds?: UnitKind[];
   unitCount?: number;
   infoUrl?: string;
   /** A date-less booking link. Prefer `LocationAvailability.bookingUrl` once dates are known. */
@@ -43,6 +50,8 @@ export interface UnitSummary {
   unitId: string;
   unitName: string;
   unitType?: string;
+  /** What the unit is, when the provider says. */
+  unitKind?: UnitKind;
   /** The fewest people the unit is booked for, when the provider says. */
   minPeople?: number;
   maxPeople?: number;
@@ -51,6 +60,11 @@ export interface UnitSummary {
   amenities?: string[];
   /** Plain text, never HTML: shown as text. */
   description?: string;
+  /**
+   * The usual fewest nights a stay must have, for the watch and snipe stay steps' warning. Leave
+   * it out where the minimum depends on the dates: the night grid explains it after a check.
+   */
+  minNights?: number;
 }
 
 /**
@@ -108,6 +122,13 @@ export interface LocationDetail extends LocationSummary {
   /** Documents about the location (its map), opened by main; absent when there are none. */
   documents?: LocationDocument[];
   units: UnitSummary[];
+  /**
+   * Each unit is a type the provider books by, standing for several places to stay (RAC's
+   * categories, whose free sites a check counts in `UnitAvailability.freeCount`), not one place
+   * to stay. The place page then lists them as types ("Bookable as 6 spot types") and never
+   * counts them as units, which would contradict the free count beside them.
+   */
+  unitsAreTypes?: boolean;
   /** A human sentence, e.g. "Bookings open 180 days ahead at midnight AWST". */
   releaseInfo?: string;
   /** ISO timestamp the detail was fetched from the provider. */
@@ -129,6 +150,8 @@ export interface CatalogQuery {
   text?: string;
   providerIds?: ProviderId[];
   kinds?: LocationKind[];
+  /** Places with any of these unit kinds. */
+  unitKinds?: UnitKind[];
   regions?: string[];
   amenities?: string[];
   bookingModes?: BookingMode[];
@@ -157,6 +180,8 @@ export interface CatalogSearchResult {
     regions: FacetCount[];
     amenities: FacetCount[];
     kinds: FacetCount[];
+    /** Places per unit kind; a place with several kinds counts once in each. */
+    unitKinds: FacetCount[];
     providers: FacetCount[];
   };
 }
@@ -236,6 +261,7 @@ export const CatalogQuerySchema = z.object({
   text: z.string().max(200).optional(),
   providerIds: z.array(ProviderIdSchema).optional(),
   kinds: z.array(LocationKindSchema).optional(),
+  unitKinds: z.array(UnitKindSchema).optional(),
   regions: z.array(z.string()).optional(),
   amenities: z.array(z.string()).optional(),
   bookingModes: z.array(BookingModeSchema).optional(),

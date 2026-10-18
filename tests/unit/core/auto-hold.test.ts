@@ -1,15 +1,19 @@
 /**
  * Watch auto-hold (PQ4, architecture-notes §12.4): on a full match a watch with `autoHold`
  * places exactly one hold on the first matching unit, notifies like a snipe and stops;
- * signed out (when the provider needs an account for holds) or blocked by another hold on
- * the same nights, it notifies a normal match instead.
+ * signed out (when the provider needs an account for holds), blocked by another hold on the
+ * same nights, or asked for "any unit" at a place with more than one stay type, it notifies a
+ * normal match instead.
  */
 
+import type { UnitKind } from '@shared/types';
 import { SnipeReleaseMode, WatchResult } from '@shared/types/common.types';
 import { createCoreHarness, fakeDateOnly, type CoreHarness } from '@tests/utils/core-harness';
 import { createFakeProvider } from '@tests/utils/fake-provider';
 
 const NOW = new Date('2026-10-04T02:00:00.000Z');
+/** The fake provider's booking page for the harness watch's stay (`links.booking`). */
+const BOOKING_URL = 'https://fake.example/book/1?arrival=2026-12-01&departure=2026-12-04';
 
 describe('watch auto-hold', () => {
   let h: CoreHarness;
@@ -46,10 +50,12 @@ describe('watch auto-hold', () => {
       isActive: false,
       lastResult: WatchResult.HELD,
     });
+    // With the public booking page, for the email's fallback
     expect(h.notifications.notifyWatchHeld).toHaveBeenCalledWith(
       expect.objectContaining({ id: watch.id }),
       result.hold,
-      'Site u1'
+      expect.objectContaining({ unitName: 'Site u1' }),
+      BOOKING_URL
     );
     expect(h.notifications.notifyWatchFound).not.toHaveBeenCalled();
 
@@ -112,7 +118,8 @@ describe('watch auto-hold', () => {
     expect(h.notifications.notifyWatchFound).toHaveBeenCalledWith(
       expect.objectContaining({ id: watch.id }),
       expect.any(Array),
-      'Sign in to Fake to enable automatic holds'
+      'Sign in to Fake to enable automatic holds',
+      BOOKING_URL
     );
     expect(h.watchRepo.findById(watch.id)?.lastResult).toBe(WatchResult.FOUND);
   });
@@ -142,6 +149,84 @@ describe('watch auto-hold', () => {
 
     expect(holdCalls()).toHaveLength(0);
     expect(h.notifications.notifyWatchFound.mock.calls[0][2]).toMatch(/one booking per night/);
+  });
+
+  describe('at a place with more than one stay type', () => {
+    // A free campsite listed first, then a free cabin and a booked dorm bed
+    const mixedPlace: Parameters<typeof createFakeProvider>[0] = {
+      availability: { '1': { s1: 'available', c1: 'available', d1: 'booked' } },
+      unitKinds: { s1: 'campsite', c1: 'cabin', d1: 'dorm' },
+    };
+    const MIXED_NOTE =
+      'Not held automatically: this place has more than one stay type. Choose one stay type or units to let WA Stay hold one.';
+
+    /** Spies on the provider's holds.create and the night guard; returns both spies. */
+    function spies() {
+      return {
+        create: jest.spyOn(h.registry.get('fake').holds!, 'create'),
+        reserve: jest.spyOn(h.nightGuard, 'tryReserve'),
+      };
+    }
+
+    it.each<[string, UnitKind[] | undefined]>([
+      ['no units and no kind', undefined],
+      ['two kinds', ['campsite', 'dorm']],
+    ])('with %s: no hold, the note in the found notification and lastError', async (_, kinds) => {
+      setUp(mixedPlace);
+      const { create, reserve } = spies();
+      const watch = await h.watches.create(
+        h.userId,
+        h.watchInput({ autoHold: true, ...(kinds ? { unitKinds: kinds } : {}) })
+      );
+      const result = await h.watches.execute(watch.id);
+
+      expect(create).not.toHaveBeenCalled();
+      expect(reserve).not.toHaveBeenCalled();
+      expect(result).toMatchObject({ success: true, found: true });
+      expect(result.hold).toBeUndefined();
+      expect(h.notifications.notifyWatchFound).toHaveBeenCalledWith(
+        expect.objectContaining({ id: watch.id }),
+        expect.any(Array),
+        MIXED_NOTE,
+        BOOKING_URL
+      );
+      expect(h.notifications.notifyWatchHeld).not.toHaveBeenCalled();
+      expect(h.watchRepo.findById(watch.id)).toMatchObject({
+        lastResult: WatchResult.FOUND,
+        lastError: MIXED_NOTE,
+      });
+      expect(h.watchRepo.findById(watch.id)?.hold).toBeUndefined();
+    });
+
+    it('with one kind: holds a unit of that kind, as today', async () => {
+      setUp(mixedPlace);
+      const { create } = spies();
+      const watch = await h.watches.create(
+        h.userId,
+        h.watchInput({ autoHold: true, unitKinds: ['cabin'] })
+      );
+      const result = await h.watches.execute(watch.id);
+
+      expect(create).toHaveBeenCalledTimes(1);
+      expect(create.mock.calls[0][0]).toMatchObject({ unitId: 'c1' });
+      expect(result.hold).toMatchObject({ reference: 'FAKE-1', unitId: 'c1' });
+      expect(h.watchRepo.findById(watch.id)).toMatchObject({ lastResult: WatchResult.HELD });
+      expect(h.watchRepo.findById(watch.id)?.lastError).toBeUndefined();
+    });
+
+    it('with units named (kinds not applied): holds the first named unit, as today', async () => {
+      setUp(mixedPlace);
+      const { create } = spies();
+      const watch = await h.watches.create(
+        h.userId,
+        h.watchInput({ autoHold: true, unitIds: ['s1', 'c1'], unitKinds: ['dorm'] })
+      );
+      await h.watches.execute(watch.id);
+
+      expect(create).toHaveBeenCalledTimes(1);
+      expect(create.mock.calls[0][0]).toMatchObject({ unitId: 's1' });
+      expect(h.watchRepo.findById(watch.id)?.lastResult).toBe(WatchResult.HELD);
+    });
   });
 
   it('autoHold is rejected at create on a provider without holds', async () => {

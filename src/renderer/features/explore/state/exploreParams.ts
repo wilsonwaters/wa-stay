@@ -5,7 +5,8 @@
  * | Key | Value |
  * | --- | --- |
  * | `q` | search text |
- * | `providers`, `kinds`, `regions`, `amenities` | comma lists |
+ * | `providers`, `regions`, `amenities` | comma lists |
+ * | `stay` | comma list of stay types (`campsite`, `cabin`, `room`, `dorm`, `glamping`) |
  * | `online` | `1`: bookable online only |
  * | `arrival`, `departure` | `YYYY-MM-DD` |
  * | `adults`, `children`, `infants` | whole numbers |
@@ -15,12 +16,14 @@
  * | `view` | `map` or `list`, the pane shown below 1024 px |
  * | `sel` | the selected location key |
  *
- * Values that are not valid are dropped. Keys this module does not know are left alone.
+ * Values that are not valid are dropped. Keys this module does not know are left alone, except
+ * `kinds` (the location "Type" filter that `stay` replaced), which is dropped.
  */
 
-import { LOCATION_KINDS, type LocationKind } from '../../../../shared/types/provider.types';
+import type { UnitKind } from '../../../../shared/types/provider.types';
 import { compareDates, isCalendarDate } from '../../../../shared/utils/calendar-date';
 import { isLocationKey } from '../../../../shared/utils/location-key';
+import { isStayType } from '../../../app/stayParams';
 import { DEFAULT_GUEST_LIMITS } from '../../../components/ui/GuestsField';
 
 export interface MapCamera {
@@ -35,7 +38,8 @@ export type ExploreView = 'map' | 'list';
 export interface ExploreParams {
   q: string;
   providers: string[];
-  kinds: LocationKind[];
+  /** The stay types chosen (`stay`): places with any of these unit kinds. Never `other`. */
+  stayTypes: UnitKind[];
   regions: string[];
   amenities: string[];
   /** Bookable online only (`bookingModes: ['online']`). */
@@ -58,7 +62,7 @@ export interface ExploreParams {
 export const DEFAULT_EXPLORE_PARAMS: Readonly<ExploreParams> = Object.freeze({
   q: '',
   providers: [],
-  kinds: [],
+  stayTypes: [],
   regions: [],
   amenities: [],
   online: false,
@@ -90,7 +94,7 @@ export interface KnownValues {
 export const EXPLORE_KEYS = [
   'q',
   'providers',
-  'kinds',
+  'stay',
   'regions',
   'amenities',
   'online',
@@ -108,7 +112,11 @@ export const EXPLORE_KEYS = [
 
 type ExploreKey = (typeof EXPLORE_KEYS)[number];
 const OWN_KEYS = new Set<string>(EXPLORE_KEYS);
-const LIST_KEYS = new Set<string>(['providers', 'kinds', 'regions', 'amenities']);
+/** Keys Explore no longer reads, dropped from the address: `kinds` was the "Type" filter. */
+const RETIRED_KEYS = new Set<string>(['kinds']);
+/** The comma-list keys and the fields they hold. */
+const LIST_KEYS: Partial<Record<ExploreKey, 'providers' | 'stayTypes' | 'regions' | 'amenities'>> =
+  { providers: 'providers', stay: 'stayTypes', regions: 'regions', amenities: 'amenities' };
 const MAX_TEXT = 200;
 
 /** One `key=value` pair as written in the query, still encoded. */
@@ -179,14 +187,16 @@ export interface ParsedExploreParams {
 
 /**
  * Reads Explore's state from a query string (`?q=bay&regions=Pilbara`). Invalid values are
- * dropped: a bad date, a guest count out of range, an unknown kind, a region or provider not
- * in `known`. An arrival on or after the departure drops both dates.
+ * dropped: a bad date, a guest count out of range, an unknown stay type (or `other`), a region
+ * or provider not in `known`. An arrival on or after the departure drops both dates. A stay
+ * type no place has is kept. `kinds` is dropped.
  */
 export function parseExploreParams(search: string, known: KnownValues = {}): ParsedExploreParams {
   const pairs = rawPairs(search);
   const first = new Map<string, string>();
   const others: RawPair[] = [];
   for (const pair of pairs) {
+    if (RETIRED_KEYS.has(pair.key)) continue;
     if (!OWN_KEYS.has(pair.key)) others.push(pair);
     else if (!first.has(pair.key)) first.set(pair.key, pair.raw);
   }
@@ -202,9 +212,7 @@ export function parseExploreParams(search: string, known: KnownValues = {}): Par
   if (q !== undefined) params.q = decode(q).trim().slice(0, MAX_TEXT);
 
   params.providers = onlyKnown(getList('providers'), known.providers);
-  params.kinds = getList('kinds').filter((kind): kind is LocationKind =>
-    (LOCATION_KINDS as readonly string[]).includes(kind)
-  );
+  params.stayTypes = getList('stay').filter(isStayType);
   params.regions = onlyKnown(getList('regions'), known.regions);
   params.amenities = onlyKnown(getList('amenities'), known.amenities);
   params.online = get('online') === '1';
@@ -245,10 +253,12 @@ function withForeign(own: string, others: RawPair[]): string {
 
 /**
  * The query string for `params`, keeping any keys in `search` that Explore does not own
- * (another feature's, or the DEV `devFixture`) after Explore's own.
+ * (another feature's, or the DEV `devFixture`) after Explore's own. `kinds` is dropped.
  */
 export function replaceExploreParams(search: string, params: ExploreParams): string {
-  const others = rawPairs(search).filter((pair) => !OWN_KEYS.has(pair.key));
+  const others = rawPairs(search).filter(
+    (pair) => !OWN_KEYS.has(pair.key) && !RETIRED_KEYS.has(pair.key)
+  );
   return withForeign(serialiseExploreParams(params), others);
 }
 
@@ -271,8 +281,9 @@ export function serialiseExploreParams(params: ExploreParams): string {
   const add = (key: ExploreKey, value: string) => out.push(`${key}=${value}`);
 
   for (const key of EXPLORE_KEYS) {
-    if (LIST_KEYS.has(key)) {
-      const values = params[key as 'providers' | 'kinds' | 'regions' | 'amenities'];
+    const field = LIST_KEYS[key];
+    if (field) {
+      const values = params[field];
       if (values.length) add(key, values.map(encodeValue).join(','));
       continue;
     }
@@ -319,7 +330,7 @@ export function serialiseExploreParams(params: ExploreParams): string {
 export function hasActiveFilters(params: ExploreParams): boolean {
   return (
     params.providers.length > 0 ||
-    params.kinds.length > 0 ||
+    params.stayTypes.length > 0 ||
     params.regions.length > 0 ||
     params.amenities.length > 0 ||
     params.online

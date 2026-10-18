@@ -11,14 +11,20 @@ One folder per provider id, each with a `manifest.json` and the response files i
 
 ```
 http/
-└── parkstay/
+├── parkstay/
+│   ├── manifest.json
+│   ├── campground_map.json      # the catalogue the app syncs 5 s after launch (V5), Explore's places (E1)
+│   ├── campground_availabilty_view.json   # every campground's free sites for any stay, Explore's dates (E3)
+│   ├── campsite_availablity_view_20.json  # Bungarra's sites and description, for its detail page (E2) and a new watch's first check (U1)
+│   ├── campground_page_20.html  # Bungarra's campground page: its About's notices and sections (E2, PD2)
+│   ├── profile-signed-out.json  # /api/profile signed out (403), the account check at launch (V6)
+│   └── queue-active.json        # the DBCA queue letting the session through, before a payment window (V6)
+└── rac/
     ├── manifest.json
-    ├── campground_map.json      # the catalogue the app syncs 5 s after launch (V5), Explore's places (E1)
-    ├── campground_availabilty_view.json   # every campground's free sites for any stay, Explore's dates (E3)
-    ├── campsite_availablity_view_20.json  # Bungarra's sites and description, for its detail page (E2) and a new watch's first check (U1)
-    ├── campground_page_20.html  # Bungarra's campground page: its About's notices and sections (E2, PD2)
-    ├── profile-signed-out.json  # /api/profile signed out (403), the account check at launch (V6)
-    └── queue-active.json        # the DBCA queue letting the session through, before a payment window (V6)
+    ├── book-now-busselton.html       # RAC Busselton Holiday Park's categories, for its page
+    ├── book-now-margaret-river.html  # RAC Margaret River Nature Park's categories (dorms, a safari tent)
+    ├── availability-busselton-2026-11-06-2n.json  # Busselton's availability, 6–8 Nov 2026
+    └── availability-<park>-2026-11-06-2n.json     # the seven other parks', for the same stay
 ```
 
 A provider with no folder, or no routes, answers every request with an error.
@@ -50,6 +56,7 @@ Accounts opens; without the route the request is refused and logged, and the pre
       "query": { "gear_type": "all" },
       "file": "availability.json"
     },
+    { "method": "POST", "path": "/api/availability/", "form": { "park": "3" }, "file": "park-3.json" },
     { "method": "GET", "path": "/queue", "status": 200, "file": "queue.html", "contentType": "text/html" }
   ]
 }
@@ -60,15 +67,20 @@ Accounts opens; without the route the request is refused and logged, and the pre
 | `method` | `GET`, `HEAD`, `POST`, `PUT`, `PATCH` or `DELETE`. |
 | `path` | The URL path, exactly, trailing slash included. The host is not compared. |
 | `query` | Optional. Every parameter listed must have exactly this value; parameters not listed may have any value. Without `query`, any query string matches. |
+| `form` | Optional. The request's body, read as a form (`application/x-www-form-urlencoded`, what `postForm` sends), must have every field listed with exactly this value (a string); fields not listed may have any value. A route with `form` never matches a request without a body, so POSTs to one path are told apart by their form. Without `form`, any body matches. With both `query` and `form`, both must match. |
 | `status` | Optional, default 200. |
 | `file` | The response body, relative to the provider's folder. |
 | `contentType` | Optional. Defaults from the extension: `.json` → `application/json`, `.html` → `text/html`, anything else → `text/plain`. |
 
-The first matching route wins, so put specific routes (with `query`) before general ones.
+The first matching route wins, so put specific routes (with `query` or `form`) before general
+ones.
 
 A request that no route matches is not sent. It fails with `no fixture for GET <url>; add a
-route to <manifest>`, and is appended to `<userData>/e2e-unexpected-requests.log`. A failed
-test attaches that log as `unexpected-requests`, which lists exactly the routes to add.
+route to <manifest>` (for a request with a body, `no fixture for POST <url> with form fields
+<names>`: the names only, as the error can reach the app's log), and is appended to
+`<userData>/e2e-unexpected-requests.log`, with its `form` fields and their values when it had a
+body. A failed test attaches that log as `unexpected-requests`, which lists exactly the routes
+to add.
 
 ## Provenance and rules
 
@@ -96,7 +108,8 @@ test attaches that log as `unexpected-requests`, which lists exactly the routes 
 - **ParkStay, E2 and U1**: `campsite_availablity_view_20.json` is the Jest fixture
   `tests/fixtures/parkstay/campsite_availablity_view_20.json` (the public per-campground view
   for Bungarra, campground 20), copied unchanged; it answers Bungarra's detail page and a new
-  watch's first check, for any dates. `profile-signed-out.json` is Django REST Framework's standard 403
+  watch's first check, for any dates. `alert-snipe.spec.ts` launches on a copy moved to its own
+  dates (`support/dated-fixtures.ts`), where sites 3 to 5 are free for both nights. `profile-signed-out.json` is Django REST Framework's standard 403
   body for `GET /api/profile` without a session, which the account service's startup check (V6)
   sends 5 s after launch; it is written by hand, not recorded, and holds no personal data.
 - **ParkStay, the campground page** (PD2): `campground_page_20.html` is the Jest fixture
@@ -111,6 +124,52 @@ test attaches that log as `unexpected-requests`, which lists exactly the routes 
   `queue.dbca.wa.gov.au`'s `GET /api/check-create-session/` (`queue_group=parkstayv2`; the host
   is not compared). "Pay now" passes the queue before it opens the payment window, so the
   held-snipe journey needs it; its session key is made up.
+
+- **RAC Parks & Resorts** (`rac/`): RAC's parks are a seed in the module, so the catalogue
+  sync sends nothing; a park's page reads its book-now page. `book-now-busselton.html` and
+  `book-now-margaret-river.html` are the Jest fixtures in `tests/fixtures/providers/rac/`,
+  copied unchanged: the public `/<park>/book-now/` pages, fetched anonymously on 16 Oct 2026
+  and trimmed to the type filter, the equipment list, a few dated notices (booking rules, no
+  phone numbers) and some categories' facts. RAC's photos are replaced by placeholder addresses
+  on NewBook's image host and its descriptions by "Placeholder description.", with no script,
+  menu, footer, price or marketing copy (RAC's terms, rule 7;
+  `tests/unit/providers/rac-fixtures.test.ts` checks every file here). The other parks' pages
+  have no route: the Explore journey (`rac-catalogue.spec.ts`) opens Margaret River, and the
+  preview opens the first park, Busselton.
+- **RAC, availability**: `availability-busselton-2026-11-06-2n.json` is the Jest fixture
+  `tests/fixtures/providers/rac/availability-busselton-2026-11-06-2n.json`, copied unchanged:
+  RAC's answer to the availability POST its own book-now page sends (`availability-ajax.php`,
+  `blog_id` 6, 6–8 Nov 2026, 2 adults), fetched anonymously on 16 Oct 2026 and trimmed to the
+  fields WA Stay reads (codes, counts, amounts, rates' labels, minimums and closed days, and
+  `online_booking_url`), with the NewBook key and every cart address `<redacted>`. Its route
+  matches `blog_id` (`form`), for any dates. `rac-watch.spec.ts` launches on a copy moved
+  to its own dates (`support/dated-fixtures.ts`); the preview answers it with
+  `PREVIEW_ARRIVAL=2026-11-06`.
+- **RAC, Explore's free counts** (R11): Explore asks every park once, so every park has an
+  answer, routed by its `blog_id` alone (`form`), for any dates. Busselton's is the recorded one
+  above. The seven others, `availability-<park>-2026-11-06-2n.json`, are RAC's answers for the
+  same stay (6–8 Nov 2026, 2 adults), recorded anonymously on 17 Oct 2026 between 16:39 and
+  16:41 Perth, one POST per park at least 12 s after the one before, with curl's default user
+  agent and the headers RAC's own page sends, and trimmed the same way: 3 or 4 of each park's
+  categories (the `_fixture` note says how many of how many), the NewBook key and cart addresses
+  `<redacted>`. They are the Jest fixtures in `tests/fixtures/providers/rac/`, copied unchanged.
+  Between them: spots free at every park, cabins free at Cable Beach and Esperance and booked out
+  elsewhere, a cabin closed for the stay (Exmouth, stop sold), minimum stays (the "Stay & Save"
+  rates) and every stay type. `rac-explore.spec.ts` launches on a copy moved to tomorrow
+  (`support/dated-fixtures.ts`, which moves a route by `blog_id` alone from its answer's first
+  night). The preview shows RAC's free counts for the recorded stay:
+
+  ```bash
+  npm run build:e2e
+  xvfb-run -a npx cross-env PREVIEW_PROVIDER=rac PREVIEW_ARRIVAL=2026-11-06 playwright test preview-provider
+  ```
+
+  Use it on or before 5 Nov 2026: on 6 Nov the stay has begun, and from 7 Nov the preview refuses
+  the date (no arrival before today in Perth). Later, the preview still passes on
+  its default dates, but RAC's answers cover none of their nights, so every park reads "No spot
+  free every night". To see counts again, record the eight answers for a later stay (anonymous,
+  read-only, one POST at least 10 s after another, trimmed as above, never a cart address), or
+  move their dates as `writeDatedFixtures` (`support/dated-fixtures.ts`) does for the journeys.
 
 ## Refreshing a fixture
 

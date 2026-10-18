@@ -26,6 +26,33 @@ describe('resultSummary', () => {
     expect(resultSummary(watch, SITES)).toBe('2 sites available');
   });
 
+  it('counts a unit as the night grid does, not by its fullyAvailable flag (R8)', () => {
+    const refused = makeUnit('2', NIGHTS, ['available', 'available'], {
+      nights: NIGHTS.map((date) => ({ date, state: 'available', reason: 'min-stay' })),
+    });
+    const watch = makeWatch({
+      ...checked,
+      lastResult: WatchResult.FOUND,
+      lastAvailability: [makeUnit('1', NIGHTS), refused],
+    });
+    expect(refused.fullyAvailable).toBe(true);
+    expect(resultSummary(watch, SITES)).toBe('1 site available');
+  });
+
+  it('counts the units a free unit stands for, as Explore counts them (RAC: sites of a category)', () => {
+    const watch = makeWatch({
+      ...checked,
+      lastResult: WatchResult.FOUND,
+      lastAvailability: [
+        makeUnit('cat:4', NIGHTS, undefined, { unitName: 'Powered Site', freeCount: 51 }),
+        makeUnit('cat:7', NIGHTS, ['booked', 'booked'], { unitName: 'Ensuite Site', freeCount: 0 }),
+        makeUnit('cat:9', NIGHTS, undefined, { unitName: 'Drive-thru Site', freeCount: 3 }),
+      ],
+    });
+    // Explore's word for a provider that counts its units: "free"
+    expect(resultSummary(watch, SITES)).toBe('54 sites free');
+  });
+
   it('counts the nights with something free for a partial result', () => {
     const watch = makeWatch({
       ...checked,
@@ -99,6 +126,17 @@ describe('runResultMessage', () => {
     ).toBe('3 sites available at Osprey Bay');
   });
 
+  it("counts the units the matches stand for (RAC: a category's sites free for the whole stay)", () => {
+    const powered = { ...match('cat:4', '2099-12-11', '2099-12-13'), freeCount: 51 };
+    expect(
+      runResultMessage({ ...base, found: true, matches: [powered] }, watch, SITES, undefined)
+    ).toBe('51 sites free at Osprey Bay');
+    const one = { ...match('cat:9', '2099-12-11', '2099-12-13'), freeCount: 1 };
+    expect(
+      runResultMessage({ ...base, found: true, matches: [one] }, watch, SITES, undefined)
+    ).toBe('1 site free at Osprey Bay');
+  });
+
   it('counts the nights partial runs cover', () => {
     expect(
       runResultMessage(
@@ -140,5 +178,24 @@ describe('runResultMessage', () => {
         PARKSTAY_MANIFEST
       )
     ).toBe('Site 12 held at Osprey Bay. Pay before Tue 1 Dec, 3:42 pm AWST.');
+  });
+
+  it("a first check that holds names the unit from the check's own matches, never by its id (R19 review)", () => {
+    const hold = {
+      reference: 'rac-cart:busselton:2099-12-11:0a1b2c',
+      unitId: 'cat:4',
+      paymentUrl: 'https://parksandresorts.rac.com.au/busselton/booking/',
+      expiresAt: '2099-12-01T07:42:00Z',
+      expiresEstimated: true,
+    };
+    const powered = { ...match('cat:4', '2099-12-11', '2099-12-13'), unitName: 'Powered Site' };
+    // The watch is the one from before the check: no units yet
+    expect(
+      runResultMessage({ ...base, found: true, matches: [powered], hold }, watch, SITES, undefined)
+    ).toBe('Powered Site held at Osprey Bay.');
+    // With no match naming it, the noun, never `cat:4`
+    expect(runResultMessage({ ...base, found: true, hold }, watch, SITES, undefined)).toBe(
+      'A site held at Osprey Bay.'
+    );
   });
 });

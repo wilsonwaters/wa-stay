@@ -2,7 +2,8 @@
  * `NodeHttpClient`: the test transport. Node's global `fetch`, one hop at a time with
  * `redirect: 'manual'`: `BaseHttpClient` follows redirects, and this client applies and
  * captures cookies on every hop with an in-memory `CookieJar`. Like the production client it
- * sends the desktop Chrome user agent unless a request sets its own.
+ * sends a desktop Chrome user agent for the OS it runs on (`CHROME_USER_AGENT`, from the same
+ * helpers, at a fixed version) unless a request sets its own.
  *
  * `CookieJar` follows RFC 6265 closely enough for provider tests: the value is everything
  * after the **first** `=`; `Domain`, `Path`, `Expires`, `Max-Age` and `Secure` are honoured;
@@ -198,7 +199,7 @@ export interface NodeHttpClientOptions {
   jar?: CookieJar;
   /** Defaults to the global `fetch`. */
   fetch?: typeof fetch;
-  /** Defaults to the desktop Chrome user agent, as in production. */
+  /** Defaults to `CHROME_USER_AGENT`: desktop Chrome on this OS, as in production. */
   userAgent?: string;
 }
 

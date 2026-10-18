@@ -42,6 +42,13 @@ export type HttpMethod = 'GET' | 'HEAD' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
 
 export type QueryValue = string | number | boolean | null | undefined;
 
+/**
+ * Who a request is for, on a paced client (`pacing.ts`): `interactive` (the person is
+ * waiting: a place page, Explore's dates, "Check now") goes first, after a short gap;
+ * `background` (sync, watches, snipes, account checks) waits the provider's full gap.
+ */
+export type RequestPriority = 'interactive' | 'background';
+
 export interface HttpRequestOptions {
   /** Appended to the URL's search params; `null`/`undefined` values are skipped. */
   query?: Record<string, QueryValue>;
@@ -53,6 +60,17 @@ export interface HttpRequestOptions {
   signal?: AbortSignal;
   /** Default `follow` (at most `MAX_REDIRECTS` hops). `manual` returns a 3xx with an empty body. */
   redirect?: 'follow' | 'manual' | 'error';
+  /**
+   * Only a paced client reads it. Without it the ambient priority applies
+   * (`withRequestPriority`, set by the core), which is `background` by default.
+   */
+  priority?: RequestPriority;
+  /**
+   * Called once, when the request is sent: at once, or on a paced client when its turn comes.
+   * Never for a request aborted before it was sent (one still waiting for its turn), so a
+   * caller can tell a request it may still call off from one the site is already answering.
+   */
+  onSend?: () => void;
 }
 
 export interface HttpResponse {
@@ -255,6 +273,7 @@ export abstract class BaseHttpClient implements HttpClient {
     const { signal, timeoutMs = DEFAULT_TIMEOUT_MS } = options;
     if (signal?.aborted) throw createAbortError(signal);
     const target = this.checkedUrl(url, options.query);
+    options.onSend?.();
 
     const controller = new AbortController();
     let timedOut = false;

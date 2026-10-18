@@ -1,19 +1,21 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { FormProvider, useForm, type Resolver } from 'react-hook-form';
 import { useNavigate } from 'react-router';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { toApiError, useCreateSnipe, useLocationDetail } from '../../../api';
-import { SnipeReleaseMode } from '../../../../shared/types/common.types';
-import type { ProviderManifest } from '../../../../shared/types/provider.types';
+import type { ProviderManifest, UnitKind } from '../../../../shared/types/provider.types';
+import type { UnitNoun } from '../../../components/nightGridModel';
 import { providerToday } from '../../../components/stay/providerToday';
+import {
+  chosenNoun,
+  placeUnitKinds,
+  reconcileStayTypes,
+  stayNoun,
+} from '../../../components/stay/stayTypes';
 import { ROUTES } from '../../../app/routes';
 import { StepFlow, type FlowStep } from '../../../components/StepFlow';
-import { unitNoun } from '../../../components/locationFormat';
 import { Notice, useToast } from '../../../components/ui';
 import { useNow } from '../../../hooks/useNow';
-import { releaseModeLabel } from '../shared/snipeFormat';
-import { unitNounFor } from '../shared/snipeState';
-import { whenInZone } from './releasePreview';
 import {
   emptySnipeForm,
   snipeFormSchema,
@@ -28,8 +30,9 @@ import { ProviderStep } from './steps/ProviderStep';
 import { ReleaseStep } from './steps/ReleaseStep';
 import { ReviewStep } from './steps/ReviewStep';
 import { StayStep } from './steps/StayStep';
-import { isComputedMode, useReleasePreview } from './useReleasePreview';
-import { zonedInstant } from './zonedTime';
+import { useReleasePreview } from './useReleasePreview';
+import { releaseSummaryFor, useReleaseRefusal } from './useReleaseRefusal';
+import { useSnipeHolds } from './useSnipeHolds';
 
 const STEPS: (FlowStep & { id: SnipeStepId })[] = [
   { id: 'provider', title: 'Provider' },
@@ -55,13 +58,22 @@ export function SnipeFlow({ manifests, initialValues, initialStep, notices = [] 
   const now = useNow();
   const [step, setStep] = useState<SnipeStepId>(initialStep);
   const [submitError, setSubmitError] = useState<string>();
+  /** Notices about the link found once the place's units are known. */
+  const [placeNotices, setPlaceNotices] = useState<string[]>([]);
+  // What the hold rule needs from the place (below), for the resolver.
+  const hold = useRef<{ placeKinds?: UnitKind[]; noun?: UnitNoun }>({});
 
   const manifestOf = useCallback((id: string) => manifests.find((m) => m.id === id), [manifests]);
   const resolver = useCallback<Resolver<SnipeFormValues>>(
     (values, context, options) => {
       const manifest = manifestOf(values.providerId);
       const at = new Date();
-      const schema = snipeFormSchema({ manifest, today: providerToday(manifest, at), now: at });
+      const schema = snipeFormSchema({
+        manifest,
+        today: providerToday(manifest, at),
+        now: at,
+        ...hold.current,
+      });
       return zodResolver(schema)(values, context, options);
     },
     [manifestOf]
@@ -73,13 +85,19 @@ export function SnipeFlow({ manifests, initialValues, initialStep, notices = [] 
   });
   const { watch, setValue, getValues, trigger, getFieldState, setError, reset } = form;
   const values = watch();
+  const { refused, remember } = useReleaseRefusal(values);
   const manifest = manifestOf(values.providerId);
+  const placesHolds = useSnipeHolds(manifest, form);
   const today = providerToday(manifest, now);
-  const noun = values.location?.kind ? unitNoun(values.location.kind) : unitNounFor(manifest);
   const detail = useLocationDetail(
     values.location ? `${values.providerId}:${values.location.externalId}` : null
   );
   const units = detail.isPlaceholderData ? undefined : detail.data?.units;
+  // The units listed (the Stay step), and those the snipe will take (release, Review)
+  const listedNoun = stayNoun(values.unitKinds, detail.data ?? values.location, units, manifest);
+  const noun = chosenNoun(values.unitIds, units, listedNoun);
+  const placeKinds = useMemo(() => (units ? placeUnitKinds(units) : undefined), [units]);
+  hold.current = { placeKinds, noun };
   const preview = useReleasePreview(
     manifest ?? manifests[0],
     values,
@@ -98,6 +116,20 @@ export function SnipeFlow({ manifests, initialValues, initialStep, notices = [] 
     lastSuggestion.current = next;
     if (next !== values.name) setValue('name', next);
   }, [values.location, values.arrival, values.departure, values.name, today, setValue]);
+
+  // The link's stay types, once the place's units are known: those it has are kept; at a mixed
+  // place with none of them they are cleared with a notice, at any other place silently. Before
+  // the page paints, so a stay type the place lacks never shows.
+  const reconciledFor = useRef<string | null>(null);
+  useLayoutEffect(() => {
+    const location = values.location;
+    if (!location || !placeKinds || reconciledFor.current === location.externalId) return;
+    reconciledFor.current = location.externalId;
+    const chosen = getValues('unitKinds');
+    const { unitKinds, notice } = reconcileStayTypes(chosen, placeKinds, location.name);
+    if (unitKinds.length !== chosen.length) setValue('unitKinds', unitKinds);
+    if (notice) setPlaceNotices((shown) => [...shown, notice]);
+  }, [values.location, placeKinds, getValues, setValue]);
 
   const changeProvider = (id: string) =>
     reset({ ...emptySnipeForm(manifestOf(id)), name: '' }, { keepDefaultValues: true });
@@ -123,6 +155,8 @@ export function SnipeFlow({ manifests, initialValues, initialStep, notices = [] 
       const fields = (apiError.issues ?? [])
         .map((path) => issueField(path, mode))
         .filter((n): n is SnipeFieldName => Boolean(n));
+      if (apiError.code === 'VALIDATION' && apiError.issues?.includes('releaseAt'))
+        remember(getValues(), apiError.message);
       if (apiError.code === 'VALIDATION' && fields.length > 0) {
         for (const name of fields) setError(name, { type: 'server', message: apiError.message });
         const failing = firstStepWithError();
@@ -136,26 +170,17 @@ export function SnipeFlow({ manifests, initialValues, initialStep, notices = [] 
 
   const onContinue = async () =>
     step === 'review' ? submit() : trigger(stepFields(step, manifest));
+  const linkNotices = [...notices, ...placeNotices];
 
-  const scheduledAt =
-    values.releaseMode === SnipeReleaseMode.SCHEDULED && manifest
-      ? zonedInstant(values.releaseDate, values.releaseTime, manifest.timezone)
-      : undefined;
-  const modeLabel = releaseModeLabel(manifest, values.releaseMode);
-  const releaseSummary =
-    scheduledAt && manifest
-      ? `${modeLabel}: ${whenInZone(scheduledAt, manifest.timezone)}`
-      : isComputedMode(values.releaseMode)
-        ? `${modeLabel}. ${preview}`
-        : modeLabel;
+  const releaseSummary = releaseSummaryFor(manifest, values, refused ?? preview);
 
   return (
     <FormProvider {...form}>
       <form noValidate onSubmit={(event) => event.preventDefault()} className="flex flex-col gap-6">
-        {notices.length > 0 && (
+        {linkNotices.length > 0 && (
           <Notice tone="info" title="Some of the link couldn't be used">
             <ul className="list-disc pl-5">
-              {notices.map((notice) => (
+              {linkNotices.map((notice) => (
                 <li key={notice}>{notice}</li>
               ))}
             </ul>
@@ -178,13 +203,15 @@ export function SnipeFlow({ manifests, initialValues, initialStep, notices = [] 
             <LocationStep manifest={manifest} place={detail.data} placeLoading={detail.isLoading} />
           )}
           {step === 'stay' && manifest && (
-            <StayStep manifest={manifest} today={today} units={units} noun={noun} />
+            <StayStep manifest={manifest} today={today} units={units} noun={listedNoun} />
           )}
           {step === 'release' && manifest && (
             <ReleaseStep
               manifest={manifest}
               noun={noun}
               releaseInfo={detail.data?.releaseInfo}
+              refusal={refused}
+              placesHolds={placesHolds}
               now={now}
             />
           )}
@@ -194,6 +221,7 @@ export function SnipeFlow({ manifests, initialValues, initialStep, notices = [] 
               today={today}
               noun={noun}
               place={detail.data}
+              placeKinds={placeKinds}
               placeLoading={detail.isLoading}
               releaseSummary={releaseSummary}
               onChangeStep={setStep}

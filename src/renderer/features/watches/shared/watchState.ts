@@ -5,8 +5,13 @@
 import type { ProviderManifest } from '../../../../shared/types/provider.types';
 import { WatchResult } from '../../../../shared/types/common.types';
 import type { Watch } from '../../../../shared/types/watch.types';
-import { unitNoun } from '../../../components/locationFormat';
-import type { UnitNoun } from '../../../components/stay/UnitPicker';
+import {
+  capitalise,
+  kindsOfUnits,
+  providerUnitKinds,
+  unitNounFrom,
+  type UnitNoun,
+} from '../../../../shared/utils/unit-noun';
 import { statusPresets, type StatusPreset } from '../../../components/ui';
 
 export type WatchState = 'active' | 'paused' | 'ended' | 'held' | 'hold-expired' | 'booked';
@@ -29,12 +34,15 @@ export function watchStateOf(watch: Watch, today: string, now: Date): WatchState
   return watch.isActive ? 'active' : 'paused';
 }
 
-/** The StatusPill for a state. */
-export function statusPillFor(state: WatchState): StatusPreset {
+/** The StatusPill for a state; a hold names the held unit's noun (`heldNoun`): "Site held". */
+export function statusPillFor(state: WatchState, held: UnitNoun): StatusPreset {
   switch (state) {
     case 'held':
     case 'hold-expired':
-      return statusPresets.watchResult[WatchResult.HELD];
+      return {
+        ...statusPresets.watchResult[WatchResult.HELD],
+        label: `${capitalise(held.one)} held`,
+      };
     case 'booked':
       return statusPresets.watchResult[WatchResult.BOOKED];
     case 'ended':
@@ -46,19 +54,49 @@ export function statusPillFor(state: WatchState): StatusPreset {
   }
 }
 
+type Kinded = readonly { unitKind?: unknown }[];
+
 /**
- * What a provider's units are called (its main location kind): ParkStay's are sites. A watch
- * keeps no location kind, so this is the provider's first.
+ * What a watch's units are called (R9): by the kinds of the units the words are about (`about`:
+ * by default its last check's, the units it wants), else its stay types, else the place's units'
+ * (`placeUnits`, where the page has them), else its provider's: ParkStay's are sites.
  */
-export function unitNounFor(manifest: ProviderManifest | undefined): UnitNoun {
-  return unitNoun(manifest?.locationKinds[0]);
+export function watchNoun(
+  watch: Pick<Watch, 'lastAvailability' | 'unitKinds'>,
+  manifest: ProviderManifest | undefined,
+  { about, placeUnits }: { about?: Kinded; placeUnits?: Kinded } = {}
+): UnitNoun {
+  return unitNounFrom(
+    kindsOfUnits(about ?? watch.lastAvailability),
+    watch.unitKinds,
+    kindsOfUnits(placeUnits),
+    providerUnitKinds(manifest)
+  );
 }
 
-/** A unit's name from the last check, else "site 12". */
+/**
+ * What the held unit is called: by its kind in the last check; when it is not there, as
+ * `watchNoun` falls back (stay types, the place's, the provider's).
+ */
+export function heldNoun(
+  watch: Pick<Watch, 'lastAvailability' | 'unitKinds' | 'hold'>,
+  manifest: ProviderManifest | undefined,
+  placeUnits?: Kinded
+): UnitNoun {
+  const id = watch.hold?.unitId;
+  const held = id ? (watch.lastAvailability ?? []).filter((unit) => unit.unitId === id) : [];
+  return watchNoun(watch, manifest, { about: held, placeUnits });
+}
+
+/**
+ * A unit's name from the last check, else "Site 12" for a numeric id (a site's number), else
+ * "A site": an id that is not a number (RAC's `cat:4`) is never shown, as a snipe's `unitLabel`.
+ */
 export function unitNameOf(watch: Watch, unitId: string | undefined, noun: UnitNoun): string {
-  if (!unitId) return `A ${noun.one}`;
-  const unit = watch.lastAvailability?.find((u) => u.unitId === unitId);
-  return unit?.unitName ?? `${noun.one.charAt(0).toUpperCase()}${noun.one.slice(1)} ${unitId}`;
+  const unit = unitId ? watch.lastAvailability?.find((u) => u.unitId === unitId) : undefined;
+  if (unit?.unitName) return unit.unitName;
+  if (!unitId || !/^\d+$/.test(unitId)) return `A ${noun.one}`;
+  return `${capitalise(noun.one)} ${unitId}`;
 }
 
 /** The hold panel's region name, unique per hold: "Hold at Osprey Bay". */
@@ -79,7 +117,10 @@ export function autoHoldLabel(
   const unit = unitNameOf(watch, watch.hold?.unitId, noun);
   if (state === 'held')
     return holdUntil ? `On: ${unit} held until ${holdUntil}` : `On: ${unit} held`;
-  if (state === 'hold-expired') return `On: the hold on ${unit} expired`;
+  // A hold that was let go has its message (`lastError`): it ended, not expired
+  if (state === 'hold-expired') {
+    return `On: the hold on ${unit} ${watch.lastError ? 'ended' : 'expired'}`;
+  }
   if (state === 'booked') return `On: ${unit} held, then booked`;
   return watch.autoHold ? `On: hold a ${noun.one} when found` : 'Off';
 }

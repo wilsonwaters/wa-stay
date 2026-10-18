@@ -1,7 +1,18 @@
 import { act, screen, waitFor, within } from '@testing-library/react';
-import { activeAccess, createMockApi, fail, ok } from '@tests/utils/renderer/createMockApi';
+import { RAC_SAVED, racAccount } from '@tests/fixtures/renderer/settings';
+import { makeSnipe } from '@tests/fixtures/renderer/snipes';
+import {
+  activeAccess,
+  createMockApi,
+  fail,
+  ok,
+  PARKSTAY_MANIFEST,
+} from '@tests/utils/renderer/createMockApi';
+import { RAC_MANIFEST } from '@tests/utils/renderer/manifests';
 import { currentRoute, getBanners, renderWithApp } from '@tests/utils/renderer/renderWithApp';
 import { NotificationType } from '../../shared/types';
+import { SNIPE_EVENT_COALESCE_MS } from '../api';
+import { timeInZone } from '../components/timeFormat';
 
 const nav = () => screen.getByRole('navigation', { name: 'Primary' });
 const navLink = (name: string) => within(nav()).getByRole('link', { name });
@@ -159,6 +170,101 @@ describe('App shell', () => {
       expect(currentRoute()).toBe(route);
       expect(await screen.findByRole('heading', { name: heading })).toBeInTheDocument();
       expect(screen.getByRole('link', { name })).toHaveAttribute('aria-current', 'page');
+    });
+  });
+
+  describe('saved details', () => {
+    it("drops a provider's availability on screen when its saved details change (R16)", async () => {
+      const { mock, queryClient } = renderWithApp();
+      await screen.findByRole('heading', { level: 1, name: 'Explore places to stay' });
+      const stay = { arrival: '2026-11-06', departure: '2026-11-08', adults: 2 };
+      queryClient.setQueryData(['catalog', 'check', 'rac:busselton', stay], { seeded: true });
+      act(() =>
+        mock!.emit('account:updated', {
+          providerId: 'rac',
+          requirement: 'optional',
+          authKind: 'credentials',
+          status: 'signed-in',
+          savedFields: ['memberNumber'],
+        })
+      );
+      expect(queryClient.getQueryData(['catalog', 'check', 'rac:busselton', stay])).toBeUndefined();
+    });
+
+    // Saving a member number re-arms RAC's snipes, 48 hours earlier for the member pre-sale
+    // (Busselton's summer: 8 am AWST on 3 Feb, not 5 Feb), and main sends `snipe:updated`
+    // while the person is in Settings, with no snipe page mounted.
+    const HOUR = 3_600_000;
+    const busselton = (releaseAt: Date) =>
+      makeSnipe({
+        providerId: 'rac',
+        location: {
+          externalId: 'busselton',
+          name: 'RAC Busselton Holiday Park',
+          areaName: 'South West',
+        },
+        name: 'Busselton · Mon 20 – Wed 22 Dec',
+        stay: { ...makeSnipe().stay, arrival: '2099-12-20', departure: '2099-12-22' },
+        action: 'alert',
+        releaseAt,
+      });
+
+    async function openSnipeThenSettings() {
+      const publicRelease = new Date(Date.now() + 4 * 24 * HOUR + HOUR);
+      const memberRelease = new Date(publicRelease.getTime() - 48 * HOUR);
+      const get = jest.fn().mockResolvedValue(ok(busselton(publicRelease)));
+      const mock = createMockApi({
+        providers: { list: jest.fn().mockResolvedValue(ok([PARKSTAY_MANIFEST, RAC_MANIFEST])) },
+        snipes: { get },
+        accounts: { list: jest.fn().mockResolvedValue(ok([racAccount()])) },
+      });
+      const view = renderWithApp({ route: '/site-sniper/7', api: mock });
+      expect(await screen.findByRole('timer', { name: /^Opens in 4 days/ })).toBeInTheDocument();
+
+      await view.user.click(screen.getByRole('button', { name: 'Account and settings' }));
+      await view.user.click(screen.getByRole('menuitem', { name: 'Settings' }));
+      expect(
+        await screen.findByRole('heading', { level: 1, name: 'Settings' })
+      ).toBeInTheDocument();
+      expect(screen.queryByRole('timer')).toBeNull();
+      return { ...view, mock, get, moved: busselton(memberRelease) };
+    }
+
+    it('shows a snipe main re-armed while Settings was open at its new release time on coming back', async () => {
+      const { mock, get, moved } = await openSnipeThenSettings();
+      get.mockResolvedValue(ok(moved));
+      mock.emit('account:updated', RAC_SAVED);
+      mock.emit('snipe:updated', moved);
+
+      act(() => window.history.back());
+      expect(
+        await screen.findByRole('heading', { level: 1, name: moved.name })
+      ).toBeInTheDocument();
+      // At once, from the cache: no wait for a refetch, and never the old countdown
+      expect(screen.getByRole('timer', { name: /^Opens in 2 days/ })).toBeInTheDocument();
+      const release = screen.getByRole('region', { name: 'Release' });
+      expect(within(release).getByText('When').nextSibling).toHaveTextContent(
+        `When these dates open: ${timeInZone(moved.releaseAt!, 'Australia/Perth')}`
+      );
+    });
+
+    it('refetches a snipe once for a burst of changes, though the shell and its page both listen', async () => {
+      const { mock, get, moved } = await openSnipeThenSettings();
+      act(() => window.history.back());
+      await screen.findByRole('timer', { name: /^Opens in 4 days/ });
+      await act(async () => {
+        await new Promise((resolve) => setTimeout(resolve, SNIPE_EVENT_COALESCE_MS + 100));
+      });
+      const before = get.mock.calls.length;
+
+      get.mockResolvedValue(ok(moved));
+      for (let i = 0; i < 3; i += 1) mock.emit('snipe:updated', moved);
+      expect(await screen.findByRole('timer', { name: /^Opens in 2 days/ })).toBeInTheDocument();
+      await waitFor(() => expect(get).toHaveBeenCalledTimes(before + 1));
+      await act(async () => {
+        await new Promise((resolve) => setTimeout(resolve, SNIPE_EVENT_COALESCE_MS + 100));
+      });
+      expect(get).toHaveBeenCalledTimes(before + 1);
     });
   });
 

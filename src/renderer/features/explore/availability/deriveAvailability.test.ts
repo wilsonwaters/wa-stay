@@ -1,5 +1,8 @@
+import type { BulkAvailabilityEntry, UnitKind } from '../../../../shared/types/provider.types';
+import type { LocationKind } from '../../../../shared/types/provider.types';
 import {
   availabilityLabel,
+  countedKinds,
   deriveAvailability,
   sortByAvailability,
   type AvailabilityInput,
@@ -9,7 +12,7 @@ import {
 const BULK = { availability: true, bulkAvailability: true, accessGate: true };
 const ONE_AT_A_TIME = { availability: true, bulkAvailability: false, accessGate: false };
 const NO_AVAILABILITY = { availability: false, bulkAvailability: false, accessGate: false };
-const ONLINE = { bookingMode: 'online' as const };
+const ONLINE = { bookingMode: 'online' as const, kind: 'campground' as const };
 const entry = (availableUnits: number, bookableUnits: number) => ({
   key: 'parkstay:20',
   availableUnits,
@@ -30,13 +33,13 @@ describe('deriveAvailability', () => {
       ['no stay', ONLINE, { ...answered, staySet: false }, { state: 'no-dates' }],
       [
         'not bookable online, even with an entry',
-        { bookingMode: 'offline' },
+        { ...ONLINE, bookingMode: 'offline' },
         answered,
         { state: 'offline-booking' },
       ],
       [
         'booked by application',
-        { bookingMode: 'application' },
+        { ...ONLINE, bookingMode: 'application' },
         answered,
         { state: 'offline-booking' },
       ],
@@ -139,9 +142,201 @@ describe('deriveAvailability', () => {
   });
 });
 
+describe('deriveAvailability with stay types chosen', () => {
+  /** A holiday park: sites and cabins, 5 of 30 units free (3 sites, 2 cabins). */
+  const PARK = { bookingMode: 'online' as const, kind: 'holiday-park' as const };
+  const mixed = (patch: Partial<BulkAvailabilityEntry> = {}): BulkAvailabilityEntry => ({
+    key: 'fake:1',
+    availableUnits: 5,
+    bookableUnits: 30,
+    byKind: {
+      campsite: { availableUnits: 3, bookableUnits: 20 },
+      cabin: { availableUnits: 2, bookableUnits: 10 },
+    },
+    ...patch,
+  });
+  const derive = (
+    location: Parameters<typeof deriveAvailability>[0],
+    entry: BulkAvailabilityEntry,
+    stayTypes: UnitKind[]
+  ) =>
+    deriveAvailability(location, {
+      staySet: true,
+      capabilities: BULK,
+      status: 'success',
+      entry,
+      stayTypes,
+    });
+
+  it('counts the totals when nothing is chosen', () => {
+    expect(derive(PARK, mixed(), [])).toEqual({
+      state: 'available',
+      availableUnits: 5,
+      bookableUnits: 30,
+    });
+    expect(
+      deriveAvailability(PARK, {
+        staySet: true,
+        capabilities: BULK,
+        status: 'success',
+        entry: mixed(),
+      })
+    ).toEqual({ state: 'available', availableUnits: 5, bookableUnits: 30 });
+  });
+
+  it('counts the totals when every kind the place has is chosen, even with no byKind', () => {
+    expect(derive(PARK, mixed(), ['campsite', 'cabin'])).toEqual({
+      state: 'available',
+      availableUnits: 5,
+      bookableUnits: 30,
+    });
+    // A campground is sites only: Camping is all of it, byKind or not.
+    expect(derive(ONLINE, entry(8, 24), ['campsite', 'dorm'])).toEqual({
+      state: 'available',
+      availableUnits: 8,
+      bookableUnits: 24,
+    });
+    // Its own unit kinds decide, not its kind.
+    expect(
+      derive({ ...PARK, unitKinds: ['cabin'] }, mixed({ byKind: undefined }), ['cabin'])
+    ).toEqual({ state: 'available', availableUnits: 5, bookableUnits: 30 });
+  });
+
+  it("counts only the chosen kinds' units at a place with other kinds too", () => {
+    expect(derive(PARK, mixed(), ['cabin'])).toEqual({
+      state: 'available',
+      availableUnits: 2,
+      bookableUnits: 10,
+    });
+    expect(derive(PARK, mixed(), ['campsite', 'room'])).toEqual({
+      state: 'available',
+      availableUnits: 3,
+      bookableUnits: 20,
+    });
+  });
+
+  it("sums the chosen kinds' counts over several, and reads full or not open from them", () => {
+    const park = { ...PARK, unitKinds: ['campsite', 'cabin', 'glamping'] as UnitKind[] };
+    const counts = mixed({
+      byKind: {
+        campsite: { availableUnits: 0, bookableUnits: 20 },
+        cabin: { availableUnits: 2, bookableUnits: 10 },
+        glamping: { availableUnits: 1, bookableUnits: 4 },
+      },
+    });
+    expect(derive(park, counts, ['cabin', 'glamping'])).toEqual({
+      state: 'available',
+      availableUnits: 3,
+      bookableUnits: 14,
+    });
+    expect(derive(park, counts, ['campsite'])).toEqual({ state: 'full', bookableUnits: 20 });
+    expect(
+      derive(park, mixed({ byKind: { cabin: { availableUnits: 0, bookableUnits: 0 } } }), ['cabin'])
+    ).toEqual({ state: 'none-open' });
+  });
+
+  it('counts a chosen kind that byKind leaves out as none', () => {
+    const park = { ...PARK, unitKinds: ['campsite', 'cabin', 'glamping'] as UnitKind[] };
+    expect(derive(park, mixed(), ['cabin', 'glamping'])).toEqual({
+      state: 'available',
+      availableUnits: 2,
+      bookableUnits: 10,
+    });
+  });
+
+  it('says "check dates", never "not open", when byKind counts none of the chosen kinds', () => {
+    expect(derive(PARK, mixed({ byKind: undefined }), ['cabin'])).toEqual({
+      state: 'check-dates',
+    });
+    expect(
+      derive(PARK, mixed({ byKind: { campsite: { availableUnits: 3, bookableUnits: 20 } } }), [
+        'cabin',
+      ])
+    ).toEqual({ state: 'check-dates' });
+    // Not usable: anything but an object of counts is no entry.
+    const junk = { campsite: null, cabin: 'two' } as unknown as BulkAvailabilityEntry['byKind'];
+    expect(derive(PARK, mixed({ byKind: junk }), ['cabin'])).toEqual({ state: 'check-dates' });
+    expect(
+      derive(PARK, mixed({ byKind: 'none' as unknown as BulkAvailabilityEntry['byKind'] }), [
+        'cabin',
+      ])
+    ).toEqual({ state: 'check-dates' });
+  });
+
+  it("clamps the chosen kinds' NaN, negative and fractional counts to whole units or none", () => {
+    expect(
+      derive(
+        PARK,
+        mixed({ byKind: { cabin: { availableUnits: Number.NaN, bookableUnits: 4.8 } } }),
+        ['cabin']
+      )
+    ).toEqual({ state: 'full', bookableUnits: 4 });
+    expect(
+      derive(
+        PARK,
+        mixed({ byKind: { cabin: { availableUnits: -2, bookableUnits: Number.NaN } } }),
+        ['cabin']
+      )
+    ).toEqual({ state: 'none-open' });
+  });
+
+  it('keeps the order before the counts: no dates, info only, one at a time, loading, unknown', () => {
+    const input: AvailabilityInput = {
+      staySet: true,
+      capabilities: BULK,
+      status: 'success',
+      entry: mixed({ byKind: undefined }),
+      stayTypes: ['cabin'],
+    };
+    expect(deriveAvailability(PARK, { ...input, staySet: false })).toEqual({ state: 'no-dates' });
+    expect(deriveAvailability({ ...PARK, bookingMode: 'offline' }, input)).toEqual({
+      state: 'offline-booking',
+    });
+    expect(deriveAvailability(PARK, { ...input, capabilities: NO_AVAILABILITY })).toEqual({
+      state: 'not-supported',
+    });
+    expect(deriveAvailability(PARK, { ...input, status: 'loading' })).toEqual({ state: 'loading' });
+    expect(deriveAvailability(PARK, { ...input, entry: undefined })).toEqual({ state: 'unknown' });
+  });
+
+  it('lets "Available only" hide a place that says "check dates", and sorts it after full ones', () => {
+    const places = [
+      {
+        name: 'Cabins unknown',
+        availability: derive(PARK, mixed({ byKind: undefined }), ['cabin']),
+      },
+      { name: 'Cabins free', availability: derive(PARK, mixed(), ['cabin']) },
+      {
+        name: 'Cabins full',
+        availability: derive(
+          PARK,
+          mixed({ byKind: { cabin: { availableUnits: 0, bookableUnits: 6 } } }),
+          ['cabin']
+        ),
+      },
+    ];
+    // "Available only" keeps the places whose state is available (ExplorePage's `isAvailable`).
+    expect(
+      places.filter((place) => place.availability.state === 'available').map((p) => p.name)
+    ).toEqual(['Cabins free']);
+    expect(sortByAvailability(places, (place) => place.availability).map((p) => p.name)).toEqual([
+      'Cabins free',
+      'Cabins full',
+      'Cabins unknown',
+    ]);
+    expect(
+      availabilityLabel(places[0].availability, countedKinds(PARK, ['cabin']), 'Fake')
+    ).toEqual({
+      pill: 'Check dates',
+      card: 'Check dates on the place page',
+      tone: 'neutral',
+    });
+  });
+});
+
 describe('availabilityLabel', () => {
-  const label = (availability: PlaceAvailability, kind = 'campground') =>
-    availabilityLabel(availability, kind, 'ParkStay');
+  const label = (availability: PlaceAvailability, kind: LocationKind = 'campground') =>
+    availabilityLabel(availability, countedKinds({ kind }), 'ParkStay');
 
   it.each<[PlaceAvailability, string, string | null, string | null]>([
     [{ state: 'full', bookableUnits: 24 }, 'None free', 'No site free every night', 'neutral'],
@@ -149,7 +344,7 @@ describe('availabilityLabel', () => {
     [{ state: 'check-dates' }, 'Check dates', 'Check dates on the place page', 'neutral'],
     // The card already says "Info only": no second badge.
     [{ state: 'offline-booking' }, 'Info only', null, 'neutral'],
-    [{ state: 'not-supported' }, '–', 'Availability not shared by ParkStay', 'neutral'],
+    [{ state: 'not-supported' }, '–', 'Check dates on ParkStay', 'neutral'],
     [{ state: 'unknown' }, '–', 'Availability unknown', 'neutral'],
     [{ state: 'error', queue: false }, '–', "Couldn't check ParkStay", 'danger'],
     [{ state: 'loading' }, '···', '', null],
@@ -190,7 +385,8 @@ describe('availabilityLabel', () => {
     const two = { state: 'available', availableUnits: 2, bookableUnits: 6 } as const;
     expect(label(two, 'caravan-park').card).toBe('2 of 6 sites available');
     expect(label(two, 'cabin').card).toBe('2 of 6 cabins available');
-    expect(label(two, 'farm-stay').card).toBe('2 of 6 rooms available');
+    // A farm stay's units are `other` (R9): "spots"
+    expect(label(two, 'farm-stay').card).toBe('2 of 6 spots available');
     expect(label({ state: 'available', availableUnits: 1, bookableUnits: 1 }).card).toBe(
       '1 of 1 site available'
     );
@@ -203,6 +399,169 @@ describe('availabilityLabel', () => {
       card: '5 sites available',
       tone: 'available',
     });
+  });
+});
+
+describe('countedKinds and the noun it gives (R9)', () => {
+  const MIXED = { kind: 'holiday-park' as const, unitKinds: ['campsite', 'cabin'] as UnitKind[] };
+  const free = { state: 'available', availableUnits: 27, bookableUnits: 40 } as const;
+
+  it('counts the stay types chosen that the place has, else all its kinds', () => {
+    expect(countedKinds(MIXED)).toEqual(['campsite', 'cabin']);
+    expect(countedKinds(MIXED, ['cabin', 'room'])).toEqual(['cabin']);
+    expect(countedKinds(MIXED, ['room'])).toEqual(['campsite', 'cabin']);
+    expect(countedKinds({ kind: 'campground' }, [])).toEqual(['campsite']);
+  });
+
+  it('reads a mixed park’s units as "spots", and "cabins" with Cabins & villas chosen', () => {
+    expect(availabilityLabel(free, countedKinds(MIXED), 'RAC')?.card).toBe(
+      '27 of 40 spots available'
+    );
+    expect(availabilityLabel(free, countedKinds(MIXED, ['cabin']), 'RAC')?.card).toBe(
+      '27 of 40 cabins available'
+    );
+    expect(availabilityLabel({ state: 'none-open' }, countedKinds(MIXED), 'RAC')?.card).toBe(
+      'No spots open for these dates'
+    );
+  });
+});
+
+describe('free counts without a provider total (RS12)', () => {
+  /** An RAC park: sites and cabins, whose provider counts free units and gives no total. */
+  const RAC_PARK = {
+    bookingMode: 'online' as const,
+    kind: 'holiday-park' as const,
+    unitKinds: ['campsite', 'cabin'] as UnitKind[],
+  };
+  const noTotal = (patch: Partial<BulkAvailabilityEntry> = {}): BulkAvailabilityEntry => ({
+    key: 'rac:busselton',
+    availableUnits: 27,
+    byKind: { campsite: { availableUnits: 26 }, cabin: { availableUnits: 1 } },
+    ...patch,
+  });
+  const derive = (entry: BulkAvailabilityEntry, stayTypes: UnitKind[] = []) =>
+    deriveAvailability(RAC_PARK, {
+      staySet: true,
+      capabilities: BULK,
+      status: 'success',
+      entry,
+      stayTypes,
+    });
+  const label = (entry: BulkAvailabilityEntry, stayTypes: UnitKind[] = []) =>
+    availabilityLabel(derive(entry, stayTypes), countedKinds(RAC_PARK, stayTypes), 'RAC');
+
+  it('reads 27 free with no total as "27 free" on the pill and "27 spots free" on the card', () => {
+    expect(derive(noTotal())).toEqual({ state: 'available', availableUnits: 27 });
+    expect(label(noTotal())).toEqual({
+      pill: '27 free',
+      card: '27 spots free',
+      tone: 'available',
+    });
+    expect(label(noTotal())?.card).not.toMatch(/\bof\b/);
+  });
+
+  it('reads one free cabin with Cabins & villas chosen as "1 cabin free"', () => {
+    expect(derive(noTotal(), ['cabin'])).toEqual({ state: 'available', availableUnits: 1 });
+    expect(label(noTotal(), ['cabin'])).toEqual({
+      pill: '1 free',
+      card: '1 cabin free',
+      tone: 'available',
+    });
+    expect(label(noTotal(), ['campsite'])?.card).toBe('26 sites free');
+  });
+
+  it('reads none free with no total as "None free", and a total of 0 as "Not open"', () => {
+    const full = noTotal({ availableUnits: 0, byKind: undefined });
+    expect(derive(full)).toEqual({ state: 'full' });
+    expect(label(full)).toEqual({
+      pill: 'None free',
+      card: 'No spot free every night',
+      tone: 'neutral',
+    });
+    const closed = noTotal({ availableUnits: 0, bookableUnits: 0, byKind: undefined });
+    expect(derive(closed)).toEqual({ state: 'none-open' });
+    expect(label(closed)).toEqual({
+      pill: 'Not open',
+      card: 'No spots open for these dates',
+      tone: 'neutral',
+    });
+    // A null total is left out too, never 0
+    expect(
+      derive(
+        noTotal({ availableUnits: 0, bookableUnits: null as unknown as number, byKind: undefined })
+      )
+    ).toEqual({ state: 'full' });
+  });
+
+  it('keeps "Not open" for a chosen kind whose total is 0, and "None free" for one with none', () => {
+    const counts = noTotal({
+      byKind: { campsite: { availableUnits: 0 }, cabin: { availableUnits: 0, bookableUnits: 0 } },
+    });
+    expect(derive(counts, ['cabin'])).toEqual({ state: 'none-open' });
+    expect(label(counts, ['cabin'])?.card).toBe('No cabins open for these dates');
+    expect(derive(counts, ['campsite'])).toEqual({ state: 'full' });
+    expect(label(counts, ['campsite'])?.card).toBe('No site free every night');
+  });
+
+  it('sums kinds with no total when any kind summed has none', () => {
+    const park = { ...RAC_PARK, unitKinds: ['campsite', 'cabin', 'glamping'] as UnitKind[] };
+    const counts = noTotal({
+      byKind: {
+        campsite: { availableUnits: 3 },
+        cabin: { availableUnits: 2, bookableUnits: 10 },
+        glamping: { availableUnits: 1, bookableUnits: 4 },
+      },
+    });
+    const derived = (stayTypes: UnitKind[]) =>
+      deriveAvailability(park, {
+        staySet: true,
+        capabilities: BULK,
+        status: 'success',
+        entry: counts,
+        stayTypes,
+      });
+    // One kind without a total: the sum has none
+    expect(derived(['campsite', 'cabin'])).toEqual({ state: 'available', availableUnits: 5 });
+    expect(
+      availabilityLabel(derived(['campsite', 'cabin']), ['campsite', 'cabin'], 'RAC')?.card
+    ).toBe('5 spots free');
+    // Every kind summed has one: the sum has one
+    expect(derived(['cabin', 'glamping'])).toEqual({
+      state: 'available',
+      availableUnits: 3,
+      bookableUnits: 14,
+    });
+  });
+
+  it('keeps ParkStay\'s "N of M" with a total', () => {
+    expect(
+      availabilityLabel(
+        { state: 'available', availableUnits: 8, bookableUnits: 24 },
+        ['campsite'],
+        'ParkStay'
+      )
+    ).toEqual({
+      pill: '8 available',
+      card: '8 of 24 sites available',
+      tone: 'available',
+      statesTotal: true,
+    });
+  });
+
+  it('sorts places without a total among the available by their free count', () => {
+    const places = [
+      {
+        name: 'ParkStay 3',
+        availability: { state: 'available', availableUnits: 3, bookableUnits: 9 },
+      },
+      { name: 'RAC 27', availability: derive(noTotal()) },
+      { name: 'RAC none', availability: derive(noTotal({ availableUnits: 0, byKind: undefined })) },
+    ] as const;
+    expect(sortByAvailability(places, (place) => place.availability).map((p) => p.name)).toEqual([
+      'RAC 27',
+      'ParkStay 3',
+      'RAC none',
+    ]);
   });
 });
 

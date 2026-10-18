@@ -2,10 +2,9 @@ import { memo, useEffect, useId, useRef, useState, type FocusEvent, type ReactNo
 import { Link } from 'react-router';
 import { MapPinOff } from 'lucide-react';
 import type { LocationSummary } from '../../shared/types/catalog.types';
-import { ROUTES } from '../app/routes';
-import type { StayParams } from '../app/stayParams';
+import { ROUTES, type PlaceLinkQuery } from '../app/routes';
 import { amenityIcon } from './amenityIcons';
-import { areaLine, hasMapLocation, kindLabel, unitCountLabel } from './locationFormat';
+import { areaLine, hasMapLocation, kindLabel, placeNoun, unitCountLabel } from './locationFormat';
 import {
   Badge,
   PhotoPlaceholder,
@@ -143,8 +142,11 @@ export interface LocationCardProps {
   onHighlight?: (key: string | null) => void;
   /** The DOM id, so a map pin can scroll its card into view. */
   id?: string;
-  /** The stay to open the detail page with (Explore's dates and guests). Keep it stable. */
-  stay?: Partial<StayParams>;
+  /**
+   * The stay to open the detail page with (Explore's dates and guests, and its stay types).
+   * Keep it stable.
+   */
+  stay?: PlaceLinkQuery;
   /** History state for the detail link, e.g. where it was opened from. Keep it stable. */
   linkState?: unknown;
   /**
@@ -235,7 +237,7 @@ export const LocationCard = memo(function LocationCard({
                 <>
                   <span aria-hidden="true">·</span>
                   <span className="tabular-nums">
-                    {unitCountLabel(location.kind, location.unitCount)}
+                    {unitCountLabel(location.unitCount, placeNoun(location))}
                   </span>
                 </>
               )}

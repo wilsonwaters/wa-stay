@@ -89,3 +89,70 @@ export function seedHeldSnipe(
     },
   });
 }
+
+export interface AlertSnipeSeed {
+  snipe: {
+    /** ParkStay unless given. */
+    providerId?: string;
+    /** Watching for cancellations unless given (`daily_rollover` asks the provider when). */
+    releaseMode?: string;
+    name: string;
+    location: { externalId: string; name: string; areaName?: string };
+    stay: { arrival: string; departure: string; adults: number };
+  };
+}
+
+/**
+ * A snipe that alerts (`action: 'alert'`), armed, by default ParkStay's watching for
+ * cancellations, in the profile at `userDataDir` (its database is created and migrated if new).
+ * Only the snipe row is written: once the app starts, its scheduler arms it (a daily rollover
+ * asks the provider for its release time first) and, watching for cancellations, checks the
+ * place at once; when the fixtures have the stay free, the app itself records the alert and
+ * sends its `snipe_alert` notification. Nothing is ever held (architecture-notes §12.33).
+ */
+export function seedAlertSnipe(userDataDir: string, seed: AlertSnipeSeed): { snipeId: number } {
+  return runSeed({
+    op: 'alert-snipe',
+    dbPath: path.join(userDataDir, 'wa-stay.db'),
+    snipe: { providerId: 'parkstay', releaseMode: 'cancellation', action: 'alert', ...seed.snipe },
+  });
+}
+
+export interface HeldWatchSeed {
+  watch: {
+    providerId: string;
+    name: string;
+    location: { externalId: string; name: string; areaName?: string };
+    stay: { arrival: string; departure: string; adults: number };
+    unitKinds?: string[];
+    checkIntervalMinutes: number;
+    autoHold: true;
+    stayParams?: Record<string, string | number | boolean>;
+  };
+  hold: {
+    /** A made-up reference: it never reaches the provider, and no cart or hold is created. */
+    reference: string;
+    expiresAt: Date;
+    expiresEstimated?: boolean;
+    unitId: string;
+    paymentUrl: string;
+  };
+  /** The provider's experiment choices, stored before launch (`{ autoCart: true }`). */
+  experiments?: Record<string, boolean>;
+}
+
+/**
+ * A watch whose automatic hold holds a unit (last result `held`, inactive), in the profile at
+ * `userDataDir` (its database is created and migrated if new), with the provider's experiment
+ * choices stored first when given, so the provider registers with them at launch. Nothing is
+ * ever held at the provider (architecture-notes §12.33).
+ */
+export function seedHeldWatch(userDataDir: string, seed: HeldWatchSeed): { watchId: number } {
+  return runSeed({
+    op: 'held-watch',
+    dbPath: path.join(userDataDir, 'wa-stay.db'),
+    watch: seed.watch,
+    hold: { ...seed.hold, expiresAt: seed.hold.expiresAt.toISOString() },
+    ...(seed.experiments ? { experiments: seed.experiments } : {}),
+  });
+}

@@ -1,10 +1,23 @@
 /**
  * What an account row says (Settings → Accounts): its status line, its action, and what the
  * account is needed for, from the provider's manifest (architecture-notes §12.32: signing in
- * is a soft suggestion for providers whose account is optional, never a blocker).
+ * is a soft suggestion for providers whose account is optional, never a blocker). A
+ * `credentials` account (details saved in the app, §12.35) has its own words below.
  */
-import type { ProviderAccount, ProviderManifest } from '../../../../shared/types/provider.types';
+import {
+  ACCOUNT_VALUE_MAX_LENGTH,
+  type AccountFieldDescriptor,
+  type ProviderAccount,
+  type ProviderManifest,
+} from '../../../../shared/types/provider.types';
+import { inSentence } from '../../../components/accounts/credentialText';
 import { formatDay } from '../format';
+
+export {
+  copyCredentialLabel,
+  credentialCopiedAnnouncement,
+  inSentence,
+} from '../../../components/accounts/credentialText';
 
 export type AccountAction = 'connect' | 'reconnect' | 'sign-out';
 
@@ -80,25 +93,31 @@ function neededForHolds({ holds, snipes, watches }: ProviderManifest['capabiliti
  * What the account is needed for, from the manifest's capabilities, or null for a provider
  * without accounts (its status line already says "No account needed"). Signed in to an
  * optional account, the suggestion to connect becomes what being signed in gives. A release
- * is mentioned only for a provider with Site Sniper (`snipes`).
+ * is mentioned only for a provider with Site Sniper (`snipes`). A `credentials` account (a
+ * detail saved in the app, such as a member number) is added, never connected: "Add your
+ * {label}".
  */
 export function accountPurpose(
   manifest: ProviderManifest,
-  account?: Pick<ProviderAccount, 'status'>
+  account?: Pick<ProviderAccount, 'status' | 'authKind' | 'fields'>
 ): string | null {
   const { capabilities } = manifest;
   const { account: requirement, holds, snipes, bookingImport } = capabilities;
   const name = manifest.shortName;
   const signedIn = account?.status === 'signed-in';
+  const when = snipes ? ' before a release' : '';
   let purpose: string;
   switch (requirement) {
     case 'none':
       return null;
     case 'optional':
-      if (!holds) purpose = 'Optional.';
-      else if (signedIn) purpose = "Optional. Checkout is quicker while you're signed in.";
+      if (!holds || (signedIn && account?.authKind === 'credentials')) purpose = 'Optional.';
+      else if (account?.authKind === 'credentials') {
+        const detail = inSentence(credentialsName(account));
+        const have = (account.fields ?? []).length > 1 ? 'them' : 'one';
+        purpose = `Optional. Add your ${detail}${when} if you have ${have}. Holds work without it.`;
+      } else if (signedIn) purpose = "Optional. Checkout is quicker while you're signed in.";
       else {
-        const when = snipes ? ' before a release' : '';
         purpose = `Optional. Connect ${name}${when} so checkout is quicker. Holds work without it.`;
       }
       break;
@@ -118,7 +137,102 @@ export function missingAccountWarning(
   account: ProviderAccount | undefined
 ): string | null {
   if (!requiresAccount(manifest) || account?.status === 'signed-in') return null;
+  const until =
+    account?.authKind === 'credentials'
+      ? `until you add your ${inSentence(credentialsName(account))}`
+      : 'until you connect';
   return manifest.capabilities.account === 'required'
-    ? `${manifest.shortName} can't be used until you connect.`
-    : `${manifest.shortName} holds can't be placed until you connect.`;
+    ? `${manifest.shortName} can't be used ${until}.`
+    : `${manifest.shortName} holds can't be placed ${until}.`;
+}
+
+// ---------------------------------------------------------------------------------------
+// `credentials` accounts: details saved in the app (a member number), write-only
+// ---------------------------------------------------------------------------------------
+
+/** What the saved details are called: the one field's label, or "Details" for several. */
+export function credentialsName(account: Pick<ProviderAccount, 'fields'>): string {
+  const fields = account.fields ?? [];
+  return fields.length === 1 ? fields[0].label : 'Details';
+}
+
+/** True when every field has a saved value (main's `signed-in`). */
+export function credentialsSaved(account: ProviderAccount): boolean {
+  return account.status === 'signed-in';
+}
+
+/** The status line and tone of a `credentials` row: "Member number saved" or "Not added". */
+export function credentialsRowText(
+  manifest: ProviderManifest,
+  account: ProviderAccount
+): Pick<AccountRowText, 'status' | 'tone'> {
+  if (credentialsSaved(account)) {
+    return { status: `${credentialsName(account)} saved`, tone: 'signed-in' };
+  }
+  return { status: 'Not added', tone: requiresAccount(manifest) ? 'warning' : 'neutral' };
+}
+
+export const CREDENTIALS_TEXT = {
+  replace: 'Replace',
+  remove: 'Remove',
+  save: 'Save',
+  cancel: 'Cancel',
+  /** The statements' group. */
+  statements: 'Before you save',
+  saveFailed: "Couldn't save. Try again.",
+  /** Under the statements while Save is disabled; Save is described by it. */
+  tickEach: 'Tick each statement to save.',
+} as const;
+
+/** "it" for one saved detail, "them" for several. */
+const pronoun = (account: Pick<ProviderAccount, 'fields'>) =>
+  (account.fields ?? []).length > 1 ? 'them' : 'it';
+
+/** The form's description: what happens to what is typed. */
+export function credentialsStorageText(account: Pick<ProviderAccount, 'fields'>): string {
+  return `Kept encrypted on this computer. WA Stay never shows ${pronoun(account)} again.`;
+}
+
+/** What Remove says it does: "WA Stay forgets it…", or "…them…" for several details. */
+export function removeCredentialsMessage(account: Pick<ProviderAccount, 'fields'>): string {
+  const it = pronoun(account);
+  return `WA Stay forgets ${it}; you can add ${it} again any time.`;
+}
+
+/** "Add member number", or "Add details" when the provider asks for several. */
+export function addCredentialsLabel(account: ProviderAccount): string {
+  return `Add ${inSentence(credentialsName(account))}`;
+}
+
+/** The form's title: "RAC account". */
+export function credentialsDialogTitle(manifest: ProviderManifest): string {
+  return `${manifest.shortName} account`;
+}
+
+/** "Remove your member number?" */
+export function removeCredentialsTitle(account: ProviderAccount): string {
+  return `Remove your ${inSentence(credentialsName(account))}?`;
+}
+
+/** Announced after a save: "Member number saved". */
+export function credentialsSavedAnnouncement(account: ProviderAccount): string {
+  return `${credentialsName(account)} saved`;
+}
+
+/** Announced after a removal: "Member number removed". */
+export function credentialsRemovedAnnouncement(account: ProviderAccount): string {
+  return `${credentialsName(account)} removed`;
+}
+
+/**
+ * What is wrong with a typed value before main sees it (main checks the same), or null. Main
+ * trims it; nothing here quotes it.
+ */
+export function credentialFieldError(field: AccountFieldDescriptor, value: string): string | null {
+  const trimmed = value.trim();
+  if (!trimmed) return `Enter your ${inSentence(field.label)}.`;
+  if ([...trimmed].length > ACCOUNT_VALUE_MAX_LENGTH) {
+    return `${field.label} is too long (${ACCOUNT_VALUE_MAX_LENGTH} characters at most).`;
+  }
+  return null;
 }

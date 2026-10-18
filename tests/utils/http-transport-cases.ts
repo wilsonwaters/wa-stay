@@ -16,6 +16,7 @@ import type { AddressInfo } from 'node:net';
 import {
   isAbortError,
   MAX_REDIRECTS,
+  platformTokens,
   ProviderHttpError,
   ProviderParseError,
   ProviderTimeoutError,
@@ -313,13 +314,17 @@ export const HTTP_TRANSPORT_CASES: readonly TransportCase[] = [
     },
   },
   {
-    name: 'sends the desktop Chrome user agent',
+    name: 'sends the desktop Chrome user agent of the OS it runs on',
     async run({ client, base, userAgent }) {
       const echo = await client.getJson<Echo>(`${base}/echo`);
       assert.equal(echo.userAgent, userAgent);
+      assert.ok(
+        userAgent.startsWith(`Mozilla/5.0 (${platformTokens().userAgent}) `),
+        `${userAgent} names another OS than ${process.platform}`
+      );
       assert.match(
         userAgent,
-        /^Mozilla\/5\.0 \(Windows NT 10\.0; Win64; x64\).* Chrome\/\d+\.0\.0\.0 Safari/
+        /\) AppleWebKit\/537\.36 \(KHTML, like Gecko\) Chrome\/\d+\.0\.0\.0 Safari\/537\.36$/
       );
     },
   },

@@ -26,6 +26,8 @@ export enum SnipeResult {
   QUEUE_FULL = 'queue_full',
   EXPIRED = 'expired', // window/hold expired
   ERROR = 'error',
+  /** An alert was sent: the dates were free, and nothing was held (§12.35). */
+  ALERTED = 'alerted',
 }
 
 export enum SnipeReleaseMode {
@@ -44,12 +46,16 @@ export enum SnipeStatus {
   FAILED = 'failed',
   EXPIRED = 'expired',
   DISABLED = 'disabled',
+  /** The dates were free and the person was alerted; nothing is held (terminal, §12.35). */
+  ALERTED = 'alerted',
 }
 
 export enum NotificationType {
   WATCH_FOUND = 'watch_found',
   SNIPE_HELD = 'snipe_held',
   SNIPE_BOOKED = 'snipe_booked',
+  /** A snipe found the dates free and alerts with the booking page; nothing is held. */
+  SNIPE_ALERT = 'snipe_alert',
   BOOKING_CONFIRMED = 'booking_confirmed',
   ERROR = 'error',
   WARNING = 'warning',

@@ -1,0 +1,5 @@
+{
+  "_fixture": "Synthetic: written from RAC's NewBook scripts, not recorded. The NewBook proxy's answer to remove_item_from_cart (process.min.js reads cart_total and cart_sidebar): the cart is empty. No cart was ever opened.",
+  "cart_total": 0,
+  "cart_sidebar": ""
+}

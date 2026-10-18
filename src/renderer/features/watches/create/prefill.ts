@@ -3,11 +3,16 @@
  * page link here. The query is read by the shared `parseCreatePrefill` (and the stay kept to
  * the provider's day by `clampStayParams`); this adds what a watch needs on top: the provider
  * must offer watches, the dates must not have passed where the provider is, and every part of
- * the link that cannot be used is dropped with a notice. Pure.
+ * the link that cannot be used is dropped with a notice. The stay types (`stay=cabin`) are
+ * checked against the place's units once they load (`reconcileStayTypes`). Pure.
  */
-import type { ProviderManifest } from '../../../../shared/types/provider.types';
+import type { ProviderManifest, UnitKind } from '../../../../shared/types/provider.types';
 import { parseCreatePrefill } from '../../../app/routes';
-import { clampStayParams, EMPTY_STAY_PARAMS } from '../../../app/stayParams';
+import {
+  clampStayParams,
+  EMPTY_STAY_PARAMS,
+  unusableStayTypeNotice,
+} from '../../../app/stayParams';
 import { providerToday } from '../../../components/stay/providerToday';
 
 export interface WatchPrefill {
@@ -18,6 +23,8 @@ export interface WatchPrefill {
   departure?: string;
   adults?: number;
   children?: number;
+  /** The stay types chosen on Explore, in order, without `other` or repeats. */
+  unitKinds?: UnitKind[];
   /** Why parts of the link were not used. */
   notices: string[];
 }
@@ -72,5 +79,9 @@ export function parseWatchPrefill(
     (raw.has('children') && parsed.children === undefined);
   if (lostGuests)
     prefill.notices.push("The link's guests couldn't be used, so check who's coming.");
+
+  if (parsed.stay) prefill.unitKinds = [...parsed.stay];
+  const stayNotice = unusableStayTypeNotice(raw.get('stay'));
+  if (stayNotice) prefill.notices.push(stayNotice);
   return prefill;
 }

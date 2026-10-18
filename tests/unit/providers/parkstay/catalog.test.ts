@@ -69,6 +69,7 @@ describe('ParkStay catalogue', () => {
         'https://parkstay.dbca.wa.gov.au/media/parkstay/campground_images/25f050a7-6c3.jpg',
       ],
       amenities: ['Toilet', 'Road access for 2WD/SUV'],
+      unitKinds: ['campsite'],
       unitCount: 3,
       infoUrl: 'https://exploreparks.dbca.wa.gov.au/site/bungarra',
       bookingUrl:
@@ -151,6 +152,7 @@ describe('ParkStay catalogue', () => {
       expect(detail.units[0]).toEqual({
         unitId: '1',
         unitName: 'CAMPSITE 01',
+        unitKind: 'campsite',
         minPeople: 1,
         maxPeople: 6,
         maxVehicles: 3,

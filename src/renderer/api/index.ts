@@ -19,7 +19,10 @@ export {
   useAccountCheck,
   useAccounts,
   useAccountStatus,
+  useCopyCredential,
+  useCredentialChangeUpdates,
   useOpenSignInLink,
+  useSaveCredentials,
   useSignIn,
   useSignOut,
 } from './accounts';
@@ -34,10 +37,13 @@ export { useSetSetting, useSetting } from './settings';
 export {
   useAccessStatus,
   useProvider,
+  useProviderExperiments,
   useProviders,
   useProvidersWith,
+  useSetExperiment,
   type ProviderCapabilities,
   type ProviderCapability,
+  type ProviderExperimentState,
   type ProviderManifest,
 } from './providers';
 export {
@@ -81,6 +87,7 @@ export {
   useLocationDetailUpdates,
   useLocationSearch,
   useOpenLocationDocument,
+  usePlaceUnitsLoader,
   type BulkAvailability,
   type BulkAvailabilityStatus,
 } from './catalog';
@@ -89,6 +96,7 @@ export {
   useCreateWatch,
   useDeleteWatch,
   useOpenWatchPayment,
+  useReleaseWatchHold,
   useRunWatchNow,
   useSetWatchActive,
   useUpdateWatch,
@@ -109,7 +117,9 @@ export {
   useCreateSnipe,
   useDeleteSnipe,
   useOpenSnipePayment,
+  useReleaseSnipeHold,
   useRunSnipeNow,
+  useCachedSnipe,
   useSetSnipeActive,
   useSnipe,
   useSnipes,

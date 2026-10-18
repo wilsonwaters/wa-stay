@@ -14,6 +14,7 @@
 
 import type {
   AccessStatus,
+  AccountConfirmation,
   AccountFieldDescriptor,
   AccountStatus,
   BulkAvailabilityEntry,
@@ -23,6 +24,7 @@ import type {
   ProviderManifest,
   StayParams,
   StayQuery,
+  UnitKind,
 } from '@shared/types/provider.types';
 import type {
   BoundingBox,
@@ -180,6 +182,18 @@ export interface ReleaseComputeInput {
   params?: StayParams;
   /** The release time a person entered, for modes such as `scheduled`. */
   requestedAt?: Date;
+  /**
+   * The snipe's unit choice (§12.35): the units it names, or else its stay types (none: any).
+   * A policy may time a unit or category differently (a category left out of a pre-sale).
+   */
+  unitIds?: string[];
+  unitKinds?: UnitKind[];
+  /**
+   * How long the snipe keeps trying after its release, in ms: its own window, clamped to the
+   * mode's `maxWindowMinutes` (§12.35). A policy that refuses a release whose window has
+   * already passed measures it with this. None (an availability check): the policy's own.
+   */
+  windowMs?: number;
   now: Date;
   signal?: AbortSignal;
 }
@@ -212,6 +226,12 @@ export interface HoldSuccess {
   ok: true;
   reference: string;
   expiresAt: Date;
+  /**
+   * `expiresAt` is the provider's guess, not a time its answer gave (a cart that shows no
+   * countdown): the app says "about" before it ("Held until about 10:42 am", "within about 10
+   * minutes"). The night guard and `HOLD_EXPIRED` use the guess as it is.
+   */
+  expiresAtEstimated?: boolean;
   unitId?: string;
 }
 
@@ -222,6 +242,25 @@ export interface HoldFailure {
 }
 
 export type HoldResult = HoldSuccess | HoldFailure;
+
+/** A hold the core asks the provider to let go: as the core recorded it when it was placed. */
+export interface HoldToRelease {
+  reference: string;
+  unitId?: string;
+  expiresAt: Date;
+}
+
+/**
+ * What a release found:
+ * - `released`: the provider held it, and has let it go;
+ * - `gone`: the provider no longer held it (paid, expired, or removed on its own page), so
+ *   nothing was let go. Never touch a booking to answer this.
+ */
+export type HoldReleaseOutcome = 'released' | 'gone';
+
+export interface HoldReleaseResult {
+  outcome: HoldReleaseOutcome;
+}
 
 export interface HoldsModule {
   /** Places a temporary hold. A refusal is a `HoldFailure`, not a rejection. */
@@ -237,6 +276,23 @@ export interface HoldsModule {
    * payment completes.
    */
   bookedReference?(hold: { reference: string }, page: PaymentPage): Promise<string | null>;
+  /**
+   * Lets the hold go before it runs out: when the person declines it ("Let it go"), deletes
+   * its watch or snipe, or (with `releaseOnPaymentClose`) closes the payment window without a
+   * confirmed payment. **The provider decides**: the core never takes a closed window as
+   * unpaid, so look at your own side first, and answer `gone` when the hold is no longer there
+   * (the person may have paid). Reject only when the provider could not be asked (a failed
+   * request, a block, an abort): the hold then stays until it runs out, and nothing retries.
+   * The core calls it at interactive priority, at most once at a time per hold. Needs the
+   * manifest's `holdRelease`.
+   */
+  release?(hold: HoldToRelease, signal?: AbortSignal): Promise<HoldReleaseResult>;
+  /**
+   * Call `release` when the payment window closes with no confirmed payment (a provider with
+   * no confirmation page the app can read, whose hold must not outlive the person's visit).
+   * Not when the window's first page failed, nor on quit. Needs `release`.
+   */
+  readonly releaseOnPaymentClose?: boolean;
 }
 
 /** A page the payment window loaded, as `HoldsModule.bookedReference` may read it. */
@@ -285,20 +341,56 @@ export interface BrowserSessionAuth extends AuthBase {
 }
 
 /**
- * Sign-in with values the app asks for (§12.30). Declared and validated; the account
- * service does not implement it yet. Secret values are kept in the provider's scoped
- * secret vault, never in plain state.
+ * Sign-in with details the app asks for (§12.30, §12.35): Settings → Accounts shows `fields`
+ * and `confirmations`, and `accounts.saveCredentials` stores the values once `signIn` accepts
+ * them. The core keeps every value in the provider's scoped secret vault as `account.<key>`
+ * (`ctx.secrets.get('account.<key>')` reads it), never in plain state, never in a log and never
+ * back to the renderer. The status is worked out from what is stored: `isSignedIn` is not
+ * called.
  */
 export interface CredentialsAuth extends AuthBase {
   kind: 'credentials';
   /** At least one, with unique keys. */
   fields: readonly AccountFieldDescriptor[];
+  /** Statements the person must tick to save, with unique keys. */
+  confirmations?: readonly AccountConfirmation[];
+  /**
+   * Checks the values (trimmed, every declared field, none empty) before they are stored,
+   * within 15 s: `signed-in` stores them, `signed-out` refuses them ("{shortName} didn't accept
+   * these details", or the answer's own `message`), and `unknown` or a rejection stores nothing
+   * ("Couldn't check these details"). A `signed-in` answer may carry `values` to store instead,
+   * in the provider's own form (see `CredentialsSignInResult`). Never put a value in an error
+   * message, a refusal's `message` or a log line.
+   */
   signIn(
     values: Readonly<Record<string, string>>,
     http: HttpClient,
     signal?: AbortSignal
-  ): Promise<AccountStatus>;
+  ): Promise<CredentialsSignInResult>;
 }
+
+/**
+ * What a `credentials` sign-in's `signIn` answers: the status, and with `signed-in` optionally
+ * the values to store (and copy) instead of what was typed, normalised the provider's way
+ * ("1234 5678 9012" → "123456789012"). Only declared keys, each a string that is not empty and
+ * at most 256 characters once trimmed; a declared key left out keeps the typed value. Anything
+ * else makes the core ignore `values` (with a warning that names no value) and store what was
+ * typed.
+ */
+export interface CredentialsSignInResult extends AccountStatus {
+  values?: Readonly<Record<string, string>>;
+  /**
+   * With `signed-out` only: why, in the provider's own words, said on the field instead of
+   * "{shortName} didn't accept these details" ("That doesn't look like an RAC member number").
+   * Plain text, at most `CREDENTIALS_MESSAGE_MAX_LENGTH` characters, quoting nothing the person
+   * typed: the core ignores one that is not text, is empty or longer, or contains a value it
+   * was given, and says its own words instead.
+   */
+  message?: string;
+}
+
+/** The most characters a `credentials` refusal's `message` may have. */
+export const CREDENTIALS_MESSAGE_MAX_LENGTH = 200;
 
 /** Sign-in that browser automation performs (§12.30). Declared and validated only. */
 export interface AutomationAuth extends AuthBase {
@@ -311,8 +403,14 @@ export type ProviderAuth = BrowserSessionAuth | CredentialsAuth | AutomationAuth
 export interface ProviderLinks {
   /** The location's page on the provider's site. */
   location(externalId: string): string | null;
-  /** A booking deep link, for the stay when given. */
-  booking(externalId: string, stay?: StayQuery): string | null;
+  /**
+   * A booking deep link, for the stay when given, and for the unit (or category) `unitId`
+   * when the provider can prefill one (a provider may ignore it; ParkStay does). With a stay
+   * it is a booking link, by the rule on `UnitAvailability.bookingUrl`: https on the
+   * provider's own site, a public page that needs no sign-in, works on a phone, and never
+   * adds to a cart, holds or books when it is opened.
+   */
+  booking(externalId: string, stay?: StayQuery, unitId?: string): string | null;
   /** Where the person manages an existing booking (§12.5). */
   manageBooking?(reference: string): string | null;
 }

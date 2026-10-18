@@ -1,8 +1,8 @@
 # WA Stay documentation
 
-WA Stay is a desktop app for finding and booking places to stay across Western Australia,
-starting with ParkStay WA's national-park campgrounds. The project overview and downloads are in
-the [README](../README.md).
+WA Stay is a desktop app for finding and booking places to stay across Western Australia, from
+ParkStay WA's national-park campgrounds to RAC Parks & Resorts' holiday parks. The project
+overview and downloads are in the [README](../README.md).
 
 ## Using WA Stay
 
@@ -22,7 +22,8 @@ the [README](../README.md).
 - [Architecture overview](architecture/overview.md): processes, source layout, start-up, the
   provider architecture, the data model, security and the upgrade path.
   - [ADR-001: UI framework choice](architecture/adr/ADR-001-ui-framework-choice.md)
-- [Security](security.md): secret storage, legacy secrets, provider sign-in and payment windows.
+- [Security](security.md): secret storage (a member number included), legacy secrets,
+  experiments, provider sign-in and payment windows.
 - [CLAUDE.md](../CLAUDE.md): conventions for working in the code (IPC, migrations, checks).
 - [Tests](../tests/README.md): the Jest suite, fixtures and the Electron smoke tests.
 
@@ -36,6 +37,12 @@ the [README](../README.md).
 - [ParkStay WA](providers/parkstay/README.md): the manifest, releases, data and terms.
   - [Endpoints](providers/parkstay/endpoints.md): what is requested, with verification status.
   - [Sign-in](providers/parkstay/authentication.md): the in-app sign-in window.
+- [RAC Parks & Resorts](providers/rac/README.md): the manifest, the parks, availability, pacing,
+  releases, the member number and RAC's terms.
+  - [Endpoints](providers/rac/endpoints.md): what is requested, with verification status, and
+    RAC's codes.
+  - [Release calendar](providers/rac/release-calendar.md): keeping the school-holiday release
+    days current.
 
 ## Design
 

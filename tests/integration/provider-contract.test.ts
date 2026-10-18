@@ -10,10 +10,13 @@ import { createFakeProvider, createTestProviderContext } from '@tests/utils/fake
 import { createFakeSearchProvider } from '@tests/utils/fake-search-provider';
 import {
   abortViolation,
+  bookingLinkViolations,
   defaultSearchText,
   describeProviderContract,
+  freeCountViolations,
   searchAreaViolations,
   searchTextViolations,
+  stayRuleViolations,
 } from '@tests/utils/provider-contract';
 
 /** Perth to Albany: 6 of FakeSearchProvider's 12 places. */
@@ -37,6 +40,10 @@ describeProviderContract('FakeProvider with only catalogue and availability', ()
       account: 'none',
     },
   }),
+}));
+
+describeProviderContract('FakeProvider with unit booking links', () => ({
+  provider: createFakeProvider({ unitBookingUrls: true }),
 }));
 
 describeProviderContract('FakeProvider with a search-mode catalogue', () => ({
@@ -146,6 +153,244 @@ describe('the search-mode checks of the contract suite', () => {
     expect(await searchTextViolations(foreign, 'bad', 'bay')).toEqual([
       'searchText("bay"): other:1 is not a location of bad',
     ]);
+  });
+});
+
+describe('the booking-link check of the contract suite', () => {
+  const stay = { arrival: '2026-11-10', departure: '2026-11-12', adults: 2 };
+  const unit = (unitId: string, bookingUrl?: string) => ({
+    unitId,
+    unitName: `Site ${unitId}`,
+    nights: [],
+    fullyAvailable: false,
+    ...(bookingUrl ? { bookingUrl } : {}),
+  });
+
+  it("passes links on the provider's site: its website's host and a subdomain of it", async () => {
+    const fake = createFakeProvider({ unitBookingUrls: true });
+    const result = await fake.availability!.check('1', stay);
+    expect(result.bookingUrl).toMatch(/^https:\/\/fake\.example\//);
+    expect(result.units[0].bookingUrl).toMatch(/^https:\/\/book\.fake\.example\//);
+    expect(bookingLinkViolations(fake.manifest, result)).toEqual([]);
+    expect(bookingLinkViolations(fake.manifest, { units: [unit('u1')] })).toEqual([]);
+  });
+
+  it('fails a provider whose check returns an off-site link, for the location or a unit', async () => {
+    // A provider whose booking links are on another site: its check returns them as they are
+    const offSite = createFakeProvider();
+    offSite.links.booking = () => 'https://cart.elsewhere.test/add?campground=1';
+    const result = await offSite.availability!.check('1', stay);
+    expect(result.bookingUrl).toBe('https://cart.elsewhere.test/add?campground=1');
+    expect(bookingLinkViolations(offSite.manifest, result)).toEqual([
+      "the location's bookingUrl https://cart.elsewhere.test/add?campground=1 is not on https://fake.example",
+    ]);
+
+    // A look-alike host on a unit
+    const lookAlike = {
+      ...result,
+      bookingUrl: undefined,
+      units: [
+        result.units[0],
+        { ...result.units[1], bookingUrl: 'https://fake.example.evil.test/u2' },
+      ],
+    };
+    expect(bookingLinkViolations(offSite.manifest, lookAlike)).toEqual([
+      "unit u2's bookingUrl https://fake.example.evil.test/u2 is not on https://fake.example",
+    ]);
+  });
+
+  it('fails an http link, credentials and a non-URL', () => {
+    expect(
+      bookingLinkViolations(
+        { website: 'https://fake.example' },
+        {
+          units: [
+            unit('a', 'http://fake.example/book'),
+            unit('b', 'https://me:pw@fake.example/book'),
+            unit('c', 'javascript:alert(1)'),
+          ],
+        }
+      ).map((violation) => violation.split("'")[0])
+    ).toEqual(['unit a', 'unit b', 'unit c']);
+  });
+});
+
+/**
+ * A provider with stay rules: u1 needs 3 nights (a shorter stay's nights are answered
+ * `min-stay`), u2's nights are refused under its rules.
+ */
+const withStayRules = () =>
+  createFakeProvider({
+    availability: {
+      '1': {
+        u1: 'available',
+        u2: [
+          { state: 'unknown', reason: 'min-stay', minNights: 3, noArrival: true },
+          { state: 'unknown', reason: 'min-stay', minNights: 3, noDeparture: true },
+        ],
+      },
+    },
+    unitMinNights: { u1: 3 },
+  });
+
+describeProviderContract('FakeProvider with stay rules', () => ({
+  provider: withStayRules(),
+  sample: { externalId: '1', stay: { arrival: '2026-11-10', departure: '2026-11-12', adults: 2 } },
+}));
+
+describe('the stay-rule checks of the contract suite', () => {
+  const stay = { arrival: '2026-11-10', departure: '2026-11-12', adults: 2 };
+
+  it('pass a provider that refuses a stay under its minimum and words its refused nights unknown', async () => {
+    const fake = withStayRules();
+    const result = await fake.availability!.check('1', stay);
+    expect(result.units.map((u) => [u.unitId, u.fullyAvailable, u.minNights])).toEqual([
+      ['u1', false, 3],
+      ['u2', false, undefined],
+    ]);
+    // u1 has room both nights, but the 2-night stay is under its minimum: refused, not free
+    expect(result.units[0].nights.map((n) => [n.state, n.reason])).toEqual([
+      ['unknown', 'min-stay'],
+      ['unknown', 'min-stay'],
+    ]);
+    expect(stayRuleViolations(stay, result)).toEqual([]);
+    // A 3-night stay meets u1's minimum
+    const longer = { ...stay, departure: '2026-11-13' };
+    const three = await fake.availability!.check('1', longer, { unitIds: ['u1'] });
+    expect(three.units[0].fullyAvailable).toBe(true);
+    expect(three.units[0].nights.every((n) => n.state === 'available' && !n.reason)).toBe(true);
+    expect(stayRuleViolations(longer, three)).toEqual([]);
+  });
+
+  it('fail a unit that is fullyAvailable for a stay shorter than its minNights', async () => {
+    const result = await createFakeProvider().availability!.check('1', stay);
+    const mistaken = {
+      units: result.units.map((u) => (u.unitId === 'u1' ? { ...u, minNights: 3 } : u)),
+    };
+    expect(mistaken.units[0].fullyAvailable).toBe(true);
+    expect(stayRuleViolations(stay, mistaken)).toEqual([
+      'unit u1 is fullyAvailable for 2 nights, under its minNights 3',
+      "unit u1's nights 2026-11-10, 2026-11-11 are available with no reason, under its 3-night minimum for 2 nights (they are min-stay)",
+    ]);
+    // A minimum the stay meets, or one that is no rule, is fine
+    for (const minNights of [2, 1, 0, 2.5]) {
+      const fine = { units: [{ ...result.units[0], minNights }] };
+      expect(stayRuleViolations(stay, fine)).toEqual([]);
+    }
+  });
+
+  it('fail a stay under the minimum (the arrival night’s, else the unit’s) whose nights are available with no reason', () => {
+    const unit = (nights: object[], extra: object = {}) => ({
+      unitId: 'u1',
+      unitName: 'Site u1',
+      fullyAvailable: false,
+      nights: nights as never,
+      ...extra,
+    });
+    const free = (date: string, extra: object = {}) => ({ date, state: 'available', ...extra });
+    const refused = (date: string) => ({ date, state: 'unknown', reason: 'min-stay' });
+    const message = (dates: string, minimum: number) =>
+      `unit u1's nights ${dates} are available with no reason, under its ${minimum}-night minimum for 2 nights (they are min-stay)`;
+
+    // The unit's minimum
+    expect(
+      stayRuleViolations(stay, {
+        units: [unit([free('2026-11-10'), refused('2026-11-11')], { minNights: 3 })],
+      })
+    ).toEqual([message('2026-11-10', 3)]);
+    // The arrival night's minimum, which comes before the unit's (here 1, no rule)
+    expect(
+      stayRuleViolations(stay, {
+        units: [unit([free('2026-11-10', { minNights: 4 }), free('2026-11-11')], { minNights: 1 })],
+      })
+    ).toEqual([message('2026-11-10, 2026-11-11', 4)]);
+    // A night's 0 or fraction is no rule: the unit's applies
+    expect(
+      stayRuleViolations(stay, {
+        units: [
+          unit([free('2026-11-10', { minNights: 0.5 }), free('2026-11-11')], { minNights: 3 }),
+        ],
+      })
+    ).toEqual([message('2026-11-10, 2026-11-11', 3)]);
+    // The arrival night's 2 lets the stay through, whatever the unit says; booked nights are fine
+    expect(
+      stayRuleViolations(stay, {
+        units: [unit([free('2026-11-10', { minNights: 2 }), free('2026-11-11')], { minNights: 5 })],
+      })
+    ).toEqual([]);
+    expect(
+      stayRuleViolations(stay, {
+        units: [
+          unit([refused('2026-11-10'), { date: '2026-11-11', state: 'booked' }], { minNights: 3 }),
+        ],
+      })
+    ).toEqual([]);
+  });
+
+  it('fail a min-stay night that is available', () => {
+    const unit = {
+      unitId: 'u1',
+      unitName: 'Site u1',
+      fullyAvailable: false,
+      nights: [
+        { date: '2026-11-10', state: 'available' as const, reason: 'min-stay' as const },
+        { date: '2026-11-11', state: 'unknown' as const, reason: 'min-stay' as const },
+      ],
+    };
+    expect(stayRuleViolations(stay, { units: [unit] })).toEqual([
+      "unit u1's night 2026-11-10 is min-stay but available",
+    ]);
+  });
+});
+
+describe('the free-count checks of the contract suite', () => {
+  const stay = { arrival: '2026-11-10', departure: '2026-11-12', adults: 2 };
+  const unit = (unitId: string, fullyAvailable: boolean, freeCount?: unknown) => ({
+    unitId,
+    unitName: `Category ${unitId}`,
+    fullyAvailable,
+    nights: [],
+    ...(freeCount !== undefined ? { freeCount: freeCount as number } : {}),
+  });
+
+  it('pass a provider that counts no units (each unit is one), as FakeProvider does', async () => {
+    const result = await createFakeProvider().availability!.check('1', stay);
+    expect(result.units.some((u) => u.freeCount !== undefined)).toBe(false);
+    expect(freeCountViolations(result)).toEqual([]);
+  });
+
+  it('pass whole counts on every unit: 1 or more when free for the whole stay, else 0', () => {
+    expect(
+      freeCountViolations({
+        units: [unit('c1', true, 51), unit('c2', false, 0), unit('c3', true, 1)],
+      })
+    ).toEqual([]);
+  });
+
+  it('fail a count that is not a whole number, or that disagrees with fullyAvailable', () => {
+    expect(
+      freeCountViolations({
+        units: [
+          unit('c1', true, 2.5),
+          unit('c2', true, -1),
+          unit('c3', true, '4'),
+          unit('c4', true, 0),
+          unit('c5', false, 3),
+        ],
+      })
+    ).toEqual([
+      "unit c1's freeCount 2.5 is not a whole number",
+      "unit c2's freeCount -1 is not a whole number",
+      "unit c3's freeCount 4 is not a whole number",
+      'unit c4 is fullyAvailable with freeCount 0',
+      'unit c5 is not fullyAvailable, but its freeCount is 3',
+    ]);
+  });
+
+  it('fail counts on some units only: a count of what is free could not tell if there is a total', () => {
+    expect(
+      freeCountViolations({ units: [unit('c1', true, 51), unit('c2', false), unit('c3', true)] })
+    ).toEqual(['units c2, c3 have no freeCount, but others do']);
   });
 });
 

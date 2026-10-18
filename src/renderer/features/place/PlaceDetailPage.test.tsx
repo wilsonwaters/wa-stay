@@ -299,7 +299,8 @@ describe('Place detail page', () => {
       placeApi({ detail: placeDetail({ descriptionHtml: undefined, summary: undefined }) })
     );
     const about = screen.getByRole('region', { name: 'About' });
-    expect(within(about).getByText("ParkStay hasn't published a description.")).toBeInTheDocument();
+    // Says what WA Stay lacks, never that the provider failed (R9, routed R5 note)
+    expect(within(about).getByText('No description yet.')).toBeInTheDocument();
     expect(
       within(about).getByRole('link', {
         name: 'More information exploreparks.dbca.wa.gov.au (opens in your browser)',
@@ -591,7 +592,7 @@ describe('Place detail page', () => {
         fail('parkstay: HTTP 429 from https://parkstay.dbca.wa.gov.au/api', 'RATE_LIMITED')
       );
       expect(
-        await within(card()).findByText('Too many checks in a short time. Try again in a minute.')
+        await within(card()).findByText('ParkStay asked WA Stay to slow down. Try again later.')
       ).toBeInTheDocument();
     });
 
@@ -631,7 +632,7 @@ describe('Place detail page', () => {
   });
 
   describe('capabilities', () => {
-    it("says when the provider doesn't share availability, instead of Check", async () => {
+    it("says WA Stay can't check availability here, instead of Check", async () => {
       await renderPlace(
         `/places/parkstay/20${STAY}`,
         placeApi({
@@ -644,7 +645,7 @@ describe('Place detail page', () => {
       );
       expect(
         within(card()).getByText(
-          "ParkStay doesn't share availability with WA Stay. Check dates on their website."
+          "WA Stay can't check availability here. Check dates on ParkStay's website."
         )
       ).toBeInTheDocument();
       expect(within(card()).queryByRole('button', { name: 'Check availability' })).toBeNull();
@@ -736,6 +737,20 @@ describe('Place detail page', () => {
       expect(within(card()).getByRole('link', { name: 'Watch for availability' })).toHaveAttribute(
         'href',
         '#/watches/new?provider=parkstay&location=20&arrival=2099-11-06&departure=2099-11-08&adults=2'
+      );
+    });
+
+    it("hands on Explore's stay types: the watch and snipe links carry stay=cabin", async () => {
+      await renderPlace(`/places/parkstay/20${STAY}&stay=cabin,castle`);
+      expect(within(card()).getByRole('link', { name: 'Watch for availability' })).toHaveAttribute(
+        'href',
+        '#/watches/new?provider=parkstay&location=20&arrival=2099-11-06&departure=2099-11-08&adults=2&stay=cabin'
+      );
+      expect(
+        within(card()).getByRole('link', { name: 'Snipe a site, coming soon' })
+      ).toHaveAttribute(
+        'href',
+        '#/site-sniper/new?provider=parkstay&location=20&arrival=2099-11-06&departure=2099-11-08&adults=2&stay=cabin'
       );
     });
 

@@ -1,11 +1,12 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useCallback } from 'react';
+import { useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import type {
   SiteSnipe,
   SiteSnipeInput,
   SnipeExecutionResult,
 } from '../../shared/types/site-sniper.types';
 import { unwrap } from './client';
-import { useApiEvent, useInvalidateOn } from './events';
+import { useApiEvent } from './events';
 import { queryKeys } from './queryKeys';
 
 /** Bursts of `snipe:updated` (a snipe at release changes every second) refetch once per window. */
@@ -28,10 +29,17 @@ export function useSnipe(id: number) {
   });
 }
 
+const pendingRefresh = new WeakMap<QueryClient, ReturnType<typeof setTimeout>>();
+
 /**
  * Keeps snipe queries fresh. `snipe:updated` carries the whole snipe, so the affected card and
  * detail change in place at once (no refetch, no spinner); the lists are then marked stale,
  * coalesced, which also catches a snipe that was deleted or created elsewhere.
+ *
+ * The app shell mounts it, so a change made while no snipe page is open (a member number saved
+ * in Settings re-arms that provider's snipes with a new release time) is in the cache when one
+ * opens again. The snipe pages mount it too; however many listen, a burst refetches once per
+ * query client.
  */
 export function useSnipeUpdates(): void {
   const queryClient = useQueryClient();
@@ -42,8 +50,15 @@ export function useSnipeUpdates(): void {
     queryClient.setQueryData<SiteSnipe | null>(queryKeys.snipes.detail(snipe.id), (current) =>
       current === undefined ? current : snipe
     );
+    if (pendingRefresh.has(queryClient)) return;
+    pendingRefresh.set(
+      queryClient,
+      setTimeout(() => {
+        pendingRefresh.delete(queryClient);
+        void queryClient.invalidateQueries({ queryKey: queryKeys.snipes.all });
+      }, SNIPE_EVENT_COALESCE_MS)
+    );
   });
-  useInvalidateOn('snipe:updated', queryKeys.snipes.all, { coalesceMs: SNIPE_EVENT_COALESCE_MS });
 }
 
 export function useCreateSnipe() {
@@ -82,6 +97,20 @@ export function useSetSnipeActive() {
   });
 }
 
+/**
+ * The snipe as the cache holds it now: its detail, else its entry in the list. A pushed
+ * `snipe:updated` lands there at once, before the screen re-renders.
+ */
+export function useCachedSnipe(): (id: number) => SiteSnipe | undefined {
+  const queryClient = useQueryClient();
+  return useCallback(
+    (id: number) =>
+      queryClient.getQueryData<SiteSnipe | null>(queryKeys.snipes.detail(id)) ??
+      queryClient.getQueryData<SiteSnipe[]>(queryKeys.snipes.list())?.find((s) => s.id === id),
+    [queryClient]
+  );
+}
+
 /** One attempt now. The snipe itself refreshes from the `snipe:updated` main sends after it. */
 export function useRunSnipeNow() {
   return useMutation({
@@ -98,6 +127,27 @@ export function useOpenSnipePayment() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (id: number) => unwrap((api) => api.snipes.openPayment(id)),
+    onError: () => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.snipes.all });
+    },
+  });
+}
+
+/**
+ * "Let it go": asks main to let a HELD snipe's hold go. Resolves with the snipe, EXPIRED with
+ * why (`lastError`), which goes straight into the cache. A failure (the hold ended meanwhile,
+ * the provider did not answer) refetches the snipe, so the page shows what is true.
+ */
+export function useReleaseSnipeHold() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: number): Promise<SiteSnipe> => unwrap((api) => api.snipes.releaseHold(id)),
+    onSuccess: (snipe: SiteSnipe) => {
+      queryClient.setQueryData<SiteSnipe[]>(queryKeys.snipes.list(), (list) =>
+        list?.map((item) => (item.id === snipe.id ? snipe : item))
+      );
+      queryClient.setQueryData(queryKeys.snipes.detail(snipe.id), snipe);
+    },
     onError: () => {
       void queryClient.invalidateQueries({ queryKey: queryKeys.snipes.all });
     },

@@ -5,7 +5,8 @@
  *   module on `NodeHttpClient` against V3's fixture server: sync isolation, search filters
  *   and facets over the ParkStay fixture catalogue, the detail cache and its stale fallback,
  *   and the availability fan-out;
- * - the `catalog.*` handlers through P3's IPC harness on a real container;
+ * - the `catalog.*` handlers through P3's IPC harness on a real container, unit kinds (R1)
+ *   included: every location and detail main returns has them;
  * - the retired transitional `parkstay` namespace.
  */
 
@@ -28,6 +29,7 @@ import type {
   CatalogStatus,
   LocationAvailability,
   LocationDetail,
+  UnitSummary,
 } from '@shared/types';
 import { TestDatabaseHelper } from '@tests/utils/database-helper';
 import {
@@ -475,6 +477,7 @@ describe('the location catalogue on a real database', () => {
         key: 'parkstay:20',
         availableUnits: 3,
         bookableUnits: 5,
+        byKind: { campsite: { availableUnits: 3, bookableUnits: 5 } },
       });
       expect(result.entries.map((e) => e.key).sort()).toEqual(['parkstay:18', 'parkstay:20']);
     });
@@ -493,6 +496,7 @@ describe('the location catalogue on a real database', () => {
         key: 'parkstay:20',
         availableUnits: 3,
         bookableUnits: 5,
+        byKind: { campsite: { availableUnits: 3, bookableUnits: 5 } },
       });
       expect(entriesOf(result, 'fake2')).toHaveLength(2);
 
@@ -624,6 +628,7 @@ describe('catalog.* over IPC (P3 harness, real container)', () => {
       'kinds',
       'providers',
       'regions',
+      'unitKinds',
     ]);
 
     const detail = await call<LocationDetail>('catalog:get', { key: 'fake:area:3' });
@@ -660,6 +665,81 @@ describe('catalog.* over IPC (P3 harness, real container)', () => {
     for (const response of [refreshed, status, search, detail, bulk, check]) {
       expect(structuredClone(response)).toEqual(response);
     }
+  });
+
+  describe('unit kinds (a provider that sets none)', () => {
+    it('every catalog.search item and catalog.get detail has non-empty unitKinds', async () => {
+      // Not vacuous: the fake's summaries and details carry no unit kinds
+      const listed = await fake.catalog!.listLocations!();
+      expect(listed.every((l) => l.unitKinds === undefined)).toBe(true);
+      expect((await fake.catalog!.getLocation('1')).unitKinds).toBeUndefined();
+      await call('catalog:refresh', { providerId: 'fake' });
+
+      const search = await call<CatalogSearchResult>('catalog:search', {});
+      expect(search.data!.items.map((l) => [l.key, l.unitKinds])).toEqual([
+        ['fake:1', ['campsite']],
+        ['fake:2', ['campsite']],
+        ['fake:area:3', ['campsite']],
+      ]);
+      for (const { key } of search.data!.items) {
+        const detail = await call<LocationDetail>('catalog:get', { key });
+        expect([key, detail.success, detail.data?.unitKinds]).toEqual([key, true, ['campsite']]);
+        // Served from the cache the second time, still with them
+        const cached = await call<LocationDetail>('catalog:get', { key });
+        expect(cached.data!.unitKinds).toEqual(['campsite']);
+      }
+    });
+
+    it('catalog:search filters and counts by unitKinds; an unknown kind is VALIDATION', async () => {
+      await call('catalog:refresh', { providerId: 'fake' });
+
+      const camping = await call<CatalogSearchResult>('catalog:search', {
+        unitKinds: ['campsite', 'cabin'],
+      });
+      expect(camping.data!.total).toBe(3);
+      expect(camping.data!.facets!.unitKinds).toEqual([{ value: 'campsite', count: 3 }]);
+      const cabins = await call<CatalogSearchResult>('catalog:search', { unitKinds: ['cabin'] });
+      expect(cabins.data!.total).toBe(0);
+      // `other` is a valid filter, though no chip offers it
+      expect((await call('catalog:search', { unitKinds: ['other'] })).success).toBe(true);
+      expect(await call('catalog:search', { unitKinds: ['castle'] })).toMatchObject({
+        success: false,
+        code: 'VALIDATION',
+        issues: ['unitKinds.0'],
+      });
+    });
+
+    it("cleans a detail's unit kinds, else gives the summary's; a unit keeps only a known kind", async () => {
+      await call('catalog:refresh', { providerId: 'fake' });
+      const detailOf = async (externalId: string) => ({
+        ...(await fake.catalog!.getLocation(externalId)),
+        units: [
+          { unitId: 'u1', unitName: 'Site 1', unitKind: 'cabin' as const },
+          {
+            unitId: 'u2',
+            unitName: 'Castle 2',
+            unitKind: 'castle' as unknown as UnitSummary['unitKind'],
+          },
+        ],
+      });
+      const first = await detailOf('1');
+      const second = await detailOf('2');
+      const getLocation = jest.spyOn(fake.catalog!, 'getLocation');
+      getLocation.mockResolvedValueOnce({
+        ...first,
+        unitKinds: ['castle', 'cabin', 'cabin', 'room'] as unknown as UnitSummary['unitKind'][],
+      });
+      getLocation.mockResolvedValueOnce({ ...second, unitKinds: [] });
+
+      const own = await call<LocationDetail>('catalog:get', { key: 'fake:1' });
+      expect(own.data!.unitKinds).toEqual(['cabin', 'room']);
+      expect(own.data!.units).toEqual([
+        { unitId: 'u1', unitName: 'Site 1', unitKind: 'cabin' },
+        { unitId: 'u2', unitName: 'Castle 2' },
+      ]);
+      const fromSummary = await call<LocationDetail>('catalog:get', { key: 'fake:2' });
+      expect(fromSummary.data!.unitKinds).toEqual(['campsite']);
+    });
   });
 
   it("a provider's failure is an error entry over IPC, not a failed call", async () => {

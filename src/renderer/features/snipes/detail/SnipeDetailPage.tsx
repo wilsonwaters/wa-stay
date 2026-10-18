@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router';
 import { LoaderCircle } from 'lucide-react';
 import {
@@ -8,11 +8,9 @@ import {
   useSnipe,
   useSnipeUpdates,
 } from '../../../api';
-import { SnipeStatus } from '../../../../shared/types/common.types';
 import type { ProviderManifest } from '../../../../shared/types/provider.types';
 import type { SiteSnipe } from '../../../../shared/types/site-sniper.types';
 import { ROUTES } from '../../../app/routes';
-import { ConnectAccountPrompt } from '../../../components/accounts/ConnectAccountPrompt';
 import { PlacePhoto } from '../../../components/PlacePhoto';
 import { providerToday } from '../../../components/stay/providerToday';
 import {
@@ -22,20 +20,20 @@ import {
   PageHeader,
   ProviderBadge,
   Skeleton,
+  StatusPill,
   VisuallyHidden,
 } from '../../../components/ui';
 import { useNow } from '../../../hooks/useNow';
 import { ConnectToArmDialog } from '../shared/ConnectToArmDialog';
 import { DeleteSnipeDialog } from '../shared/DeleteSnipeDialog';
-import { HeldPanel } from '../shared/HeldPanel';
 import { ReleaseLine } from '../shared/ReleaseLine';
 import { SnipeActionsBar } from '../shared/SnipeActionsBar';
 import { SnipeTimeline } from '../shared/SnipeTimeline';
-import { isFinished, timelineSteps } from '../shared/snipeState';
+import { heldUnitNoun, statusPillFor } from '../shared/snipeState';
 import { useSnipeActions } from '../shared/useSnipeActions';
-import { useUnitNames } from '../shared/useUnitNames';
-import { bookingHref } from '../shared/snipeFormat';
+import { usePlaceUnits } from '../shared/usePlaceUnits';
 import { HoldAlert, useStatusAnnouncements } from '../shared/useStatusAnnouncements';
+import { SnipeOutcome } from './SnipeOutcome';
 import { SnipeRecord, SnipeSummary } from './SnipeSummary';
 import { useLingering } from './useLingering';
 
@@ -55,15 +53,18 @@ function SnipeDetailView({ snipe, manifest, updating: fetching }: ViewProps) {
   const now = useNow();
   const [confirming, setConfirming] = useState(false);
   const place = useLocationDetail(snipe.locationKey);
-  const names = useUnitNames(snipe);
-  const actions = useSnipeActions(snipe, manifest, names);
+  const units = usePlaceUnits(snipe);
+  // After Arm, Arm again or Disarm the button pressed goes: focus moves to the status line
+  const statusLine = useRef<HTMLParagraphElement>(null);
+  const actions = useSnipeActions(snipe, manifest, units, {
+    onActiveChanged: () => statusLine.current?.focus(),
+  });
   const snipes = useMemo(() => [snipe], [snipe]);
   const manifestOf = useCallback(() => manifest, [manifest]);
   const alert = useStatusAnnouncements(snipes, manifestOf);
   const { location } = snipe;
   const provider = manifest?.shortName ?? 'the provider';
   const today = providerToday(manifest, now);
-  const terminal = timelineSteps(snipe).find((step) => step.terminal);
 
   return (
     <div className={PAGE}>
@@ -109,43 +110,32 @@ function SnipeDetailView({ snipe, manifest, updating: fetching }: ViewProps) {
         }
       />
       <HoldAlert message={alert} />
-      {snipe.status === SnipeStatus.HELD && (
-        <HeldPanel snipe={snipe} manifest={manifest} actions={actions} unitNames={names} />
-      )}
-      {snipe.status === SnipeStatus.BOOKED && (
-        <Notice tone="success" title={`Booked on ${provider}`}>
-          {snipe.bookedReference && <>Reference {snipe.bookedReference}. </>}
-          <Link to={bookingHref(snipe.bookedReference)} className="font-semibold underline">
-            See it in Bookings
-          </Link>
-        </Notice>
-      )}
-      {terminal && (
-        <Notice
-          tone={snipe.status === SnipeStatus.FAILED ? 'danger' : 'info'}
-          title={terminal.label}
-        >
-          {snipe.lastError ?? 'The snipe has stopped. Arm it again to keep trying.'}
-        </Notice>
-      )}
-      {manifest && !isFinished(snipe) && (
-        <ConnectAccountPrompt
-          manifest={manifest}
-          message={
-            manifest.capabilities.account === 'optional'
-              ? `Connect ${provider} before the release so checkout is quicker.`
-              : `${provider} needs you signed in before Site Sniper can hold a site.`
-          }
-        />
-      )}
+      <SnipeOutcome
+        snipe={snipe}
+        manifest={manifest}
+        actions={actions}
+        units={units}
+        today={today}
+        now={now}
+      />
       <div className="grid gap-8 md:grid-cols-[minmax(0,15rem)_1fr]">
         <section aria-labelledby="progress-heading" className="flex flex-col gap-4">
           <h2 id="progress-heading" className="text-lg font-semibold text-fg">
             Progress
           </h2>
+          <p
+            ref={statusLine}
+            tabIndex={-1}
+            className="flex w-fit items-center gap-2 rounded-sm text-sm text-fg-secondary"
+          >
+            Status
+            <StatusPill
+              {...statusPillFor(snipe.status, heldUnitNoun(snipe, manifest, units.units))}
+            />
+          </p>
           <ReleaseLine snipe={snipe} manifest={manifest} />
           <SnipeTimeline snipe={snipe} />
-          <SnipeRecord snipe={snipe} manifest={manifest} now={now} />
+          <SnipeRecord snipe={snipe} manifest={manifest} now={now} units={units.units} />
         </section>
         <SnipeSummary
           snipe={snipe}

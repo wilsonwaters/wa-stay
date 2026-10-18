@@ -8,8 +8,11 @@
 import {
   AccessGateError,
   ProviderCapabilityError,
+  ProviderHttpError,
   UnknownProviderError,
 } from '@main/providers/sdk';
+import { WATCH_EDITED_DURING_CHECK } from '@main/core/watches/watch.service';
+import type { WatchUpdate } from '@shared/types';
 import { WatchResult } from '@shared/types/common.types';
 import { createCoreHarness, fakeDateOnly, type CoreHarness } from '@tests/utils/core-harness';
 import { createFakeProvider, FAKE_PRICE } from '@tests/utils/fake-provider';
@@ -218,6 +221,488 @@ describe('WatchService', () => {
 
       expect(result.error).toBe('The check was stopped');
       expect(h.watchRepo.findById(watch.id)?.lastCheckedAt).toBeUndefined();
+    });
+  });
+
+  describe('stay types (unitKinds)', () => {
+    // A mixed place: two campsites and two cabins, every unit free; s1 is listed first
+    const MIXED = { s1: 'available', c1: 'available', s2: 'available', c2: 'available' } as const;
+
+    beforeEach(async () => {
+      await h.close();
+      h = createCoreHarness({
+        providers: [
+          createFakeProvider({
+            availability: { '1': MIXED },
+            unitKinds: { s1: 'campsite', s2: 'campsite', c1: 'cabin', c2: 'cabin' },
+          }),
+        ],
+      });
+    });
+
+    it("unitKinds ['cabin'] at a mixed place matches only cabins, and notifies only cabins", async () => {
+      const watch = await h.watches.create(h.userId, h.watchInput({ unitKinds: ['cabin'] }));
+      expect(watch.unitKinds).toEqual(['cabin']);
+      const result = await h.watches.execute(watch.id);
+
+      expect(result.matches.map((m) => m.unitId)).toEqual(['c1', 'c2']);
+      const [, notified] = h.notifications.notifyWatchFound.mock.calls[0];
+      expect(notified.map((m: { unitId: string }) => m.unitId)).toEqual(['c1', 'c2']);
+      // The units it keeps for the watch's page are the cabins too
+      expect(h.watchRepo.findById(watch.id)?.lastAvailability?.map((u) => u.unitId)).toEqual([
+        'c1',
+        'c2',
+      ]);
+    });
+
+    it('with no kind, every unit matches as before', async () => {
+      const watch = await h.watches.create(h.userId, h.watchInput());
+      expect(watch.unitKinds).toEqual([]);
+      const result = await h.watches.execute(watch.id);
+      expect(result.matches.map((m) => m.unitId)).toEqual(['s1', 'c1', 's2', 'c2']);
+    });
+
+    it('drops duplicate kinds at create and update; a change of kinds makes the watch due at once', async () => {
+      const watch = await h.watches.create(
+        h.userId,
+        h.watchInput({ unitKinds: ['cabin', 'campsite', 'cabin'] })
+      );
+      expect(watch.unitKinds).toEqual(['cabin', 'campsite']);
+      await h.watches.execute(watch.id);
+      expect(h.watchRepo.findById(watch.id)?.nextCheckAt).toEqual(
+        new Date(NOW.getTime() + 60 * 60_000)
+      );
+
+      const updated = await h.watches.update(watch.id, { unitKinds: ['dorm', 'dorm'] });
+      expect(updated.unitKinds).toEqual(['dorm']);
+      expect(updated.nextCheckAt).toEqual(NOW);
+      await expect(h.watches.update(watch.id, { unitKinds: [] })).resolves.toMatchObject({
+        unitKinds: [],
+      });
+    });
+  });
+
+  describe('stay rules (R8)', () => {
+    it('a 2-night stay whose every night is refused under a 3-night minimum is NOT_FOUND, with no alert', async () => {
+      const refused = { state: 'unknown', reason: 'min-stay', minNights: 3 } as const;
+      h.fake.setAvailability('1', {
+        u1: [{ ...refused, noArrival: true }, { ...refused }],
+        u2: [{ ...refused }, { ...refused, noDeparture: true }],
+      });
+      const watch = await h.watches.create(
+        h.userId,
+        h.watchInput({
+          stay: { arrival: '2026-12-01', departure: '2026-12-03', adults: 2 },
+          allowPartialMatch: true,
+        })
+      );
+      const result = await h.watches.execute(watch.id);
+
+      expect(result).toMatchObject({ success: true, found: false, matches: [] });
+      const stored = h.watchRepo.findById(watch.id)!;
+      expect(stored.lastResult).toBe(WatchResult.NOT_FOUND);
+      // The nights are kept as the provider said them, for the watch's page
+      expect(stored.lastAvailability?.[0].nights[0]).toMatchObject({
+        reason: 'min-stay',
+        minNights: 3,
+        noArrival: true,
+      });
+      expect(h.notifications.notifyWatchFound).not.toHaveBeenCalled();
+      expect(h.notifications.notifyWatchPartialFound).not.toHaveBeenCalled();
+      expect((await h.watches.get(watch.id))?.bookingLink).toBeUndefined();
+    });
+
+    it('a partial alert names the run from the day after a no-arrival night, with its booking page', async () => {
+      h.fake.setAvailability('1', {
+        u1: [
+          { state: 'available', noArrival: true },
+          { state: 'available' },
+          { state: 'available' },
+        ],
+        u2: 'booked',
+      });
+      const watch = await h.watches.create(h.userId, h.watchInput({ allowPartialMatch: true }));
+      const result = await h.watches.execute(watch.id);
+
+      expect(result.matches).toEqual([
+        expect.objectContaining({ unitId: 'u1', arrival: '2026-12-02', departure: '2026-12-04' }),
+      ]);
+      expect(h.watchRepo.findById(watch.id)?.lastResult).toBe(WatchResult.PARTIAL_FOUND);
+      const url = 'https://fake.example/book/1?arrival=2026-12-02&departure=2026-12-04';
+      expect(h.notifications.notifyWatchPartialFound).toHaveBeenCalledWith(
+        expect.objectContaining({ id: watch.id }),
+        [expect.objectContaining({ unitId: 'u1', arrival: '2026-12-02' })],
+        url
+      );
+      expect((await h.watches.get(watch.id))?.bookingLink).toEqual({
+        url,
+        arrival: '2026-12-02',
+        departure: '2026-12-04',
+      });
+    });
+  });
+
+  describe('booking links (R7)', () => {
+    /** The fake's booking page (`links.booking`) for location 1 and these dates. */
+    const bookingUrl = (arrival: string, departure: string) =>
+      `https://fake.example/book/1?arrival=${arrival}&departure=${departure}`;
+    const WHOLE_STAY = bookingUrl('2026-12-01', '2026-12-04');
+    /** The `watch:updated` payloads for `id`, oldest first. */
+    const updates = (id: number) =>
+      h.events.emit.mock.calls
+        .filter(([name, watch]) => name === 'watch:updated' && watch.id === id)
+        .map(([, watch]) => watch);
+
+    it('a found alert gets the booking page for the stay, and get, list and watch:updated carry it', async () => {
+      const watch = await h.watches.create(h.userId, h.watchInput());
+      expect(watch.bookingLink).toBeUndefined();
+      await h.watches.execute(watch.id);
+
+      expect(h.notifications.notifyWatchFound).toHaveBeenCalledWith(
+        expect.objectContaining({ id: watch.id }),
+        [expect.objectContaining({ unitId: 'u1' })],
+        undefined,
+        WHOLE_STAY
+      );
+      const link = { url: WHOLE_STAY, arrival: '2026-12-01', departure: '2026-12-04' };
+      expect((await h.watches.get(watch.id))?.bookingLink).toEqual(link);
+      expect((await h.watches.list(h.userId)).map((w) => w.bookingLink)).toEqual([link]);
+      expect(updates(watch.id).at(-1)?.bookingLink).toEqual(link);
+      // Derived, never stored
+      expect(h.watchRepo.findById(watch.id)?.bookingLink).toBeUndefined();
+    });
+
+    it("a partial alert gets the booking page for the longest run, with the run's dates", async () => {
+      h.fake.setAvailability('1', {
+        u1: [{ state: 'available' }, { state: 'booked' }, { state: 'available' }],
+        u2: [{ state: 'available' }, { state: 'available' }, { state: 'booked' }],
+      });
+      const watch = await h.watches.create(h.userId, h.watchInput({ allowPartialMatch: true }));
+      await h.watches.execute(watch.id);
+
+      const runUrl = bookingUrl('2026-12-01', '2026-12-03');
+      expect(h.notifications.notifyWatchPartialFound).toHaveBeenCalledWith(
+        expect.objectContaining({ id: watch.id }),
+        expect.arrayContaining([expect.objectContaining({ unitId: 'u2', partial: true })]),
+        runUrl
+      );
+      expect((await h.watches.get(watch.id))?.bookingLink).toEqual({
+        url: runUrl,
+        arrival: '2026-12-01',
+        departure: '2026-12-03',
+      });
+    });
+
+    it('a held alert gets the booking page too (the email’s fallback), and the held watch has none', async () => {
+      const watch = await h.watches.create(h.userId, h.watchInput({ autoHold: true }));
+      await h.watches.execute(watch.id);
+
+      expect(h.notifications.notifyWatchHeld).toHaveBeenCalledWith(
+        expect.objectContaining({ id: watch.id }),
+        expect.objectContaining({ reference: 'FAKE-1' }),
+        expect.objectContaining({ unitName: 'Site u1' }),
+        WHOLE_STAY
+      );
+      const held = await h.watches.get(watch.id);
+      expect(held?.lastResult).toBe(WatchResult.HELD);
+      expect(held?.bookingLink).toBeUndefined();
+    });
+
+    it("uses the first full match's own unit link, after maxPrice has left a unit out", async () => {
+      await h.close();
+      h = createCoreHarness({
+        providers: [
+          createFakeProvider({
+            unitBookingUrls: true,
+            availability: {
+              '1': {
+                u1: [
+                  { state: 'available', price: 40 },
+                  { state: 'available', price: 40 },
+                  { state: 'available', price: 40 },
+                ],
+                u2: 'available',
+                u3: 'available',
+              },
+            },
+          }),
+        ],
+      });
+      const watch = await h.watches.create(h.userId, h.watchInput({ maxPrice: 35 }));
+      await h.watches.execute(watch.id);
+
+      const u2 = 'https://book.fake.example/1/u2?arrival=2026-12-01&departure=2026-12-04';
+      const [, matches, , url] = h.notifications.notifyWatchFound.mock.calls[0];
+      expect(matches.map((m: { unitId: string }) => m.unitId)).toEqual(['u2', 'u3']);
+      expect(url).toBe(u2);
+      expect((await h.watches.get(watch.id))?.bookingLink?.url).toBe(u2);
+    });
+
+    it('get and list have none for a result other than found or partly found', async () => {
+      const watch = await h.watches.create(h.userId, h.watchInput());
+      await h.watches.execute(watch.id);
+      expect((await h.watches.get(watch.id))?.bookingLink).toBeDefined();
+
+      // A failed check keeps the stored units but is no longer a find
+      h.fake.failNext('availability', new Error('HTTP 500'));
+      await h.watches.execute(watch.id, { manual: true });
+      expect((await h.watches.get(watch.id))?.lastResult).toBe(WatchResult.ERROR);
+      expect((await h.watches.get(watch.id))?.bookingLink).toBeUndefined();
+
+      h.fake.setAvailability('1', { u1: 'booked', u2: 'booked' });
+      await h.watches.execute(watch.id, { manual: true });
+      expect((await h.watches.get(watch.id))?.lastResult).toBe(WatchResult.NOT_FOUND);
+      expect((await h.watches.list(h.userId))[0].bookingLink).toBeUndefined();
+      expect(updates(watch.id).at(-1)?.bookingLink).toBeUndefined();
+    });
+
+    it('after the stay is edited there is none, until a check of the new stay', async () => {
+      const watch = await h.watches.create(h.userId, h.watchInput());
+      await h.watches.execute(watch.id);
+      expect((await h.watches.get(watch.id))?.bookingLink).toBeDefined();
+
+      const newStay = { arrival: '2026-12-02', departure: '2026-12-05', adults: 2 };
+      const updated = await h.watches.update(watch.id, { stay: newStay });
+      expect(updated.lastResult).toBe(WatchResult.FOUND);
+      expect(updated.bookingLink).toBeUndefined();
+      expect(updates(watch.id).at(-1)?.bookingLink).toBeUndefined();
+      expect((await h.watches.get(watch.id))?.bookingLink).toBeUndefined();
+      expect((await h.watches.list(h.userId))[0].bookingLink).toBeUndefined();
+
+      // A longer stay that still starts on the same night has none either
+      await h.watches.update(watch.id, {
+        stay: { arrival: '2026-12-01', departure: '2026-12-05', adults: 2 },
+      });
+      expect((await h.watches.get(watch.id))?.bookingLink).toBeUndefined();
+
+      await h.watches.execute(watch.id, { manual: true });
+      expect((await h.watches.get(watch.id))?.bookingLink?.url).toBe(
+        bookingUrl('2026-12-01', '2026-12-05')
+      );
+    });
+
+    it('after the location is edited there is none, also for a paused watch the due-loop skips', async () => {
+      // notifyOnly: paused right after its found alert, so no check runs on its own
+      const watch = await h.watches.create(h.userId, h.watchInput({ notifyOnly: true }));
+      await h.watches.execute(watch.id);
+      const paused = await h.watches.get(watch.id);
+      expect(paused).toMatchObject({ isActive: false, lastResult: WatchResult.FOUND });
+      expect(paused?.bookingLink?.url).toBe(WHOLE_STAY);
+
+      // A new name for the same place keeps what the check found
+      await h.watches.update(watch.id, { location: { externalId: '1', name: 'Banksia (north)' } });
+      expect((await h.watches.get(watch.id))?.bookingLink?.url).toBe(WHOLE_STAY);
+
+      const moved = await h.watches.update(watch.id, {
+        location: { externalId: '2', name: 'Karri Grove' },
+      });
+      expect(moved.bookingLink).toBeUndefined();
+      expect(moved).toMatchObject({ isActive: false });
+      // The old place's check is forgotten: no result, units or time to show for the new one
+      expect(moved.lastResult).toBeUndefined();
+      expect(moved.lastAvailability).toBeUndefined();
+      expect(moved.lastCheckedAt).toBeUndefined();
+      expect(updates(watch.id).at(-1)?.bookingLink).toBeUndefined();
+      expect((await h.watches.get(watch.id))?.bookingLink).toBeUndefined();
+      expect((await h.watches.list(h.userId))[0].bookingLink).toBeUndefined();
+      expect(h.watches.findDue(new Date(NOW.getTime() + 60_000), ['fake'])).toEqual([]);
+
+      // Its next check is of the new place, with the new place's link
+      await h.watches.execute(watch.id, { manual: true });
+      expect((await h.watches.get(watch.id))?.bookingLink?.url).toBe(
+        'https://fake.example/book/2?arrival=2026-12-01&departure=2026-12-04'
+      );
+    });
+
+    it('a check in flight when the watch moves to another place keeps nothing and alerts on nothing', async () => {
+      const watch = await h.watches.create(h.userId, h.watchInput());
+      h.fake.delayMs = 20;
+      const running = h.watches.execute(watch.id, { manual: true });
+      // The provider is answering about place 1 when the watch moves to place 2
+      await new Promise((resolve) => setTimeout(resolve, 5));
+      await h.watches.update(watch.id, { location: { externalId: '2', name: 'Karri Grove' } });
+      const result = await running;
+
+      expect(result).toMatchObject({ success: false, found: false, matches: [] });
+      expect(result.error).toBe(WATCH_EDITED_DURING_CHECK);
+      const moved = (await h.watches.get(watch.id))!;
+      expect(moved.lastResult).toBeUndefined();
+      expect(moved.lastAvailability).toBeUndefined();
+      expect(moved.lastCheckedAt).toBeUndefined();
+      expect(moved.bookingLink).toBeUndefined();
+      expect(h.notifications.notifyWatchFound).not.toHaveBeenCalled();
+      // The edit made it due at once: the next check is of the new place
+      expect(h.watches.findDue(NOW, ['fake']).map((w) => w.id)).toEqual([watch.id]);
+      h.fake.delayMs = 0;
+      await h.watches.execute(watch.id);
+      expect((await h.watches.get(watch.id))?.bookingLink?.url).toBe(
+        'https://fake.example/book/2?arrival=2026-12-01&departure=2026-12-04'
+      );
+    });
+
+    it("a check in flight keeps its answer when only the place's name or the interval changes", async () => {
+      const watch = await h.watches.create(h.userId, h.watchInput());
+      h.fake.delayMs = 20;
+      const running = h.watches.execute(watch.id, { manual: true });
+      await new Promise((resolve) => setTimeout(resolve, 5));
+      await h.watches.update(watch.id, {
+        location: { externalId: '1', name: 'Banksia (north)' },
+        checkIntervalMinutes: 60,
+      });
+
+      await expect(running).resolves.toMatchObject({ success: true, found: true });
+      expect(h.watchRepo.findById(watch.id)?.lastResult).toBe(WatchResult.FOUND);
+      expect(h.notifications.notifyWatchFound).toHaveBeenCalledTimes(1);
+    });
+
+    it.each<[string, WatchUpdate]>([
+      ['dates', { stay: { arrival: '2026-12-02', departure: '2026-12-04', adults: 2 } }],
+      ['units', { unitIds: ['u1'] }],
+      ['stay types', { unitKinds: ['cabin'] }],
+      ['stay fields', { stayParams: { gearType: 'caravan' } }],
+    ])(
+      'a check in flight when its %s change keeps nothing and alerts on nothing',
+      async (_what, edit) => {
+        const watch = await h.watches.create(h.userId, h.watchInput());
+        h.fake.delayMs = 20;
+        const running = h.watches.execute(watch.id, { manual: true });
+        await new Promise((resolve) => setTimeout(resolve, 5));
+        await h.watches.update(watch.id, edit);
+
+        await expect(running).resolves.toMatchObject({
+          success: false,
+          error: WATCH_EDITED_DURING_CHECK,
+        });
+        const stored = h.watchRepo.findById(watch.id)!;
+        expect(stored.lastResult).toBeUndefined();
+        expect(stored.lastAvailability).toBeUndefined();
+        expect(h.notifications.notifyWatchFound).not.toHaveBeenCalled();
+        expect(h.watches.findDue(NOW, ['fake']).map((w) => w.id)).toEqual([watch.id]);
+      }
+    );
+
+    it('a check in flight keeps its answer when automatic holds fill in a stay field only holds use', async () => {
+      await h.close();
+      h = createCoreHarness({
+        providers: [
+          createFakeProvider({
+            stayFields: [
+              {
+                key: 'vehicles',
+                label: 'Vehicles',
+                type: 'number',
+                min: 0,
+                max: 3,
+                default: 1,
+                appliesTo: ['hold'],
+              },
+            ],
+          }),
+        ],
+      });
+      const watch = await h.watches.create(h.userId, h.watchInput());
+      h.fake.delayMs = 20;
+      const running = h.watches.execute(watch.id, { manual: true });
+      await new Promise((resolve) => setTimeout(resolve, 5));
+      await h.watches.update(watch.id, { autoHold: true });
+      expect(h.watchRepo.findById(watch.id)?.stayParams).toEqual({ gearType: 'tent', vehicles: 1 });
+
+      await expect(running).resolves.toMatchObject({ success: true, found: true });
+      expect(h.watchRepo.findById(watch.id)?.lastResult).toBe(WatchResult.FOUND);
+      expect(h.notifications.notifyWatchFound).toHaveBeenCalledTimes(1);
+    });
+
+    it('a check that fails while the watch moves keeps nothing of the failure, and is due again', async () => {
+      const watch = await h.watches.create(h.userId, h.watchInput());
+      h.fake.delayMs = 20;
+      h.fake.failNext(
+        'availability',
+        new ProviderHttpError({ providerId: 'fake', status: 500, url: 'https://fake.example/a' })
+      );
+      const running = h.watches.execute(watch.id, { manual: true });
+      await new Promise((resolve) => setTimeout(resolve, 5));
+      await h.watches.update(watch.id, { location: { externalId: '2', name: 'Karri Grove' } });
+
+      await expect(running).resolves.toMatchObject({
+        success: false,
+        error: WATCH_EDITED_DURING_CHECK,
+      });
+      const moved = h.watchRepo.findById(watch.id)!;
+      expect(moved.lastResult).toBeUndefined();
+      expect(moved.lastError).toBeUndefined();
+      expect(moved.lastCheckedAt).toBeUndefined();
+      expect(h.watches.findDue(NOW, ['fake']).map((w) => w.id)).toEqual([watch.id]);
+    });
+
+    it.each([403, 429])(
+      "keeps a provider's block (HTTP %i) met while the watch moves, and the next check waits its interval",
+      async (status) => {
+        const watch = await h.watches.create(h.userId, h.watchInput());
+        h.fake.delayMs = 20;
+        h.fake.failNext(
+          'availability',
+          new ProviderHttpError({
+            providerId: 'fake',
+            status,
+            url: 'https://fake.example/a',
+            retryable: false,
+            message: `Fake turned the request away (HTTP ${status}).`,
+          })
+        );
+        const running = h.watches.execute(watch.id, { manual: true });
+        await new Promise((resolve) => setTimeout(resolve, 5));
+        await h.watches.update(watch.id, { location: { externalId: '2', name: 'Karri Grove' } });
+
+        const result = await running;
+        expect(result).toMatchObject({ success: false });
+        expect(result.error).not.toBe(WATCH_EDITED_DURING_CHECK);
+        const moved = h.watchRepo.findById(watch.id)!;
+        expect(moved.lastResult).toBe(WatchResult.ERROR);
+        expect(moved.lastError).toBe(`Fake turned the request away (HTTP ${status}).`);
+        expect(h.watches.findDue(NOW, ['fake'])).toEqual([]);
+        expect(moved.nextCheckAt!.getTime()).toBeGreaterThanOrEqual(NOW.getTime() + 60 * 60_000);
+      }
+    );
+
+    it('a held watch moved to another place keeps its hold and the held unit, and gets no link', async () => {
+      const watch = await h.watches.create(h.userId, h.watchInput({ autoHold: true }));
+      await h.watches.execute(watch.id);
+      const moved = await h.watches.update(watch.id, {
+        location: { externalId: '2', name: 'Karri Grove' },
+      });
+      expect(moved).toMatchObject({ lastResult: WatchResult.HELD, hold: { reference: 'FAKE-1' } });
+      expect(moved.lastAvailability?.map((u) => u.unitName)).toEqual(['Site u1', 'Site u2']);
+      expect(moved.bookingLink).toBeUndefined();
+    });
+
+    it('a stored check it cannot read gives no link, and get and list still answer', async () => {
+      const watch = await h.watches.create(h.userId, h.watchInput());
+      await h.watches.execute(watch.id);
+      h.db
+        .prepare('UPDATE watches SET last_availability = ? WHERE id = ?')
+        .run(
+          JSON.stringify([
+            { unitId: 'u1', unitName: 'Site u1', nights: [null], fullyAvailable: true },
+          ]),
+          watch.id
+        );
+
+      expect((await h.watches.get(watch.id))?.bookingLink).toBeUndefined();
+      expect((await h.watches.list(h.userId)).map((w) => [w.id, w.bookingLink])).toEqual([
+        [watch.id, undefined],
+      ]);
+    });
+
+    it('a notifyOnly watch paused after its alert keeps the link; an unregistered provider gives none', async () => {
+      const watch = await h.watches.create(h.userId, h.watchInput({ notifyOnly: true }));
+      await h.watches.execute(watch.id);
+      const paused = await h.watches.get(watch.id);
+      expect(paused?.isActive).toBe(false);
+      expect(paused?.bookingLink?.url).toBe(WHOLE_STAY);
+
+      h.db.prepare("UPDATE watches SET provider_id = 'gone' WHERE id = ?").run(watch.id);
+      expect((await h.watches.get(watch.id))?.bookingLink).toBeUndefined();
+      expect((await h.watches.list(h.userId))[0].bookingLink).toBeUndefined();
     });
   });
 

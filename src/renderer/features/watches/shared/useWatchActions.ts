@@ -3,6 +3,7 @@ import {
   toApiError,
   useDeleteWatch,
   useOpenWatchPayment,
+  useReleaseWatchHold,
   useRunWatchNow,
   useSetWatchActive,
 } from '../../../api';
@@ -11,7 +12,7 @@ import type { Watch } from '../../../../shared/types/watch.types';
 import { HOLD_EXPIRED_MESSAGE } from '../../../components/stay/HoldPanel';
 import { useToast } from '../../../components/ui';
 import { runResultMessage } from './resultSummary';
-import { unitNounFor } from './watchState';
+import { watchNoun } from './watchState';
 
 /**
  * The actions a watch offers wherever it is shown (card, detail, edit), each telling the
@@ -23,6 +24,7 @@ export function useWatchActions(watch: Watch, manifest: ProviderManifest | undef
   const run = useRunWatchNow();
   const setActive = useSetWatchActive();
   const pay = useOpenWatchPayment();
+  const release = useReleaseWatchHold();
   const remove = useDeleteWatch();
   // One check at a time, even from a double-click before the button shows it is busy.
   const checking = useRef(false);
@@ -32,7 +34,7 @@ export function useWatchActions(watch: Watch, manifest: ProviderManifest | undef
     checking.current = true;
     run.mutate(watch.id, {
       onSuccess: (result) => {
-        const message = runResultMessage(result, watch, unitNounFor(manifest), manifest);
+        const message = runResultMessage(result, watch, watchNoun(watch, manifest), manifest);
         if (result.success) toast.success(message);
         else toast.error(message);
       },
@@ -61,6 +63,12 @@ export function useWatchActions(watch: Watch, manifest: ProviderManifest | undef
         ),
     });
 
+  /**
+   * For the hold panel's "Let it go" (its ConfirmDialog): resolves with why the hold ended, for
+   * the panel to announce; a rejection keeps the dialog open with the error.
+   */
+  const releaseHold = async () => (await release.mutateAsync(watch.id)).lastError;
+
   /** For a ConfirmDialog: resolves once deleted (rejects keep the dialog open with the error). */
   const deleteWatch = async () => {
     await remove.mutateAsync(watch.id);
@@ -74,6 +82,7 @@ export function useWatchActions(watch: Watch, manifest: ProviderManifest | undef
     resume: () => setWatching(true),
     payNow,
     paying: pay.isPending,
+    releaseHold,
     deleteWatch,
   };
 }

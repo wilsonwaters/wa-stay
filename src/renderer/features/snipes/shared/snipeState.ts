@@ -4,16 +4,24 @@
  */
 import { CircleHelp } from 'lucide-react';
 import { SnipeReleaseMode, SnipeStatus } from '../../../../shared/types/common.types';
-import type { ProviderManifest } from '../../../../shared/types/provider.types';
 import type { SiteSnipe } from '../../../../shared/types/site-sniper.types';
-import { unitNoun } from '../../../components/locationFormat';
-import type { UnitNoun } from '../../../components/stay/UnitPicker';
+import { holdEndingOf } from '../../../../shared/utils/hold-release';
+import { capitalise, type UnitNoun } from '../../../../shared/utils/unit-noun';
 import { statusPresets, type StatusPreset } from '../../../components/ui';
+
+// What a snipe's units are called, decided with the rest of its state (`snipeNouns.ts`)
+export { heldUnitNoun, snipeNoun } from './snipeNouns';
 
 const KNOWN = new Set<string>(Object.values(SnipeStatus));
 
-/** The status pill: the preset ("Paused", "Booked"…), or the raw status for one it does not know. */
-export function statusPillFor(status: string): StatusPreset {
+/**
+ * The status pill: the preset ("Paused", "Booked"…), a hold with the held unit's noun
+ * (`heldUnitNoun`: "Site held"), or the raw status for one it does not know.
+ */
+export function statusPillFor(status: string, held: UnitNoun): StatusPreset {
+  if (status === SnipeStatus.HELD) {
+    return { ...statusPresets.snipe[SnipeStatus.HELD], label: `${capitalise(held.one)} held` };
+  }
   if (KNOWN.has(status)) return statusPresets.snipe[status as SnipeStatus];
   return { tone: 'neutral', icon: CircleHelp, label: status };
 }
@@ -35,15 +43,17 @@ export function isFinished(snipe: Pick<SiteSnipe, 'status'>): boolean {
   return (
     snipe.status === SnipeStatus.HELD ||
     snipe.status === SnipeStatus.BOOKED ||
+    snipe.status === SnipeStatus.ALERTED ||
     snipe.status === SnipeStatus.EXPIRED ||
     snipe.status === SnipeStatus.FAILED
   );
 }
 
 /**
- * The one visible action, by status: Arm a paused (or ended) snipe, Disarm a running one, pay
- * for a held site, see a booked one. Main refuses to arm a held or booked snipe again (§12.31),
- * so neither is ever offered Arm.
+ * The one visible action, by status: Arm a paused snipe, Arm again an ended or alerted one,
+ * Disarm a running one, pay for a held unit, see a booked one. Main refuses to arm a held or
+ * booked snipe again (§12.31), so neither is ever offered Arm; an alerted one holds nothing, so
+ * it may be (§12.35).
  */
 export type PrimaryAction = 'arm' | 'arm-again' | 'disarm' | 'pay' | 'booking';
 
@@ -57,6 +67,7 @@ export function primaryActionFor(
       return 'booking';
     case SnipeStatus.EXPIRED:
     case SnipeStatus.FAILED:
+    case SnipeStatus.ALERTED:
       return 'arm-again';
     case SnipeStatus.DISABLED:
       return 'arm';
@@ -79,7 +90,8 @@ export interface TimelineStep {
 /**
  * The steps in order (the state machine in tech-review): Armed → … → Held → Booked. Booked is
  * always there, still to come until the hold is paid for, so a snipe counts the same steps in
- * every state ("Step 4 of 5: Held", then "Step 5 of 5: Booked").
+ * every state ("Step 4 of 5: Held", then "Step 5 of 5: Booked"). A snipe that alerts (its
+ * action, or a hold snipe that alerted instead) ends at "Alert sent" instead of Held and Booked.
  */
 function stepsFor(snipe: SiteSnipe): { id: string; label: string }[] {
   const continuous = snipe.releaseMode === SnipeReleaseMode.CANCELLATION;
@@ -92,8 +104,12 @@ function stepsFor(snipe: SiteSnipe): { id: string; label: string }[] {
       ? []
       : [{ id: 'waiting', label: 'Waiting for release' }]),
     { id: 'sniping', label: 'Sniping' },
-    { id: 'held', label: 'Held' },
-    { id: 'booked', label: 'Booked' },
+    ...(snipe.action === 'alert' || snipe.status === SnipeStatus.ALERTED
+      ? [{ id: 'alerted', label: 'Alert sent' }]
+      : [
+          { id: 'held', label: 'Held' },
+          { id: 'booked', label: 'Booked' },
+        ]),
   ];
 }
 
@@ -104,14 +120,15 @@ const CURRENT_STEP: Partial<Record<string, string>> = {
   [SnipeStatus.SNIPING]: 'sniping',
   [SnipeStatus.HELD]: 'held',
   [SnipeStatus.BOOKED]: 'booked',
+  [SnipeStatus.ALERTED]: 'alerted',
 };
 
 /**
  * The timeline: each step done, current, still to come, or (once the snipe has stopped) not
- * reached. A paused or unknown status has no current step. Expired and Failed take Booked's
- * place as the current, terminal step, so the count stays the same; only steps known to have
- * happened are marked done (an expired hold was held; an expired window was spent sniping; a
- * failure only says it was armed).
+ * reached. A paused or unknown status has no current step. Expired and Failed take the last
+ * step's place (Booked, or an alert's "Alert sent") as the current, terminal step, so the count
+ * stays the same; only steps known to have happened are marked done (an expired hold was held;
+ * an expired window was spent sniping; a failure only says it was armed).
  */
 export function timelineSteps(snipe: SiteSnipe): TimelineStep[] {
   const steps = stepsFor(snipe);
@@ -127,11 +144,14 @@ export function timelineSteps(snipe: SiteSnipe): TimelineStep[] {
     const wasHeld = Boolean(snipe.holdReference || snipe.holdExpiresAt);
     const reachedId = snipe.status === SnipeStatus.FAILED ? 'armed' : wasHeld ? 'held' : 'sniping';
     const reached = steps.findIndex((step) => step.id === reachedId);
+    // A hold that ended early says how (R18): let go, or gone from the provider
+    const ending = wasHeld ? holdEndingOf(snipe.lastError) : undefined;
+    const heldEnd = ending === 'let-go' ? 'Hold let go' : ending ? 'Hold ended' : 'Hold expired';
     const terminalLabel =
-      snipe.status === SnipeStatus.FAILED ? 'Failed' : wasHeld ? 'Hold expired' : 'Expired';
+      snipe.status === SnipeStatus.FAILED ? 'Failed' : wasHeld ? heldEnd : 'Expired';
     return [
       ...steps
-        .filter((step) => step.id !== 'booked')
+        .filter((step) => step.id !== 'booked' && step.id !== 'alerted')
         .map((step, i): TimelineStep => ({ ...step, state: i <= reached ? 'done' : 'missed' })),
       { id: snipe.status, label: terminalLabel, state: 'current', terminal: true },
     ];
@@ -173,14 +193,6 @@ export function releaseLineFor(snipe: SiteSnipe): ReleaseLine {
 }
 
 /**
- * What a provider's units are called (its main location kind): ParkStay's are sites. A snipe
- * keeps no location kind, so this is the provider's first.
- */
-export function unitNounFor(manifest: ProviderManifest | undefined): UnitNoun {
-  return unitNoun(manifest?.locationKinds[0]);
-}
-
-/**
  * A unit by the place's own name for it ("CAMPSITE 01", "Camp site (no power)"). Without one, a
  * plain number reads "Site 12"; any other id (a class such as `class:117`) is never shown and
  * reads "A site".
@@ -193,10 +205,13 @@ export function unitLabel(
   const named = unitId ? names?.get(unitId) : undefined;
   if (named) return named;
   if (!unitId || !/^\d+$/.test(unitId)) return `A ${noun.one}`;
-  return `${noun.one.charAt(0).toUpperCase()}${noun.one.slice(1)} ${unitId}`;
+  return `${capitalise(noun.one)} ${unitId}`;
 }
 
-/** Most urgent first: a hold to pay for, then running snipes, paused, ended, booked. */
+/**
+ * Most urgent first: a hold to pay for, then running snipes, paused, ended (an alert sent is
+ * one), booked.
+ */
 const URGENCY: Partial<Record<string, number>> = {
   [SnipeStatus.HELD]: 0,
   [SnipeStatus.SNIPING]: 1,
@@ -206,6 +221,7 @@ const URGENCY: Partial<Record<string, number>> = {
   [SnipeStatus.DISABLED]: 3,
   [SnipeStatus.FAILED]: 4,
   [SnipeStatus.EXPIRED]: 4,
+  [SnipeStatus.ALERTED]: 4,
   [SnipeStatus.BOOKED]: 5,
 };
 

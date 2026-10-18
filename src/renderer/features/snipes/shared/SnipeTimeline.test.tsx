@@ -1,6 +1,6 @@
 import { render, screen, within } from '@testing-library/react';
 import { SnipeStatus } from '../../../../shared/types/common.types';
-import { makeHeldSnipe, makeSnipe } from '@tests/fixtures/renderer/snipes';
+import { makeAlertedSnipe, makeHeldSnipe, makeSnipe } from '@tests/fixtures/renderer/snipes';
 import { SnipeTimeline } from './SnipeTimeline';
 
 const items = () => within(screen.getByRole('list', { name: 'Progress' })).getAllByRole('listitem');
@@ -67,5 +67,24 @@ describe('SnipeTimeline', () => {
       <SnipeTimeline snipe={makeSnipe({ status: SnipeStatus.DISABLED, isActive: false })} compact />
     );
     expect(screen.getByText('Not running')).toBeInTheDocument();
+  });
+
+  it('ends an alert snipe at "Alert sent", the current step once it has alerted', () => {
+    const { rerender } = render(<SnipeTimeline snipe={makeAlertedSnipe()} />);
+    expect(items().map((li) => li.textContent)).toEqual([
+      'ArmedDonedone',
+      'Waiting for releaseDonedone',
+      'SnipingDonedone',
+      'Alert sentNowcurrent step',
+    ]);
+    expect(items()[3]).toHaveAttribute('aria-current', 'step');
+    // Never a hold or a booking, in any state
+    expect(screen.queryByText('Held')).toBeNull();
+    expect(screen.queryByText('Booked')).toBeNull();
+
+    rerender(<SnipeTimeline snipe={makeSnipe({ action: 'alert' })} />);
+    expect(items().at(-1)).toHaveTextContent('Alert sentNot yet');
+    rerender(<SnipeTimeline snipe={makeAlertedSnipe()} compact />);
+    expect(screen.getByText('Step 4 of 4: Alert sent')).toBeInTheDocument();
   });
 });

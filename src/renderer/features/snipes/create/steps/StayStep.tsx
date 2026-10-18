@@ -1,7 +1,11 @@
+import { useMemo } from 'react';
 import { useFormContext } from 'react-hook-form';
 import type { UnitSummary } from '../../../../../shared/types/catalog.types';
 import type { ProviderManifest } from '../../../../../shared/types/provider.types';
+import { MinStayNotice } from '../../../../components/stay/MinStayNotice';
 import { ProviderStayFields } from '../../../../components/stay/ProviderStayFields';
+import { StayTypeChips } from '../../../../components/stay/StayTypeChips';
+import { placeUnitKinds, stayTypeOptions } from '../../../../components/stay/stayTypes';
 import { choosesUnit, UnitPicker, type UnitNoun } from '../../../../components/stay/UnitPicker';
 import { DateRangeField, GuestsField, Notice } from '../../../../components/ui';
 import { snipeStayFields, type SnipeFormValues } from '../snipeForm';
@@ -31,14 +35,29 @@ export interface StayStepProps {
 
 /**
  * Step 3: the dates, who is coming, the provider's own snipe and hold fields (vehicles,
- * postcode…), and the preferred units: none chosen means any unit.
+ * postcode…), the stay types at a place whose units are of more than one kind, and the
+ * preferred units: none chosen means any unit. A snipe that holds needs a stay type or a unit
+ * at such a place, which the Release step asks for where "Hold it for me" is chosen; changing
+ * either here checks that rule again once its message shows. Warnings say when the stay is
+ * shorter than the units take (`MinStayNotice`), or the party more than they hold.
  */
 export function StayStep({ manifest, today, units, noun }: StayStepProps) {
-  const { watch, formState } = useFormContext<SnipeFormValues>();
+  const { watch, formState, getFieldState, trigger } = useFormContext<SnipeFormValues>();
   const set = useSetSnipeField();
   const setFields = useSetSnipeFields();
   const { errors } = formState;
-  const [arrival, departure, adults, children, infants, stayParams, unitIds] = watch([
+  const [
+    arrival,
+    departure,
+    adults,
+    children,
+    infants,
+    stayParams,
+    unitIds,
+    unitKinds,
+    location,
+    action,
+  ] = watch([
     'arrival',
     'departure',
     'adults',
@@ -46,8 +65,18 @@ export function StayStep({ manifest, today, units, noun }: StayStepProps) {
     'infants',
     'stayParams',
     'unitIds',
+    'unitKinds',
+    'location',
+    'action',
   ]);
+  const holds = action === 'hold';
+  // A unit or a stay type meets the hold rule: check it again once its message shows.
+  const recheckHoldRule = () => {
+    if (getFieldState('action').error) void trigger('action');
+  };
   const fields = snipeStayFields(manifest);
+  const placeKinds = useMemo(() => (units ? placeUnitKinds(units) : undefined), [units]);
+  const stayTypes = placeKinds ? stayTypeOptions(placeKinds, unitKinds) : [];
   const capacity = units ? chosenCapacity(units, unitIds) : undefined;
   const party = adults + children + infants;
 
@@ -60,7 +89,7 @@ export function StayStep({ manifest, today, units, noun }: StayStepProps) {
           setFields(['arrival', range.arrival ?? ''], ['departure', range.departure ?? ''])
         }
         minDate={today}
-        hint="The nights you want to hold, even if they aren't released yet."
+        hint={`The nights you want${holds ? ' to hold' : ''}, even if they aren't released yet.`}
         error={errors.arrival?.message ?? errors.departure?.message}
       />
       <GuestsField
@@ -83,15 +112,44 @@ export function StayStep({ manifest, today, units, noun }: StayStepProps) {
           fields.map((field) => [field.key, errors.stayParams?.[field.key]?.message])
         )}
       />
+      {stayTypes.length > 0 && (
+        <StayTypeChips
+          options={stayTypes}
+          value={unitKinds}
+          onChange={(kinds) => {
+            set('unitKinds', kinds);
+            recheckHoldRule();
+          }}
+        />
+      )}
       {units && units.length > 0 && (
         <UnitPicker
           units={units}
           value={unitIds}
-          onChange={(ids) => set('unitIds', ids)}
+          onChange={(ids) => {
+            set('unitIds', ids);
+            recheckHoldRule();
+          }}
           noun={noun}
-          hint={`Leave all unticked and Site Sniper holds the first ${noun.one} that comes free.`}
+          hint={
+            holds
+              ? `Leave all unticked and Site Sniper holds the first ${noun.one} that comes free.`
+              : `Leave all unticked and Site Sniper alerts you to the first ${noun.one} that comes free.`
+          }
+          kinds={stayTypes.length > 0 ? unitKinds : undefined}
         />
       )}
+      <MinStayNotice
+        units={units}
+        unitIds={unitIds}
+        unitKinds={stayTypes.length > 0 ? unitKinds : undefined}
+        arrival={arrival}
+        departure={departure}
+        place={location?.name}
+        noun={noun}
+        shortName={manifest.shortName}
+        action={holds ? 'holds' : 'alerts on'}
+      />
       {capacity !== undefined && party > capacity && (
         <Notice tone="warning">
           Your party of {party} is more than the chosen {noun.many} are known to hold (up to{' '}

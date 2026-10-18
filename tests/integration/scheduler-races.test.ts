@@ -304,7 +304,11 @@ describe('scheduler races (V4 review)', () => {
         holdReference: 'FAKE-1',
         holdExpiresAt: expect.any(Date),
         paymentUrl: 'https://fake.example/pay/FAKE-1',
-      })
+      }),
+      // The fake's units say no kind
+      undefined,
+      // The public booking page, for the email (R12)
+      'https://fake.example/book/1?arrival=2026-12-01&departure=2026-12-03'
     );
     expect(h.snipeRepo.findById(snipe.id)).toBeNull();
   });

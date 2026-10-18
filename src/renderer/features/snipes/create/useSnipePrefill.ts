@@ -15,8 +15,8 @@ export interface ResolvedSnipePrefill {
 }
 
 /**
- * The new-snipe form as the URL's prefill query (§12.10) sets it up: provider, location, dates
- * and guests, and the step to open on (the first the link did not settle, else Your stay). The
+ * The new-snipe form as the URL's prefill query (§12.10) sets it up: provider, location, dates,
+ * guests and stay types, and the step to open on (the first the link did not settle, else Your stay). The
  * place comes from `catalog.get`, the same detail the place page shows (and caches).
  */
 export function useSnipePrefill(manifests: readonly ProviderManifest[]): ResolvedSnipePrefill {
@@ -52,6 +52,7 @@ export function useSnipePrefill(manifests: readonly ProviderManifest[]): Resolve
     }
     if (prefill.adults) values.adults = prefill.adults;
     if (prefill.children !== undefined) values.children = prefill.children;
+    if (prefill.unitKinds) values.unitKinds = [...prefill.unitKinds];
     const step: SnipeStepId = !prefill.providerId
       ? 'provider'
       : values.location

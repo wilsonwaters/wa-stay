@@ -1,7 +1,8 @@
 /**
  * The new-snipe form: its values, the rules each step checks (zod, with the provider's own stay
  * field rules), and a blank form for a provider. Advanced timing is typed as text (seconds and
- * minutes, as people think of them) and becomes the contract's ms fields on submit.
+ * minutes, as people think of them) and becomes the contract's ms fields on submit. `action`
+ * (alert or hold, `snipeAction.ts`) is chosen on the Release step.
  */
 import { z } from 'zod';
 import {
@@ -14,14 +15,20 @@ import {
 import { SnipeReleaseMode } from '../../../../shared/types/common.types';
 import {
   LOCATION_KINDS,
+  UNIT_KINDS,
   type ProviderManifest,
   type StayFieldDescriptor,
+  type UnitKind,
 } from '../../../../shared/types/provider.types';
+import { SNIPE_ACTIONS } from '../../../../shared/types/site-sniper.types';
+import { DEFAULT_UNIT_NOUN, type UnitNoun } from '../../../components/nightGridModel';
 import {
   stayFieldDefaults,
   stayFieldIssue,
   stayFieldsFor,
 } from '../../../components/stay/stayFields';
+import { holdNeedsChoice } from '../../../components/stay/stayTypes';
+import { defaultSnipeAction, snipeHoldChoiceMessage, windowCapMinutes } from './snipeAction';
 import { zonedInstant } from './zonedTime';
 
 const shape = z.object({
@@ -43,8 +50,12 @@ const shape = z.object({
   infants: z.number(),
   stayParams: z.record(z.string(), z.union([z.string(), z.number(), z.boolean()]).optional()),
   unitIds: z.array(z.string()),
+  /** The stay types wanted, in stay-type order; none means any. */
+  unitKinds: z.array(z.enum(UNIT_KINDS)),
   /** A `releaseModes` id of the provider. */
   releaseMode: z.string(),
+  /** What the snipe does when the dates are free: alert, or hold (where the provider can). */
+  action: z.enum(SNIPE_ACTIONS),
   /** A scheduled release, in the provider's zone: `YYYY-MM-DD` and `HH:MM`. */
   releaseDate: z.string(),
   releaseTime: z.string(),
@@ -61,9 +72,13 @@ export type SnipeFormValues = z.infer<typeof shape>;
 export type SnipeFieldName = Exclude<keyof SnipeFormValues, 'stayParams'> | `stayParams.${string}`;
 export type SnipeStepId = 'provider' | 'location' | 'stay' | 'release' | 'review';
 
-/** The provider's stay fields a snipe asks for: its own, and what a hold needs. */
+/**
+ * The provider's stay fields a snipe asks for: its own, and what a hold needs when the provider
+ * holds (a provider whose holds are an experiment that is off asks for none of a hold's: RAC's
+ * equipment).
+ */
 export function snipeStayFields(manifest: ProviderManifest | undefined): StayFieldDescriptor[] {
-  return stayFieldsFor(manifest, ['snipe', 'hold']);
+  return stayFieldsFor(manifest, manifest?.capabilities.holds ? ['snipe', 'hold'] : ['snipe']);
 }
 
 /** The ms or s value as text without trailing zeros: 1500 ms → "1.5". */
@@ -81,7 +96,9 @@ export function emptySnipeForm(manifest: ProviderManifest | undefined): SnipeFor
     infants: 0,
     stayParams: stayFieldDefaults(snipeStayFields(manifest)),
     unitIds: [],
+    unitKinds: [],
     releaseMode: manifest?.releaseModes?.[0]?.id ?? '',
+    action: defaultSnipeAction(manifest),
     releaseDate: '',
     releaseTime: '',
     accessGateEnabled: manifest?.capabilities.accessGate === true,
@@ -109,6 +126,14 @@ export interface SnipeFormContext {
   /** Today in the provider's time zone, `YYYY-MM-DD`. */
   today: string;
   now: Date;
+  /**
+   * The kinds of the place's units (`placeUnitKinds`), once its detail has loaded. A snipe that
+   * holds needs a stay type or a unit at a mixed place; without them nothing is enforced here
+   * (main then alerts instead of holding). An alert needs neither.
+   */
+  placeKinds?: readonly UnitKind[];
+  /** What a unit is called here, for the hold rule's message. */
+  noun?: UnitNoun;
 }
 
 /** Midnight of check-in day where the provider is (epoch ms), or never when there is no date. */
@@ -117,7 +142,13 @@ function checkInAt(arrival: string, timeZone: string): number {
 }
 
 /** The form's rules for one provider. */
-export function snipeFormSchema({ manifest, today, now }: SnipeFormContext) {
+export function snipeFormSchema({
+  manifest,
+  today,
+  now,
+  placeKinds,
+  noun = DEFAULT_UNIT_NOUN,
+}: SnipeFormContext) {
   const fields = snipeStayFields(manifest);
   const modes = manifest?.releaseModes ?? [];
   return shape.superRefine((v, ctx) => {
@@ -135,9 +166,12 @@ export function snipeFormSchema({ manifest, today, now }: SnipeFormContext) {
       const message = stayFieldIssue(field, v.stayParams[field.key]);
       if (message) issue(['stayParams', field.key], message);
     }
+    if (v.action === 'hold' && placeKinds && holdNeedsChoice(placeKinds, v.unitKinds, v.unitIds)) {
+      issue(['action'], snipeHoldChoiceMessage(noun, v.location?.name));
+    }
 
     if (!modes.some((mode) => mode.id === v.releaseMode)) {
-      issue(['releaseMode'], 'Choose when the sites are released');
+      issue(['releaseMode'], `Choose when the ${noun.many} are released`);
     } else if (v.releaseMode === SnipeReleaseMode.SCHEDULED && manifest) {
       const at = zonedInstant(v.releaseDate, v.releaseTime, manifest.timezone);
       if (!v.releaseDate || !v.releaseTime)
@@ -166,8 +200,12 @@ export function snipeFormSchema({ manifest, today, now }: SnipeFormContext) {
       );
     }
     const window = whole(v.windowMinutes);
+    // The mode's limit (`maxWindowMinutes`), in the provider's words
+    const cap = windowCapMinutes(manifest, v.releaseMode) ?? 1440;
     if (!continuous && (window === undefined || window < 1 || window > 1440)) {
       issue(['windowMinutes'], 'Enter whole minutes, from 1 to 1440');
+    } else if (!continuous && manifest && window !== undefined && window > cap) {
+      issue(['windowMinutes'], `${manifest.shortName} allows at most ${cap} minutes`);
     }
     if (whole(v.maxAttempts) === undefined)
       issue(['maxAttempts'], 'Enter a whole number; 0 means no limit');
@@ -199,6 +237,7 @@ export function stepFields(
       return [
         'releaseMode',
         'releaseDate',
+        'action',
         'leadTimeSeconds',
         'pollIntervalSeconds',
         'windowMinutes',

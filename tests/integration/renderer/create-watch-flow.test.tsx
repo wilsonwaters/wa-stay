@@ -7,7 +7,12 @@ import { nightsBetween, todayIn } from '../../../src/shared/utils/calendar-date'
 import type { WatchInput } from '../../../src/shared/types/watch.types';
 import { FAKE_MANIFEST, PARKSTAY_MANIFEST, ok } from '../../utils/renderer/createMockApi';
 import { currentRoute, renderWithApp } from '../../utils/renderer/renderWithApp';
-import { makeLocation, makeWatch } from '../../fixtures/renderer/watches';
+import {
+  catalogGet,
+  makeLocation,
+  makeMixedDetail,
+  makeWatch,
+} from '../../fixtures/renderer/watches';
 
 const LUCKY = makeLocation({
   providerId: 'fakestay',
@@ -113,6 +118,74 @@ describe('create a watch, end to end', () => {
 
     await waitFor(() => expect(currentRoute()).toBe('/watches/9'));
     expect(await screen.findByRole('heading', { level: 1, name: input.name })).toBeInTheDocument();
+  });
+});
+
+describe('create a watch at a place with sites and cabins, end to end', () => {
+  it('chooses "Cabins & villas" on Your stay and sends it as unitKinds', async () => {
+    const detail = makeMixedDetail({ ...LUCKY, key: 'fakestay:lb' });
+    const create = jest.fn((input: WatchInput) =>
+      Promise.resolve(ok(makeWatch({ id: 9, ...input, stay: { ...makeWatch().stay } })))
+    );
+    const { user } = renderWithApp({
+      route: '/watches/new',
+      api: {
+        providers: { list: jest.fn().mockResolvedValue(ok([PARKSTAY_MANIFEST, FAKE_MANIFEST])) },
+        catalog: {
+          get: catalogGet(detail),
+          search: jest.fn().mockResolvedValue(ok({ items: [LUCKY], total: 1 })),
+          status: jest.fn().mockResolvedValue(
+            ok({
+              providers: [{ providerId: 'fakestay', count: 3, stale: false, syncing: false }],
+            })
+          ),
+        },
+        watches: {
+          list: jest.fn().mockResolvedValue(ok([])),
+          create,
+          get: jest.fn(() => Promise.resolve(ok(makeWatch({ id: 9 })))),
+        },
+        accounts: { list: jest.fn().mockResolvedValue(ok([])) },
+      },
+    });
+
+    await user.click(await screen.findByRole('radio', { name: 'Fake Stay Holidays' }));
+    await user.click(screen.getByRole('button', { name: 'Continue' }));
+    const location = await screen.findByRole('combobox', { name: 'Location' });
+    await user.type(location, 'Lucky');
+    await user.click(await screen.findByRole('option', { name: /Lucky Bay Holiday Park/ }));
+    await user.click(screen.getByRole('button', { name: 'Continue' }));
+
+    // Your stay: the place's two stay types, cabins chosen, and only cabins to pick from.
+    await screen.findByRole('heading', { level: 2, name: /Your stay$/ });
+    const stayTypes = await screen.findByRole('group', { name: 'Stay type' });
+    await user.click(within(stayTypes).getByRole('button', { name: 'Cabins & villas' }));
+    // Only cabins listed now: the units are cabins (R9)
+    await user.click(screen.getByRole('button', { name: 'Choose cabins' }));
+    expect(screen.queryByRole('checkbox', { name: 'Site 1' })).toBeNull();
+    await user.click(screen.getByRole('button', { name: /^Dates/ }));
+    await user.keyboard('{ArrowRight}{Enter}{ArrowRight}{ArrowRight}{Enter}');
+    await user.click(
+      within(screen.getByRole('dialog', { name: 'Choose dates' })).getByRole('button', {
+        name: 'Done',
+      })
+    );
+    await user.click(screen.getByRole('button', { name: 'Continue' }));
+    await screen.findByRole('heading', { level: 2, name: /Alerts$/ });
+    await user.click(screen.getByRole('button', { name: 'Continue' }));
+
+    await screen.findByRole('heading', { level: 2, name: /Review$/ });
+    expect(
+      within(screen.getByRole('region', { name: 'Who' })).getByText('Cabins & villas')
+    ).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Create watch' }));
+    await waitFor(() => expect(create).toHaveBeenCalledTimes(1));
+    expect(create.mock.calls[0][0]).toMatchObject({
+      providerId: 'fakestay',
+      location: { externalId: 'lb', name: 'Lucky Bay Holiday Park' },
+      unitKinds: ['cabin'],
+    });
+    await waitFor(() => expect(currentRoute()).toBe('/watches/9'));
   });
 });
 

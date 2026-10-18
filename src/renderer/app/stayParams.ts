@@ -2,7 +2,8 @@
  * The stay a page is opened with, in its query string: `arrival`, `departure` (calendar dates
  * `YYYY-MM-DD`), `adults`, `children` and `infants`. Explore passes its stay to a place's
  * detail page this way (E2), and the create flows read the same keys from the prefill query
- * (architecture-notes §12.10). Pure.
+ * (architecture-notes §12.10). The stay types chosen on Explore travel the same way, as
+ * `stay=cabin,room` (`parseStayTypes`). Pure.
  */
 
 import {
@@ -11,6 +12,7 @@ import {
   isCalendarDate,
   nightsBetween,
 } from '../../shared/utils/calendar-date';
+import { STAY_TYPES, type StayTypeKind } from '../../shared/utils/unit-kinds';
 import { DEFAULT_GUEST_LIMITS } from '../components/ui/GuestsField';
 
 export interface StayParams {
@@ -112,4 +114,49 @@ export function hasDates(
   stay: Pick<StayParams, 'arrival' | 'departure'>
 ): stay is { arrival: string; departure: string } {
   return Boolean(stay.arrival && stay.departure);
+}
+
+const STAY_TYPE_KINDS: ReadonlySet<string> = new Set(STAY_TYPES.map((type) => type.kind));
+
+/** Whether `value` is the kind of one of the `STAY_TYPES` (any unit kind but `other`). */
+export function isStayType(value: unknown): value is StayTypeKind {
+  return typeof value === 'string' && STAY_TYPE_KINDS.has(value);
+}
+
+/**
+ * The stay types in a `stay` query value (`cabin,room`), in its order: unknown values, `other`
+ * and repeats are left out. `[]` for no value.
+ */
+export function parseStayTypes(raw: string | null | undefined): StayTypeKind[] {
+  if (!raw) return [];
+  return [...new Set(raw.split(',').map((item) => item.trim()))].filter(isStayType);
+}
+
+/**
+ * Whether a `stay` query value names something that is not a stay type (`castle`, `other`),
+ * which `parseStayTypes` leaves out: a create flow says so. Repeats and empty items do not count.
+ */
+export function hasUnusableStayType(raw: string | null | undefined): boolean {
+  return unusableStayTypes(raw).length > 0;
+}
+
+/** What a `stay` query value names that is not a stay type, without repeats. */
+function unusableStayTypes(raw: string | null | undefined): string[] {
+  const items = (raw ?? '').split(',').map((item) => item.trim());
+  return [...new Set(items.filter((item) => item !== '' && !isStayType(item)))];
+}
+
+/**
+ * A create flow's notice for a `stay` query value naming something that is not a stay type:
+ * with none of its stay types usable, to choose one; with some kept, that only the others were
+ * left out ("stay=cabin,castle" keeps Cabins & villas). None when all of it is usable.
+ */
+export function unusableStayTypeNotice(raw: string | null | undefined): string | undefined {
+  const unusable = unusableStayTypes(raw).length;
+  if (unusable === 0) return undefined;
+  if (parseStayTypes(raw).length === 0)
+    return "The link's stay type couldn't be used, so choose one.";
+  return unusable === 1
+    ? "One of the link's stay types couldn't be used, so it was left out."
+    : "Some of the link's stay types couldn't be used, so they were left out.";
 }

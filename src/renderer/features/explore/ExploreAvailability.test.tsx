@@ -9,6 +9,7 @@ import { bulkAvailabilityFor } from '../../../../tests/fixtures/catalog/bulk-ava
 import { catalogApi, placeNamed } from '../../../../tests/utils/renderer/catalog';
 import { ok, PARKSTAY_MANIFEST } from '../../../../tests/utils/renderer/createMockApi';
 import { installFakeMap, type FakeMaps } from '../../../../tests/utils/renderer/fakeMapController';
+import { RAC_MANIFEST } from '../../../../tests/utils/renderer/manifests';
 import { currentRoute, renderWithApp } from '../../../../tests/utils/renderer/renderWithApp';
 import type { LocationSummary } from '../../../shared/types/catalog.types';
 import type { BulkAvailabilityEntry, StayQuery } from '../../../shared/types/provider.types';
@@ -562,6 +563,105 @@ describe('Explore with dates: providers that fail or are slow', () => {
   });
 });
 
+describe("Explore with dates: RAC's free counts, with no total (RS12)", () => {
+  /** An RAC park: sites and cabins, its free units counted with no total. */
+  const BUSSELTON: LocationSummary = {
+    ...KINGSTOWN,
+    key: 'rac:busselton',
+    providerId: 'rac',
+    externalId: 'busselton',
+    name: 'RAC Busselton Holiday Park',
+    kind: 'holiday-park',
+    unitKinds: ['campsite', 'cabin'],
+    lng: 115.25,
+  };
+  const ENTRIES: BulkAvailabilityEntry[] = [
+    ...bulkAvailabilityFor([BUNGARRA]),
+    {
+      key: BUSSELTON.key,
+      availableUnits: 27,
+      byKind: { campsite: { availableUnits: 26 }, cabin: { availableUnits: 1 } },
+    },
+  ];
+  const stubs = (availability?: AvailabilityStub) =>
+    api(
+      availability ?? jest.fn(async (stay, options) => answering(ENTRIES)(stay, options)),
+      [PARKSTAY_MANIFEST, RAC_MANIFEST],
+      [BUNGARRA, BUSSELTON]
+    ).stubs;
+
+  it("reads RAC's free units with their noun and no total, beside ParkStay's N of M", async () => {
+    await renderExplore(`/?${STAY}`, stubs(), '2 places · 2 available for 6–8 Nov');
+    const rac = card(BUSSELTON.name);
+    expect(within(rac).getByText('27 spots free')).toBeInTheDocument();
+    expect(rac).toHaveAccessibleDescription(expect.stringContaining('27 spots free'));
+    expect(within(rac).queryByText(/\bof\b/)).toBeNull();
+    expect(within(card('Bungarra')).getByText('3 of 5 sites available')).toBeInTheDocument();
+  });
+
+  it('counts only the cabins with Cabins & villas chosen: "1 cabin free"', async () => {
+    await renderExplore(`/?stay=cabin&${STAY}`, stubs(), '1 place · 1 available for 6–8 Nov');
+    expect(within(card(BUSSELTON.name)).getByText('1 cabin free')).toBeInTheDocument();
+  });
+
+  it('says "Still checking RAC…" in the notices after 10 seconds while its counts arrive', async () => {
+    jest.useFakeTimers();
+    try {
+      const availability: AvailabilityStub = jest.fn((stay, options) =>
+        options?.providerIds?.[0] === 'rac'
+          ? new Promise(() => undefined)
+          : answering(ENTRIES)(stay, options)
+      );
+      renderWithApp({ route: `/?${STAY}`, api: stubs(availability) });
+      await screen.findByRole('heading', { name: '2 places · checking availability…' });
+      expect(screen.queryByText(/Still checking/)).toBeNull();
+      await act(async () => {
+        jest.advanceTimersByTime(SLOW_AVAILABILITY_MS);
+      });
+      // A status notice in the results' notices; RAC has no waiting queue: no word of one
+      const notices = within(results())
+        .getAllByRole('status')
+        .map((status) => status.textContent);
+      expect(notices).toContain('Still checking RAC…');
+      expect(screen.queryByText(/Still checking ParkStay/)).toBeNull();
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it('says it could not check RAC, with "Retry RAC availability", when RAC turned the request away', async () => {
+    let blocked = true;
+    const availability: AvailabilityStub = jest.fn(async (stay, options) =>
+      options?.providerIds?.[0] === 'rac' && blocked
+        ? ok({
+            entries: [],
+            errors: [
+              {
+                providerId: 'rac',
+                code: 'http',
+                message:
+                  "RAC Parks & Resorts turned the request away (HTTP 403). WA Stay won't ask again until 3:45 pm.",
+              },
+            ],
+          })
+        : answering(ENTRIES)(stay, options)
+    );
+    const { user } = await renderExplore(
+      `/?${STAY}`,
+      stubs(availability),
+      '2 places · 1 available for 6–8 Nov'
+    );
+    const alert = within(results()).getByRole('alert');
+    expect(alert).toHaveTextContent("Couldn't check availability on RAC.");
+    expect(within(card(BUSSELTON.name)).getByText("Couldn't check RAC")).toBeInTheDocument();
+
+    blocked = false;
+    await user.click(within(alert).getByRole('button', { name: 'Retry RAC availability' }));
+    expect(await within(card(BUSSELTON.name)).findByText('27 spots free')).toBeInTheDocument();
+    expect(availability).toHaveBeenLastCalledWith(expect.anything(), { providerIds: ['rac'] });
+  });
+});
+
 describe('Explore with dates: announcements', () => {
   it('announces how many places have sites once availability settles', async () => {
     await renderExplore(`/?${STAY}`);
@@ -679,5 +779,165 @@ describe('Explore with dates: the map', () => {
   it('opens an available place from its card with the same stay', async () => {
     await renderExplore(`/?${STAY}`);
     expect(card('Bungarra')).toHaveAttribute('href', `#/places/parkstay/20?${STAY}`);
+  });
+});
+
+describe('Explore with dates: stay types', () => {
+  /** A provider with holiday parks: sites and cabins at each. */
+  const PARKS = {
+    ...PARKSTAY_MANIFEST,
+    id: 'parks',
+    name: 'Holiday Parks WA',
+    shortName: 'Parks',
+    capabilities: { ...PARKSTAY_MANIFEST.capabilities, accessGate: false },
+  };
+  const park = (externalId: string, name: string, lng: number): LocationSummary => ({
+    ...KINGSTOWN,
+    key: `parks:${externalId}`,
+    providerId: 'parks',
+    externalId,
+    name,
+    kind: 'holiday-park',
+    lng,
+  });
+  /** Counts its sites and cabins apart (`byKind`). */
+  const COUNTED = park('1', 'Counted Cove Holiday Park', 115.6);
+  /** Gives only its totals. */
+  const TOTALS = park('2', 'Totals Bay Holiday Park', 115.7);
+  const ENTRIES: BulkAvailabilityEntry[] = [
+    ...bulkAvailabilityFor([BUNGARRA]),
+    {
+      key: COUNTED.key,
+      availableUnits: 7,
+      bookableUnits: 26,
+      byKind: {
+        campsite: { availableUnits: 5, bookableUnits: 20 },
+        cabin: { availableUnits: 2, bookableUnits: 6 },
+      },
+    },
+    { key: TOTALS.key, availableUnits: 4, bookableUnits: 12 },
+  ];
+  const stubs = () =>
+    api(
+      jest.fn(async (stay, options) => answering(ENTRIES)(stay, options)),
+      [PARKSTAY_MANIFEST, PARKS],
+      [BUNGARRA, COUNTED, TOTALS]
+    ).stubs;
+
+  it('counts every unit with no stay type chosen, or with every kind of the place chosen', async () => {
+    const { unmount } = await renderExplore(
+      `/?${STAY}`,
+      stubs(),
+      '3 places · 3 available for 6–8 Nov'
+    );
+    // Holiday parks have sites and cabins: their units are "spots" (R9)
+    expect(within(card(COUNTED.name)).getByText('7 of 26 spots available')).toBeInTheDocument();
+    expect(within(card(TOTALS.name)).getByText('4 of 12 spots available')).toBeInTheDocument();
+    unmount();
+
+    // Camping and Cabins & villas: everything these places have, so their totals.
+    await renderExplore(
+      `/?stay=campsite,cabin&${STAY}`,
+      stubs(),
+      '3 places · 3 available for 6–8 Nov'
+    );
+    // Holiday parks have sites and cabins: their units are "spots" (R9)
+    expect(within(card(COUNTED.name)).getByText('7 of 26 spots available')).toBeInTheDocument();
+    expect(within(card(TOTALS.name)).getByText('4 of 12 spots available')).toBeInTheDocument();
+    expect(within(card('Bungarra')).getByText('3 of 5 sites available')).toBeInTheDocument();
+  });
+
+  it('counts only the cabins with Cabins & villas chosen, or says "Check dates" in words', async () => {
+    const { user } = await renderExplore(
+      `/?stay=cabin&${STAY}`,
+      stubs(),
+      '2 places · 1 available for 6–8 Nov'
+    );
+    // Only cabins counted: "cabins" (R9)
+    expect(within(card(COUNTED.name)).getByText('2 of 6 cabins available')).toBeInTheDocument();
+    // No count of cabins alone: never its totals, which include sites, and never "not open".
+    const totals = card(TOTALS.name);
+    expect(within(totals).getByText('Check dates on the place page')).toBeInTheDocument();
+    expect(totals).toHaveAccessibleDescription(
+      expect.stringContaining('Check dates on the place page')
+    );
+    expect(within(totals).queryByText(/available|not open|No (sites|spots|cabins)/i)).toBeNull();
+    expect(cardNames()).toEqual([COUNTED.name, TOTALS.name]);
+
+    // "Available only" hides the place that says "Check dates".
+    await user.click(availableOnly());
+    expect(cardNames()).toEqual([COUNTED.name]);
+  });
+
+  it('announces the units counted by their kinds: "spots" at mixed parks, "cabins" when chosen', async () => {
+    const { unmount } = await renderExplore(
+      `/?${STAY}`,
+      stubs(),
+      '3 places · 3 available for 6–8 Nov'
+    );
+    // Bungarra's sites and two parks' sites and cabins: units of more than one kind (R9)
+    await waitFor(() =>
+      expect(politeLive()?.textContent?.trim()).toBe(
+        '3 of 3 places have spots available for 6–8 Nov'
+      )
+    );
+    unmount();
+
+    await renderExplore(`/?stay=cabin&${STAY}`, stubs(), '2 places · 1 available for 6–8 Nov');
+    await waitFor(() =>
+      expect(politeLive()?.textContent?.trim()).toBe(
+        '1 of 2 places have cabins available for 6–8 Nov'
+      )
+    );
+  });
+
+  it('says "No places have spots", or "cabins" with Cabins & villas chosen, when none is free', async () => {
+    const full: BulkAvailabilityEntry[] = ENTRIES.map((entry) => ({
+      ...entry,
+      availableUnits: 0,
+      ...(entry.byKind
+        ? {
+            byKind: {
+              campsite: { availableUnits: 0, bookableUnits: 20 },
+              cabin: { availableUnits: 0, bookableUnits: 6 },
+            },
+          }
+        : {}),
+    }));
+    const nothingFree = () =>
+      api(
+        jest.fn(async (stay, options) => answering(full)(stay, options)),
+        [PARKSTAY_MANIFEST, PARKS],
+        [BUNGARRA, COUNTED, TOTALS]
+      ).stubs;
+    const { unmount } = await renderExplore(`/?${STAY}&avail=1`, nothingFree(), /./);
+    expect(
+      await screen.findByRole('heading', { name: 'No places have spots for 6–8 Nov' })
+    ).toBeInTheDocument();
+    unmount();
+
+    await renderExplore(`/?stay=cabin&${STAY}&avail=1`, nothingFree(), /./);
+    expect(
+      await screen.findByRole('heading', { name: 'No places have cabins for 6–8 Nov' })
+    ).toBeInTheDocument();
+  });
+
+  describe('on the map', () => {
+    beforeEach(() => {
+      mockMapAvailable = true;
+    });
+
+    it('says "Check dates" on the pill of a place that cannot count the stay types chosen', async () => {
+      await renderExplore(`/?stay=cabin&${STAY}`, stubs(), '2 places · 1 available for 6–8 Nov');
+      const map = maps.current;
+      expect([map.pin(COUNTED.key)?.avail, map.pin(COUNTED.key)?.availLabel]).toEqual([
+        'available',
+        '2 available',
+      ]);
+      expect([map.pin(TOTALS.key)?.avail, map.pin(TOTALS.key)?.availLabel]).toEqual([
+        'check-dates',
+        'Check dates',
+      ]);
+    });
   });
 });

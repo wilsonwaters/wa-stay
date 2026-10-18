@@ -1,6 +1,6 @@
 import type { ApiErrorCode } from './api.types';
 import { WatchResult } from './common.types';
-import type { ProviderId, StayParams, UnitAvailability } from './provider.types';
+import type { ProviderId, StayParams, UnitAvailability, UnitKind } from './provider.types';
 import type { LocationRef, Stay, StayInput } from './stay.types';
 
 /**
@@ -19,6 +19,11 @@ export interface Watch {
   stay: Stay;
   /** Preferred units (ParkStay: site ids or names). Empty means any unit. */
   unitIds: string[];
+  /**
+   * The stay types wanted (`UnitKind`s, no duplicates): only units of these kinds match, a
+   * unit with no kind counting as `other`. Empty means any kind. `unitIds`, when set, win.
+   */
+  unitKinds: UnitKind[];
   /** The provider's own stay fields (ParkStay: `parkId`, `gearType`). */
   stayParams: StayParams;
   checkIntervalMinutes: number;
@@ -39,14 +44,32 @@ export interface Watch {
   hold?: WatchHoldState;
   /** Why the last run did not do what it should (a failed check or automatic hold). */
   lastError?: string;
+  /**
+   * The provider's booking page for what the last check found ("Book on {shortName}"): set
+   * only while `lastResult` is found or partly found and the stored nights are the stay's.
+   * Main derives it from `lastAvailability` on every read; it is never stored.
+   */
+  bookingLink?: WatchBookingLink;
   createdAt: Date;
   updatedAt: Date;
+}
+
+/**
+ * A booking link for a stay a watch found: the provider's public booking page, prefilled where
+ * it can, and the stay it is for (a partial match's run, or the whole stay). Calendar dates.
+ */
+export interface WatchBookingLink {
+  url: string;
+  arrival: string;
+  departure: string;
 }
 
 /** A watch's auto-hold as stored: pay for it with `watches.openPayment` until `expiresAt`. */
 export interface WatchHoldState {
   reference: string;
   expiresAt: Date;
+  /** `expiresAt` is the provider's guess (`HoldSuccess.expiresAtEstimated`): "about". */
+  expiresEstimated?: boolean;
   unitId?: string;
   paymentUrl?: string;
 }
@@ -58,6 +81,8 @@ export interface WatchInput {
   location: LocationRef;
   stay: StayInput;
   unitIds?: string[];
+  /** Stay types (`Watch.unitKinds`); none or empty means any kind. Duplicates are dropped. */
+  unitKinds?: UnitKind[];
   stayParams?: StayParams;
   /** One of `WATCH_INTERVAL_OPTIONS`. */
   checkIntervalMinutes?: number;
@@ -82,6 +107,8 @@ export interface WatchHold {
   reference: string;
   /** ISO instant. */
   expiresAt: string;
+  /** `expiresAt` is the provider's guess: the alert says "within about N minutes". */
+  expiresEstimated?: boolean;
   unitId: string;
   paymentUrl: string;
 }
@@ -110,9 +137,17 @@ export interface WatchMatch {
   unitId: string;
   unitName: string;
   unitType?: string;
+  /** The unit's kind, when the provider gave one: what copy calls it (`nounForKinds`). */
+  unitKind?: UnitKind;
   arrival: string;
   departure: string;
   partial: boolean;
+  /**
+   * For a whole-stay match, how many units its unit stands for (`UnitAvailability.freeCount`),
+   * when the provider counts them: the alert and Check now add them up (`freeUnitsOf`). A
+   * partial match never has one.
+   */
+  freeCount?: number;
   /** Whether every night of the match has a price; `maxPrice` applies only then. */
   priceKnown: boolean;
   /** The sum of the nightly prices, when every night has one. */

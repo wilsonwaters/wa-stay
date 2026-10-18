@@ -13,15 +13,36 @@
  *
  * Knobs:
  * - `failNext(module, error)`: the next call into that module rejects with `error`;
+ * - `pauseNext(module)`: the next call into that module waits, after its delay, until the
+ *   returned `resume()` is called (abortable), so a test can act while it is in flight
+ *   whatever the machine's speed;
  * - `delayMs`: every async call waits this long first (abortable); `delays` per module;
- * - `calls`: every call, in order, with its `signal`;
+ * - `limits`: replaces parts of the manifest's limits;
+ * - `calls`: every call, in order, with its `signal` and the ambient request priority it was
+ *   made at (`currentRequestPriority()`, what a paced `ctx.http` would send it with);
  * - `peakInFlight(module)`: the most calls into the module at once;
  * - `accessStates`: the states the access gate steps through on `ensure()`;
- * - `availability`: a state per unit for every night, or a list of nights (state and price);
- *   `setAvailability` changes it later;
+ * - `availability`: a state per unit for every night, or a list of nights (state, price and
+ *   the stay rules: `reason`, `minNights`, `noArrival`, `noDeparture`); `setAvailability`
+ *   changes it later; `unitKinds`: what each unit id is (none by default); `unitMinNights`:
+ *   each unit's minimum stay (`UnitAvailability.minNights`): a shorter stay is refused, its
+ *   nights with room answered `min-stay` and never `fullyAvailable`;
  * - `scriptHold(...results)`: the next `holds.create` calls answer these;
+ * - `holdRelease`: `holds.release` (R18) and the manifest's `holdRelease`; each call answers
+ *   the next `scriptRelease(...)` outcome, else `released` (`failNext('holds', …)` rejects it,
+ *   a `delays.holds` delays it); `onPaymentClose` also sets `releaseOnPaymentClose`. Without
+ *   it the fake, like ParkStay, cannot let a hold go;
+ * - `maxWindowMinutes`: every release mode's window limit;
+ * - `stayFields`: stay fields after its own `gearType` (for availability, watches and snipes);
  * - `account` / `setAccount(state)`: what `auth.isSignedIn` answers; `auth` replaces its
- *   sign-in URL, origins or completion pages.
+ *   sign-in URL, origins or completion pages;
+ * - `experiments`: declared in the manifest, with the capabilities they turn on off there; the
+ *   modules of those capabilities (built as `capabilities` says) reach the registry only when
+ *   `ctx.manifest` has them on, as a provider's factory does (`withExperiments` applies them);
+ * - `credentials`: a `credentials` sign-in instead of `browser-session` (R15), with
+ *   `FAKE_CREDENTIAL_FIELDS` (a copyable member number and a password that is not) and one
+ *   statement, `FAKE_CONFIRMATIONS`, unless given; `signIn` answers `signed-in` unless
+ *   scripted. Its calls are recorded with the keys only, never a value.
  *
  * Every async method honours its `AbortSignal` and rejects with an `AbortError`.
  */
@@ -31,6 +52,7 @@ import path from 'path';
 import {
   AccessGateError,
   createAbortError,
+  currentRequestPriority,
   defineProvider,
   FakeSecretVault,
   InMemoryKeyValueStore,
@@ -43,26 +65,41 @@ import {
   type BrowserAutomation,
   type BrowserSessionAuth,
   type CatalogModule,
+  type CredentialsAuth,
+  type CredentialsSignInResult,
   type ExternalBooking,
+  type HttpClient,
+  type HoldReleaseOutcome,
   type HoldResult,
   type HoldSuccess,
+  type HoldToRelease,
   type PaymentPage,
   type ProviderContext,
   type ProviderFactory,
   type ProviderLogger,
+  type ProviderModules,
+  type RequestPriority,
 } from '@main/providers/sdk';
 import type {
   AccessState,
   AccessStatus,
+  AccountConfirmation,
+  AccountFieldDescriptor,
   AccountRequirement,
   AccountStatus,
+  BooleanCapability,
   LocationAvailability,
   NightState,
   NightStatus,
   ProviderCapabilities,
+  ProviderExperiment,
+  ProviderLimits,
   ProviderManifest,
+  StayFieldDescriptor,
   StayQuery,
+  UnitKind,
 } from '@shared/types/provider.types';
+import { minimumNights } from '@main/core/watches/matching';
 import type { LocationDetail, LocationSummary } from '@shared/types/catalog.types';
 import { SnipeReleaseMode } from '@shared/types/common.types';
 import { makeLocationKey } from '@shared/utils/location-key';
@@ -75,13 +112,17 @@ export interface FakeCall {
   method: string;
   args: unknown[];
   signal?: AbortSignal;
+  /** The ambient request priority when it was called (the fake's own modules record it). */
+  priority?: RequestPriority;
 }
 
 /**
  * One night of a unit: its state, and its price (`FAKE_PRICE` when available unless given;
- * `null` for no price).
+ * `null` for no price), with the stay rules passed through as given.
  */
-export interface FakeNight {
+export interface FakeNight extends Partial<
+  Pick<NightStatus, 'reason' | 'minNights' | 'noArrival' | 'noDeparture'>
+> {
   state: NightState;
   price?: number | null;
 }
@@ -109,24 +150,91 @@ export interface FakeProviderOptions {
    * default to `u1` (available) and `u2` (booked).
    */
   availability?: Record<string, Record<string, FakeUnitNights>>;
+  /** What each unit is, by unit id, at every location (`unitKind`). Units left out have none. */
+  unitKinds?: Record<string, UnitKind>;
+  /**
+   * Each unit's minimum stay, by unit id, at every location (`UnitAvailability.minNights`): a
+   * shorter stay (by the core's `minimumNights`) is refused, so its nights with room are
+   * `min-stay` and it is never `fullyAvailable`. Units left out have none.
+   */
+  unitMinNights?: Record<string, number>;
+  /**
+   * Each unit of a check carries its own booking link (`UnitAvailability.bookingUrl`):
+   * `https://book.<id>.example/<externalId>/<unitId>?arrival=…&departure=…`, on a subdomain of
+   * the fake's website. Units have none by default.
+   */
+  unitBookingUrls?: boolean;
   /** The signed-in state `auth.isSignedIn` reports (`setAccount` changes it). */
   account?: AccountStatus['state'];
   /** Replaces parts of the `browser-session` auth (sign-in URL, origins, completion pages). */
   auth?: Partial<
     Pick<BrowserSessionAuth, 'signInUrl' | 'allowedOrigins' | 'completionUrlPatterns'>
   >;
+  /** A `credentials` sign-in instead of `browser-session` (see `FakeCredentialsOptions`). */
+  credentials?: FakeCredentialsOptions;
   accessStates?: AccessState[];
   bookings?: ExternalBooking[];
   delayMs?: number;
   /** Per-module delays, instead of `delayMs`. */
   delays?: Partial<Record<FakeModule, number>>;
+  /** Replaces parts of the manifest's limits (5 min watches, 2 at once, a 1 h catalogue). */
+  limits?: Partial<ProviderLimits>;
   /** The manifest's `bulkAvailabilityStayFields` (every stay field when absent). */
   bulkAvailabilityStayFields?: ProviderManifest['bulkAvailabilityStayFields'];
   /** A search-mode catalogue's `searchArea` page size (default 2). */
   searchPageSize?: number;
   /** A search-mode catalogue also has `catalog.searchText`. */
   textSearch?: boolean;
+  /**
+   * Declared in the manifest, where the capabilities they turn on are off. Their modules are
+   * built as `capabilities` says, and given to the registry only when `ctx.manifest` has them on.
+   */
+  experiments?: ProviderExperiment[];
+  /** Every release mode's `maxWindowMinutes` (none by default). */
+  maxWindowMinutes?: number;
+  /** Stay fields after the fake's own `gearType` (none by default). */
+  stayFields?: StayFieldDescriptor[];
+  /**
+   * `holds.release` and the manifest's `holdRelease` (R18); `onPaymentClose` also sets
+   * `holds.releaseOnPaymentClose`. None by default: the fake cannot let a hold go.
+   */
+  holdRelease?: { onPaymentClose?: boolean };
 }
+
+/** A `credentials` sign-in for the fake. Values here are made up; never a real number. */
+export interface FakeCredentialsOptions {
+  /** Default `FAKE_CREDENTIAL_FIELDS`. */
+  fields?: AccountFieldDescriptor[];
+  /** Default `FAKE_CONFIRMATIONS`; `[]` for none. */
+  confirmations?: AccountConfirmation[];
+  /**
+   * What `signIn` answers: a state, or a function of the trimmed values and the HTTP client
+   * the core passes (it may reject, or return normalised `values`). Default `signed-in`.
+   */
+  signIn?:
+    | AccountStatus['state']
+    | ((
+        values: Readonly<Record<string, string>>,
+        http: HttpClient,
+        signal?: AbortSignal
+      ) => CredentialsSignInResult | Promise<CredentialsSignInResult>);
+}
+
+/** The fake's default `credentials` fields: a copyable member number, and a password that is not. */
+export const FAKE_CREDENTIAL_FIELDS: AccountFieldDescriptor[] = [
+  {
+    key: 'memberNumber',
+    label: 'Member number',
+    help: 'The 13 digits on your card.',
+    secret: true,
+    copyable: true,
+  },
+  { key: 'password', label: 'Password', secret: true },
+];
+
+export const FAKE_CONFIRMATIONS: AccountConfirmation[] = [
+  { key: 'own', label: 'This is my own membership.' },
+];
 
 export interface FakeProvider extends AccommodationProvider {
   readonly factory: ProviderFactory;
@@ -135,10 +243,14 @@ export interface FakeProvider extends AccommodationProvider {
   /** The context the factory was called with. */
   ctx?: ProviderContext;
   failNext(module: FakeModule, error: Error): void;
+  /** The next call into `module` waits (after its delay) until `resume()`; abortable. */
+  pauseNext(module: FakeModule): () => void;
   /** Replaces a location's units from now on. */
   setAvailability(externalId: string, units: Record<string, FakeUnitNights>): void;
   /** The next `holds.create` calls answer these, in order. */
   scriptHold(...results: HoldResult[]): void;
+  /** The next `holds.release` calls answer these outcomes, in order (then `released`). */
+  scriptRelease(...outcomes: HoldReleaseOutcome[]): void;
   /** The most calls into `module` in flight at once. */
   peakInFlight(module: FakeModule): number;
   /** How many `holdOpen()` releases are outstanding. */
@@ -159,6 +271,15 @@ const DEFAULT_LOCATIONS: FakeLocationSeed[] = [
   // An external id containing ":" must survive the location key round trip.
   { externalId: 'area:3', name: 'Tingle Hut' },
 ];
+
+/** The module a capability an experiment turns on brings, when it has one of its own. */
+const EXPERIMENT_MODULES: Partial<Record<BooleanCapability, keyof ProviderModules>> = {
+  catalog: 'catalog',
+  accessGate: 'access',
+  snipes: 'release',
+  holds: 'holds',
+  bookingImport: 'bookings',
+};
 
 const ALL_ON: ProviderCapabilities = {
   catalog: true,
@@ -198,6 +319,20 @@ function wait(ms: number, signal?: AbortSignal): Promise<void> {
   });
 }
 
+/** Resolves when `paused` does, or rejects when `signal` aborts first. */
+function untilResumed(paused: Promise<void>, signal?: AbortSignal): Promise<void> {
+  if (!signal) return paused;
+  if (signal.aborted) return Promise.reject(createAbortError(signal));
+  return new Promise((resolve, reject) => {
+    const onAbort = (): void => reject(createAbortError(signal));
+    signal.addEventListener('abort', onAbort, { once: true });
+    void paused.then(() => {
+      signal.removeEventListener('abort', onAbort);
+      resolve();
+    });
+  });
+}
+
 export function createFakeProvider(options: FakeProviderOptions = {}): FakeProvider {
   const id = options.id ?? 'fake';
   const capabilities: ProviderCapabilities = { ...ALL_ON, ...options.capabilities };
@@ -211,11 +346,15 @@ export function createFakeProvider(options: FakeProviderOptions = {}): FakeProvi
     ...options.availability,
   };
   const scriptedHolds: HoldResult[] = [];
+  const scriptedReleases: HoldReleaseOutcome[] = [];
+  const pauses = new Map<FakeModule, Promise<void>[]>();
   const active = new Map<FakeModule, number>();
   const peaks = new Map<FakeModule, number>();
   let holdCount = 0;
   let holdSequence = 0;
   let disposed = false;
+  const experimental = [...new Set(options.experiments?.flatMap((e) => e.turnsOn) ?? [])];
+  const experimentalOff = Object.fromEntries(experimental.map((c) => [c, false]));
 
   const manifest: ProviderManifest = {
     id,
@@ -228,8 +367,15 @@ export function createFakeProvider(options: FakeProviderOptions = {}): FakeProvi
     locationKinds: ['campground', 'cabin'],
     timezone: 'Australia/Perth',
     currency: 'AUD',
-    capabilities,
-    limits: { minWatchIntervalMinutes: 5, maxConcurrentRequests: 2, catalogTtlHours: 1 },
+    capabilities: { ...capabilities, ...experimentalOff },
+    ...(options.experiments ? { experiments: options.experiments } : {}),
+    ...(options.holdRelease ? { holdRelease: true } : {}),
+    limits: {
+      minWatchIntervalMinutes: 5,
+      maxConcurrentRequests: 2,
+      catalogTtlHours: 1,
+      ...options.limits,
+    },
     ...(options.bulkAvailabilityStayFields
       ? { bulkAvailabilityStayFields: options.bulkAvailabilityStayFields }
       : {}),
@@ -245,6 +391,7 @@ export function createFakeProvider(options: FakeProviderOptions = {}): FakeProvi
         default: 'tent',
         appliesTo: ['availability', 'watch', 'snipe'],
       },
+      ...(options.stayFields ?? []),
     ],
     releaseModes: capabilities.snipes
       ? [
@@ -266,9 +413,54 @@ export function createFakeProvider(options: FakeProviderOptions = {}): FakeProvi
             description: 'Polls for a freed unit.',
             usesAccessGate: false,
           },
-        ]
+        ].map((mode) =>
+          options.maxWindowMinutes === undefined
+            ? mode
+            : { ...mode, maxWindowMinutes: options.maxWindowMinutes }
+        )
       : undefined,
   };
+
+  function credentialsAuth(credentials: FakeCredentialsOptions): CredentialsAuth {
+    const answer = credentials.signIn ?? 'signed-in';
+    return {
+      kind: 'credentials',
+      fields: credentials.fields ?? FAKE_CREDENTIAL_FIELDS,
+      confirmations: credentials.confirmations ?? FAKE_CONFIRMATIONS,
+      async signIn(values, http, signal) {
+        // The keys only: a test may print its calls
+        await enter('auth', 'signIn', [Object.keys(values)], signal);
+        return typeof answer === 'function' ? answer(values, http, signal) : { state: answer };
+      },
+      async isSignedIn(_http, signal) {
+        await enter('auth', 'isSignedIn', [], signal);
+        return { state: accountState };
+      },
+    };
+  }
+
+  /** The fake's modules, without those of experimental capabilities `on` has off. */
+  function modulesFor(on: ProviderCapabilities): ProviderModules {
+    const { links, catalog, availability, access, release, holds, bookings, auth } = fake;
+    const modules: ProviderModules = {
+      links,
+      catalog,
+      availability,
+      access,
+      release,
+      holds,
+      bookings,
+      auth,
+      async dispose() {
+        await fake.dispose?.();
+      },
+    };
+    for (const capability of experimental) {
+      const module = EXPERIMENT_MODULES[capability];
+      if (module && !on[capability]) delete modules[module];
+    }
+    return modules;
+  }
 
   /** Records the call, honours the signal and the delay, and fires a scripted failure. */
   async function enter(
@@ -277,13 +469,15 @@ export function createFakeProvider(options: FakeProviderOptions = {}): FakeProvi
     args: unknown[],
     signal?: AbortSignal
   ): Promise<void> {
-    calls.push({ module, method, args, signal });
+    calls.push({ module, method, args, signal, priority: currentRequestPriority() });
     const now = (active.get(module) ?? 0) + 1;
     active.set(module, now);
     peaks.set(module, Math.max(peaks.get(module) ?? 0, now));
     try {
       // Always yields to a timer, so an abort right after the call still lands.
       await wait(options.delays?.[module] ?? fake.delayMs, signal);
+      const pause = pauses.get(module)?.shift();
+      if (pause) await untilResumed(pause, signal);
     } finally {
       active.set(module, (active.get(module) ?? 1) - 1);
     }
@@ -336,8 +530,38 @@ export function createFakeProvider(options: FakeProviderOptions = {}): FakeProvi
         night.price === null
           ? undefined
           : (night.price ?? (night.state === 'available' ? FAKE_PRICE : undefined));
-      return { date, state: night.state, ...(price !== undefined ? { price } : {}) };
+      const { reason, minNights, noArrival, noDeparture } = night;
+      return {
+        date,
+        state: night.state,
+        ...(price !== undefined ? { price } : {}),
+        ...(reason ? { reason } : {}),
+        ...(minNights !== undefined ? { minNights } : {}),
+        ...(noArrival ? { noArrival } : {}),
+        ...(noDeparture ? { noDeparture } : {}),
+      };
     });
+  }
+
+  /**
+   * The nights as a provider with stay rules answers them: a stay under its minimum (the core's
+   * `minimumNights`: the first night's `minNights`, else the unit's) is refused, so each night
+   * with room is `unknown` with `reason: 'min-stay'`.
+   */
+  function underStayRules(nights: NightStatus[], minNights: number | undefined): NightStatus[] {
+    if (nights.length >= minimumNights({ minNights }, nights[0])) return nights;
+    return nights.map((night) =>
+      night.state === 'available' && night.reason === undefined
+        ? { ...night, state: 'unknown', reason: 'min-stay' }
+        : night
+    );
+  }
+
+  /** Every night available with no reason, arriving on a day that takes arrivals. */
+  function freeForStay(nights: NightStatus[]): boolean {
+    if (nights.length === 0) return false;
+    if (nights.some((night) => night.state !== 'available' || night.reason)) return false;
+    return !nights[0].noArrival;
   }
 
   function checkNow(externalId: string, stay: StayQuery, unitIds?: string[]): LocationAvailability {
@@ -346,20 +570,30 @@ export function createFakeProvider(options: FakeProviderOptions = {}): FakeProvi
     const units = Object.entries(unitStates(externalId))
       .filter(([unitId]) => !unitIds || unitIds.includes(unitId))
       .map(([unitId, spec]) => {
-        const nights = nightsOf(spec, dates);
-        const fullyAvailable =
-          nights.length > 0 && nights.every((night) => night.state === 'available');
+        const minNights = options.unitMinNights?.[unitId];
+        const nights = underStayRules(nightsOf(spec, dates), minNights);
+        const fullyAvailable = freeForStay(nights);
         const priced = nights.every((night) => night.price !== undefined);
+        const unitKind = options.unitKinds?.[unitId];
         return {
           unitId,
           unitName: `Site ${unitId}`,
           unitType: 'Tent site',
+          ...(unitKind ? { unitKind } : {}),
           nights,
           fullyAvailable,
+          ...(minNights !== undefined ? { minNights } : {}),
           total:
             fullyAvailable && priced
               ? nights.reduce((sum, night) => sum + (night.price ?? 0), 0)
               : undefined,
+          ...(options.unitBookingUrls
+            ? {
+                bookingUrl:
+                  `https://book.${id}.example/${encodeURIComponent(externalId)}/` +
+                  `${encodeURIComponent(unitId)}?arrival=${stay.arrival}&departure=${stay.departure}`,
+              }
+            : {}),
         };
       });
     return {
@@ -482,16 +716,27 @@ export function createFakeProvider(options: FakeProviderOptions = {}): FakeProvi
     delayMs: options.delayMs ?? 0,
     factory: defineProvider(manifest, (ctx) => {
       fake.ctx = ctx;
-      return fake;
+      return experimental.length ? modulesFor(ctx.manifest.capabilities) : fake;
     }),
     failNext(module, error) {
       failures.set(module, error);
+    },
+    pauseNext(module) {
+      let resume!: () => void;
+      const paused = new Promise<void>((resolve) => {
+        resume = resolve;
+      });
+      pauses.set(module, [...(pauses.get(module) ?? []), paused]);
+      return () => resume();
     },
     setAvailability(externalId, units) {
       availabilityByLocation[externalId] = units;
     },
     scriptHold(...results) {
       scriptedHolds.push(...results);
+    },
+    scriptRelease(...outcomes) {
+      scriptedReleases.push(...outcomes);
     },
     peakInFlight(module) {
       return peaks.get(module) ?? 0;
@@ -600,6 +845,15 @@ export function createFakeProvider(options: FakeProviderOptions = {}): FakeProvi
             const onPage = page.url === paid || page.url.startsWith(`${paid}?`);
             return onPage && (await page.hasText(booked)) ? booked : null;
           },
+          ...(options.holdRelease
+            ? {
+                async release(hold: HoldToRelease, signal?: AbortSignal) {
+                  await enter('holds', 'release', [hold], signal);
+                  return { outcome: scriptedReleases.shift() ?? 'released' };
+                },
+                ...(options.holdRelease.onPaymentClose ? { releaseOnPaymentClose: true } : {}),
+              }
+            : {}),
         }
       : undefined,
 
@@ -625,21 +879,23 @@ export function createFakeProvider(options: FakeProviderOptions = {}): FakeProvi
       : undefined,
 
     auth:
-      capabilities.account !== 'none'
-        ? {
-            kind: 'browser-session',
-            signInUrl: `https://${id}.example/sign-in`,
-            allowedOrigins: [`https://${id}.example`],
-            completionUrlPatterns: [`https://${id}.example/signed-in*`],
-            ...options.auth,
-            async isSignedIn(_http, signal) {
-              await enter('auth', 'isSignedIn', [], signal);
-              return accountState === 'signed-in'
-                ? { state: 'signed-in', email: `person@${id}.example`, displayName: 'Pat Person' }
-                : { state: accountState };
-            },
-          }
-        : undefined,
+      capabilities.account !== 'none' && options.credentials
+        ? credentialsAuth(options.credentials)
+        : capabilities.account !== 'none'
+          ? {
+              kind: 'browser-session',
+              signInUrl: `https://${id}.example/sign-in`,
+              allowedOrigins: [`https://${id}.example`],
+              completionUrlPatterns: [`https://${id}.example/signed-in*`],
+              ...options.auth,
+              async isSignedIn(_http, signal) {
+                await enter('auth', 'isSignedIn', [], signal);
+                return accountState === 'signed-in'
+                  ? { state: 'signed-in', email: `person@${id}.example`, displayName: 'Pat Person' }
+                  : { state: accountState };
+              },
+            }
+          : undefined,
 
     async dispose() {
       disposed = true;

@@ -53,6 +53,18 @@ describe('toSnipeInput', () => {
     expect(input.accessGateEnabled).toBe(false);
     expect(input.pollIntervalMs).toBe(1500);
   });
+
+  it('sends what the snipe does when the dates are free, always', () => {
+    expect(toSnipeInput(filled(), PARKSTAY_MANIFEST).action).toBe('hold');
+    expect(toSnipeInput({ ...filled(), action: 'alert' }, PARKSTAY_MANIFEST).action).toBe('alert');
+  });
+
+  it('sends the chosen stay types, and nothing for any', () => {
+    expect(
+      toSnipeInput({ ...filled(), unitKinds: ['cabin', 'room'] }, PARKSTAY_MANIFEST)
+    ).toMatchObject({ unitKinds: ['cabin', 'room'] });
+    expect(toSnipeInput(filled(), PARKSTAY_MANIFEST)).not.toHaveProperty('unitKinds');
+  });
 });
 
 describe('issueField', () => {
@@ -66,6 +78,8 @@ describe('issueField', () => {
     expect(issueField('stay')).toBe('arrival');
     expect(issueField('stayParams.postcode')).toBe('stayParams.postcode');
     expect(issueField('pollIntervalMs')).toBe('pollIntervalSeconds');
+    // Main refusing a hold (a provider without holds): the "When the dates are free" choice
+    expect(issueField('action')).toBe('action');
     expect(issueField('somethingElse')).toBeUndefined();
   });
 });
@@ -107,5 +121,19 @@ describe('parseSnipePrefill', () => {
       "The link's place couldn't be used, so choose a location.",
       "The link's dates couldn't be used (they have passed or are out of order), so choose your dates.",
     ]);
+  });
+
+  it('reads the link’s stay types, and says when it named one it cannot use', () => {
+    const parse = (query: string) => parseSnipePrefill(query, [PARKSTAY_MANIFEST], now);
+    expect(parse('?provider=parkstay&location=20&stay=cabin,cabin')).toEqual({
+      providerId: 'parkstay',
+      locationId: '20',
+      unitKinds: ['cabin'],
+      notices: [],
+    });
+    expect(parse('?stay=bogus')).toEqual({
+      notices: ["The link's stay type couldn't be used, so choose one."],
+    });
+    expect(parse('?stay=')).toEqual({ notices: [] });
   });
 });

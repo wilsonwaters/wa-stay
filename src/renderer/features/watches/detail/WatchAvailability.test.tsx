@@ -1,4 +1,5 @@
-import { render, screen, within } from '@testing-library/react';
+import { screen, within } from '@testing-library/react';
+import { renderWithProviders } from '@tests/utils/renderer/renderWithProviders';
 import { WatchResult } from '../../../../shared/types/common.types';
 import { eachNight } from '../../../../shared/utils/calendar-date';
 import { PARKSTAY_MANIFEST } from '@tests/utils/renderer/manifests';
@@ -23,7 +24,7 @@ function renderFor(arrival: string, departure: string, units = 2, overrides = {}
     ),
     ...overrides,
   });
-  render(<WatchAvailability watch={watch} manifest={PARKSTAY_MANIFEST} now={NOW} />);
+  renderWithProviders(<WatchAvailability watch={watch} manifest={PARKSTAY_MANIFEST} now={NOW} />);
   return nights;
 }
 
@@ -83,14 +84,14 @@ describe('WatchAvailability (NightGrid)', () => {
   });
 
   it('says when the watch has not been checked, or its units were not in the check', () => {
-    const { unmount } = render(
+    const { unmount } = renderWithProviders(
       <WatchAvailability watch={makeWatch()} manifest={PARKSTAY_MANIFEST} now={NOW} />
     );
     expect(
       screen.getByText('No check yet. Use Check now to see availability.')
     ).toBeInTheDocument();
     unmount();
-    render(
+    renderWithProviders(
       <WatchAvailability
         watch={makeWatch({ unitIds: ['99'], lastAvailability: [], lastCheckedAt: NOW })}
         manifest={PARKSTAY_MANIFEST}
@@ -105,5 +106,81 @@ describe('WatchAvailability (NightGrid)', () => {
   it('says when the check was, in the provider’s time zone', () => {
     renderFor('2099-12-11', '2099-12-13');
     expect(screen.getByText(/From the check 10 min ago \(9:50 am AWST\)/)).toBeInTheDocument();
+  });
+
+  describe('Book on {shortName} (R7)', () => {
+    const URL =
+      'https://parkstay.dbca.wa.gov.au/search-availability/information/?campground_id=20&arrival=2099/12/11&departure=2099/12/13';
+    const NIGHTS = ['2099-12-11', '2099-12-12'];
+    const found = (overrides = {}) =>
+      makeWatch({
+        lastResult: WatchResult.FOUND,
+        lastCheckedAt: new Date(NOW.getTime() - 10 * 60_000),
+        lastAvailability: [makeUnit('1', NIGHTS)],
+        bookingLink: { url: URL, arrival: '2099-12-11', departure: '2099-12-13' },
+        ...overrides,
+      });
+    const show = (watch: ReturnType<typeof makeWatch>, now = NOW) =>
+      renderWithProviders(
+        <WatchAvailability watch={watch} manifest={PARKSTAY_MANIFEST} now={now} />
+      );
+    const bookLink = () =>
+      screen.queryByRole('link', { name: 'Book on ParkStay (opens in your browser)' });
+
+    it('a found watch links its booking page, in the browser, right after the result line', () => {
+      show(found());
+      const link = bookLink();
+      expect(link).toHaveAttribute('href', URL);
+      expect(link).toHaveAttribute('target', '_blank');
+      expect(screen.queryByText(/^For /)).toBeNull();
+
+      // Reading order: the result line, at once the link, then the nights
+      const resultLine = screen.getByText(/^From the check/);
+      expect(resultLine).toHaveTextContent('1 site available');
+      expect(resultLine.nextElementSibling).toContainElement(link);
+      expect(
+        link!.compareDocumentPosition(table()) & Node.DOCUMENT_POSITION_FOLLOWING
+      ).toBeTruthy();
+    });
+
+    it('a partial match says which nights the link is for, as text', () => {
+      show(
+        found({
+          lastResult: WatchResult.PARTIAL_FOUND,
+          stay: { ...makeWatch().stay, arrival: '2099-11-02', departure: '2099-11-06' },
+          lastAvailability: [
+            makeUnit(
+              '1',
+              ['2099-11-02', '2099-11-03', '2099-11-04', '2099-11-05'],
+              ['booked', 'available', 'available', 'booked']
+            ),
+          ],
+          bookingLink: { url: URL, arrival: '2099-11-03', departure: '2099-11-05' },
+        }),
+        new Date('2099-10-01T02:00:00Z')
+      );
+      expect(bookLink()).toHaveAttribute('href', URL);
+      expect(screen.getByText('For 3–5 Nov')).toBeVisible();
+    });
+
+    it.each([
+      ['held', { lastResult: WatchResult.HELD }],
+      ['not found', { lastResult: WatchResult.NOT_FOUND, bookingLink: undefined }],
+      ['found with no link from main', { bookingLink: undefined }],
+    ])('a %s watch shows no link', (_name, overrides) => {
+      show(found(overrides));
+      expect(bookLink()).toBeNull();
+      expect(screen.queryByRole('link', { name: /^Book on/ })).toBeNull();
+    });
+
+    it('shows none once the stay has begun where the provider is (Perth midnight)', () => {
+      // 10 Dec 23:59 in Perth: the day before arrival
+      const { unmount } = show(found(), new Date('2099-12-10T15:59:00Z'));
+      expect(bookLink()).not.toBeNull();
+      unmount();
+      // 11 Dec 00:00 in Perth (still 10 Dec in UTC): the stay has begun
+      show(found(), new Date('2099-12-10T16:00:00Z'));
+      expect(bookLink()).toBeNull();
+    });
   });
 });

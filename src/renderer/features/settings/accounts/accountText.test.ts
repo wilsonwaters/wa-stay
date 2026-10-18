@@ -1,13 +1,30 @@
 import {
   FAKESTAY,
+  KEY_SAVED,
+  KEYSTAY,
   LAST_SIGN_IN,
+  MEMBER_NUMBER_FIELD,
   OPENSTAY,
   PARKSTAY,
   account,
+  keyAccount,
 } from '@tests/fixtures/renderer/settings';
 import type { ProviderManifest } from '../../../../shared/types/provider.types';
 import { formatDay } from '../format';
-import { accountPurpose, accountRowText, missingAccountWarning } from './accountText';
+import {
+  accountPurpose,
+  accountRowText,
+  addCredentialsLabel,
+  copyCredentialLabel,
+  credentialFieldError,
+  credentialsDialogTitle,
+  credentialsRemovedAnnouncement,
+  credentialsRowText,
+  credentialsSavedAnnouncement,
+  inSentence,
+  missingAccountWarning,
+  removeCredentialsTitle,
+} from './accountText';
 
 const withAccount = (
   manifest: ProviderManifest,
@@ -169,5 +186,62 @@ describe('formatDay', () => {
     expect(formatDay('2026-10-02T23:00:00')).toBe('Fri 2 Oct 2026');
     expect(formatDay(new Date(2026, 9, 3, 12))).toBe('Sat 3 Oct 2026');
     expect(formatDay('not a date')).toBe('');
+  });
+});
+
+describe('credentials words (details saved in the app)', () => {
+  const PASSWORD_FIELD = { key: 'password', label: 'Password', secret: true };
+  const several = keyAccount({ fields: [MEMBER_NUMBER_FIELD, PASSWORD_FIELD] });
+
+  it('one field is named by its label: saved, add, copy, remove, the announcements', () => {
+    expect(credentialsRowText(KEYSTAY, KEY_SAVED)).toEqual({
+      status: 'Member number saved',
+      tone: 'signed-in',
+    });
+    expect(credentialsRowText(KEYSTAY, keyAccount())).toEqual({
+      status: 'Not added',
+      tone: 'neutral',
+    });
+    expect(addCredentialsLabel(keyAccount())).toBe('Add member number');
+    expect(copyCredentialLabel(MEMBER_NUMBER_FIELD)).toBe('Copy member number');
+    expect(removeCredentialsTitle(KEY_SAVED)).toBe('Remove your member number?');
+    expect(credentialsSavedAnnouncement(KEY_SAVED)).toBe('Member number saved');
+    expect(credentialsRemovedAnnouncement(KEY_SAVED)).toBe('Member number removed');
+    expect(credentialsDialogTitle(KEYSTAY)).toBe('KeyStay account');
+  });
+
+  it('several fields are "details"', () => {
+    expect(credentialsRowText(KEYSTAY, { ...several, status: 'signed-in' }).status).toBe(
+      'Details saved'
+    );
+    expect(addCredentialsLabel(several)).toBe('Add details');
+    expect(removeCredentialsTitle(several)).toBe('Remove your details?');
+  });
+
+  it('a label keeps its capitals inside a sentence only when they are an acronym', () => {
+    expect(inSentence('Member number')).toBe('member number');
+    expect(inSentence('RAC member number')).toBe('RAC member number');
+    expect(inSentence('PIN')).toBe('PIN');
+  });
+
+  it('a provider that needs the account warns until the details are added, in the warning tone', () => {
+    const required = withAccount(KEYSTAY, { account: 'required-for-holds', holds: true });
+    expect(credentialsRowText(required, keyAccount())).toEqual({
+      status: 'Not added',
+      tone: 'warning',
+    });
+    expect(missingAccountWarning(required, keyAccount())).toBe(
+      "KeyStay holds can't be placed until you add your member number."
+    );
+    expect(missingAccountWarning(required, KEY_SAVED)).toBeNull();
+  });
+
+  it('a typed value: needed, at most 256 characters once trimmed; never quoted', () => {
+    expect(credentialFieldError(MEMBER_NUMBER_FIELD, '   ')).toBe('Enter your member number.');
+    expect(credentialFieldError(MEMBER_NUMBER_FIELD, ' 012345678 ')).toBeNull();
+    expect(credentialFieldError(MEMBER_NUMBER_FIELD, '𝔸'.repeat(256))).toBeNull();
+    expect(credentialFieldError(MEMBER_NUMBER_FIELD, '1'.repeat(257))).toBe(
+      'Member number is too long (256 characters at most).'
+    );
   });
 });

@@ -14,7 +14,7 @@ import {
   SqliteKeyValueStore,
   WatchRepository,
 } from '@main/database/repositories';
-import { readStayParams, readUnitIds } from '@main/database/stay-columns';
+import { readStayParams, readUnitIds, readUnitKinds } from '@main/database/stay-columns';
 import { createScopedSecretVault, FakeSecretVault } from '@main/providers/sdk';
 import { NotificationType, RelatedType } from '@shared/types/common.types';
 import { createMockWatchInput } from '@tests/fixtures/watches';
@@ -141,9 +141,45 @@ describe('provider-aware repositories', () => {
         locationKey: 'fake:loc-1',
         location: { externalId: 'loc-1', name: 'Somewhere' },
         unitIds: [],
+        unitKinds: [],
         stayParams: {},
       });
       expect(created.location.areaName).toBeUndefined();
+    });
+
+    it('round-trips stay types (unit_kinds, v11); an update sets, keeps and clears them', () => {
+      const watches = new WatchRepository(db);
+      const created = watches.create(
+        userId,
+        createMockWatchInput({ unitKinds: ['cabin', 'dorm'] })
+      );
+      expect(created.unitKinds).toEqual(['cabin', 'dorm']);
+      const unitKindsColumn = () =>
+        (
+          db.prepare('SELECT unit_kinds FROM watches WHERE id = ?').get(created.id) as {
+            unit_kinds: string;
+          }
+        ).unit_kinds;
+      expect(unitKindsColumn()).toBe('["cabin","dorm"]');
+
+      expect(watches.update(created.id, { name: 'Renamed' }).unitKinds).toEqual(['cabin', 'dorm']);
+      expect(watches.update(created.id, { unitKinds: ['glamping'] }).unitKinds).toEqual([
+        'glamping',
+      ]);
+      expect(watches.update(created.id, { unitKinds: [] }).unitKinds).toEqual([]);
+      expect(unitKindsColumn()).toBe('[]');
+    });
+
+    it('reads stored stay types without unknown entries or duplicates', () => {
+      const watches = new WatchRepository(db);
+      const created = watches.create(userId, createMockWatchInput());
+      db.prepare('UPDATE watches SET unit_kinds = ? WHERE id = ?').run(
+        '["cabin","castle",3,null,"cabin","room"]',
+        created.id
+      );
+      expect(watches.findById(created.id)?.unitKinds).toEqual(['cabin', 'room']);
+      db.prepare("UPDATE watches SET unit_kinds = 'cabins' WHERE id = ?").run(created.id);
+      expect(watches.findById(created.id)?.unitKinds).toEqual([]);
     });
   });
 
@@ -236,6 +272,26 @@ describe('provider-aware repositories', () => {
       expect(readUnitIds('Site 1, Site 2', 'watches 2')).toEqual([]);
       expect(readUnitIds('{"a":1}', 'watches 3')).toEqual([]);
       expect(warn).toHaveBeenCalledWith('watches 2: unit_ids is not a JSON array; read as []');
+      expect(warn).toHaveBeenCalledTimes(2);
+    });
+
+    it('reads unit kinds as known kinds, once each, and anything but a JSON array as [] with a warning', () => {
+      const warn = jest.spyOn(logger, 'warn');
+
+      expect(readUnitKinds('["dorm","castle","dorm",1,"campsite"]', 'watches 1')).toEqual([
+        'dorm',
+        'campsite',
+      ]);
+      expect(readUnitKinds('[]', 'watches 1')).toEqual([]);
+      expect(readUnitKinds(null, 'watches 1')).toEqual([]);
+      expect(readUnitKinds('', 'watches 1')).toEqual([]);
+      expect(warn).not.toHaveBeenCalled();
+
+      expect(readUnitKinds('{bad', 'site_snipes 2')).toEqual([]);
+      expect(readUnitKinds('"cabin"', 'site_snipes 3')).toEqual([]);
+      expect(warn).toHaveBeenCalledWith(
+        'site_snipes 2: unit_kinds is not a JSON array; read as []'
+      );
       expect(warn).toHaveBeenCalledTimes(2);
     });
 

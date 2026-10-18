@@ -12,7 +12,10 @@
  *   window; closing it first, or closing the main window, resolves with the stored status;
  * - pasted sign-in links: only on ParkStay's sign-in origins (`VALIDATION` otherwise);
  * - sign-out: `ACCOUNT_BUSY` while a snipe needs the session; otherwise the partition is
- *   cleared once, and the profile row and its watches stay.
+ *   cleared once, and the profile row and its watches stay;
+ * - a `credentials` FakeProvider (R15): listed with its fields and statements, saved,
+ *   copied through the container's clipboard (Electron's, mocked), removed without touching
+ *   its partition; no sign-in window.
  */
 
 import { EventEmitter } from 'events';
@@ -49,6 +52,7 @@ jest.mock('node-machine-id', () => ({ machineIdSync: () => FIXTURE_MACHINE_ID })
 
 const electron = jest.requireMock('electron') as {
   BrowserWindow: typeof FakeBrowserWindow;
+  clipboard: { writeText: jest.Mock };
   session: {
     fromPartition(partition: string): {
       clearStorageData: jest.Mock;
@@ -152,6 +156,7 @@ describe('accounts over IPC', () => {
           {
             providerId: 'parkstay',
             requirement: 'optional',
+            authKind: 'browser-session',
             status: 'unknown',
             email: 'fixture.user@example.com',
             displayName: 'Fixture User',
@@ -303,6 +308,56 @@ describe('accounts over IPC', () => {
       expect(partition().clearAuthCache).toHaveBeenCalledTimes(1);
     });
 
+    it('a sniping alert snipe needs no session, so sign-out goes ahead; one in the queue keeps it busy', async () => {
+      const userId = container.profile.requireUserId();
+      const snipes = container.repositories.snipes;
+      const alert = snipes.create(
+        userId,
+        createMockSiteSnipeInput({ providerId: 'parkstay', action: 'alert' })
+      );
+      snipes.updateStatus(alert.id, SnipeStatus.QUEUEING);
+
+      // Its queue place is on the session, like a hold snipe's
+      await expect(call('accounts:sign-out', { providerId: 'parkstay' })).resolves.toMatchObject({
+        success: false,
+        code: 'ACCOUNT_BUSY',
+      });
+      expect(partition().clearStorageData).not.toHaveBeenCalled();
+
+      snipes.updateStatus(alert.id, SnipeStatus.SNIPING);
+      await expect(call('accounts:sign-out', { providerId: 'parkstay' })).resolves.toMatchObject({
+        success: true,
+        data: { status: 'signed-out' },
+      });
+      expect(partition().clearStorageData).toHaveBeenCalledTimes(1);
+    });
+
+    it('an alert snipe sniping through the queue keeps sign-out busy: its checks carry the queue session', async () => {
+      const userId = container.profile.requireUserId();
+      const snipes = container.repositories.snipes;
+      const queued = snipes.create(
+        userId,
+        createMockSiteSnipeInput({
+          providerId: 'parkstay',
+          action: 'alert',
+          accessGateEnabled: true,
+        })
+      );
+      snipes.updateStatus(queued.id, SnipeStatus.SNIPING);
+
+      await expect(call('accounts:sign-out', { providerId: 'parkstay' })).resolves.toMatchObject({
+        success: false,
+        code: 'ACCOUNT_BUSY',
+      });
+      expect(partition().clearStorageData).not.toHaveBeenCalled();
+
+      // Through with the queue: its alert sent
+      snipes.updateStatus(queued.id, SnipeStatus.ALERTED);
+      await expect(call('accounts:sign-out', { providerId: 'parkstay' })).resolves.toMatchObject({
+        success: true,
+      });
+    });
+
     it('sign-out keeps the profile row and its data', async () => {
       container.repositories.providerAccounts.upsert({
         providerId: 'parkstay',
@@ -318,6 +373,58 @@ describe('accounts over IPC', () => {
 
       expect(container.repositories.users.findAll().map((u) => u.id)).toEqual([1]);
       expect((await call<unknown[]>('watches:list')).data).toHaveLength(1);
+    });
+
+    it('a credentials provider: listed with its fields, saved, copied by main, removed; no window', async () => {
+      // Made-up values only
+      const keystay = createFakeProvider({
+        id: 'keystay',
+        shortName: 'KeyStay',
+        capabilities: { account: 'optional' },
+        credentials: {},
+      });
+      container.providers.register(keystay.factory, createTestProviderContext);
+      electron.clipboard.writeText.mockClear();
+      const keystayAccount = async () =>
+        (await call<ProviderAccount[]>('accounts:list')).data?.find(
+          (a) => a.providerId === 'keystay'
+        );
+
+      expect(await keystayAccount()).toMatchObject({
+        authKind: 'credentials',
+        status: 'signed-out',
+        fields: [{ key: 'memberNumber', copyable: true }, { key: 'password' }],
+        confirmations: [{ key: 'own' }],
+        savedFields: [],
+      });
+      await expect(call('accounts:sign-in', { providerId: 'keystay' })).resolves.toMatchObject({
+        success: false,
+        code: 'NOT_IMPLEMENTED',
+      });
+      expect(electron.BrowserWindow.instances).toHaveLength(0);
+
+      await expect(
+        call('accounts:save-credentials', {
+          providerId: 'keystay',
+          values: { memberNumber: '012345678', password: 'made-up-pass' },
+          confirmed: ['own'],
+        })
+      ).resolves.toMatchObject({ success: true, data: { status: 'signed-in' } });
+      expect(accountEvents()).toEqual([expect.objectContaining({ providerId: 'keystay' })]);
+      await expect(
+        call('accounts:copy-credential', { providerId: 'keystay', key: 'memberNumber' })
+      ).resolves.toEqual({ success: true });
+      expect(electron.clipboard.writeText.mock.calls).toEqual([['012345678']]);
+
+      await expect(call('accounts:sign-out', { providerId: 'keystay' })).resolves.toMatchObject({
+        success: true,
+        data: { status: 'signed-out', savedFields: [] },
+      });
+      expect(
+        electron.session.fromPartition('persist:provider-keystay').clearStorageData
+      ).not.toHaveBeenCalled();
+      expect(await keystayAccount()).toMatchObject({ status: 'signed-out', savedFields: [] });
+      expect(keystay.calls.filter((c) => c.method === 'isSignedIn')).toEqual([]);
     });
 
     it('answers UNKNOWN_PROVIDER for a provider that is not registered', async () => {

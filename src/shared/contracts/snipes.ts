@@ -4,13 +4,15 @@
 
 import { z } from 'zod';
 import { SnipeReleaseMode, SnipeStatus } from '../types/common.types';
-import { ProviderIdSchema, StayParamsSchema } from '../types/provider.types';
-import type {
-  SiteSnipe,
-  SiteSnipeInput,
-  SiteSnipeUpdate,
-  SnipeExecutionResult,
-  SnipeListFilter,
+import { ProviderIdSchema, StayParamsSchema, UnitKindSchema } from '../types/provider.types';
+import {
+  SNIPE_ACTIONS,
+  type SiteSnipe,
+  type SiteSnipeInput,
+  type SiteSnipeUpdate,
+  type SnipeAction,
+  type SnipeExecutionResult,
+  type SnipeListFilter,
 } from '../types/site-sniper.types';
 import { LocationRefSchema, StayInputSchema } from '../types/stay.types';
 import { assertTypeEquals } from '../utils/type-equality';
@@ -29,6 +31,7 @@ const C = CHANNELS.snipes;
 // assignable to `SnipeReleaseMode` but not identical to it, so assertTypeEquals would fail.
 // Both type arguments: zod 4's `ZodType<O>` alone has an `unknown` input type.
 const releaseModeSchema: z.ZodType<SnipeReleaseMode, SnipeReleaseMode> = z.enum(SnipeReleaseMode);
+const actionSchema: z.ZodType<SnipeAction, SnipeAction> = z.enum(SNIPE_ACTIONS);
 
 export const snipeInputSchema = z.object({
   providerId: ProviderIdSchema,
@@ -36,8 +39,10 @@ export const snipeInputSchema = z.object({
   location: LocationRefSchema,
   stay: StayInputSchema,
   unitIds: z.array(z.string()).optional(),
+  unitKinds: z.array(UnitKindSchema).optional(),
   stayParams: StayParamsSchema.optional(),
   releaseMode: releaseModeSchema,
+  action: actionSchema.optional(),
   releaseAt: z.date().optional(),
   accessGateEnabled: z.boolean().optional(),
   leadTimeSeconds: z.number().int().nonnegative().optional(),
@@ -124,5 +129,17 @@ export const snipes = {
     request: idPayload,
     args: {} as [id: number],
     response: undefined as void,
+  },
+  /**
+   * "Let it go": asks the provider to let a HELD snipe's hold go (closing its payment window
+   * first), and answers the snipe, EXPIRED with why (`lastError`). `NOT_FOUND`; `CAPABILITY`
+   * when the provider cannot let holds go (`manifest.holdRelease`); `HOLD_EXPIRED` when nothing
+   * unexpired is held; `PROVIDER_ERROR` when the provider could not be asked (the hold stays).
+   */
+  releaseHold: {
+    channel: C.releaseHold,
+    request: idPayload,
+    args: {} as [id: number],
+    response: {} as SiteSnipe,
   },
 } satisfies Namespace;

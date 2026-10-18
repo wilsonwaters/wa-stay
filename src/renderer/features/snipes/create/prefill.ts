@@ -3,12 +3,17 @@
  * here. The query is read by the shared `parseCreatePrefill` (the stay kept to the provider's
  * day by `clampStayParams`); this adds what a snipe needs: the provider must offer Site Sniper,
  * the dates must not have passed where the provider is, and every part of the link that cannot
- * be used is dropped with a notice. Pure.
+ * be used is dropped with a notice. The stay types (`stay=cabin`) are checked against the
+ * place's units once they load (`reconcileStayTypes`). Pure.
  */
-import type { ProviderManifest } from '../../../../shared/types/provider.types';
+import type { ProviderManifest, UnitKind } from '../../../../shared/types/provider.types';
 import { providerToday } from '../../../components/stay/providerToday';
 import { parseCreatePrefill } from '../../../app/routes';
-import { clampStayParams, EMPTY_STAY_PARAMS } from '../../../app/stayParams';
+import {
+  clampStayParams,
+  EMPTY_STAY_PARAMS,
+  unusableStayTypeNotice,
+} from '../../../app/stayParams';
 
 export interface SnipePrefill {
   providerId?: string;
@@ -18,6 +23,8 @@ export interface SnipePrefill {
   departure?: string;
   adults?: number;
   children?: number;
+  /** The stay types chosen on Explore, in order, without `other` or repeats. */
+  unitKinds?: UnitKind[];
   /** Why parts of the link were not used. */
   notices: string[];
 }
@@ -74,5 +81,9 @@ export function parseSnipePrefill(
     (raw.has('children') && parsed.children === undefined);
   if (lostGuests)
     prefill.notices.push("The link's guests couldn't be used, so check who's coming.");
+
+  if (parsed.stay) prefill.unitKinds = [...parsed.stay];
+  const stayNotice = unusableStayTypeNotice(raw.get('stay'));
+  if (stayNotice) prefill.notices.push(stayNotice);
   return prefill;
 }

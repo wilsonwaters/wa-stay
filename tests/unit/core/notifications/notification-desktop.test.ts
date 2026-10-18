@@ -4,7 +4,9 @@
  * Desktop notifications (U5; architecture-notes §12.6, §12.31). The OS title names the
  * provider through the registry ("ParkStay · Sites available at Osprey Bay") while the stored
  * title does not; a click restores and focuses the main window and sends `app:navigate` with
- * the notification's in-app page, and never a path outside the allow-list.
+ * the notification's in-app page, and never a path outside the allow-list. An availability
+ * alert's click then opens the provider's booking page in the browser (brief R6); a held
+ * alert's opens only the app.
  */
 import { NotificationService } from '@main/core/notifications/notification.service';
 import { openDatabase } from '@main/database/connection';
@@ -13,6 +15,7 @@ import { parkstayFactory } from '@main/providers/parkstay';
 import { ProviderRegistry } from '@main/providers/registry';
 import { NotificationType, RelatedType } from '@shared/types/common.types';
 import type { Watch } from '@shared/types';
+import { providerUnitKinds } from '@shared/utils/unit-noun';
 import { mockWatch } from '@tests/fixtures/watches';
 import { createTestProviderContext } from '@tests/utils/fake-provider';
 import type Database from 'better-sqlite3';
@@ -58,6 +61,7 @@ describe('desktop notifications', () => {
   let registry: ProviderRegistry;
   let events: { emit: jest.Mock };
   let showMainWindow: jest.Mock<boolean, []>;
+  let openExternal: jest.Mock<Promise<void>, [string]>;
   let service: NotificationService;
   const userId = 1;
 
@@ -83,16 +87,20 @@ describe('desktop notifications', () => {
 
   beforeEach(() => {
     mockDesktop.length = 0;
-    mockLog.warn.mockClear();
+    for (const level of ['info', 'warn', 'error', 'debug']) mockLog[level].mockClear();
     db = openDatabase(':memory:');
     repo = new NotificationRepository(db);
     registry = new ProviderRegistry();
     registry.register(parkstayFactory, createTestProviderContext);
     events = { emit: jest.fn() };
     showMainWindow = jest.fn(() => true);
+    openExternal = jest.fn(() => Promise.resolve());
     service = new NotificationService(repo, undefined, events, {
       providerName: (id) => registry.tryGet(id)?.manifest.shortName,
+      providerManifest: (id) => registry.tryGet(id)?.manifest,
+      providerUnitKinds: (id) => providerUnitKinds(registry.tryGet(id)?.manifest),
       showMainWindow,
+      openExternal,
     });
   });
 
@@ -185,5 +193,121 @@ describe('desktop notifications', () => {
 
     expect(showMainWindow).toHaveBeenCalledTimes(1);
     expect(navigations()).toEqual([]);
+    expect(openExternal).not.toHaveBeenCalled();
+  });
+
+  describe("an alert's booking page (R7)", () => {
+    const BOOKING_URL =
+      'https://parkstay.dbca.wa.gov.au/search-availability/information/?campground_id=34&arrival=2024/07/01&departure=2024/07/05';
+    const hold = {
+      reference: 'PB123',
+      expiresAt: new Date(Date.now() + 30 * 60_000).toISOString(),
+      unitId: '7',
+      paymentUrl: 'https://parkstay.dbca.wa.gov.au/pay/PB123',
+    };
+    /** Lets a rejected openExternal's handler run. */
+    const settle = () => new Promise((resolve) => setImmediate(resolve));
+
+    it('a click on a found alert opens the watch in the app, then the booking page once', async () => {
+      await service.notifyWatchFound(ospreyBay, [match], undefined, BOOKING_URL);
+      await settle();
+      expect(openExternal).not.toHaveBeenCalled();
+
+      click();
+
+      expect(navigations()).toEqual([['app:navigate', { path: '/watches/12' }]]);
+      await settle();
+      expect(openExternal).toHaveBeenCalledTimes(1);
+      expect(openExternal).toHaveBeenCalledWith(BOOKING_URL);
+      const navigateCall = events.emit.mock.calls.findIndex(([name]) => name === 'app:navigate');
+      expect(events.emit.mock.invocationCallOrder[navigateCall]).toBeLessThan(
+        openExternal.mock.invocationCallOrder[0]
+      );
+      // The link is not stored
+      expect(JSON.stringify(repo.findByUserId(userId))).not.toContain('search-availability');
+    });
+
+    it('a click on a partial alert opens its booking page too', async () => {
+      await service.notifyWatchPartialFound(ospreyBay, [{ ...match, partial: true }], BOOKING_URL);
+      click();
+      await settle();
+      expect(navigations()).toEqual([['app:navigate', { path: '/watches/12' }]]);
+      expect(openExternal).toHaveBeenCalledWith(BOOKING_URL);
+    });
+
+    it('a click on a held alert opens only the watch: the hold is paid for in the app', async () => {
+      await service.notifyWatchHeld(ospreyBay, hold, match, BOOKING_URL);
+
+      click();
+      await settle();
+
+      expect(navigations()).toEqual([['app:navigate', { path: '/watches/12' }]]);
+      expect(openExternal).not.toHaveBeenCalled();
+    });
+
+    it('with no window (quitting), a click opens nothing', async () => {
+      await service.notifyWatchFound(ospreyBay, [match], undefined, BOOKING_URL);
+      showMainWindow.mockReturnValue(false);
+
+      click();
+      await settle();
+
+      expect(navigations()).toEqual([]);
+      expect(openExternal).not.toHaveBeenCalled();
+    });
+
+    it('a rejected openExternal (no default browser) is logged by origin only; the watch still opened', async () => {
+      openExternal.mockRejectedValue(new Error(`Failed to open ${BOOKING_URL}`));
+      await service.notifyWatchFound(ospreyBay, [match], undefined, BOOKING_URL);
+
+      click();
+      await settle();
+
+      expect(navigations()).toEqual([['app:navigate', { path: '/watches/12' }]]);
+      expect(mockLog.warn).toHaveBeenCalledWith(
+        expect.stringContaining('could not open https://parkstay.dbca.wa.gov.au in the browser')
+      );
+      const logged = JSON.stringify(
+        ['info', 'warn', 'error', 'debug'].map((level) => mockLog[level].mock.calls)
+      );
+      expect(logged).not.toMatch(/search-availability|campground_id|arrival=/);
+    });
+
+    it("never opens a link off the provider's site, checked again against its manifest", async () => {
+      await service.notifyWatchFound(ospreyBay, [match], undefined, 'https://evil.test/cart?add=7');
+      click();
+      // A provider the registry does not know cannot vouch for any link
+      await service.notifyWatchFound(
+        { ...ospreyBay, providerId: 'gone' },
+        [match],
+        undefined,
+        BOOKING_URL
+      );
+      click();
+      await settle();
+
+      expect(navigations()).toHaveLength(2);
+      expect(openExternal).not.toHaveBeenCalled();
+      expect(mockLog.warn).toHaveBeenCalledWith(expect.stringContaining('https://evil.test'));
+      expect(JSON.stringify(mockLog.warn.mock.calls)).not.toContain('cart?add');
+    });
+
+    it('never opens a link that is not https, or one without a booking page', async () => {
+      await service.notifyWatchFound(
+        ospreyBay,
+        [match],
+        undefined,
+        'http://parkstay.dbca.wa.gov.au/x'
+      );
+      click();
+      await service.notifyWatchFound(ospreyBay, [match], undefined, 'javascript:alert(1)');
+      click();
+      await service.notifyWatchFound(ospreyBay, [match]);
+      click();
+      await settle();
+
+      expect(navigations()).toHaveLength(3);
+      expect(openExternal).not.toHaveBeenCalled();
+    });
   });
 });

@@ -12,8 +12,9 @@ import type { NotificationDispatcher } from '@main/core/notifications/notificati
 import { openDatabase } from '@main/database/connection';
 import { NotificationRepository } from '@main/database/repositories';
 import { ProviderRegistry } from '@main/providers/registry';
-import { NotificationType } from '@shared/types/common.types';
+import { NotificationType, RelatedType } from '@shared/types/common.types';
 import type { Watch } from '@shared/types';
+import { providerUnitKinds } from '@shared/utils/unit-noun';
 import { mockWatch } from '@tests/fixtures/watches';
 import { mockSiteSnipe } from '@tests/fixtures/site-sniper';
 import { createFakeProvider, createTestProviderContext } from '@tests/utils/fake-provider';
@@ -48,7 +49,11 @@ describe('notifications carry their provider', () => {
       repo,
       { dispatch } as unknown as NotificationDispatcher,
       undefined,
-      { providerName: (id) => registry.tryGet(id)?.manifest.shortName }
+      {
+        providerName: (id) => registry.tryGet(id)?.manifest.shortName,
+        providerManifest: (id) => registry.tryGet(id)?.manifest,
+        providerUnitKinds: (id) => providerUnitKinds(registry.tryGet(id)?.manifest),
+      }
     );
     mockNotification.mockClear();
   });
@@ -78,7 +83,7 @@ describe('notifications carry their provider', () => {
         unitId: 'u1',
         paymentUrl: 'https://fake.example/pay/FAKE-1',
       },
-      'Site u1'
+      { unitName: 'Site u1' }
     );
     await service.notifySnipeHeld(fakeSnipe);
     await service.notifySnipeBooked({ ...fakeSnipe, bookedReference: 'FAKE-6' });
@@ -126,6 +131,46 @@ describe('notifications carry their provider', () => {
     );
   });
 
+  it("gives notifiers an alert's booking link only when it is on its provider's site (R7)", async () => {
+    const match = {
+      unitId: 'u1',
+      unitName: 'Site u1',
+      arrival: fakeWatch.stay.arrival,
+      departure: fakeWatch.stay.departure,
+      partial: false,
+      priceKnown: false,
+    };
+    const onSite = 'https://fake.example/book/CG001?arrival=2024-07-01&departure=2024-07-05';
+    await service.notifyWatchFound(fakeWatch, [match], undefined, onSite);
+    await service.notifyWatchFound(fakeWatch, [match], undefined, 'https://elsewhere.test/book');
+    await service.notifyWatchFound(
+      { ...fakeWatch, providerId: 'gone' },
+      [match],
+      undefined,
+      onSite
+    );
+    await service.notifyWatchHeld(
+      fakeWatch,
+      {
+        reference: 'FAKE-3',
+        expiresAt: new Date(Date.now() + 30 * 60_000).toISOString(),
+        unitId: 'u1',
+        paymentUrl: 'https://fake.example/pay/FAKE-3',
+      },
+      { unitName: 'Site u1' },
+      onSite
+    );
+
+    const sent = dispatch.mock.calls.map(([message]) => message);
+    expect(sent[0]).toMatchObject({ bookingUrl: onSite });
+    expect(sent[0].heldInApp).toBeUndefined();
+    expect(sent[1].bookingUrl).toBeUndefined();
+    expect(sent[2].bookingUrl).toBeUndefined();
+    expect(sent[3]).toMatchObject({ bookingUrl: onSite, heldInApp: true });
+    // Never stored
+    expect(JSON.stringify(repo.findByUserId(userId))).not.toMatch(/fake\.example\/book|elsewhere/);
+  });
+
   it("words a hold's minutes left from the injected clock", async () => {
     const at = new Date('2026-10-04T02:00:00.000Z');
     const clocked = new NotificationService(repo, undefined, undefined, { clock: () => at });
@@ -137,9 +182,31 @@ describe('notifications carry their provider', () => {
         unitId: 'u1',
         paymentUrl: 'https://fake.example/pay/FAKE-2',
       },
-      'Site u1'
+      { unitName: 'Site u1' }
     );
     expect(repo.findByUserId(userId)[0].message).toContain('within 25 minutes');
+  });
+
+  it('a warning about a snipe carries its provider, its page and its place', async () => {
+    await service.notifyWarning(userId, 'Snipe stopped at Osprey Bay', 'Choose a stay type.', {
+      providerId: 'fake',
+      relatedType: RelatedType.SNIPE,
+      relatedId: 4,
+      locationName: 'Osprey Bay',
+    });
+
+    expect(repo.findByUserId(userId)[0]).toMatchObject({
+      type: NotificationType.WARNING,
+      providerId: 'fake',
+      title: 'Snipe stopped at Osprey Bay',
+      relatedType: 'snipe',
+      relatedId: 4,
+      actionUrl: '/site-sniper/4',
+    });
+    expect(mockNotification.mock.calls[0][0].title).toBe('Fake · Snipe stopped at Osprey Bay');
+    expect(dispatch).toHaveBeenCalledWith(
+      expect.objectContaining({ providerId: 'fake', locationName: 'Osprey Bay' })
+    );
   });
 
   it('app-wide notifications and unknown providers keep the plain desktop title', async () => {

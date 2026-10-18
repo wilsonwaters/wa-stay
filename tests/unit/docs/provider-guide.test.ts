@@ -5,8 +5,9 @@
  * - provider-facing docs (`docs/providers/**`) carry no internal references (plan sections,
  *   stage or brief codes, issue numbers) that mean nothing to an outside author;
  * - the guide's core timeouts are the code's (`DEFAULT_CATALOG_TIMINGS`, the sign-in check's
- *   `DEFAULT_ACCOUNT_TIMINGS`, the HTTP and page timeouts), and so are the search-mode limits
- *   the guides describe;
+ *   `DEFAULT_ACCOUNT_TIMINGS`, a hold release's `DEFAULT_HOLD_PAYMENT_TIMINGS`, the HTTP and page
+ *   timeouts, how a paced provider's grow), and so are the search-mode limits the guides
+ *   describe;
  * - the guide's lists of location kinds (with how each reads) and stay-field types are the
  *   types' own (`src/shared/types/provider.types.ts`), and so are the fields of a bulk
  *   availability entry, each documented on the type too;
@@ -19,6 +20,8 @@ import fs from 'fs';
 import path from 'path';
 import ts from 'typescript';
 import { DEFAULT_ACCOUNT_TIMINGS } from '@main/core/accounts/provider-account.service';
+import { PACED_REQUEST_ALLOWANCE_MS, pacedDeadlineMs } from '@main/core/catalog/catalog-helpers';
+import { DEFAULT_HOLD_PAYMENT_TIMINGS } from '@main/core/holds/hold-payment.service';
 import {
   AREA_SEARCH_MAX_PAGES,
   AREA_SEARCHES_KEPT,
@@ -27,8 +30,12 @@ import {
   TEXT_SEARCH_MAX_ITEMS,
   TEXT_SEARCH_MIN_CHARS,
 } from '@main/core/catalog/location-catalog.service';
-import { DEFAULT_PAGE_TIMEOUT_MS, DEFAULT_TIMEOUT_MS } from '@main/providers/sdk';
-import { KIND_LABELS, unitNoun } from '@renderer/components/locationFormat';
+import {
+  DEFAULT_PAGE_TIMEOUT_MS,
+  DEFAULT_TIMEOUT_MS,
+  INTERACTIVE_REQUEST_GAP_MS,
+} from '@main/providers/sdk';
+import { KIND_LABELS, placeNoun } from '@renderer/components/locationFormat';
 import { LOCATION_KINDS, StayFieldDescriptorSchema } from '@shared/types/provider.types';
 import { docFiles, readDoc, ROOT } from './markdown';
 
@@ -36,13 +43,14 @@ const GUIDE = 'docs/providers/adding-a-provider.md';
 
 /**
  * Internal references: plan sections (§12.30), stages (V7), the brief (D5), issues (#24), open
- * questions (PQ1, UQ1, O8).
+ * questions (PQ1, UQ1, O8), and a stream's tasks, decisions and questions (R16, RS12, RQ2, RO5).
  */
 const INTERNAL = [
   /§\s?\d/,
   /\b[A-Z]?Q\d+\b/,
   /\bO\d+\b/,
   /\bV\d+\b/,
+  /\bR[OSQ]?\d+\b/,
   /\bbrief [A-Z]\d+\b/i,
   /architecture-notes/,
   /\(#\d+\)/,
@@ -69,13 +77,16 @@ function section(text: string, heading: string): string {
 describe('provider-facing docs', () => {
   const docs = docFiles().filter((file) => file.startsWith('docs/providers/'));
 
-  it('cover the guide, the browser guide and ParkStay', () => {
+  it('cover the guide, the browser guide, ParkStay and RAC', () => {
     expect(docs).toEqual(
       expect.arrayContaining([
         GUIDE,
         'docs/providers/browser-providers.md',
         'docs/providers/README.md',
         'docs/providers/parkstay/README.md',
+        'docs/providers/rac/README.md',
+        'docs/providers/rac/endpoints.md',
+        'docs/providers/rac/release-calendar.md',
       ])
     );
   });
@@ -117,11 +128,13 @@ describe("the guide's core timeouts", () => {
         'bulkErrorTtlMs',
         'checkTtlMs',
         'probeTimeoutMs',
+        'releaseTimeoutMs',
       ])
     );
     const timings: Record<string, number> = {
       ...(DEFAULT_CATALOG_TIMINGS as unknown as Record<string, number>),
       probeTimeoutMs: DEFAULT_ACCOUNT_TIMINGS.probeTimeoutMs,
+      releaseTimeoutMs: DEFAULT_HOLD_PAYMENT_TIMINGS.releaseTimeoutMs,
     };
     // `timeoutMs` is the SDK's per-request option, checked below.
     values.delete('timeoutMs');
@@ -131,6 +144,31 @@ describe("the guide's core timeouts", () => {
   it('gives the HTTP and page timeouts the SDK applies', () => {
     expect(timeouts).toContain(`| ${DEFAULT_TIMEOUT_MS / 1000} s (\`timeoutMs\`) |`);
     expect(timeouts).toContain(`| ${DEFAULT_PAGE_TIMEOUT_MS / 1000} s (\`timeoutMs\`) |`);
+  });
+
+  it("grows a paced provider's bounds as pacedDeadlineMs does", () => {
+    const flat = timeouts.replace(/\s+/g, ' ');
+    const paced = { minRequestIntervalMs: 10_000 };
+    const { availabilityTimeoutMs, syncTimeoutMs } = DEFAULT_CATALOG_TIMINGS;
+    const bulk = pacedDeadlineMs(availabilityTimeoutMs, paced, {
+      requests: 8,
+      priority: 'interactive',
+    });
+    const sync = pacedDeadlineMs(syncTimeoutMs, paced, { requests: 8, priority: 'background' });
+    const { releaseTimeoutMs } = DEFAULT_HOLD_PAYMENT_TIMINGS;
+    const release = pacedDeadlineMs(releaseTimeoutMs, paced, {
+      requests: 2,
+      priority: 'interactive',
+    });
+    for (const text of [
+      `(${INTERACTIVE_REQUEST_GAP_MS / 1000} s for the person's requests`,
+      `a ${PACED_REQUEST_ALLOWANCE_MS / 1000} s allowance`,
+      `availability gets ${availabilityTimeoutMs / 1000} s + 8 × 11 s = ${bulk / 1000} s`,
+      `a sync ${syncTimeoutMs / 1000} s + 8 × 20 s = ${sync / 1000} s`,
+      `release counts 2 requests at the person's gap (${releaseTimeoutMs / 1000} s + 2 × 11 s = ${release / 1000} s)`,
+    ]) {
+      expect([text, flat.includes(text)]).toEqual([text, true]);
+    }
   });
 });
 
@@ -182,7 +220,7 @@ describe("the guide's location kinds, stay-field types and bulk availability ent
     expect(rows.map(([kind]) => unquote(kind))).toEqual([...LOCATION_KINDS]);
     for (const [cell, label, units] of rows) {
       const kind = unquote(cell) as (typeof LOCATION_KINDS)[number];
-      expect([kind, label, units]).toEqual([kind, KIND_LABELS[kind], unitNoun(kind).many]);
+      expect([kind, label, units]).toEqual([kind, KIND_LABELS[kind], placeNoun({ kind }).many]);
     }
   });
 

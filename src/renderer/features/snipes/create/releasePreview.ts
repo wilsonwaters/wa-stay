@@ -46,12 +46,18 @@ export interface ReleasePreviewInput {
 /**
  * - "Sites for Sat 11 Apr open Mon 13 Oct, 12:00 am AWST (in 11 days)."
  * - "Sites for Sat 11 Apr are already open for booking." (the provider says they are released)
+ * - the provider's own reason it can't time them (`release.refused`), such as "RAC Cable Beach
+ *   Holiday Park opens its dry-season dates on set days. Choose a time you set, or set a
+ *   watch.": what a create would be refused with, said before it is tried
  * - "Release time unknown. Site Sniper will keep checking." (no `opensAt`, or no answer)
  */
 export function releasePreview({ arrival, release, timeZone, now, noun }: ReleasePreviewInput) {
   const today = todayIn(timeZone, now);
   const units = `${capitalise(noun.many)} for ${nightLabel(arrival, today)}`;
   if (release?.open) return `${units} are already open for booking.`;
+  // Main's answer crosses IPC: only text is shown
+  const refused = typeof release?.refused === 'string' ? release.refused.trim() : '';
+  if (refused) return refused;
   const opensAt = release?.opensAt ? new Date(release.opensAt) : undefined;
   if (!opensAt || Number.isNaN(opensAt.getTime())) return RELEASE_UNKNOWN;
   if (opensAt.getTime() <= now.getTime()) return `${units} should be open for booking now.`;

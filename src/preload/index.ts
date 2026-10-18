@@ -62,6 +62,7 @@ const api: WindowApi = {
     deactivate: (id) => ({ id }),
     runNow: (id) => ({ id }),
     openPayment: (id) => ({ id }),
+    releaseHold: (id) => ({ id }),
   }),
 
   snipes: bind('snipes', {
@@ -74,6 +75,7 @@ const api: WindowApi = {
     deactivate: (id) => ({ id }),
     runNow: (id) => ({ id }),
     openPayment: (id) => ({ id }),
+    releaseHold: (id) => ({ id }),
   }),
 
   notifications: bind('notifications', {
@@ -118,6 +120,8 @@ const api: WindowApi = {
   providers: bind('providers', {
     list: none,
     accessStatus: (providerId) => ({ providerId }),
+    experiments: (providerId) => ({ providerId }),
+    setExperiment: (providerId, experimentId, enabled) => ({ providerId, experimentId, enabled }),
   }),
 
   catalog: bind('catalog', {
@@ -136,6 +140,8 @@ const api: WindowApi = {
     signIn: (providerId) => ({ providerId }),
     signOut: (providerId) => ({ providerId }),
     openSignInLink: (providerId, url) => ({ providerId, url }),
+    saveCredentials: (providerId, values, confirmed) => ({ providerId, values, confirmed }),
+    copyCredential: (providerId, key) => ({ providerId, key }),
   }),
 
   events: {

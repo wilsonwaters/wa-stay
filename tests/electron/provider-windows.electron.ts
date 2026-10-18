@@ -9,6 +9,9 @@
  *   allowed origin; a permission request is denied; a self-signed https page never loads;
  * - the window and `ElectronSessionHttpClient` share one cookie jar, and clearing the
  *   partition empties it;
+ * - API calls and a window on the partition present one browser: the same user agent, client
+ *   hints (`sec-ch-ua`, `-mobile`, `-platform`, and `navigator.userAgentData`) and
+ *   `Accept-Language`, the ones `user-agent.ts` works out;
  * - navigations reach the handle with their HTTP status, and the title shows the host;
  * - a first page redirected off the allow-list closes the window (never shown) and rejects
  *   `loaded`, naming the origin only; a hanging first response still shows the window;
@@ -29,8 +32,15 @@ import { join } from 'node:path';
 import { app, BrowserWindow, session, shell } from 'electron';
 import { ProviderWindows } from '../../src/main/app/provider-windows';
 import type { ProviderWindowRequest } from '../../src/main/core/accounts/ports';
+import { parkstayApiHeaders } from '../../src/main/providers/parkstay/headers';
 import { ElectronSessionHttpClient } from '../../src/main/providers/sdk/http-electron';
-import { chromeUserAgent, runtimeChromeMajor } from '../../src/main/providers/sdk/user-agent';
+import {
+  ACCEPT_LANGUAGE,
+  chromeUserAgent,
+  chromiumBrands,
+  runtimeChromeMajor,
+  secChUaPlatform,
+} from '../../src/main/providers/sdk/user-agent';
 
 const PROVIDER_ID = 'etest';
 const WATCHDOG_MS = 120_000;
@@ -50,6 +60,8 @@ interface Servers {
   selfSigned?: string;
   /** Cookies each request to `site` carried. */
   cookies: string[];
+  /** Every request to `site` under `/identity/`: its path and headers. */
+  identity: Array<{ path: string; headers: http.IncomingHttpHeaders }>;
   close(): Promise<void>;
 }
 
@@ -95,6 +107,7 @@ function selfSignedCertificate(): { key: Buffer; cert: Buffer } | undefined {
 
 async function startServers(): Promise<Servers> {
   const cookies: string[] = [];
+  const identity: Servers['identity'] = [];
   const hanging: http.ServerResponse[] = [];
   let otherOrigin = '';
   let queueOrigin = '';
@@ -113,6 +126,19 @@ async function startServers(): Promise<Servers> {
       // Not through the queue yet: off to the waiting room
       res.writeHead(302, { location: `${queueOrigin}/waiting-room` });
       return res.end();
+    }
+    if (req.url?.startsWith('/identity/')) {
+      identity.push({ path: req.url, headers: req.headers });
+      if (req.url === '/identity/page') {
+        // The page asks its own site, as a provider's page script does
+        res.writeHead(200, { 'content-type': 'text/html' });
+        return res.end(
+          PAGE('Identity') +
+            "<script>fetch('/identity/fetch', { headers: { Accept: 'application/json' } })</script>"
+        );
+      }
+      res.writeHead(200, { 'content-type': 'application/json' });
+      return res.end('{}');
     }
     if (req.url?.startsWith('/receipt')) {
       res.writeHead(200, { 'content-type': 'text/html' });
@@ -172,6 +198,7 @@ async function startServers(): Promise<Servers> {
     queue: queueOrigin,
     selfSigned,
     cookies,
+    identity,
     close: () => {
       for (const res of hanging.splice(0)) res.destroy();
       return Promise.all(
@@ -211,6 +238,15 @@ const newest = (): BrowserWindow => {
   const all = BrowserWindow.getAllWindows();
   return all.reduce((a, b) => (a.id > b.id ? a : b));
 };
+
+/** The headers that say which browser a request comes from. */
+const IDENTITY_HEADERS = [
+  'user-agent',
+  'sec-ch-ua',
+  'sec-ch-ua-mobile',
+  'sec-ch-ua-platform',
+  'accept-language',
+] as const;
 
 const CASES: Case[] = [
   {
@@ -347,6 +383,93 @@ const CASES: Case[] = [
       servers.cookies.length = 0;
       await client.request('GET', `${servers.site}/echo`);
       assert.equal(servers.cookies[0], '');
+    },
+  },
+  {
+    name: 'API calls and a window on one partition present one browser: user agent, client hints, Accept-Language',
+    async run({ servers, windows, request }) {
+      const client = new ElectronSessionHttpClient({ providerId: PROVIDER_ID });
+      servers.identity.length = 0;
+
+      // ParkStay's headers carry a user agent, client hints and Accept-Language of their own
+      await client.request('GET', `${servers.site}/identity/api`, {
+        headers: parkstayApiHeaders(),
+      });
+      // RAC's carry none of them
+      await client.request('GET', `${servers.site}/identity/bare`, {
+        headers: { Accept: 'text/html' },
+      });
+      // Headers that say another browser are rewritten to the partition's
+      await client.request('GET', `${servers.site}/identity/stale`, {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 6.1) Chrome/99.0.0.0',
+          'sec-ch-ua': '"Google Chrome";v="99", "Chromium";v="99", "Not_A Brand";v="24"',
+          'sec-ch-ua-mobile': '?1',
+          'sec-ch-ua-platform': '"Chrome OS"',
+          'Accept-Language': 'fr',
+        },
+      });
+      windows.open({ ...request, url: `${servers.site}/identity/page` });
+      const window = newest();
+      await eventually(() => assert.ok(servers.identity.some((r) => r.path === '/identity/fetch')));
+      const page = (await window.webContents.executeJavaScript(
+        `({ userAgent: navigator.userAgent, brands: navigator.userAgentData.brands,
+            platform: navigator.userAgentData.platform, mobile: navigator.userAgentData.mobile })`
+      )) as {
+        userAgent: string;
+        brands: Array<{ brand: string; version: string }>;
+        platform: string;
+        mobile: boolean;
+      };
+
+      const headersOf = (path: string): http.IncomingHttpHeaders => {
+        const seen = servers.identity.find((r) => r.path === path);
+        assert.ok(seen, `no request to ${path}`);
+        return seen.headers;
+      };
+      const identityOf = (headers: http.IncomingHttpHeaders) =>
+        Object.fromEntries(IDENTITY_HEADERS.map((name) => [name, headers[name]]));
+      const api = identityOf(headersOf('/identity/api'));
+      const bare = identityOf(headersOf('/identity/bare'));
+      const navigation = identityOf(headersOf('/identity/page'));
+      const fetched = identityOf(headersOf('/identity/fetch'));
+      console.log(`  # API call: ${JSON.stringify(api)}`);
+      console.log(`  # window:   ${JSON.stringify(fetched)}`);
+
+      // The page's own request carries Chromium's client hints; the API call says the same
+      assert.deepEqual(api, fetched);
+      assert.deepEqual(identityOf(headersOf('/identity/stale')), fetched);
+      // So does the navigation, for what it carries (Electron adds no client hints to it)
+      for (const name of IDENTITY_HEADERS) {
+        if (navigation[name] !== undefined) assert.equal(navigation[name], api[name], name);
+      }
+      // A request with no identity headers gets the partition's user agent and languages, and
+      // no client hints
+      assert.deepEqual(bare, {
+        ...api,
+        'sec-ch-ua': undefined,
+        'sec-ch-ua-mobile': undefined,
+        'sec-ch-ua-platform': undefined,
+      });
+      // The page's navigator.userAgentData says what the headers say
+      assert.equal(page.userAgent, api['user-agent']);
+      assert.equal(
+        page.brands.map(({ brand, version }) => `"${brand}";v="${version}"`).join(', '),
+        api['sec-ch-ua']
+      );
+      assert.equal(`"${page.platform}"`, api['sec-ch-ua-platform']);
+      assert.equal(page.mobile, false);
+
+      // And they are what the SDK works out: Chromium's own brand list for the version it runs
+      // (no "Google Chrome"), the OS the app runs on, and the app's languages, which Chromium
+      // writes as ACCEPT_LANGUAGE
+      assert.deepEqual(api, {
+        'user-agent': chromeUserAgent(runtimeChromeMajor()),
+        'sec-ch-ua': chromiumBrands(runtimeChromeMajor()),
+        'sec-ch-ua-mobile': '?0',
+        'sec-ch-ua-platform': secChUaPlatform(),
+        'accept-language': ACCEPT_LANGUAGE,
+      });
     },
   },
 ];

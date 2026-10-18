@@ -134,8 +134,8 @@ tests/
 ├── unit/                    # Unit tests (main project)
 │   ├── core/                # Provider-agnostic services (watches, snipes, accounts, holds)
 │   ├── database/
-│   ├── providers/           # The provider SDK, registry and ParkStay module
-│   ├── docs/                # The docs: links, the provider guide's examples, ParkStay endpoints
+│   ├── providers/           # The provider SDK, registry, and the ParkStay and RAC modules
+│   ├── docs/                # The docs: links, the provider guide's examples, ParkStay and RAC endpoints
 │   └── …                    # app, ipc, security, scheduler, renderer guards, brand, design
 ├── integration/             # Integration tests (main project)
 ├── scripts/                 # Tests for Node scripts in scripts/ (main project), new-provider.test.ts
@@ -228,12 +228,16 @@ npm run test:electron -- http-transport
   `tests/unit/providers/http-transport-parity.test.ts`, which Jest runs against
   `NodeHttpClient` (from `tests/utils/http-transport-cases.ts`), plus Electron-only checks.
   A behaviour change in either client must keep both runs green.
+- `provider-windows.electron.ts` also checks that an API call and a provider window on one
+  partition present one browser: the same `User-Agent`, `sec-ch-ua`, `sec-ch-ua-mobile`,
+  `sec-ch-ua-platform` and `Accept-Language`, and a `navigator.userAgentData` that agrees.
 - Not part of `npm test`: it needs the Electron binary and a display. Run it when you change
-  `src/main/providers/sdk/http*.ts`.
+  `src/main/providers/sdk/http*.ts`, `src/main/providers/sdk/user-agent.ts` or
+  `src/main/app/provider-windows.ts`.
 
 ## Electron smoke tests (E2E)
 
-`tests/e2e/` holds the Electron smoke suite: a handful of journeys through the **built** app
+`tests/e2e/` holds the Electron smoke suite: 29 journeys in 17 specs through the **built** app
 (main, preload and renderer together), driven by Playwright's `_electron` launcher. It
 catches what Jest cannot: startup crashes, preload or sandbox breakage, CSP violations,
 broken routing and focus, and a quit that hangs.
@@ -302,8 +306,11 @@ The `launchWaStay()` fixture starts the app with:
   provider ids): `parkstay` (`DEFAULT_PROVIDERS`) unless the launch passes `{ providers }`. The
   other built-in providers are not registered, so the journeys' counts and pre-selections
   (ParkStay's 11 places, ParkStay chosen for you) hold however many providers are built in. A
-  journey that counts or expects a pre-selection passes its list explicitly. An id that is not
-  a built-in provider stops the app at start-up, with the reason in the main process's output.
+  journey that counts or expects a pre-selection passes its list explicitly
+  (`rac-catalogue.spec.ts`, `rac-watch.spec.ts`, `rac-explore.spec.ts`,
+  `rac-member-number.spec.ts` and `rac-auto-cart.spec.ts` pass `['parkstay', 'rac']`: RAC's
+  eight parks beside ParkStay's 11 campgrounds). An id that is not a built-in provider stops the app at start-up, with the reason
+  in the main process's output.
 - **A production renderer**: `NODE_ENV=production`, no `ELECTRON_RENDERER_URL`, no Mapbox
   token, `TZ=Australia/Perth`, `LANG=en_AU.UTF-8`.
 - **An online window, whatever the host.** Chromium reads `navigator.onLine` from the host's
@@ -334,6 +341,15 @@ better-sqlite3's Electron build loads and `dist/main` opens and migrates the dat
 
 - `seedHeldSnipe(userDataDir, …)`, from `launchWaStay({ prepare })`: a HELD snipe with its hold
   and its `snipe_held` notification. No hold is ever placed (architecture-notes §12.33).
+- `seedAlertSnipe(userDataDir, …)`: an armed ParkStay snipe that alerts, watching for
+  cancellations, and nothing else: the app's scheduler checks the place at once and records the
+  alert and its `snipe_alert` notification itself (`alert-snipe.spec.ts`, with dated fixtures).
+  A seed may name another provider and release mode: `rac-member-number.spec.ts` seeds an RAC
+  snipe at Busselton for the next school holidays RAC's calendar announces (read from the
+  built `dist/main`), whose release the app works out, and checks it moves with the number.
+- `seedHeldWatch(userDataDir, …)`: a watch whose automatic hold holds a unit, with the
+  provider's experiment choices stored first when given (`rac-auto-cart.spec.ts`: RAC's
+  auto-cart on and a held cart with a made-up reference). No cart or hold is ever created.
 - `writeLegacyV1Data(dir)`: a v1.2.0 data folder from `tests/fixtures/db/v5-release-1.2.0.sql`,
   for `WA_STAY_LEGACY_DATA_DIR` (the upgrade journey).
 
@@ -345,6 +361,19 @@ Data a page can create through the preload is written that way instead
 Recorded provider responses live in `tests/e2e/fixtures/http/<providerId>/`, with a
 `manifest.json` of routes. The format, where the data comes from and how to refresh it are in
 [`fixtures/http/README.md`](e2e/fixtures/http/README.md).
+
+**Dated fixtures.** A journey that checks availability for dates near today passes a moved copy
+instead, so it never goes stale: `writeDatedFixtures(tempDir('dated'))`
+(`tests/e2e/support/dated-fixtures.ts`) copies `fixtures/http/` and moves every RAC
+availability answer (its night keys, the dates in `online_booking_url`, and its route's
+`available_from` if it has one; a route by `blog_id` alone moves from the answer's first night)
+and each ParkStay campground availability view (its nights and release date, from its own
+`arrival`) to a stay arriving 7 days after today in Perth (`arrivalInDays` for another); the
+launch passes `env: { WA_STAY_E2E_FIXTURES_DIR: fixtures.dir }`. `rac-watch.spec.ts`,
+`rac-explore.spec.ts` (tomorrow, `arrivalInDays: 1`), `rac-member-number.spec.ts` and
+`alert-snipe.spec.ts` use it. `rac-member-number.spec.ts` also reads the clipboard from the
+main process (`app.evaluate(({ clipboard }) => clipboard.readText())`) for a made-up member
+number, and attaches a screenshot of each step.
 
 ### Adding a journey
 

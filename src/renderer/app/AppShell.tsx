@@ -1,6 +1,11 @@
 import { Suspense, useRef, useState, type MouseEvent } from 'react';
 import { Link, Outlet, useLocation } from 'react-router';
-import { API_UNAVAILABLE_MESSAGE, isApiAvailable } from '../api';
+import {
+  API_UNAVAILABLE_MESSAGE,
+  isApiAvailable,
+  useCredentialChangeUpdates,
+  useSnipeUpdates,
+} from '../api';
 import { Logo } from '../components/brand/Logo';
 import { Notice, Spinner } from '../components/ui';
 import { NotificationBell } from '../features/notifications/NotificationBell';
@@ -28,6 +33,11 @@ export function AppShell() {
   useRouteFocus(mainRef);
   // A click on a desktop notification opens its page (main sends `app:navigate`).
   useAppNavigate();
+  // A saved member number changed: that provider's availability on screen is asked again.
+  useCredentialChangeUpdates();
+  // Snipes main changed while no snipe page was open (a member number saved in Settings moves
+  // their release) are in the cache when one opens.
+  useSnipeUpdates();
 
   // A plain `#main` link would change the HashRouter route, so move focus by hand.
   const skipToContent = (event: MouseEvent<HTMLAnchorElement>) => {

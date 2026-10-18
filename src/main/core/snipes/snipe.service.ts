@@ -1,22 +1,39 @@
 /**
- * Site Sniper: automated attempts to hold a high-demand unit the moment it is released.
+ * Site Sniper: automated attempts to catch a high-demand unit the moment it is released.
  *
- * Every provider comes from the registry (`snipes` capability: availability, holds and a
- * release policy), and the release and queue rules come from the provider:
+ * Every provider comes from the registry (`snipes` capability: availability and a release
+ * policy; holds are optional, §12.35), and the release and queue rules come from the provider:
  * - `release.supports(mode)` and `release.computeReleaseAt(...)` decide when a stay opens;
- * - `release.pollFloorMs` is the fastest the core may poll;
+ * - `release.pollFloorMs` is the fastest the core may poll, and a mode's `maxWindowMinutes`
+ *   the longest a snipe keeps trying after the release;
  * - the access gate (`provider.access`) is used only when the snipe asks for it, the provider
  *   has one (`capabilities.accessGate`) and the release mode uses it.
  *
- * One attempt (`execute`) is check → one-booking-per-night guard → `holds.create`. On a hold
- * the snipe is HELD with the provider's reference, expiry, unit and payment URL, and stops.
- * Payment stays a human step. The scheduler (`scheduler/snipe-runner.ts`) owns the timing;
- * this service owns the state and every write.
+ * Each snipe has an `action` (default: `hold` when the provider has holds, else `alert`). One
+ * attempt (`execute`) checks availability. The unit is the first fully available one, in a stay
+ * the provider's stay rules allow (`freeForStay`), of those the snipe names (`unitIds`, filtered
+ * by the provider), or else of its stay types (`unitKinds`; none: any kind). Then:
+ * - `alert`: the snipe is ALERTED with what was free, when, and the provider's booking page
+ *   (`SiteSnipe.alert`), and the person gets a desktop alert and email with the link. Nothing is
+ *   held and no night is reserved; no sign-in is ever needed.
+ * - `hold`: one-booking-per-night guard → `holds.create`, at interactive priority (R18: the
+ *   hold is one booking attempt the person opted into; the polling stays background). On a hold
+ *   the snipe is HELD with the provider's reference, expiry (and whether it is the provider's
+ *   guess), unit and payment URL, and stops. Payment stays a human step.
+ *   It alerts instead, with a note, when the provider has no holds (any more, or until WA Stay
+ *   restarts after the person turned a holds experiment off: `holdsOf`), or when it names no
+ *   units and its candidates are of more than one kind (`kindsAmbiguous`): it never picks
+ *   between a campsite and a cabin for the person.
+ *
+ * A provider that turns the check (or the hold) away with a 403 or 429 (`isProviderBlock`) ends
+ * the snipe FAILED with the reason: nothing tries again by itself (§12.35). The scheduler
+ * (`scheduler/snipe-runner.ts`) owns the timing; this service owns the state and every write.
  *
  * Accounts (§12.32): for a provider whose holds need an account (`required-for-holds` or
- * `required`), a snipe is created paused while signed out, `activate` is `AUTH_REQUIRED`
- * until the account is signed in, and an attempt fails as "Sign in to …" when the stored
- * state is not signed in. ParkStay's account is optional, so none of this applies to it.
+ * `required`), a `hold` snipe is created paused while signed out, `activate` is
+ * `AUTH_REQUIRED` until the account is signed in, and an attempt fails as "Sign in to …" when
+ * the stored state is not signed in. An `alert` snipe never waits for a sign-in. ParkStay's
+ * account is optional, so none of this applies to it.
  */
 
 import {
@@ -25,45 +42,71 @@ import {
   SiteSnipeUpdate,
   SnipeExecutionResult,
   type LocationAvailability,
+  type SnipeAction,
+  type SnipeAlert,
   type SnipeListFilter,
   type StayInput,
   type StayParams,
+  type StayQuery,
   type UnitAvailability,
 } from '@shared/types';
 import type { EventSink } from '@shared/contracts/events';
 import { SnipeResult, SnipeReleaseMode, SnipeStatus } from '@shared/types/common.types';
 import { toStayQuery } from '@shared/types/stay.types';
 import { compareDates, isCalendarDate, todayIn } from '@shared/utils/calendar-date';
-import { DEFAULT_SNIPE_POLL_INTERVAL_MS } from '@shared/constants';
+import { cleanUnitKinds, isUnitKind } from '@shared/utils/unit-kinds';
+import { DEFAULT_SNIPE_POLL_INTERVAL_MS, DEFAULT_SNIPE_WINDOW_MS } from '@shared/constants';
 import type { SiteSniperRepository } from '../../database/repositories';
 import type { ProviderRegistry, ProviderWith } from '../../providers/registry';
 import {
   AccessGateError,
   isAbortError,
+  isProviderBlock,
   ProviderError,
   toApiError,
 } from '../../providers/sdk/errors';
-import type { AccessGate } from '../../providers/sdk/provider';
+import { withRequestPriority } from '../../providers/sdk/pacing';
+import type { AccessGate, HoldsModule } from '../../providers/sdk/provider';
 import { AppError } from '../../utils/app-error';
 import { logger } from '../../utils/logger';
 import type { AccountGate } from '../accounts/ports';
+import { firstBookingLink } from '../booking-link';
 import type { NightGuard } from '../holds/night-guard';
 import type { NotificationService } from '../notifications/notification.service';
 import { resolveStayParams } from '../stay-params';
+import { freeForStay, kindsAmbiguous, wantedUnits } from '../watches/matching';
 
 const log = logger.child({ module: 'sitesniper' });
 
-/** The provider a snipe runs on: availability, holds and a release policy (and maybe a queue). */
+/**
+ * Why a hold snipe that names no units alerted instead of holding: the units it could hold
+ * (those of its stay types, or every unit), booked or free, are of more than one stay type.
+ */
+const MIXED_KINDS_ERROR =
+  'The units this snipe could hold are of more than one stay type: choose one stay type or units for it';
+
+/** The provider a snipe runs on: availability and a release policy (maybe holds and a queue). */
 export type SnipeProvider = ProviderWith<'snipes'>;
 
 /** Statuses a snipe never leaves on its own: nothing is armed for them. */
 export const TERMINAL_SNIPE_STATUSES: ReadonlySet<SnipeStatus> = new Set([
   SnipeStatus.HELD,
   SnipeStatus.BOOKED,
+  SnipeStatus.ALERTED,
   SnipeStatus.FAILED,
   SnipeStatus.EXPIRED,
   SnipeStatus.DISABLED,
 ]);
+
+/** Why a `hold` snipe alerted: its provider places no holds (or no longer does). */
+export function holdsOffNote(shortName: string): string {
+  return `Automatic holds are off for ${shortName}, so Site Sniper alerted you instead.`;
+}
+
+/** Why a snipe stopped when its provider turned it away (`isProviderBlock`). */
+export function blockedMessage(shortName: string, status: number): string {
+  return `${shortName} refused the check (HTTP ${status}). Site Sniper stopped and won't try again by itself.`;
+}
 
 /** What the scheduler does after an attempt. */
 export type SnipeNext = 'continue' | 'done' | 'access-gate';
@@ -90,7 +133,7 @@ export interface SnipePlan {
   timeZone: string;
 }
 
-export type SnipeNotifications = Pick<NotificationService, 'notifySnipeHeld'>;
+export type SnipeNotifications = Pick<NotificationService, 'notifySnipeHeld' | 'notifySnipeAlert'>;
 
 export interface SnipeServiceDeps {
   snipes: SiteSniperRepository;
@@ -101,6 +144,12 @@ export interface SnipeServiceDeps {
   events?: EventSink;
   /** Sign-in checks for providers whose holds need an account (none: never checked). */
   accounts?: AccountGate;
+  /**
+   * The provider's holds are on through an experiment the person has turned off: they go when
+   * WA Stay restarts, and until then a snipe treats the provider as having none (`holdsOf`):
+   * it alerts, and a new one is an alert snipe (default: never).
+   */
+  holdsTurningOff?: (providerId: string) => boolean;
   clock?: () => Date;
 }
 
@@ -108,6 +157,21 @@ export interface SnipeServiceDeps {
 function needsAccountForHolds(provider: { manifest: { capabilities: { account: string } } }) {
   const { account } = provider.manifest.capabilities;
   return account === 'required' || account === 'required-for-holds';
+}
+
+/**
+ * The longest window the release mode allows (`maxWindowMinutes`), in ms, or undefined for no
+ * limit.
+ */
+function maxWindowMs(provider: SnipeProvider, mode: string): number | undefined {
+  const minutes = provider.manifest.releaseModes?.find((m) => m.id === mode)?.maxWindowMinutes;
+  return minutes === undefined ? undefined : minutes * 60_000;
+}
+
+/** `windowMs` within the release mode's limit. */
+function clampWindow(provider: SnipeProvider, mode: string, windowMs: number): number {
+  const max = maxWindowMs(provider, mode);
+  return max === undefined ? windowMs : Math.min(windowMs, max);
 }
 
 export interface SnipeRunOptions {
@@ -119,7 +183,7 @@ export interface SnipeRunOptions {
 /** The fields create and update work out with the provider. */
 type Prepared = Pick<
   SiteSnipeInput,
-  'stayParams' | 'releaseAt' | 'accessGateEnabled' | 'pollIntervalMs'
+  'stayParams' | 'releaseAt' | 'accessGateEnabled' | 'pollIntervalMs' | 'windowDurationMs'
 >;
 
 /** One poll's units for the log: `3 available/available`, at most 20 of them. */
@@ -137,6 +201,7 @@ export class SiteSniperService {
   private readonly nightGuard: NightGuard;
   private readonly events?: EventSink;
   private readonly accounts?: AccountGate;
+  private readonly holdsTurningOff: (providerId: string) => boolean;
   private readonly clock: () => Date;
 
   constructor(deps: SnipeServiceDeps) {
@@ -146,19 +211,28 @@ export class SiteSniperService {
     this.nightGuard = deps.nightGuard;
     this.events = deps.events;
     this.accounts = deps.accounts;
+    this.holdsTurningOff = deps.holdsTurningOff ?? (() => false);
     this.clock = deps.clock ?? (() => new Date());
   }
 
   /**
    * Creates a snipe. Throws `CAPABILITY` for a provider without snipes and `VALIDATION`
    * (with the field) for a release mode the provider does not support, bad dates, bad stay
-   * fields, or a release time the provider cannot work out (a scheduled release needs one,
-   * before check-in).
+   * fields, a release time the provider cannot work out (a scheduled release needs one,
+   * before check-in), or `hold` on a provider without holds. The action defaults to `hold`
+   * when the provider has holds, else `alert`; the window is clamped to the mode's limit.
    */
   async create(userId: number, input: SiteSnipeInput): Promise<SiteSnipe> {
     const provider = this.providers.require(input.providerId, 'snipes');
-    const prepared = await this.prepare(provider, input, input.releaseAt);
-    const signIn = await this.signInNeeded(provider);
+    const action = input.action ?? (this.holdsOf(provider) ? 'hold' : 'alert');
+    this.assertAction(provider, action);
+    const unitKinds = cleanUnitKinds(input.unitKinds);
+    const prepared = {
+      action,
+      unitKinds,
+      ...(await this.prepare(provider, { ...input, unitKinds }, input.releaseAt)),
+    };
+    const signIn = action === 'hold' ? await this.signInNeeded(provider) : undefined;
     if (signIn) {
       // Saved paused, in one transaction: arming it waits for the sign-in (activate checks)
       return this.changed(this.repo.createPaused(userId, { ...input, ...prepared }, signIn).id);
@@ -186,19 +260,43 @@ export class SiteSniperService {
   }
 
   /**
-   * Updates a snipe. A change to the release mode, location, stay, stay fields, release time,
-   * queue choice or poll cadence is checked with the provider again (as at create).
+   * Updates a snipe. A change to the release mode, location, stay, stay fields, units or stay
+   * types, release time, queue choice, poll cadence or window is checked with the provider
+   * again (as at create). The action cannot change once the snipe is HELD or BOOKED, and
+   * `hold` needs a provider with holds (`VALIDATION` on `action`). A snipe switched to `hold`
+   * while its provider's holds need a sign-in that is missing is saved paused, as `create` saves
+   * a new one.
    */
   async update(id: number, updates: SiteSnipeUpdate): Promise<SiteSnipe> {
     const snipe = this.requireSnipe(id);
+    let signIn: string | undefined;
+    if (updates.action !== undefined && updates.action !== snipe.action) {
+      if (snipe.status === SnipeStatus.HELD || snipe.status === SnipeStatus.BOOKED) {
+        throw new AppError(
+          'VALIDATION',
+          snipe.status === SnipeStatus.HELD
+            ? "This snipe already has a hold, so what it does can't change"
+            : "This snipe is already booked, so what it does can't change",
+          { issues: ['action'] }
+        );
+      }
+      if (updates.action === 'hold') {
+        const provider = this.providers.require(snipe.providerId, 'snipes');
+        this.assertAction(provider, 'hold');
+        signIn = await this.signInNeeded(provider);
+      }
+    }
     const affectsPlan =
       updates.releaseMode !== undefined ||
       updates.location !== undefined ||
       updates.stay !== undefined ||
       updates.stayParams !== undefined ||
+      updates.unitIds !== undefined ||
+      updates.unitKinds !== undefined ||
       updates.releaseAt !== undefined ||
       updates.accessGateEnabled !== undefined ||
-      updates.pollIntervalMs !== undefined;
+      updates.pollIntervalMs !== undefined ||
+      updates.windowDurationMs !== undefined;
     let prepared: Partial<Prepared> = {};
     if (affectsPlan) {
       const provider = this.providers.require(snipe.providerId, 'snipes');
@@ -208,15 +306,26 @@ export class SiteSniperService {
         location: updates.location ?? snipe.location,
         stay: updates.stay ?? snipe.stay,
         stayParams: updates.stayParams ?? snipe.stayParams,
+        unitIds: updates.unitIds ?? snipe.unitIds,
+        unitKinds:
+          updates.unitKinds !== undefined ? cleanUnitKinds(updates.unitKinds) : snipe.unitKinds,
         releaseMode: updates.releaseMode ?? snipe.releaseMode,
         accessGateEnabled: updates.accessGateEnabled ?? snipe.accessGateEnabled,
         pollIntervalMs: updates.pollIntervalMs ?? snipe.pollIntervalMs,
+        windowDurationMs: updates.windowDurationMs ?? snipe.windowDurationMs,
       };
       // A scheduled release keeps its time unless a new one is given.
       const requestedAt = updates.releaseAt ?? snipe.releaseAt;
       prepared = await this.prepare(provider, merged, requestedAt);
     }
-    this.repo.update(id, { ...updates, ...prepared });
+    const changes: SiteSnipeUpdate = {
+      ...updates,
+      ...(updates.unitKinds !== undefined ? { unitKinds: cleanUnitKinds(updates.unitKinds) } : {}),
+      ...prepared,
+    };
+    // Saved paused, in one transaction: arming it waits for the sign-in (activate checks)
+    if (signIn) this.repo.updatePaused(id, changes, signIn);
+    else this.repo.update(id, changes);
     return this.changed(id);
   }
 
@@ -230,7 +339,7 @@ export class SiteSniperService {
 
   /**
    * Arms a snipe again. A HELD or BOOKED snipe is refused: it would hold the same nights a
-   * second time.
+   * second time. An ALERTED one may be, as it holds nothing: its alert is cleared.
    */
   async activate(id: number): Promise<void> {
     const snipe = this.requireSnipe(id);
@@ -238,13 +347,14 @@ export class SiteSniperService {
       throw new AppError(
         'VALIDATION',
         snipe.status === SnipeStatus.HELD
-          ? 'This snipe already holds a site'
+          ? 'This snipe already has a hold'
           : 'This snipe is already booked'
       );
     }
-    // A provider whose holds need an account: AUTH_REQUIRED, and nothing is armed
+    // A hold snipe on a provider whose holds need an account: AUTH_REQUIRED, and nothing is
+    // armed. An alert never waits for a sign-in.
     const provider = this.providers.tryGet(snipe.providerId);
-    if (provider && needsAccountForHolds(provider) && this.accounts) {
+    if (snipe.action === 'hold' && provider && needsAccountForHolds(provider) && this.accounts) {
       await this.accounts.ensureForHolds(snipe.providerId);
       // Signed in now: the sign-in hint no longer applies
       if (snipe.lastError?.startsWith(`Sign in to ${provider.manifest.shortName}`)) {
@@ -309,7 +419,8 @@ export class SiteSniperService {
 
   /**
    * How to run the snipe: its provider, release instants, gate and poll cadence. Undefined
-   * when its provider is not registered or cannot snipe.
+   * when its provider is not registered or cannot snipe. The window is clamped to the release
+   * mode's limit here too, for rows stored before it (or before the provider set it).
    */
   plan(snipe: SiteSnipe): SnipePlan | undefined {
     const provider = this.providers.tryGet(snipe.providerId);
@@ -320,11 +431,12 @@ export class SiteSniperService {
       ? snipes.release.pollFloorMs.continuous
       : snipes.release.pollFloorMs.window;
     const releaseAt = continuous ? undefined : snipe.releaseAt;
+    const windowMs = clampWindow(snipes, snipe.releaseMode, snipe.windowDurationMs);
     return {
       provider: snipes,
       releaseAt,
       warmupAt: releaseAt && new Date(releaseAt.getTime() - snipe.leadTimeSeconds * 1000),
-      windowEnd: releaseAt && new Date(releaseAt.getTime() + snipe.windowDurationMs),
+      windowEnd: releaseAt && new Date(releaseAt.getTime() + windowMs),
       gate: this.usesGate(snipes, snipe.releaseMode, snipe.accessGateEnabled)
         ? snipes.access
         : undefined,
@@ -342,9 +454,9 @@ export class SiteSniperService {
   }
 
   /**
-   * A daily-rollover snipe's release instant, asked of the provider again and stored when it
-   * changed (a v8-migrated row may still carry the old midnight instant). Keeps the stored
-   * one when the provider cannot answer.
+   * A daily-rollover snipe's release instant, asked of the provider again (with the snipe's
+   * units, stay types and clamped window) and stored when it changed (a v8-migrated row may
+   * still carry the old midnight instant). Keeps the stored one when the provider cannot answer.
    */
   async refreshReleaseAt(snipe: SiteSnipe, signal?: AbortSignal): Promise<Date | undefined> {
     if (snipe.releaseMode !== SnipeReleaseMode.DAILY_ROLLOVER) return snipe.releaseAt;
@@ -356,6 +468,9 @@ export class SiteSniperService {
         externalId: snipe.location.externalId,
         stay: toStayQuery(snipe.stay, snipe.stayParams),
         params: snipe.stayParams,
+        unitIds: [...snipe.unitIds],
+        unitKinds: [...snipe.unitKinds],
+        windowMs: clampWindow(provider, snipe.releaseMode, snipe.windowDurationMs),
         now: this.clock(),
         signal,
       });
@@ -401,7 +516,7 @@ export class SiteSniperService {
       outcome('done', SnipeResult.ERROR, { error: 'The attempt was stopped' });
 
     const snipe = this.repo.findById(snipeId);
-    if (!snipe) return outcome('done', SnipeResult.ERROR, { error: 'Site snipe not found' });
+    if (!snipe) return outcome('done', SnipeResult.ERROR, { error: 'Snipe not found' });
     if (!snipe.isActive || TERMINAL_SNIPE_STATUSES.has(snipe.status)) {
       return outcome('done', SnipeResult.EXPIRED, { error: 'Snipe is not active' });
     }
@@ -438,15 +553,25 @@ export class SiteSniperService {
       const externalId = snipe.location.externalId;
       const stay = toStayQuery(snipe.stay, snipe.stayParams);
 
-      // Poll availability: the preferred units, or every unit.
+      // Poll availability: the preferred units (the provider filters by id), or every unit,
+      // of which the snipe's stay types are the candidates.
+      const named = snipe.unitIds.length > 0;
       const availability = await provider.availability.check(externalId, stay, {
-        unitIds: snipe.unitIds.length > 0 ? snipe.unitIds : undefined,
+        unitIds: named ? snipe.unitIds : undefined,
         signal,
       });
       if (signal?.aborted) return stopped();
-      const matched = availability.units.find((unit) => unit.fullyAvailable);
+      const candidates = named
+        ? availability.units
+        : wantedUnits({ unitIds: [], unitKinds: snipe.unitKinds }, availability.units);
+      // Free for the whole stay, and a stay the provider's stay rules allow
+      const matched = candidates.find(freeForStay);
+      const ofKinds =
+        candidates.length < availability.units.length
+          ? ` (${candidates.length} of its stay types)`
+          : '';
       log.info(
-        `Snipe ${snipeId} poll: ${availability.units.length} unit(s), ` +
+        `Snipe ${snipeId} poll: ${availability.units.length} unit(s)${ofKinds}, ` +
           `${matched ? `unit ${matched.unitId} free` : 'none free'} — ${describeUnits(availability.units)}`
       );
 
@@ -456,6 +581,23 @@ export class SiteSniperService {
           : SnipeResult.UNAVAILABLE;
         this.recordAttempt(snipeId, result, undefined, checkedAt, nextCheck, true);
         return outcome('continue', result, { success: true });
+      }
+
+      // An alert snipe alerts; so does a hold snipe whose provider places no holds (or no
+      // longer does), and one for "any unit" across stay types, which never picks one for the
+      // person. None reserves a night.
+      const holds = this.holdsOf(provider);
+      if (snipe.action === 'alert') {
+        return await this.alert(snipe, provider, availability, matched, undefined, checkedAt);
+      }
+      if (!holds) {
+        const note = holdsOffNote(provider.manifest.shortName);
+        return await this.alert(snipe, provider, availability, matched, note, checkedAt);
+      }
+      if (kindsAmbiguous(snipe, candidates)) {
+        log.info(`Snipe ${snipeId}: no hold, its units are of more than one stay type`);
+        const note = `${MIXED_KINDS_ERROR}.`;
+        return await this.alert(snipe, provider, availability, matched, note, checkedAt);
       }
 
       // An account the holds need, stored as not signed in: no hold (no network here)
@@ -505,18 +647,29 @@ export class SiteSniperService {
 
       let hold;
       try {
-        hold = await provider.holds.create({ externalId, unitId: matched.unitId, stay }, signal);
+        // Interactive (R18): the hold goes ahead of the provider's background requests
+        hold = await withRequestPriority('interactive', () =>
+          holds.create({ externalId, unitId: matched.unitId, stay }, signal)
+        );
       } finally {
         reserved.reservation.release();
       }
 
       if (hold.ok) {
         // Recorded even when the attempt was stopped meanwhile: the hold exists now.
-        const paymentUrl = provider.holds.paymentUrl(hold);
+        const paymentUrl = holds.paymentUrl(hold);
         const unitId = hold.unitId ?? matched.unitId;
+        const estimated = hold.expiresAtEstimated === true;
         try {
           this.repo.incrementAttempts(snipeId);
-          this.repo.markHeld(snipeId, hold.reference, hold.expiresAt, paymentUrl, unitId);
+          this.repo.markHeld(
+            snipeId,
+            hold.reference,
+            hold.expiresAt,
+            paymentUrl,
+            unitId,
+            estimated
+          );
         } catch (error) {
           log.error(`Snipe ${snipeId}: hold ${hold.reference} placed but not recorded`, error);
         }
@@ -530,6 +683,10 @@ export class SiteSniperService {
           );
         }
         try {
+          // What the alert calls the held unit: its kind in the check, when it was in it
+          const heldKind = availability.units.find((unit) => unit.unitId === unitId)?.unitKind;
+          // The public booking page too, for booking away from this computer (brief R7)
+          const bookingUrl = this.bookingLinkFor(provider, snipe, availability, unitId);
           await this.notifications.notifySnipeHeld(
             stored ?? {
               ...snipe,
@@ -538,9 +695,12 @@ export class SiteSniperService {
               lastResult: SnipeResult.HELD,
               holdReference: hold.reference,
               holdExpiresAt: hold.expiresAt,
+              ...(estimated ? { holdExpiresEstimated: true } : {}),
               holdUnitId: unitId,
               paymentUrl,
-            }
+            },
+            isUnitKind(heldKind) ? heldKind : undefined,
+            bookingUrl
           );
         } catch (error) {
           log.error(`Snipe ${snipeId}: hold ${hold.reference} placed but not notified`, error);
@@ -597,7 +757,19 @@ export class SiteSniperService {
         this.recordAttempt(snipeId, SnipeResult.QUEUE_FULL, message, checkedAt, nextCheck, false);
         return outcome('access-gate', SnipeResult.QUEUE_FULL, { error: message });
       }
-      log.error(`Site snipe ${snipeId} execution failed: ${message}`);
+      if (isProviderBlock(error)) {
+        // The provider turned WA Stay away (403, 429, a challenge): stop, say why, and never
+        // try again by itself (§12.35).
+        const blocked = blockedMessage(provider.manifest.shortName, error.status);
+        log.warn(
+          `Snipe ${snipeId}: ${provider.manifest.id} answered HTTP ${error.status}; stopped`
+        );
+        this.repo.incrementAttempts(snipeId);
+        this.repo.finish(snipeId, SnipeStatus.FAILED, SnipeResult.ERROR, blocked);
+        this.emitIfStored(snipeId);
+        return outcome('done', SnipeResult.ERROR, { error: blocked });
+      }
+      log.error(`Snipe ${snipeId} execution failed: ${message}`);
       this.recordAttempt(snipeId, SnipeResult.ERROR, message, checkedAt, nextCheck, true);
       return outcome('continue', SnipeResult.ERROR, { error: message });
     }
@@ -645,16 +817,126 @@ export class SiteSniperService {
     };
   }
 
+  /**
+   * The dates are free: the snipe is ALERTED with what was free, when, and the provider's
+   * booking page (`note`: why it alerted instead of holding), and the person gets a desktop
+   * alert and email. Nothing is held and no night is reserved. It is written before anything
+   * is awaited, so an attempt stopped after the check writes nothing; a snipe deleted during
+   * the attempt sends no alert.
+   */
+  private async alert(
+    snipe: SiteSnipe,
+    provider: SnipeProvider,
+    availability: LocationAvailability,
+    matched: UnitAvailability,
+    note: string | undefined,
+    checkedAt: Date
+  ): Promise<SnipeOutcome> {
+    const bookingUrl = this.bookingLinkFor(provider, snipe, availability, matched.unitId);
+    const alert: SnipeAlert = {
+      at: checkedAt,
+      unitId: matched.unitId,
+      ...(matched.unitName ? { unitName: matched.unitName } : {}),
+      ...(bookingUrl ? { bookingUrl } : {}),
+      ...(note ? { note } : {}),
+    };
+    this.repo.markAlerted(snipe.id, alert);
+    const outcome: SnipeOutcome = {
+      next: 'done',
+      result: {
+        snipeId: snipe.id,
+        success: true,
+        result: SnipeResult.ALERTED,
+        held: false,
+        checkedAt,
+        matchedSiteId: matched.unitId,
+      },
+    };
+    const stored = this.repo.findById(snipe.id);
+    if (!stored) {
+      log.info(`Snipe ${snipe.id} was deleted during its attempt; no alert sent`);
+      return outcome;
+    }
+    log.info(
+      `Snipe ${snipe.id}: unit ${matched.unitId} free; alerted${note ? ' instead of a hold' : ''}`
+    );
+    this.events?.emit('snipe:updated', stored);
+    try {
+      const kind = isUnitKind(matched.unitKind) ? matched.unitKind : undefined;
+      await this.notifications.notifySnipeAlert(stored, kind);
+    } catch (error) {
+      log.error(`Snipe ${snipe.id}: alerted but not notified`, error);
+    }
+    return outcome;
+  }
+
+  /**
+   * The provider's public booking page for the snipe's stay on `unitId`: the first of the
+   * unit's own link, the check's link and `links.booking` that is a booking link of the
+   * provider (https on its own site, `firstBookingLink`); none otherwise. Refusing a cart URL
+   * is the provider's job.
+   */
+  private bookingLinkFor(
+    provider: SnipeProvider,
+    snipe: SiteSnipe,
+    availability: LocationAvailability,
+    unitId: string
+  ): string | undefined {
+    const stay: StayQuery = toStayQuery(snipe.stay, snipe.stayParams);
+    let linked: string | null = null;
+    try {
+      linked = provider.links.booking(snipe.location.externalId, stay, unitId);
+    } catch (error) {
+      log.warn(
+        `${provider.manifest.id}: links.booking failed: ${error instanceof Error ? error.name : 'error'}`
+      );
+    }
+    return firstBookingLink(provider.manifest, [
+      availability.units.find((unit) => unit.unitId === unitId)?.bookingUrl,
+      availability.bookingUrl,
+      linked,
+    ]);
+  }
+
+  /** `snipe:updated` with the stored snipe, unless it was deleted meanwhile. */
+  private emitIfStored(id: number): void {
+    const snipe = this.repo.findById(id);
+    if (snipe) this.events?.emit('snipe:updated', snipe);
+  }
+
+  /**
+   * The provider's holds, when it places them: `capabilities.holds` on, the module there, and
+   * not turning off (an experiment the person turned off, until WA Stay restarts: §12.35).
+   * Without them a snipe alerts, a new snipe defaults to `alert`, and `hold` is refused. The
+   * one place a snipe asks whether it may hold.
+   */
+  private holdsOf(provider: SnipeProvider): HoldsModule | undefined {
+    if (provider.manifest.capabilities.holds !== true) return undefined;
+    if (this.holdsTurningOff(provider.manifest.id)) return undefined;
+    return provider.holds;
+  }
+
+  /** `VALIDATION` on `action` for `hold` on a provider that places no holds. */
+  private assertAction(provider: SnipeProvider, action: SnipeAction): void {
+    if (action === 'hold' && !this.holdsOf(provider)) {
+      throw new AppError(
+        'VALIDATION',
+        `${provider.manifest.shortName} can't hold automatically, so choose an alert`,
+        { issues: ['action'] }
+      );
+    }
+  }
+
   private requireSnipe(id: number): SiteSnipe {
     const snipe = this.repo.findById(id);
-    if (!snipe) throw new AppError('NOT_FOUND', 'Site snipe not found');
+    if (!snipe) throw new AppError('NOT_FOUND', 'Snipe not found');
     return snipe;
   }
 
   /** Emits `snipe:updated` with the stored snipe, and returns it. */
   private changed(id: number): SiteSnipe {
     const snipe = this.repo.findById(id);
-    if (!snipe) throw new AppError('NOT_FOUND', 'Site snipe not found');
+    if (!snipe) throw new AppError('NOT_FOUND', 'Snipe not found');
     this.events?.emit('snipe:updated', snipe);
     return snipe;
   }
@@ -684,14 +966,23 @@ export class SiteSniperService {
   /**
    * What create and update work out with the provider: the release mode is supported, the
    * dates are good where the provider is, the stay fields (with defaults), the release
-   * instant (a scheduled one before check-in), whether the queue is used, and the poll cadence
-   * (never below the floor).
+   * instant (a scheduled one before check-in; the provider is told the snipe's units or stay
+   * types and its window), whether the queue is used, the poll cadence (never below the floor)
+   * and the window (never above the mode's `maxWindowMinutes`).
    */
   private async prepare(
     provider: SnipeProvider,
     input: Pick<
       SiteSnipeInput,
-      'releaseMode' | 'location' | 'stay' | 'stayParams' | 'accessGateEnabled' | 'pollIntervalMs'
+      | 'releaseMode'
+      | 'location'
+      | 'stay'
+      | 'stayParams'
+      | 'unitIds'
+      | 'unitKinds'
+      | 'accessGateEnabled'
+      | 'pollIntervalMs'
+      | 'windowDurationMs'
     >,
     requestedAt: Date | undefined
   ): Promise<Prepared> {
@@ -705,6 +996,11 @@ export class SiteSniperService {
     }
     this.assertStay(manifest.timezone, input.stay);
     const stayParams: StayParams = resolveStayParams(manifest, ['snipe', 'hold'], input.stayParams);
+    const windowDurationMs = clampWindow(
+      provider,
+      input.releaseMode,
+      input.windowDurationMs ?? DEFAULT_SNIPE_WINDOW_MS
+    );
 
     let releaseAt: Date | undefined;
     try {
@@ -722,6 +1018,9 @@ export class SiteSniperService {
         ),
         params: stayParams,
         requestedAt,
+        unitIds: [...(input.unitIds ?? [])],
+        unitKinds: [...(input.unitKinds ?? [])],
+        windowMs: windowDurationMs,
         now: this.clock(),
       });
       releaseAt = at ?? undefined;
@@ -750,6 +1049,7 @@ export class SiteSniperService {
       releaseAt,
       accessGateEnabled: this.usesGate(provider, input.releaseMode, input.accessGateEnabled),
       pollIntervalMs: Math.max(input.pollIntervalMs ?? DEFAULT_SNIPE_POLL_INTERVAL_MS, floor),
+      windowDurationMs,
     };
   }
 

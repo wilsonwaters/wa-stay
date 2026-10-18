@@ -57,4 +57,29 @@ describe('RadioCardGroup and RadioCard', () => {
     expect(screen.getByRole('radio', { name: 'ParkStay WA' })).toBeChecked();
     expect(screen.getByRole('radio', { name: 'RAC Parks & Resorts' })).toBeDisabled();
   });
+
+  it('with an error, marks the group invalid, reads the error with it, and lets it take focus', () => {
+    const { rerender } = render(
+      <RadioCardGroup label="When the dates are free" hint="Pick one" error="Choose one stay type">
+        <RadioCard value="alert" title="Alert me" />
+        <RadioCard value="hold" title="Hold it for me" />
+      </RadioCardGroup>
+    );
+    const group = screen.getByRole('radiogroup', { name: 'When the dates are free' });
+    expect(group).toHaveAttribute('aria-invalid', 'true');
+    expect(group).toHaveAccessibleDescription('Pick one Choose one stay type');
+    expect(group).toHaveAttribute('tabindex', '-1');
+    group.focus();
+    expect(group).toHaveFocus();
+
+    rerender(
+      <RadioCardGroup label="When the dates are free">
+        <RadioCard value="alert" title="Alert me" />
+      </RadioCardGroup>
+    );
+    expect(group).not.toHaveAttribute('aria-invalid');
+    expect(group).not.toHaveAttribute('tabindex');
+    expect(group).not.toHaveAttribute('aria-describedby');
+    expect(screen.queryByText('Choose one stay type')).toBeNull();
+  });
 });

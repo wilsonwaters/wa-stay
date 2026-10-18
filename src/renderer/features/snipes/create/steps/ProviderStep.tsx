@@ -7,15 +7,19 @@ export interface ProviderStepProps {
   onProviderChange: (providerId: string) => void;
 }
 
-/** Step 1: whose sites to snipe. Only providers that offer Site Sniper are listed (§8, §12.9). */
+/**
+ * Step 1: which provider. Only providers that offer Site Sniper are listed (§8, §12.9); one that
+ * places no holds says "Alerts only" under its name.
+ */
 export function ProviderStep({ onProviderChange }: ProviderStepProps) {
   const { watch } = useFormContext<SnipeFormValues>();
   const providerId = watch('providerId');
   return (
     <ProviderPicker
       capability="snipes"
-      label="Whose sites to snipe"
-      hint="Site Sniper holds a site on this provider the moment it is released."
+      label="Which provider"
+      hint="The moment what you choose is released, Site Sniper alerts you or, where the provider allows it, holds it for you."
+      note={(provider) => (provider.capabilities.holds ? undefined : 'Alerts only')}
       value={providerId || undefined}
       onChange={(id) => {
         if (id !== providerId) onProviderChange(id);

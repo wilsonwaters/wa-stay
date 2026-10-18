@@ -1,11 +1,14 @@
 /**
  * One snipe attempt (`SiteSniperService.execute`): check → one-booking-per-night guard →
- * hold, and what each outcome does to the snipe and to the next tick.
+ * hold, and what each outcome does to the snipe and to the next tick; which unit it holds
+ * (the named units, or the first free one of its stay types), and a snipe for "any unit" at a
+ * place with more than one stay type, which holds nothing and alerts instead (R12; the alert
+ * itself: `snipe-alert.test.ts`).
  */
 
 import { AccessGateError } from '@main/providers/sdk';
 import { SnipeResult, SnipeStatus } from '@shared/types/common.types';
-import type { SiteSnipe } from '@shared/types';
+import type { SiteSnipe, SiteSnipeInput } from '@shared/types';
 import { createCoreHarness, fakeDateOnly, type CoreHarness } from '@tests/utils/core-harness';
 import { createFakeProvider } from '@tests/utils/fake-provider';
 
@@ -20,11 +23,12 @@ describe('snipe attempt', () => {
   });
 
   async function sniping(
-    options: Parameters<typeof createFakeProvider>[0] = {}
+    options: Parameters<typeof createFakeProvider>[0] = {},
+    input: Partial<SiteSnipeInput> = {}
   ): Promise<SiteSnipe> {
     fakeDateOnly(NOW);
     h = createCoreHarness({ providers: [createFakeProvider(options)] });
-    const snipe = await h.snipes.create(h.userId, h.snipeInput());
+    const snipe = await h.snipes.create(h.userId, h.snipeInput(input));
     h.snipeRepo.updateStatus(snipe.id, SnipeStatus.SNIPING);
     return snipe;
   }
@@ -142,6 +146,158 @@ describe('snipe attempt', () => {
 
     expect(outcome.next).toBe('done');
     expect(stored(snipe.id)).toMatchObject({ status: SnipeStatus.EXPIRED, isActive: false });
+  });
+
+  describe('stay types', () => {
+    // A free campsite listed first, then a free cabin and a booked dorm bed
+    const mixedPlace: Parameters<typeof createFakeProvider>[0] = {
+      availability: { '1': { s1: 'available', c1: 'available', d1: 'booked' } },
+      unitKinds: { s1: 'campsite', c1: 'cabin', d1: 'dorm' },
+    };
+    const MIXED_NOTE =
+      'The units this snipe could hold are of more than one stay type: choose one stay type or units for it.';
+
+    it("with unitKinds ['cabin'] it holds a cabin, even when a free site is listed first", async () => {
+      const snipe = await sniping(mixedPlace, { unitKinds: ['cabin'] });
+      expect(snipe.unitKinds).toEqual(['cabin']);
+      const outcome = await h.snipes.execute(snipe.id);
+
+      const holds = h.fake.calls.filter((c) => c.module === 'holds');
+      expect(holds).toHaveLength(1);
+      expect(holds[0].args[0]).toMatchObject({ unitId: 'c1' });
+      expect(outcome.result).toMatchObject({ held: true, matchedSiteId: 'c1' });
+      expect(stored(snipe.id)).toMatchObject({ status: SnipeStatus.HELD, holdUnitId: 'c1' });
+    });
+
+    it('an ambiguous hold snipe alerts with the note instead: no hold, no night reserved, no warning (R12)', async () => {
+      const snipe = await sniping(mixedPlace);
+      expect(snipe.action).toBe('hold');
+      const create = jest.spyOn(h.registry.get('fake').holds!, 'create');
+      const reserve = jest.spyOn(h.nightGuard, 'tryReserve');
+      h.events.emit.mockClear();
+      const outcome = await h.snipes.execute(snipe.id);
+
+      expect(outcome).toMatchObject({
+        next: 'done',
+        result: { result: SnipeResult.ALERTED, held: false, matchedSiteId: 's1' },
+      });
+      expect(create).not.toHaveBeenCalled();
+      expect(reserve).not.toHaveBeenCalled();
+      expect(stored(snipe.id)).toMatchObject({
+        status: SnipeStatus.ALERTED,
+        lastResult: SnipeResult.ALERTED,
+        isActive: false,
+        attemptsCount: 1,
+        alert: { at: NOW, unitId: 's1', unitName: 'Site s1', note: MIXED_NOTE },
+      });
+      expect(stored(snipe.id).lastError).toBeUndefined();
+      expect(h.events.emit).toHaveBeenCalledWith(
+        'snipe:updated',
+        expect.objectContaining({ id: snipe.id, status: SnipeStatus.ALERTED })
+      );
+      // The alert replaces R3's warning
+      expect(h.notifications.notifyWarning).not.toHaveBeenCalled();
+      expect(h.notifications.notifySnipeAlert).toHaveBeenCalledTimes(1);
+      expect(h.notifications.notifySnipeAlert).toHaveBeenCalledWith(
+        expect.objectContaining({
+          id: snipe.id,
+          alert: expect.objectContaining({ note: MIXED_NOTE }),
+        }),
+        'campsite'
+      );
+      expect(h.notifications.notifySnipeHeld).not.toHaveBeenCalled();
+    });
+
+    it('two kinds are ambiguous too; units named are not, and kinds do not apply to them', async () => {
+      const twoKinds = await sniping(mixedPlace, { unitKinds: ['campsite', 'cabin'] });
+      await h.snipes.execute(twoKinds.id);
+      expect(stored(twoKinds.id)).toMatchObject({
+        status: SnipeStatus.ALERTED,
+        alert: expect.objectContaining({ note: MIXED_NOTE }),
+      });
+      expect(h.fake.calls.filter((c) => c.module === 'holds')).toHaveLength(0);
+      await h.close();
+
+      const named = await sniping(mixedPlace, { unitIds: ['d1', 's1'], unitKinds: ['cabin'] });
+      await h.snipes.execute(named.id);
+      expect(h.fake.calls.filter((c) => c.module === 'holds')[0].args[0]).toMatchObject({
+        unitId: 's1',
+      });
+      expect(stored(named.id).status).toBe(SnipeStatus.HELD);
+    });
+
+    it('a cabin snipe where no cabin is free keeps polling; a provider without kinds is never ambiguous', async () => {
+      const cabins = await sniping(
+        { ...mixedPlace, availability: { '1': { s1: 'available', c1: 'booked' } } },
+        { unitKinds: ['cabin'] }
+      );
+      await expect(h.snipes.execute(cabins.id)).resolves.toMatchObject({
+        next: 'continue',
+        result: { result: SnipeResult.UNAVAILABLE },
+      });
+      expect(h.fake.calls.filter((c) => c.module === 'holds')).toHaveLength(0);
+      await h.close();
+
+      // No kinds at all: every unit is `other`, so "any unit" holds the first free one
+      const plain = await sniping({ availability: { '1': { u1: 'available', u2: 'available' } } });
+      await expect(h.snipes.execute(plain.id)).resolves.toMatchObject({ result: { held: true } });
+    });
+
+    it('drops duplicate kinds at create and update', async () => {
+      const snipe = await sniping({}, { unitKinds: ['cabin', 'cabin', 'dorm'] });
+      expect(snipe.unitKinds).toEqual(['cabin', 'dorm']);
+      await expect(
+        h.snipes.update(snipe.id, { unitKinds: ['glamping', 'glamping'] })
+      ).resolves.toMatchObject({ unitKinds: ['glamping'] });
+    });
+  });
+
+  describe('stay rules (R8)', () => {
+    it('never holds a fullyAvailable unit whose stay its rules refuse, and holds the next one', async () => {
+      const snipe = await sniping({ availability: { '1': { u1: 'available', u2: 'available' } } });
+      const check = h.fake.availability!.check.bind(h.fake.availability);
+      // The provider's mistake: u1 says fullyAvailable under its own 3-night minimum (the
+      // snipe is 2 nights), and u2 arrives on a day that takes no arrivals
+      const mistaken = (units: string[]) =>
+        jest.spyOn(h.fake.availability!, 'check').mockImplementation(async (...args) => {
+          const answer = await check(...args);
+          return {
+            ...answer,
+            units: answer.units
+              .filter((unit) => units.includes(unit.unitId))
+              .map((unit) =>
+                unit.unitId === 'u1'
+                  ? { ...unit, minNights: 3 }
+                  : unit.unitId === 'u2'
+                    ? {
+                        ...unit,
+                        nights: [
+                          { ...unit.nights[0], noArrival: true as const },
+                          ...unit.nights.slice(1),
+                        ],
+                      }
+                    : unit
+              ),
+          };
+        });
+
+      mistaken(['u1', 'u2']);
+      const refused = await h.snipes.execute(snipe.id);
+      expect(refused).toMatchObject({
+        next: 'continue',
+        result: { result: SnipeResult.UNAVAILABLE, held: false },
+      });
+      expect(h.fake.calls.filter((c) => c.module === 'holds')).toEqual([]);
+      expect(stored(snipe.id)).toMatchObject({ status: SnipeStatus.SNIPING, attemptsCount: 1 });
+
+      // With a third unit that meets the rules, that one is held
+      jest.restoreAllMocks();
+      h.fake.setAvailability('1', { u1: 'available', u2: 'available', u3: 'available' });
+      mistaken(['u1', 'u2', 'u3']);
+      const held = await h.snipes.execute(snipe.id);
+      expect(held.result).toMatchObject({ held: true, matchedSiteId: 'u3' });
+      expect(stored(snipe.id)).toMatchObject({ status: SnipeStatus.HELD, holdUnitId: 'u3' });
+    });
   });
 
   it('writes nothing once aborted mid-check', async () => {

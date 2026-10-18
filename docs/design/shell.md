@@ -157,23 +157,24 @@ With no `window.api` (the renderer opened in a plain browser with `npm run dev:r
 | App error | heading, buttons | WA Stay hit a problem · Reload WA Stay · Copy error details |
 | Explore page title | heading level 1 (visually hidden) | Explore places to stay |
 | Explore search | search, combobox, button | Search places · Where · Search |
-| Explore filters | group, buttons | Filters · Provider · Type · Region · Facilities · Book online · Available only · Clear all (a chip with choices: "Region, 1 selected") |
+| Explore filters | group, buttons | Filters · Provider · Stay type · Region · Facilities · Book online · Available only · Clear all (a chip with choices: "Region, 1 selected") |
 | Explore results | region, heading level 2 | Results · "169 places", or "12 places in map area" once the person has moved the map; with dates "169 places · 8 available for 6–8 Nov", or "… · checking availability…" |
 | Explore availability | button, list | Retry {shortName} availability · Map key |
 | Explore map | region, switch | Map of places · Search as I move the map |
 | Explore below 1024 px | button | Show map · Show list |
 | Place page title | heading level 1 | The place's name, or "This place isn't available" |
 | Place page | link, region, button | Explore (the back link) · Check your dates · Check availability |
-| Place hand-offs | link | Book on {shortName} (opens in your browser) · Watch for availability · Snipe a site, coming soon |
+| Place hand-offs | link | Book on {shortName} (opens in your browser) · Watch for availability · Snipe a site, coming soon (the place's own noun: "Snipe a cabin") |
 | Place gallery | button, dialog | Show all {n} photos · Photos of {name} |
 | Place results | region, table, switch | Availability · Availability by night, {dates} · Fully available only |
 | Bookings | heading level 1, button, tablist, tab | Bookings · Add booking (· Import booking, only when a provider can import) · Trips · "Upcoming, 2 trips", "Past, 1 trip", "Cancelled, 0 trips" |
 | Booking card | article, link, button, menuitem | The place's name · More actions for {place} · Remove from WA Stay |
 | Booking page | heading level 1, link, button, region | The place's name · Manage on {shortName} (opens in your browser) · About {place} · Copy reference {ref} · Stay, Unit, Guests, Cost, Reference |
 | Site Sniper | heading level 1, link, list, article | Site Sniper · New snipe · Snipes · the snipe's name |
-| Snipe card | timer, button | "Opens in 2 days 4 hours" · Arm, Disarm, Arm again or View booking · More actions for {name} (View details · Run now · Delete) |
+| Snipe card | timer, button, link | "Opens in 2 days 4 hours" · Arm, Disarm, Arm again or View booking · Book on {shortName} (opens in your browser), once it has alerted · More actions for {name} (View details · Run now · Delete) |
 | Held snipe | region, timer, button, alert | Hold at {place} · "22 minutes left to pay" · Pay now · "Site held at {place}. Pay within {n} minutes." |
-| New snipe | navigation, radiogroup, button | New snipe steps · When are the sites released? · Advanced timing · Create snipe |
+| Alerted snipe | region, heading, link, button, status | "{unit} was free" (or "Dates were free") · Book on {shortName} (opens in your browser) · Arm again · "{name}: {unit} is free. Book on {shortName}." (polite); after Arm, Arm again or Disarm, focus moves to the status line ("Status Armed") |
+| New snipe | navigation, radiogroup, button | New snipe steps · When are the sites released? (the place's own noun) · When the dates are free (Alert me, Hold it for me; with a provider that places holds) · Advanced timing · Create snipe |
 
 ## Testing
 

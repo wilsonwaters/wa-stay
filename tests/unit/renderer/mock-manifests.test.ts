@@ -1,10 +1,12 @@
 import { parkstayManifest } from '@main/providers/parkstay';
+import { racManifest } from '@main/providers/rac';
 import { ProviderManifestSchema } from '@shared/types/provider.types';
 import { ACCOUNT_REQUIRED_MANIFEST } from '@tests/fixtures/renderer/snipes';
 import {
   BROWSE_ONLY_MANIFEST,
   FAKE_MANIFEST,
   PARKSTAY_MANIFEST,
+  RAC_MANIFEST,
 } from '@tests/utils/renderer/manifests';
 
 describe('renderer test manifests', () => {
@@ -31,9 +33,14 @@ describe('renderer test manifests', () => {
     );
   });
 
+  it('give RAC exactly the manifest main registers', () => {
+    expect(RAC_MANIFEST).toEqual(racManifest);
+  });
+
   it('are all valid manifests', () => {
     for (const manifest of [
       PARKSTAY_MANIFEST,
+      RAC_MANIFEST,
       FAKE_MANIFEST,
       BROWSE_ONLY_MANIFEST,
       ACCOUNT_REQUIRED_MANIFEST,

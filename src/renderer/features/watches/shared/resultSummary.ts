@@ -1,16 +1,23 @@
 /**
  * The words for what a watch found: its last result on a card ("3 sites available") and the
- * outcome of Check now ("3 sites available at Osprey Bay"). Pure.
+ * outcome of Check now ("3 sites available at Osprey Bay"). What is free for the whole stay is
+ * counted as Explore and the alert count it (`sumFreeUnits`: RAC's sites of each category free
+ * for the whole stay, else one per unit), in Explore's word when the provider counts its units,
+ * so an RAC park reads "51 sites free" (`freeUnitsWord`). Pure.
  */
 import type { ProviderManifest } from '../../../../shared/types/provider.types';
 import { WatchResult } from '../../../../shared/types/common.types';
 import type { Watch, WatchExecutionResult, WatchMatch } from '../../../../shared/types/watch.types';
 import { eachNight } from '../../../../shared/utils/calendar-date';
-import type { UnitNoun } from '../../../components/stay/UnitPicker';
+import { freeUnitsWord, sumFreeUnits } from '../../../../shared/utils/free-units';
+import {
+  nounOfUnits,
+  unitCountLabel as count,
+  type UnitNoun,
+} from '../../../../shared/utils/unit-noun';
+import { isFullyAvailable } from '../../../components/nightGridModel';
 import { timeInZone } from '../../../components/timeFormat';
 import { unitNameOf } from './watchState';
-
-const count = (n: number, noun: UnitNoun) => `${n} ${n === 1 ? noun.one : noun.many}`;
 
 /** Nights of the stay with at least one wanted unit free in the last check. */
 function availableNights(watch: Watch): number {
@@ -29,14 +36,21 @@ function matchedNights(matches: readonly WatchMatch[]): Set<string> {
   return nights;
 }
 
-/** A card's result line. */
+/**
+ * A card's result line. `noun` is the watch's (`watchNoun`); the units found are named by their
+ * own kinds when they say them.
+ */
 export function resultSummary(watch: Watch, noun: UnitNoun): string {
   if (!watch.lastResult || !watch.lastCheckedAt) return 'Not checked yet';
   const nights = eachNight(watch.stay.arrival, watch.stay.departure).length;
   switch (watch.lastResult) {
     case WatchResult.FOUND: {
-      const full = (watch.lastAvailability ?? []).filter((u) => u.fullyAvailable).length;
-      return full > 0 ? `${count(full, noun)} available` : `${noun.many} available`;
+      // Free every night as the night grid reads it (a night refused by stay rules is not)
+      const stay = eachNight(watch.stay.arrival, watch.stay.departure);
+      const full = (watch.lastAvailability ?? []).filter((u) => isFullyAvailable(u, stay));
+      return full.length > 0
+        ? `${count(sumFreeUnits(full), nounOfUnits(full, noun))} ${freeUnitsWord(full)}`
+        : `${noun.many} available`;
     }
     case WatchResult.PARTIAL_FOUND:
       return `${availableNights(watch)} of ${nights} nights available`;
@@ -62,14 +76,21 @@ export function runResultMessage(
   if (!result.success) return result.error ?? `The check of ${place} failed. Try again soon.`;
   if (result.expired) return `The stay at ${place} has started, so the watch has stopped.`;
   if (result.hold) {
-    const unit = unitNameOf(watch, result.hold.unitId, noun);
+    // This check's own units name it (the watch is from before the check, with no units yet)
+    const held = result.hold.unitId;
+    const unit =
+      result.matches.find((match) => match.unitId === held)?.unitName ??
+      unitNameOf(watch, held, noun);
+    // A guessed expiry is "about" (R18)
+    const about = result.hold.expiresEstimated ? 'about ' : '';
     const by = manifest
-      ? ` Pay before ${timeInZone(new Date(result.hold.expiresAt), manifest.timezone)}.`
+      ? ` Pay before ${about}${timeInZone(new Date(result.hold.expiresAt), manifest.timezone)}.`
       : '';
     return `${unit} held at ${place}.${by}`;
   }
   const full = result.matches.filter((m) => !m.partial);
-  if (full.length > 0) return `${count(full.length, noun)} available at ${place}`;
+  if (full.length > 0)
+    return `${count(sumFreeUnits(full), nounOfUnits(full, noun))} ${freeUnitsWord(full)} at ${place}`;
   const partial = result.matches.filter((m) => m.partial);
   if (partial.length > 0) {
     const nights = eachNight(watch.stay.arrival, watch.stay.departure).length;

@@ -32,8 +32,10 @@ export function makeSnipe(overrides: Partial<SiteSnipe> = {}): SiteSnipe {
       concessions: 0,
     },
     unitIds: [],
+    unitKinds: [],
     stayParams: {},
     releaseMode: SnipeReleaseMode.DAILY_ROLLOVER,
+    action: 'hold',
     releaseAt: new Date(Date.now() + 26 * 3_600_000),
     accessGateEnabled: false,
     leadTimeSeconds: 120,
@@ -92,8 +94,64 @@ export const ACCOUNT_REQUIRED_MANIFEST: ProviderManifest = {
   ],
 };
 
+/**
+ * A provider whose snipes alert (snipes without holds, §12.35), as RAC's will: no account, and a
+ * daily rollover that keeps trying for at most 30 minutes (`maxWindowMinutes`) beside a
+ * scheduled release without a limit.
+ */
+export const ALERT_ONLY_MANIFEST: ProviderManifest = {
+  ...PARKSTAY_MANIFEST,
+  id: 'alertstay',
+  name: 'Alert Stay Parks',
+  shortName: 'Alert Stay',
+  description: 'Holiday parks that take no holds',
+  website: 'https://alert.example.com',
+  brand: { color: '#3A3F47', monogram: 'AS' }, // token-guard-ignore: provider brand data
+  locationKinds: ['holiday-park'],
+  capabilities: {
+    ...PARKSTAY_MANIFEST.capabilities,
+    holds: false,
+    accessGate: false,
+    account: 'none',
+  },
+  stayFields: [],
+  releaseModes: [
+    {
+      id: SnipeReleaseMode.DAILY_ROLLOVER,
+      label: 'When these dates open',
+      description: 'Dates open a year ahead, at midnight.',
+      usesAccessGate: false,
+      maxWindowMinutes: 30,
+    },
+    {
+      id: SnipeReleaseMode.SCHEDULED,
+      label: 'At a scheduled time',
+      description: 'Dates open at a time you set.',
+      usesAccessGate: false,
+    },
+  ],
+};
+
+/** An ALERTED snipe: CAMPSITE 03 was free, with ParkStay's booking page for the stay. */
+export function makeAlertedSnipe(overrides: Partial<SiteSnipe> = {}): SiteSnipe {
+  return makeSnipe({
+    action: 'alert',
+    status: SnipeStatus.ALERTED,
+    isActive: false,
+    attemptsCount: 2,
+    alert: {
+      at: new Date(Date.now() - 5 * 60_000),
+      unitId: '3',
+      unitName: 'CAMPSITE 03',
+      bookingUrl:
+        'https://parkstay.dbca.wa.gov.au/search-availability/information/?campground_id=20&arrival=2099/12/11&departure=2099/12/13',
+    },
+    ...overrides,
+  });
+}
+
 /** The answer of `catalog.checkLocation` with this release, for the Release step's preview. */
-export function checkLocationWith(release: { open: boolean; opensAt?: string }) {
+export function checkLocationWith(release: { open: boolean; opensAt?: string; refused?: string }) {
   return jest.fn().mockResolvedValue({
     success: true,
     data: { key: 'parkstay:20', checkedAt: new Date().toISOString(), units: [], release },

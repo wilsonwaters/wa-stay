@@ -1,7 +1,8 @@
-import { screen, waitFor } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
 import type { SiteSnipeInput } from '../../../../shared/types/site-sniper.types';
 import {
   ACCOUNT_REQUIRED_MANIFEST,
+  ALERT_ONLY_MANIFEST,
   SNIPE_PREFILL as PREFILL,
   snipeFlowApi as api,
 } from '@tests/fixtures/renderer/snipes';
@@ -10,6 +11,7 @@ import { createMockApi, fail, ok } from '@tests/utils/renderer/createMockApi';
 import { currentRoute, renderWithApp } from '@tests/utils/renderer/renderWithApp';
 
 const FAKE_PLACE = makeLocationDetail({ key: 'fakestay:20', providerId: 'fakestay' });
+const ALERT_PLACE = makeLocationDetail({ key: 'alertstay:20', providerId: 'alertstay' });
 const button = (name: string) => screen.getByRole('button', { name });
 const sent = (mock: jest.Mock): SiteSnipeInput => mock.mock.calls[0][0];
 const step = (name: RegExp) => screen.findByRole('heading', { level: 2, name });
@@ -36,6 +38,8 @@ describe('NewSnipePage: creating the snipe', () => {
       stay: { arrival: '2099-12-11', departure: '2099-12-13', adults: 2 },
       stayParams: { gearType: 'all', numVehicles: 1 },
       releaseMode: 'daily_rollover',
+      // ParkStay holds by default (RS9)
+      action: 'hold',
       accessGateEnabled: true,
       leadTimeSeconds: 120,
       pollIntervalMs: 1500,
@@ -43,6 +47,46 @@ describe('NewSnipePage: creating the snipe', () => {
       maxAttempts: 0,
     });
     await waitFor(() => expect(currentRoute()).toBe('/site-sniper/42'));
+  });
+
+  it('"Alert me" sends action alert, and the Review says so without the hold’s words', async () => {
+    const mock = api();
+    const { user } = renderWithApp({ route: PREFILL, api: mock });
+    await step(/Your stay$/);
+    await user.click(button('Continue'));
+    await step(/Release and timing$/);
+    await user.click(screen.getByRole('radio', { name: 'Alert me' }));
+    await user.click(button('Continue'));
+    await step(/Review$/);
+    const release = screen.getByRole('region', { name: 'Release' });
+    expect(within(release).getByText('When the dates are free')).toBeInTheDocument();
+    expect(within(release).getByText('Alert me')).toBeInTheDocument();
+    expect(
+      screen.getByText('Book only what you will use. You book and pay for it on ParkStay.')
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/Hold only what you will use/)).toBeNull();
+    await user.click(button('Create snipe'));
+
+    await waitFor(() => expect(mock.snipes.create).toHaveBeenCalledTimes(1));
+    expect(sent(mock.snipes.create)).toMatchObject({ providerId: 'parkstay', action: 'alert' });
+  });
+
+  it('a provider without holds alerts: its snipe sends action alert', async () => {
+    const mock = api({}, [ALERT_ONLY_MANIFEST], ALERT_PLACE);
+    const { user } = renderWithApp({
+      route:
+        '/site-sniper/new?provider=alertstay&location=20&arrival=2099-12-11&departure=2099-12-13',
+      api: mock,
+    });
+    await step(/Your stay$/);
+    for (const name of ['Continue', 'Continue']) await user.click(button(name));
+    await step(/Review$/);
+    expect(
+      within(screen.getByRole('region', { name: 'Release' })).getByText('Alert me')
+    ).toBeInTheDocument();
+    await user.click(button('Create snipe'));
+    await waitFor(() => expect(mock.snipes.create).toHaveBeenCalledTimes(1));
+    expect(sent(mock.snipes.create)).toMatchObject({ providerId: 'alertstay', action: 'alert' });
   });
 
   it('sends a scheduled release as the instant it is where the place is, and timing in ms', async () => {

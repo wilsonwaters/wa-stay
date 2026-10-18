@@ -1,0 +1,33 @@
+Source: https://parksandresorts.rac.com.au/busselton/booking/ (GET, no params; fetched 2026-10-16 ~23:39 AWST)
+
+newbook_api_path='https://parksandresorts.rac.com.au/busselton/wp-content/themes/parks-and-resorts/inc/newbook/api/rac-busselton-holiday-park.php?'
+cc_data_path='https://apiau.newbook.cloud/cc_secure/1230'
+newbook_image_host='https://driveau.newbook.cloud/'
+var options = {"autoApply":true,"locale":{"format":"D MMM YYYY","separator":"                                                                      ","firstDay":1},"opens":"right","minDate":"17 Oct 2026","startDate":"17 Oct 2026","endDate":"20 Oct 2026","minSpan":1,"autoUpdateInput":false,"maxDate":"15 Oct 2027","minSpanTitle":"1 Night minimum"};
+var process_layout_url='cart'
+var page_action = 'cart'
+var availability_layout_url = 'availability_chart_responsive'
+var cc_gateway = true
+var gateway_redirect_payment = false
+var online_bookings_preauth_only = false
+var cart_breakdown = {"Online\\Step\\Booking":{"label":"Booking","amount":0,"deposit":0,"deposit_date":"17 Oct 2026","deposit_due_today":false,"totalBookingNights":0,"allow_popup":true}};
+var newbook_online_auto_login_popup=false
+href="https://parksandresorts.rac.com.au/busselton/booking/?login"
+
+Main form (hidden fields):
+<form id="newbook_online_main_form" action="https://parksandresorts.rac.com.au/busselton/booking/?cart=Booking" method="post">
+<input type='hidden' id='REMOTE_ADDR' name='REMOTE_ADDR' value='<redacted client IP>' />
+<input type='hidden' id='force_booking_channel_id' name='force_booking_channel_id' value='' />
+<input type='hidden' id='HTTP_REFERER' name='HTTP_REFERER' value='parksandresorts.rac.com.au/busselton/booking/' />
+<input type='hidden' id='newbook_api_action' name='newbook_api_action' value='cart' />
+<input type='hidden' id='discount_total_display' name='discount_total_display' value='0' />
+<input type='hidden' id='force_category_id' name='force_category_id[]' value='uK0ip@c7ty%8bQ#2i' />
+<input type='hidden' id='force_category_type_id' name='force_category_type_id[]' value='uK0ip@c7ty%8bQ#2i' />
+<input type='hidden' id='no_billing_booking' name='no_billing_booking' value='0' />
+<input type='hidden' id='force_tariff_type_id' name='force_tariff_type_id[]' value='uK0ip@c7ty%8bQ#2i' />
+<input type='hidden' id='discount_id' name='discount_id' value='null' />
+<input type='hidden' id='facebook_user_id' name='facebook_user_id' value='' />
+<input type='hidden' id='category_type_id' name='category_type_id' value='' />
+<input type='hidden' id='owner_occupied_booking_id' name='owner_occupied_booking_id' value='' />
+<input type='hidden' id='discount_code' name='discount_code' value='' />
+<input type='hidden' id='booking_action' name='booking_action' value='' />

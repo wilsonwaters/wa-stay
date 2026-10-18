@@ -125,6 +125,43 @@ describe('IPC contract', () => {
     }
   });
 
+  it('bounds a credentials save generously; the account service checks the real rules', () => {
+    // Made-up values only
+    const save = contract.accounts.saveCredentials.request;
+    const ok = (values: Record<string, unknown>, confirmed: unknown[] = ['own']) =>
+      save.safeParse({ providerId: 'rac', values, confirmed }).success;
+    const many = (count: number) =>
+      Object.fromEntries(Array.from({ length: count }, (_, i) => [`field${i}`, '1']));
+
+    expect(ok({ memberNumber: '1234567890123' })).toBe(true);
+    // Up to 1024 characters passes here (the service refuses over 256); 1025 does not
+    expect(ok({ memberNumber: '1'.repeat(1024) })).toBe(true);
+    expect(ok({ memberNumber: '1'.repeat(1025) })).toBe(false);
+    // Keys: 64 characters at most, alphanumeric
+    expect(ok({ [`k${'e'.repeat(63)}`]: '1' })).toBe(true);
+    expect(ok({ [`k${'e'.repeat(64)}`]: '1' })).toBe(false);
+    expect(ok({ 'member-number': '1' })).toBe(false);
+    expect(ok({ memberNumber: 1234567890123 })).toBe(false);
+    expect(ok(many(16))).toBe(true);
+    expect(ok(many(17))).toBe(false);
+    expect(
+      ok(
+        { memberNumber: '1' },
+        Array.from({ length: 16 }, (_, i) => `s${i}`)
+      )
+    ).toBe(true);
+    expect(
+      ok(
+        { memberNumber: '1' },
+        Array.from({ length: 17 }, (_, i) => `s${i}`)
+      )
+    ).toBe(false);
+
+    const copy = contract.accounts.copyCredential.request;
+    expect(copy.safeParse({ providerId: 'rac', key: 'memberNumber' }).success).toBe(true);
+    expect(copy.safeParse({ providerId: 'rac', key: `k${'e'.repeat(64)}` }).success).toBe(false);
+  });
+
   it('has no request schema with a key named userId', () => {
     const offenders: string[] = [];
     let keysSeen = 0;
@@ -163,7 +200,39 @@ describe('IPC contract', () => {
     expect(Object.keys(contract)).not.toContain('auth');
     expect(Object.keys(CHANNELS)).not.toContain('auth');
     expect(Object.keys(contract.accounts).sort()).toEqual(
-      ['list', 'openSignInLink', 'signIn', 'signOut', 'status'].sort()
+      [
+        'list',
+        'openSignInLink',
+        'signIn',
+        'signOut',
+        'status',
+        'saveCredentials',
+        'copyCredential',
+      ].sort()
+    );
+  });
+
+  it('providers: experiments and setExperiment (R17) take a provider, an experiment id and a boolean', () => {
+    expect(Object.keys(contract.providers).sort()).toEqual(
+      ['accessStatus', 'experiments', 'list', 'setExperiment'].sort()
+    );
+    expect(contract.providers.experiments.channel).toBe('providers:experiments');
+    expect(contract.providers.setExperiment.channel).toBe('providers:set-experiment');
+    const set = contract.providers.setExperiment.request;
+    expect(
+      set.safeParse({ providerId: 'rac', experimentId: 'autoCart', enabled: true }).success
+    ).toBe(true);
+    for (const bad of [
+      { providerId: 'rac', experimentId: 'autoCart' },
+      { providerId: 'rac', experimentId: 'auto-cart', enabled: false },
+      { providerId: 'rac', experimentId: 'AutoCart', enabled: false },
+      { providerId: 'RAC', experimentId: 'autoCart', enabled: false },
+      { providerId: 'rac', experimentId: 'autoCart', enabled: 1 },
+    ]) {
+      expect(set.safeParse(bad).success).toBe(false);
+    }
+    expect(contract.providers.experiments.request.safeParse({ providerId: 'rac' }).success).toBe(
+      true
     );
   });
 
@@ -173,6 +242,16 @@ describe('IPC contract', () => {
     for (const method of [contract.snipes.openPayment, contract.watches.openPayment]) {
       expect(method.request.safeParse({ id: 4 }).success).toBe(true);
       expect(method.request.safeParse({ id: 'x' }).success).toBe(false);
+    }
+  });
+
+  it('lets holds go: snipes.releaseHold and watches.releaseHold take an id (R18)', () => {
+    expect(contract.snipes.releaseHold.channel).toBe('snipes:release-hold');
+    expect(contract.watches.releaseHold.channel).toBe('watches:release-hold');
+    for (const method of [contract.snipes.releaseHold, contract.watches.releaseHold]) {
+      expect(method.request.safeParse({ id: 4 }).success).toBe(true);
+      expect(method.request.safeParse({ id: 'x' }).success).toBe(false);
+      expect(method.request.safeParse({}).success).toBe(false);
     }
   });
 

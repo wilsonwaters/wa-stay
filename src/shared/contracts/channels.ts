@@ -25,6 +25,7 @@ export const CHANNELS = {
     deactivate: 'watches:deactivate',
     runNow: 'watches:run-now',
     openPayment: 'watches:open-payment',
+    releaseHold: 'watches:release-hold',
   },
   snipes: {
     list: 'snipes:list',
@@ -36,6 +37,7 @@ export const CHANNELS = {
     deactivate: 'snipes:deactivate',
     runNow: 'snipes:run-now',
     openPayment: 'snipes:open-payment',
+    releaseHold: 'snipes:release-hold',
   },
   notifications: {
     list: 'notifications:list',
@@ -73,6 +75,8 @@ export const CHANNELS = {
   providers: {
     list: 'providers:list',
     accessStatus: 'providers:access-status',
+    experiments: 'providers:experiments',
+    setExperiment: 'providers:set-experiment',
   },
   catalog: {
     search: 'catalog:search',
@@ -89,6 +93,8 @@ export const CHANNELS = {
     signIn: 'accounts:sign-in',
     signOut: 'accounts:sign-out',
     openSignInLink: 'accounts:open-sign-in-link',
+    saveCredentials: 'accounts:save-credentials',
+    copyCredential: 'accounts:copy-credential',
   },
 } as const;
 

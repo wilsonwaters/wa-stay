@@ -107,7 +107,7 @@ export function EmailNotifierCard() {
     <Card padding="lg" className="flex flex-col gap-5">
       <Switch
         label="Email notifications"
-        description="Alerts by email when a watch finds a site or a site is held."
+        description="Alerts by email when a place frees up for your dates or a stay is held for you."
         checked={setUp ? view.enabled : Boolean(editing)}
         disabled={setEnabled.isPending}
         onChange={(event) => toggle(event.target.checked)}

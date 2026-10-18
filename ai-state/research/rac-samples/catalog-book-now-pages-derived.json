@@ -1,0 +1,1374 @@
+{
+ "busselton": {
+  "blogId": 6,
+  "name": "RAC Busselton Holiday Park",
+  "region": "South West, Western Australia",
+  "types": [
+   [
+    "Cabins",
+    "5"
+   ],
+   [
+    "Sites",
+    "2"
+   ]
+  ],
+  "features": [
+   [
+    "Bathroom",
+    "4"
+   ],
+   [
+    "Wheelchair_accessible",
+    ""
+   ]
+  ],
+  "equipmentTypes": [
+   [
+    "2",
+    "Caravan Without Awning"
+   ],
+   [
+    "1",
+    "Caravan with Awning"
+   ],
+   [
+    "15",
+    "Caravan with Slideout"
+   ],
+   [
+    "3",
+    "Campervan"
+   ],
+   [
+    "10",
+    "Motorhome"
+   ],
+   [
+    "12",
+    "Rooftop Tent"
+   ],
+   [
+    "4",
+    "Camper Trailer 2 berth (Small)"
+   ],
+   [
+    "5",
+    "Camper Trailer 4 berth (Medium)"
+   ],
+   [
+    "6",
+    "Camper Trailer 6+ berth (Large)"
+   ],
+   [
+    "13",
+    "Car and Single Room Tent (Small)"
+   ],
+   [
+    "7",
+    "Car and Multiroom Tent (large)"
+   ],
+   [
+    "11",
+    "Car & Swag (with trailer)"
+   ],
+   [
+    "14",
+    "Car & Swag (NO trailer)"
+   ],
+   [
+    "8",
+    "5th Wheeler"
+   ],
+   [
+    "9",
+    "Bus"
+   ]
+  ],
+  "categories": [
+   {
+    "postId": 754,
+    "title": "Two Bedroom Cabin (Sleeps 4)",
+    "catId": "9",
+    "catTypeId": "5",
+    "maxGuests": "4",
+    "bedrooms": "2",
+    "bathrooms": "1",
+    "maxAnimals": "0",
+    "accessible": "false",
+    "allowedEquipment": "false",
+    "active": "true"
+   },
+   {
+    "postId": 755,
+    "title": "Two Bedroom Queen Cabin (Sleeps 4)",
+    "catId": "10",
+    "catTypeId": "5",
+    "maxGuests": "4",
+    "bedrooms": "2",
+    "bathrooms": "1",
+    "maxAnimals": "0",
+    "accessible": "false",
+    "allowedEquipment": "false",
+    "active": "true"
+   },
+   {
+    "postId": 756,
+    "title": "Two Bedroom Cabin (Sleeps 5)",
+    "catId": "11",
+    "catTypeId": "5",
+    "maxGuests": "5",
+    "bedrooms": "2",
+    "bathrooms": "1",
+    "maxAnimals": "0",
+    "accessible": "false",
+    "allowedEquipment": "false",
+    "active": "true"
+   },
+   {
+    "postId": 757,
+    "title": "Two Bedroom Cabin (Sleeps 6)",
+    "catId": "18",
+    "catTypeId": "5",
+    "maxGuests": "6",
+    "bedrooms": "2",
+    "bathrooms": "1",
+    "maxAnimals": "0",
+    "accessible": "false",
+    "allowedEquipment": "false",
+    "active": "true"
+   },
+   {
+    "postId": 759,
+    "title": "One Bedroom Cabin (Sleeps 2)",
+    "catId": "12",
+    "catTypeId": "5",
+    "maxGuests": "2",
+    "bedrooms": "1",
+    "bathrooms": "1",
+    "maxAnimals": "0",
+    "accessible": "false",
+    "allowedEquipment": "false",
+    "active": "true"
+   },
+   {
+    "postId": 760,
+    "title": "One Bedroom Cabin (Sleeps 4)",
+    "catId": "8",
+    "catTypeId": "5",
+    "maxGuests": "4",
+    "bedrooms": "1",
+    "bathrooms": "1",
+    "maxAnimals": "0",
+    "accessible": "false",
+    "allowedEquipment": "false",
+    "active": "true"
+   },
+   {
+    "postId": 762,
+    "title": "Studio Room",
+    "catId": "3",
+    "catTypeId": "5",
+    "maxGuests": "3",
+    "bedrooms": "1",
+    "bathrooms": "1",
+    "maxAnimals": "0",
+    "accessible": "false",
+    "allowedEquipment": "false",
+    "active": "true"
+   },
+   {
+    "postId": 763,
+    "title": "Ensuite Site",
+    "catId": "7",
+    "catTypeId": "2",
+    "maxGuests": "6",
+    "bedrooms": "0",
+    "bathrooms": "1",
+    "maxAnimals": "2",
+    "accessible": "false",
+    "allowedEquipment": "2,1,15,12,6,5,4,10,3,14,11,13,7",
+    "active": "true"
+   },
+   {
+    "postId": 764,
+    "title": "Powered Big Rig Site",
+    "catId": "20",
+    "catTypeId": "2",
+    "maxGuests": "6",
+    "bedrooms": "0",
+    "bathrooms": "false",
+    "maxAnimals": "2",
+    "accessible": "false",
+    "allowedEquipment": "2,1,15,12,6,5,4,10,3,7,9,8",
+    "active": "true"
+   },
+   {
+    "postId": 765,
+    "title": "Powered Site",
+    "catId": "4",
+    "catTypeId": "2",
+    "maxGuests": "6",
+    "bedrooms": "0",
+    "bathrooms": "false",
+    "maxAnimals": "2",
+    "accessible": "false",
+    "allowedEquipment": "2,1,15,12,6,5,4,10,3,14,11,13,7,9",
+    "active": "true"
+   },
+   {
+    "postId": 767,
+    "title": "Unpowered Site",
+    "catId": "5",
+    "catTypeId": "2",
+    "maxGuests": "6",
+    "bedrooms": "0",
+    "bathrooms": "false",
+    "maxAnimals": "0",
+    "accessible": "false",
+    "allowedEquipment": "12,10,3,14,11,13,7",
+    "active": "true"
+   }
+  ],
+  "detailLinks": [
+   "https://parksandresorts.rac.com.au/busselton/accommodation/2-bedroom-standard/",
+   "https://parksandresorts.rac.com.au/busselton/accommodation/2-bedroom-standard-queen/",
+   "https://parksandresorts.rac.com.au/busselton/accommodation/2-bedroom-family-5-person/"
+  ],
+  "notices": [
+   [
+    "20270702",
+    "20270717"
+   ],
+   [
+    "20270409",
+    "20270425"
+   ],
+   [
+    "20270326",
+    "20270328"
+   ],
+   [
+    "20261219",
+    "20270131"
+   ],
+   [
+    "20261121",
+    "20261128"
+   ],
+   [
+    "20260925",
+    "20261010"
+   ],
+   [
+    "20270924",
+    "20271009"
+   ]
+  ],
+  "newbookApi": []
+ },
+ "cable-beach": {
+  "blogId": 9,
+  "name": "RAC Cable Beach Holiday Park",
+  "region": "North West, Western Australia",
+  "types": [
+   [
+    "Powered Sites",
+    "4"
+   ]
+  ],
+  "features": [
+   [
+    "Air-conditioned accommodation",
+    "1"
+   ],
+   [
+    "Ensuite Bathroom",
+    "4"
+   ],
+   [
+    "Pet-friendly sites",
+    "26"
+   ],
+   [
+    "Self_catering_accommodaiton",
+    ""
+   ]
+  ],
+  "equipmentTypes": [
+   [
+    "2",
+    "Caravan Without Awning"
+   ],
+   [
+    "1",
+    "Caravan with Awning"
+   ],
+   [
+    "15",
+    "Caravan with Slideout"
+   ],
+   [
+    "3",
+    "Campervan"
+   ],
+   [
+    "10",
+    "Motorhome"
+   ],
+   [
+    "12",
+    "Rooftop Tent"
+   ],
+   [
+    "4",
+    "Camper Trailer 2 berth (Small)"
+   ],
+   [
+    "5",
+    "Camper Trailer 4 berth (Medium)"
+   ],
+   [
+    "6",
+    "Camper Trailer 6+ berth (Large)"
+   ],
+   [
+    "13",
+    "Car and Single Room Tent (Small)"
+   ],
+   [
+    "7",
+    "Car and Multiroom Tent (large)"
+   ],
+   [
+    "11",
+    "Car & Swag (with trailer)"
+   ],
+   [
+    "14",
+    "Car & Swag (NO trailer)"
+   ],
+   [
+    "8",
+    "5th Wheeler"
+   ],
+   [
+    "9",
+    "Bus"
+   ]
+  ],
+  "categories": [
+   {
+    "postId": 1100,
+    "title": "Two Bedroom Palm Cabin (Sleeps 4)",
+    "catId": "43",
+    "catTypeId": "2",
+    "maxGuests": "4",
+    "bedrooms": "0",
+    "bathrooms": "false",
+    "maxAnimals": "0",
+    "accessible": "false",
+    "allowedEquipment": "false",
+    "active": "true"
+   },
+   {
+    "postId": 755,
+    "title": "Two Bedroom Garden Cabin (Sleeps 4)",
+    "catId": "21",
+    "catTypeId": "2",
+    "maxGuests": "4",
+    "bedrooms": "0",
+    "bathrooms": "1",
+    "maxAnimals": "0",
+    "accessible": "false",
+    "allowedEquipment": "false",
+    "active": "true"
+   },
+   {
+    "postId": 754,
+    "title": "Two Bedroom Garden Cabin (Sleeps 5)",
+    "catId": "20",
+    "catTypeId": "2",
+    "maxGuests": "5",
+    "bedrooms": "0",
+    "bathrooms": "1",
+    "maxAnimals": "0",
+    "accessible": "false",
+    "allowedEquipment": "false",
+    "active": "true"
+   },
+   {
+    "postId": 756,
+    "title": "Studio Room",
+    "catId": "19",
+    "catTypeId": "2",
+    "maxGuests": "2",
+    "bedrooms": "0",
+    "bathrooms": "1",
+    "maxAnimals": "0",
+    "accessible": "false",
+    "allowedEquipment": "false",
+    "active": "true"
+   },
+   {
+    "postId": 757,
+    "title": "Powered Caravan Site",
+    "catId": "2",
+    "catTypeId": "4",
+    "maxGuests": "6",
+    "bedrooms": "0",
+    "bathrooms": "false",
+    "maxAnimals": "0",
+    "accessible": "false",
+    "allowedEquipment": "2,1,15,12,6,5,4,10,3,14,11,13,7",
+    "active": "true"
+   },
+   {
+    "postId": 758,
+    "title": "Pet Friendly Powered Site",
+    "catId": "40",
+    "catTypeId": "4",
+    "maxGuests": "6",
+    "bedrooms": "0",
+    "bathrooms": "false",
+    "maxAnimals": "2",
+    "accessible": "false",
+    "allowedEquipment": "2,1,15,12,6,5,4,10,3,14,11,13,7,9,8",
+    "active": "true"
+   }
+  ],
+  "detailLinks": [
+   "https://parksandresorts.rac.com.au/cable-beach/accommodation/two-bedroom-palm-cabin-sleeps-4/",
+   "https://parksandresorts.rac.com.au/cable-beach/accommodation/2-bedroom-sleeps-4/",
+   "https://parksandresorts.rac.com.au/cable-beach/accommodation/2-bedroom-sleeps-5/"
+  ],
+  "notices": [
+   [
+    "20260519",
+    "20260725"
+   ],
+   [
+    "20260409",
+    "20260527"
+   ],
+   [
+    "20270601",
+    "20270831"
+   ],
+   [
+    "20270515",
+    "20271015"
+   ],
+   [
+    "20260601",
+    "20260831"
+   ]
+  ],
+  "newbookApi": []
+ },
+ "cervantes": {
+  "blogId": 5,
+  "name": "RAC Cervantes Holiday Park",
+  "region": "Coral Coast, Western Australia",
+  "types": [
+   [
+    "Cabins",
+    "1"
+   ],
+   [
+    "Sites",
+    "2"
+   ]
+  ],
+  "features": [
+   [
+    "Air-conditioning",
+    "5"
+   ],
+   [
+    "Pet-friendly",
+    "14"
+   ],
+   [
+    "Wheelchair_friendly",
+    ""
+   ]
+  ],
+  "equipmentTypes": [
+   [
+    "2",
+    "Caravan Without Awning"
+   ],
+   [
+    "1",
+    "Caravan with Awning"
+   ],
+   [
+    "15",
+    "Caravan with Slideout"
+   ],
+   [
+    "3",
+    "Campervan"
+   ],
+   [
+    "10",
+    "Motorhome"
+   ],
+   [
+    "12",
+    "Rooftop Tent"
+   ],
+   [
+    "4",
+    "Camper Trailer 2 berth (Small)"
+   ],
+   [
+    "5",
+    "Camper Trailer 4 berth (Medium)"
+   ],
+   [
+    "6",
+    "Camper Trailer 6+ berth (Large)"
+   ],
+   [
+    "13",
+    "Car and Single Room Tent (Small)"
+   ],
+   [
+    "7",
+    "Car and Multiroom Tent (large)"
+   ],
+   [
+    "11",
+    "Car & Swag (with trailer)"
+   ],
+   [
+    "14",
+    "Car & Swag (NO trailer)"
+   ],
+   [
+    "8",
+    "5th Wheeler"
+   ],
+   [
+    "9",
+    "Bus"
+   ]
+  ],
+  "categories": [
+   {
+    "postId": 824,
+    "title": "Three Bedroom Villa",
+    "catId": "19",
+    "catTypeId": "1",
+    "maxGuests": "8",
+    "bedrooms": "0",
+    "bathrooms": "1",
+    "maxAnimals": "0",
+    "accessible": "false",
+    "allowedEquipment": "false",
+    "active": "true"
+   },
+   {
+    "postId": 825,
+    "title": "Two Bedroom Villa",
+    "catId": "20",
+    "catTypeId": "1",
+    "maxGuests": "6",
+    "bedrooms": "0",
+    "bathrooms": "1",
+    "maxAnimals": "0",
+    "accessible": "false",
+    "allowedEquipment": "false",
+    "active": "true"
+   },
+   {
+    "postId": 826,
+    "title": "Two Bedroom Villa - Accessible",
+    "catId": "21",
+    "catTypeId": "1",
+    "maxGuests": "6",
+    "bedrooms": "0",
+    "bathrooms": "1",
+    "maxAnimals": "0",
+    "accessible": "false",
+    "allowedEquipment": "false",
+    "active": "true"
+   },
+   {
+    "postId": 1043,
+    "title": "One Bedroom Studio",
+    "catId": "31",
+    "catTypeId": "1",
+    "maxGuests": "2",
+    "bedrooms": "0",
+    "bathrooms": "1",
+    "maxAnimals": "0",
+    "accessible": "false",
+    "allowedEquipment": "false",
+    "active": "true"
+   },
+   {
+    "postId": 827,
+    "title": "Powered Firm Ground Site",
+    "catId": "1",
+    "catTypeId": "2",
+    "maxGuests": "6",
+    "bedrooms": "0",
+    "bathrooms": "false",
+    "maxAnimals": "2",
+    "accessible": "false",
+    "allowedEquipment": "false",
+    "active": "true"
+   },
+   {
+    "postId": 831,
+    "title": "Powered Campervan Site",
+    "catId": "25",
+    "catTypeId": "2",
+    "maxGuests": "6",
+    "bedrooms": "0",
+    "bathrooms": "false",
+    "maxAnimals": "2",
+    "accessible": "false",
+    "allowedEquipment": "3,10,12,4",
+    "active": "true"
+   },
+   {
+    "postId": 832,
+    "title": "Powered Tent Site",
+    "catId": "3",
+    "catTypeId": "2",
+    "maxGuests": "6",
+    "bedrooms": "0",
+    "bathrooms": "false",
+    "maxAnimals": "2",
+    "accessible": "false",
+    "allowedEquipment": "13,7,11,14,12,3",
+    "active": "true"
+   },
+   {
+    "postId": 908,
+    "title": "Unpowered Van Site",
+    "catId": "30",
+    "catTypeId": "2",
+    "maxGuests": "6",
+    "bedrooms": "0",
+    "bathrooms": "false",
+    "maxAnimals": "2",
+    "accessible": "false",
+    "allowedEquipment": "false",
+    "active": "true"
+   },
+   {
+    "postId": 833,
+    "title": "Unpowered Camping Site",
+    "catId": "2",
+    "catTypeId": "2",
+    "maxGuests": "6",
+    "bedrooms": "0",
+    "bathrooms": "false",
+    "maxAnimals": "2",
+    "accessible": "false",
+    "allowedEquipment": "13,7,11,14,12,3",
+    "active": "true"
+   }
+  ],
+  "detailLinks": [
+   "https://parksandresorts.rac.com.au/cervantes/accommodation/3-bedroom-villa/",
+   "https://parksandresorts.rac.com.au/cervantes/accommodation/2-bedroom-villa/",
+   "https://parksandresorts.rac.com.au/cervantes/accommodation/2-bedroom-villa-accessible/"
+  ],
+  "notices": [
+   [
+    "20270702",
+    "20270717"
+   ],
+   [
+    "20270409",
+    "20270425"
+   ],
+   [
+    "20270326",
+    "20270328"
+   ],
+   [
+    "20261219",
+    "20270131"
+   ],
+   [
+    "20260925",
+    "20261010"
+   ],
+   [
+    "20270924",
+    "20271009"
+   ]
+  ],
+  "newbookApi": []
+ },
+ "esperance": {
+  "blogId": 10,
+  "name": "RAC Esperance Holiday Park",
+  "region": "South East Coast, Western Australia",
+  "types": [
+   [
+    "Cabins",
+    "5"
+   ],
+   [
+    "Sites",
+    "2"
+   ]
+  ],
+  "features": [
+   [
+    "Air-conditioning",
+    "1"
+   ],
+   [
+    "Bathroom",
+    "4"
+   ],
+   [
+    "King_Bed",
+    ""
+   ],
+   [
+    "Kitchen",
+    "17"
+   ],
+   [
+    "Ocean views",
+    "47"
+   ],
+   [
+    "Pet-friendly",
+    "26"
+   ],
+   [
+    "Wheelchair accessible",
+    "34"
+   ]
+  ],
+  "equipmentTypes": [
+   [
+    "2",
+    "Caravan Without Awning"
+   ],
+   [
+    "1",
+    "Caravan with Awning"
+   ],
+   [
+    "15",
+    "Caravan with Slideout"
+   ],
+   [
+    "3",
+    "Campervan"
+   ],
+   [
+    "10",
+    "Motorhome"
+   ],
+   [
+    "12",
+    "Rooftop Tent"
+   ],
+   [
+    "4",
+    "Camper Trailer 2 berth (Small)"
+   ],
+   [
+    "5",
+    "Camper Trailer 4 berth (Medium)"
+   ],
+   [
+    "6",
+    "Camper Trailer 6+ berth (Large)"
+   ],
+   [
+    "13",
+    "Car and Single Room Tent (Small)"
+   ],
+   [
+    "7",
+    "Car and Multiroom Tent (large)"
+   ],
+   [
+    "11",
+    "Car & Swag (with trailer)"
+   ],
+   [
+    "14",
+    "Car & Swag (NO trailer)"
+   ],
+   [
+    "8",
+    "5th Wheeler"
+   ],
+   [
+    "9",
+    "Bus"
+   ]
+  ],
+  "categories": [
+   {
+    "postId": 982,
+    "title": "The Azure Lodge",
+    "catId": "37",
+    "catTypeId": "5",
+    "maxGuests": "8",
+    "bedrooms": "0",
+    "bathrooms": "4",
+    "maxAnimals": "0",
+    "accessible": "false",
+    "allowedEquipment": "false",
+    "active": "true"
+   },
+   {
+    "postId": 784,
+    "title": "Three Bedroom Bay Villa",
+    "catId": "11",
+    "catTypeId": "5",
+    "maxGuests": "7",
+    "bedrooms": "0",
+    "bathrooms": "1",
+    "maxAnimals": "0",
+    "accessible": "false",
+    "allowedEquipment": "false",
+    "active": "true"
+   },
+   {
+    "postId": 984,
+    "title": "Three Bedroom Pool Villa",
+    "catId": "32",
+    "catTypeId": "5",
+    "maxGuests": "7",
+    "bedrooms": "0",
+    "bathrooms": "1",
+    "maxAnimals": "0",
+    "accessible": "false",
+    "allowedEquipment": "false",
+    "active": "true"
+   },
+   {
+    "postId": 983,
+    "title": "Three Bedroom Garden Villa",
+    "catId": "35",
+    "catTypeId": "5",
+    "maxGuests": "7",
+    "bedrooms": "0",
+    "bathrooms": "1",
+    "maxAnimals": "0",
+    "accessible": "false",
+    "allowedEquipment": "false",
+    "active": "true"
+   },
+   {
+    "postId": 782,
+    "title": "Two Bedroom Bay Villa",
+    "catId": "23",
+    "catTypeId": "5",
+    "maxGuests": "5",
+    "bedrooms": "0",
+    "bathrooms": "1",
+    "maxAnimals": "0",
+    "accessible": "false",
+    "allowedEquipment": "false",
+    "active": "true"
+   },
+   {
+    "postId": 985,
+    "title": "Two Bedroom Pool Villa",
+    "catId": "33",
+    "catTypeId": "5",
+    "maxGuests": "5",
+    "bedrooms": "0",
+    "bathrooms": "1",
+    "maxAnimals": "0",
+    "accessible": "false",
+    "allowedEquipment": "false",
+    "active": "true"
+   },
+   {
+    "postId": 783,
+    "title": "Accessible Two Bedroom Pool Villa",
+    "catId": "24",
+    "catTypeId": "5",
+    "maxGuests": "5",
+    "bedrooms": "0",
+    "bathrooms": "1",
+    "maxAnimals": "0",
+    "accessible": "false",
+    "allowedEquipment": "false",
+    "active": "true"
+   },
+   {
+    "postId": 978,
+    "title": "Accessible One Bedroom Garden Villa",
+    "catId": "34",
+    "catTypeId": "5",
+    "maxGuests": "2",
+    "bedrooms": "0",
+    "bathrooms": "1",
+    "maxAnimals": "0",
+    "accessible": "false",
+    "allowedEquipment": "false",
+    "active": "true"
+   },
+   {
+    "postId": 781,
+    "title": "One Bedroom Bay Studio",
+    "catId": "26",
+    "catTypeId": "5",
+    "maxGuests": "2",
+    "bedrooms": "0",
+    "bathrooms": "1",
+    "maxAnimals": "0",
+    "accessible": "false",
+    "allowedEquipment": "false",
+    "active": "true"
+   },
+   {
+    "postId": 979,
+    "title": "One Bedroom Garden Studio",
+    "catId": "36",
+    "catTypeId": "5",
+    "maxGuests": "2",
+    "bedrooms": "0",
+    "bathrooms": "1",
+    "maxAnimals": "0",
+    "accessible": "false",
+    "allowedEquipment": "false",
+    "active": "true"
+   },
+   {
+    "postId": 780,
+    "title": "One Bedroom Studio",
+    "catId": "25",
+    "catTypeId": "5",
+    "maxGuests": "2",
+    "bedrooms": "0",
+    "bathrooms": "1",
+    "maxAnimals": "0",
+    "accessible": "false",
+    "allowedEquipment": "false",
+    "active": "true"
+   },
+   {
+    "postId": 785,
+    "title": "Two Bedroom Pet Friendly Park Cabin",
+    "catId": "8",
+    "catTypeId": "5",
+    "maxGuests": "5",
+    "bedrooms": "0",
+    "bathrooms": "1",
+    "maxAnimals": "2",
+    "accessible": "false",
+    "allowedEquipment": "false",
+    "active": "true"
+   },
+   {
+    "postId": 786,
+    "title": "Ensuite Powered Site",
+    "catId": "27",
+    "catTypeId": "2",
+    "maxGuests": "6",
+    "bedrooms": "0",
+    "bathrooms": "1",
+    "maxAnimals": "2",
+    "accessible": "false",
+    "allowedEquipment": "2,1,15,3,10,12,4,5,6,13,7,11,14",
+    "active": "true"
+   },
+   {
+    "postId": 790,
+    "title": "Powered Mat Site",
+    "catId": "14",
+    "catTypeId": "2",
+    "maxGuests": "6",
+    "bedrooms": "0",
+    "bathrooms": "false",
+    "maxAnimals": "2",
+    "accessible": "false",
+    "allowedEquipment": "2,1,15,3,10,12,4,5,6,13,7,11,14,8",
+    "active": "true"
+   },
+   {
+    "postId": 789,
+    "title": "Powered Slab Site",
+    "catId": "28",
+    "catTypeId": "2",
+    "maxGuests": "6",
+    "bedrooms": "0",
+    "bathrooms": "false",
+    "maxAnimals": "2",
+    "accessible": "false",
+    "allowedEquipment": "2,1,15,3,10,12,4,5,6,8,9",
+    "active": "true"
+   },
+   {
+    "postId": 981,
+    "title": "Powered Campervan Site",
+    "catId": "38",
+    "catTypeId": "2",
+    "maxGuests": "6",
+    "bedrooms": "0",
+    "bathrooms": "false",
+    "maxAnimals": "2",
+    "accessible": "false",
+    "allowedEquipment": "3,10,12",
+    "active": "true"
+   },
+   {
+    "postId": 787,
+    "title": "Powered Tent Site",
+    "catId": "22",
+    "catTypeId": "2",
+    "maxGuests": "6",
+    "bedrooms": "0",
+    "bathrooms": "false",
+    "maxAnimals": "2",
+    "accessible": "false",
+    "allowedEquipment": "2,1,3,10,12,13,7,11,14",
+    "active": "true"
+   },
+   {
+    "postId": 980,
+    "title": "Powered Big Rig Slab Site",
+    "catId": "39",
+    "catTypeId": "2",
+    "maxGuests": "6",
+    "bedrooms": "0",
+    "bathrooms": "false",
+    "maxAnimals": "2",
+    "accessible": "false",
+    "allowedEquipment": "2,1,15,5,6,8,9",
+    "active": "true"
+   }
+  ],
+  "detailLinks": [
+   "https://parksandresorts.rac.com.au/esperance/accommodation/the-azure-lodge/",
+   "https://parksandresorts.rac.com.au/esperance/accommodation/three-bedroom-bay-villa/",
+   "https://parksandresorts.rac.com.au/esperance/accommodation/three-bedroom-pool-villa/"
+  ],
+  "notices": [
+   [
+    "20270702",
+    "20270717"
+   ],
+   [
+    "20270326",
+    "20270328"
+   ],
+   [
+    "20270409",
+    "20270425"
+   ],
+   [
+    "20261219",
+    "20270131"
+   ],
+   [
+    "20251212",
+    "20281231"
+   ],
+   [
+    "20260925",
+    "20261010"
+   ],
+   [
+    "20270924",
+    "20271009"
+   ]
+  ],
+  "newbookApi": []
+ },
+ "exmouth": {
+  "blogId": null,
+  "name": "RAC Exmouth Cape Holiday Park",
+  "region": "Coral Coast, Western Australia",
+  "types": [],
+  "features": [],
+  "equipmentTypes": [],
+  "categories": [],
+  "detailLinks": [],
+  "notices": [],
+  "newbookApi": [
+   "newbook/api/rac-exmouth-cape-holiday-park.php"
+  ]
+ },
+ "karri-valley": {
+  "blogId": null,
+  "name": "RAC Karri Valley Resort",
+  "region": "Southern Forests, Western Australia",
+  "types": [],
+  "features": [],
+  "equipmentTypes": [],
+  "categories": [],
+  "detailLinks": [],
+  "notices": [],
+  "newbookApi": [
+   "newbook/api/rac-karri-valley-resort.php"
+  ]
+ },
+ "margaret-river": {
+  "blogId": 8,
+  "name": "RAC Margaret River Nature Park",
+  "region": "South West, Western Australia",
+  "types": [
+   [
+    "Cabins",
+    "2"
+   ],
+   [
+    "Dorm",
+    "4"
+   ],
+   [
+    "Sites",
+    "5"
+   ]
+  ],
+  "features": [
+   [
+    "Air-conditioning",
+    "1"
+   ],
+   [
+    "Bathroom",
+    "4"
+   ],
+   [
+    "Fireplace",
+    "15"
+   ],
+   [
+    "Kitchen",
+    "17"
+   ]
+  ],
+  "equipmentTypes": [
+   [
+    "2",
+    "Caravan Without Awning"
+   ],
+   [
+    "1",
+    "Caravan with Awning"
+   ],
+   [
+    "15",
+    "Caravan with Slideout"
+   ],
+   [
+    "3",
+    "Campervan"
+   ],
+   [
+    "10",
+    "Motorhome"
+   ],
+   [
+    "12",
+    "Rooftop Tent"
+   ],
+   [
+    "4",
+    "Camper Trailer 2 berth (Small)"
+   ],
+   [
+    "5",
+    "Camper Trailer 4 berth (Medium)"
+   ],
+   [
+    "6",
+    "Camper Trailer 6+ berth (Large)"
+   ],
+   [
+    "13",
+    "Car and Single Room Tent (Small)"
+   ],
+   [
+    "7",
+    "Car and Multiroom Tent (large)"
+   ],
+   [
+    "11",
+    "Car & Swag (with trailer)"
+   ],
+   [
+    "14",
+    "Car & Swag (NO trailer)"
+   ],
+   [
+    "8",
+    "5th Wheeler"
+   ],
+   [
+    "9",
+    "Bus"
+   ]
+  ],
+  "categories": [
+   {
+    "postId": 790,
+    "title": "4 Bedroom Eco Lodge",
+    "catId": "9",
+    "catTypeId": "2",
+    "maxGuests": "13",
+    "bedrooms": "0",
+    "bathrooms": "1",
+    "maxAnimals": "0",
+    "accessible": "false",
+    "allowedEquipment": "false",
+    "active": "true"
+   },
+   {
+    "postId": 791,
+    "title": "2 Bedroom Cabin",
+    "catId": "8",
+    "catTypeId": "2",
+    "maxGuests": "7",
+    "bedrooms": "0",
+    "bathrooms": "1",
+    "maxAnimals": "0",
+    "accessible": "false",
+    "allowedEquipment": "false",
+    "active": "true"
+   },
+   {
+    "postId": 793,
+    "title": "Modern Safari Tent",
+    "catId": "10",
+    "catTypeId": "2",
+    "maxGuests": "6",
+    "bedrooms": "0",
+    "bathrooms": "false",
+    "maxAnimals": "0",
+    "accessible": "false",
+    "allowedEquipment": "false",
+    "active": "true"
+   },
+   {
+    "postId": 794,
+    "title": "Dorm Room - Sleeps 26",
+    "catId": "3",
+    "catTypeId": "4",
+    "maxGuests": "26",
+    "bedrooms": "0",
+    "bathrooms": "false",
+    "maxAnimals": "0",
+    "accessible": "false",
+    "allowedEquipment": "false",
+    "active": "true"
+   },
+   {
+    "postId": 795,
+    "title": "Dorm Room - Sleeps 14",
+    "catId": "2",
+    "catTypeId": "4",
+    "maxGuests": "14",
+    "bedrooms": "0",
+    "bathrooms": "false",
+    "maxAnimals": "0",
+    "accessible": "false",
+    "allowedEquipment": "false",
+    "active": "true"
+   },
+   {
+    "postId": 796,
+    "title": "Dorm Room - Sleeps 5",
+    "catId": "4",
+    "catTypeId": "4",
+    "maxGuests": "5",
+    "bedrooms": "0",
+    "bathrooms": "false",
+    "maxAnimals": "0",
+    "accessible": "false",
+    "allowedEquipment": "false",
+    "active": "true"
+   },
+   {
+    "postId": 797,
+    "title": "Powered Site",
+    "catId": "6",
+    "catTypeId": "5",
+    "maxGuests": "6",
+    "bedrooms": "0",
+    "bathrooms": "false",
+    "maxAnimals": "0",
+    "accessible": "false",
+    "allowedEquipment": "1,2,3,4,5,6,7,10,11,12,13,14,15",
+    "active": "true"
+   }
+  ],
+  "detailLinks": [
+   "https://parksandresorts.rac.com.au/margaret-river/accommodation/4-bedroom-eco-lodge/",
+   "https://parksandresorts.rac.com.au/margaret-river/accommodation/2-bedroom-cabin/",
+   "https://parksandresorts.rac.com.au/margaret-river/accommodation/modern-safari-tent/"
+  ],
+  "notices": [
+   [
+    "20270326",
+    "20270328"
+   ],
+   [
+    "20270409",
+    "20270425"
+   ],
+   [
+    "20261219",
+    "20270131"
+   ],
+   [
+    "20260925",
+    "20261010"
+   ],
+   [
+    "20270702",
+    "20270717"
+   ],
+   [
+    "20261015",
+    "20261018"
+   ],
+   [
+    "20270924",
+    "20271009"
+   ]
+  ],
+  "newbookApi": []
+ },
+ "monkey-mia": {
+  "blogId": null,
+  "name": "RAC Monkey Mia Dolphin Resort",
+  "region": "Coral Coast, Western Australia",
+  "types": [],
+  "features": [],
+  "equipmentTypes": [],
+  "categories": [],
+  "detailLinks": [],
+  "notices": [],
+  "newbookApi": [
+   "newbook/api/rac-monkey-mia-dolphin-resort.php"
+  ]
+ },
+ "ningaloo": {
+  "blogId": null,
+  "name": "RAC Ningaloo Reef Resort",
+  "region": "Coral Coast, Western Australia",
+  "types": [],
+  "features": [],
+  "equipmentTypes": [],
+  "categories": [],
+  "detailLinks": [],
+  "notices": [],
+  "newbookApi": [
+   "newbook/api/rac-ningaloo-reef-resort.php"
+  ]
+ }
+}

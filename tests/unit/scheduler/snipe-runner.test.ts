@@ -3,14 +3,22 @@
  * `ensure` ignores its signal: a continuation that resumes after the snipe was re-armed or
  * unscheduled must take no gate hold and arm no timer (the old `startWarmup` race), and a
  * run releases its one `holdOpen()` exactly once.
+ *
+ * Release-alert snipes (R12) on the real core with fake timers: a provider's 403 or 429 ends
+ * the snipe FAILED and no further check is made; an ALERTED snipe is never armed, at start or
+ * after a resume; an alert snipe released at midnight in Perth polls at its cadence until its
+ * window (clamped to the mode's limit) closes.
  */
 
 import { SnipeRunner } from '@main/scheduler/snipe-runner';
 import type { SiteSniperService, SnipePlan } from '@main/core/snipes/snipe.service';
+import { ProviderHttpError } from '@main/providers/sdk/errors';
 import type { AccessGate } from '@main/providers/sdk/provider';
 import type { SiteSnipe } from '@shared/types';
-import { SnipeReleaseMode, SnipeStatus } from '@shared/types/common.types';
+import { SnipeReleaseMode, SnipeResult, SnipeStatus } from '@shared/types/common.types';
 import { createMockSiteSnipe } from '@tests/fixtures/site-sniper';
+import { createCoreHarness, settle, type CoreHarness } from '@tests/utils/core-harness';
+import { createFakeProvider, type FakeProviderOptions } from '@tests/utils/fake-provider';
 
 const NOW = new Date('2026-10-04T02:00:00.000Z');
 
@@ -237,5 +245,164 @@ describe('SnipeRunner daily-rollover start (m1)', () => {
     expect(service.expire).not.toHaveBeenCalled();
     expect(snipe.status).toBe(SnipeStatus.ARMED);
     expect(runner.isScheduled(1)).toBe(true);
+  });
+});
+
+describe('SnipeRunner with release-alert snipes (R12; fake timers, real core)', () => {
+  const SECOND = 1000;
+  const MINUTE = 60 * SECOND;
+  // 5 Oct 2026, 00:00 in Perth: a release at midnight where the provider is
+  const MIDNIGHT_PERTH = new Date('2026-10-04T16:00:00.000Z');
+  let h: CoreHarness;
+
+  afterEach(async () => {
+    const closing = h.close();
+    await jest.advanceTimersByTimeAsync(10 * SECOND);
+    await closing;
+    jest.useRealTimers();
+  });
+
+  function setUp(options: FakeProviderOptions = {}): void {
+    jest.useFakeTimers({ now: NOW });
+    h = createCoreHarness({ providers: [createFakeProvider(options)] });
+  }
+
+  const checks = () => h.fake.calls.filter((c) => c.module === 'availability');
+  const stored = (id: number) => h.snipeRepo.findById(id)!;
+
+  /** An alert snipe released at `releaseAt`, polling every `pollIntervalMs`. */
+  function alertSnipe(releaseAt: Date, extra: Parameters<CoreHarness['snipeInput']>[0] = {}) {
+    return settle(
+      h.snipes.create(
+        h.userId,
+        h.snipeInput({
+          action: 'alert',
+          releaseMode: SnipeReleaseMode.SCHEDULED,
+          releaseAt,
+          leadTimeSeconds: 0,
+          pollIntervalMs: 10 * SECOND,
+          ...extra,
+        })
+      )
+    );
+  }
+
+  it.each([403, 429])(
+    'a %s ends the snipe FAILED with the message, and no further check is made',
+    async (status) => {
+      setUp({ availability: { '1': { u1: 'booked' } } });
+      const snipe = await alertSnipe(NOW);
+      h.fake.failNext(
+        'availability',
+        new ProviderHttpError({ providerId: 'fake', status, url: 'https://fake.example/check' })
+      );
+      h.scheduler.snipeRunner.arm(snipe.id);
+      await jest.advanceTimersByTimeAsync(SECOND);
+
+      expect(checks()).toHaveLength(1);
+      expect(stored(snipe.id)).toMatchObject({
+        status: SnipeStatus.FAILED,
+        lastResult: SnipeResult.ERROR,
+        lastError: `Fake refused the check (HTTP ${status}). Site Sniper stopped and won't try again by itself.`,
+        isActive: false,
+      });
+      expect(h.scheduler.snipeRunner.isScheduled(snipe.id)).toBe(false);
+
+      // Nothing tries again: not the window, not a resume, not a restart
+      await jest.advanceTimersByTimeAsync(15 * MINUTE);
+      h.power.emit('resume');
+      h.scheduler.snipeRunner.start();
+      await jest.advanceTimersByTimeAsync(MINUTE);
+      expect(checks()).toHaveLength(1);
+      expect(jest.getTimerCount()).toBe(0);
+    }
+  );
+
+  it('an ALERTED snipe is not armed by start() or rescheduleAll()', async () => {
+    setUp();
+    const snipe = await alertSnipe(NOW);
+    h.snipeRepo.markAlerted(snipe.id, { at: NOW, unitId: 'u1' });
+    // Even a row left active (a crash between writes) is not armed: ALERTED is terminal
+    const active = await alertSnipe(NOW);
+    h.snipeRepo.markAlerted(active.id, { at: NOW, unitId: 'u1' });
+    h.db.prepare('UPDATE site_snipes SET is_active = 1 WHERE id = ?').run(active.id);
+
+    h.scheduler.snipeRunner.start();
+    await jest.advanceTimersByTimeAsync(0);
+    expect(h.scheduler.snipeRunner.isScheduled(snipe.id)).toBe(false);
+    expect(h.scheduler.snipeRunner.isScheduled(active.id)).toBe(false);
+
+    h.power.emit('resume');
+    h.scheduler.snipeRunner.rescheduleAll();
+    await jest.advanceTimersByTimeAsync(MINUTE);
+    expect(h.scheduler.snipeRunner.isScheduled(snipe.id)).toBe(false);
+    expect(h.scheduler.snipeRunner.isScheduled(active.id)).toBe(false);
+    expect(checks()).toHaveLength(0);
+    expect(stored(snipe.id).status).toBe(SnipeStatus.ALERTED);
+    expect(stored(active.id).status).toBe(SnipeStatus.ALERTED);
+  });
+
+  it('an alert snipe released at midnight in Perth alerts on the first free check and stops', async () => {
+    setUp({ availability: { '1': { u1: 'booked' } } });
+    const snipe = await alertSnipe(MIDNIGHT_PERTH);
+    h.scheduler.snipeRunner.arm(snipe.id);
+
+    // Nothing is asked before the release
+    await jest.advanceTimersByTimeAsync(MIDNIGHT_PERTH.getTime() - NOW.getTime() - 1);
+    expect(checks()).toHaveLength(0);
+    await jest.advanceTimersByTimeAsync(1);
+    expect(checks()).toHaveLength(1);
+    expect(stored(snipe.id).status).toBe(SnipeStatus.SNIPING);
+
+    // Free on the third check, 20 s after midnight (each check takes a tick of the fake clock)
+    await jest.advanceTimersByTimeAsync(15 * SECOND);
+    h.fake.setAvailability('1', { u1: 'available' });
+    await jest.advanceTimersByTimeAsync(6 * SECOND);
+    expect(checks()).toHaveLength(3);
+    const alerted = stored(snipe.id);
+    expect(alerted).toMatchObject({
+      status: SnipeStatus.ALERTED,
+      isActive: false,
+      alert: { unitId: 'u1' },
+    });
+    const sinceMidnight = alerted.alert!.at.getTime() - MIDNIGHT_PERTH.getTime();
+    expect(sinceMidnight).toBeGreaterThanOrEqual(20 * SECOND);
+    expect(sinceMidnight).toBeLessThan(21 * SECOND);
+    expect(h.notifications.notifySnipeAlert).toHaveBeenCalledTimes(1);
+    expect(h.fake.calls.filter((c) => c.module === 'holds')).toHaveLength(0);
+
+    await jest.advanceTimersByTimeAsync(30 * MINUTE);
+    expect(checks()).toHaveLength(3);
+    expect(h.scheduler.snipeRunner.isScheduled(snipe.id)).toBe(false);
+  });
+
+  it('polls no faster than its cadence within the clamped window, then expires as an alert', async () => {
+    setUp({ availability: { '1': { u1: 'booked' } }, maxWindowMinutes: 30 });
+    const snipe = await alertSnipe(MIDNIGHT_PERTH, { windowDurationMs: 2 * 60 * MINUTE });
+    expect(snipe.windowDurationMs).toBe(30 * MINUTE);
+    const availability = h.registry.get('fake').availability!;
+    const check = availability.check;
+    const at: number[] = [];
+    jest.spyOn(availability, 'check').mockImplementation((...args) => {
+      at.push(Date.now());
+      return check(...args);
+    });
+    h.scheduler.snipeRunner.arm(snipe.id);
+
+    await jest.advanceTimersByTimeAsync(MIDNIGHT_PERTH.getTime() - NOW.getTime() + 2 * 60 * MINUTE);
+
+    // One check every 10 s from 00:00:00 to 00:29:50, then the window closes at 00:30
+    expect(checks()).toHaveLength(180);
+    expect(at[0]).toBe(MIDNIGHT_PERTH.getTime());
+    expect(at[at.length - 1]).toBeLessThan(MIDNIGHT_PERTH.getTime() + 30 * MINUTE);
+    for (let i = 1; i < at.length; i++)
+      expect(at[i] - at[i - 1]).toBeGreaterThanOrEqual(10 * SECOND);
+    expect(stored(snipe.id)).toMatchObject({
+      status: SnipeStatus.EXPIRED,
+      lastResult: SnipeResult.EXPIRED,
+      lastError: 'The window closed before the dates were free',
+      isActive: false,
+    });
+    expect(h.notifications.notifySnipeAlert).not.toHaveBeenCalled();
   });
 });

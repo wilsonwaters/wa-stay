@@ -1,0 +1,840 @@
+{
+  "_fixture": "Trimmed from RAC Parks & Resorts' availability answer for RAC Karri Valley Resort (blog 7), 31 Oct-1 Nov 2026, 2 adults, fetched anonymously; only the fields WA Stay reads, the NewBook key and cart addresses redacted. (Fetched 17 Oct 2026, 11:35 Perth.)",
+  "success": "true",
+  "message": "",
+  "timestamp": "2026-10-17 11:35:12",
+  "timezone": "Australia/Perth",
+  "api_key": "<redacted>",
+  "data": {
+    "4": {
+      "category_id": 4,
+      "category_type_id": "2",
+      "category_name": "Lakeside Room",
+      "sort": 0,
+      "sites_available": {
+        "2026-10-31": 0
+      },
+      "sites_code": {
+        "2026-10-31": 3
+      },
+      "sites_message": {
+        "2026-10-31": "There is no availability for this date"
+      },
+      "stay_through_sites_available": 0,
+      "stay_through_sites_code": 3,
+      "stay_through_sites_message": "There is no longer availability for the dates given (<strong>31 Oct 2026 14:00</strong> to <strong>1 Nov 2026 10:00</strong>)",
+      "online_booking_url": "https://parksandresorts.rac.com.au/karri-valley/booking/?available_from=2026-10-31&available_to=2026-11-01&force_category_id=4&adults=2&children=0&infants=0&animals=0",
+      "tariffs_available": [
+        {
+          "tariff_label": "Standard Rate",
+          "tariff_success": "true",
+          "tariff_code": 0,
+          "tariff_message": "",
+          "tariff_total": 357,
+          "tariffs_quoted": {
+            "2026-10-31": {
+              "amount": 357,
+              "minimum_periods": "1",
+              "close_arrival": 0,
+              "close_departure": 0
+            }
+          }
+        },
+        {
+          "tariff_label": "RAC Member Rate",
+          "tariff_success": "true",
+          "tariff_code": 0,
+          "tariff_message": "",
+          "tariff_total": 329,
+          "tariffs_quoted": {
+            "2026-10-31": {
+              "amount": 329,
+              "minimum_periods": "1",
+              "close_arrival": 0,
+              "close_departure": 0
+            }
+          }
+        },
+        {
+          "tariff_label": "Stay & Save This Spring",
+          "tariff_success": "false",
+          "tariff_code": 6,
+          "tariff_message": "This Rate has a 3 Night Minimum",
+          "tariff_total": 286,
+          "tariffs_quoted": {
+            "2026-10-31": {
+              "amount": 286,
+              "minimum_periods": "3",
+              "close_arrival": 0,
+              "close_departure": 0
+            }
+          }
+        },
+        {
+          "tariff_label": "Stay & Save This Spring - RAC Member",
+          "tariff_success": "false",
+          "tariff_code": 6,
+          "tariff_message": "This Rate has a 3 Night Minimum",
+          "tariff_total": 263,
+          "tariffs_quoted": {
+            "2026-10-31": {
+              "amount": 263,
+              "minimum_periods": "3",
+              "close_arrival": 0,
+              "close_departure": 0
+            }
+          }
+        }
+      ]
+    },
+    "10": {
+      "category_id": 10,
+      "category_type_id": "2",
+      "category_name": "Lakeside Room Queen",
+      "sort": 1,
+      "sites_available": {
+        "2026-10-31": 0
+      },
+      "sites_code": {
+        "2026-10-31": 3
+      },
+      "sites_message": {
+        "2026-10-31": "There is no availability for this date"
+      },
+      "stay_through_sites_available": 0,
+      "stay_through_sites_code": 2,
+      "stay_through_sites_message": "This Site is closed as of 8 Aug 2023",
+      "online_booking_url": "https://parksandresorts.rac.com.au/karri-valley/booking/?available_from=2026-10-31&available_to=2026-11-01&force_category_id=10&adults=2&children=0&infants=0&animals=0",
+      "tariffs_available": [
+        {
+          "tariff_label": "Standard Rate",
+          "tariff_success": "true",
+          "tariff_code": 0,
+          "tariff_message": "",
+          "tariff_total": 357,
+          "tariffs_quoted": {
+            "2026-10-31": {
+              "amount": 357,
+              "minimum_periods": "1",
+              "close_arrival": 0,
+              "close_departure": 0
+            }
+          }
+        },
+        {
+          "tariff_label": "RAC Member Rate",
+          "tariff_success": "true",
+          "tariff_code": 0,
+          "tariff_message": "",
+          "tariff_total": 329,
+          "tariffs_quoted": {
+            "2026-10-31": {
+              "amount": 329,
+              "minimum_periods": "1",
+              "close_arrival": 0,
+              "close_departure": 0
+            }
+          }
+        },
+        {
+          "tariff_label": "Stay & Save This Spring",
+          "tariff_success": "false",
+          "tariff_code": 6,
+          "tariff_message": "This Rate has a 3 Night Minimum",
+          "tariff_total": 286,
+          "tariffs_quoted": {
+            "2026-10-31": {
+              "amount": 286,
+              "minimum_periods": "3",
+              "close_arrival": 0,
+              "close_departure": 0
+            }
+          }
+        },
+        {
+          "tariff_label": "Stay & Save This Spring - RAC Member",
+          "tariff_success": "false",
+          "tariff_code": 6,
+          "tariff_message": "This Rate has a 3 Night Minimum",
+          "tariff_total": 263,
+          "tariffs_quoted": {
+            "2026-10-31": {
+              "amount": 263,
+              "minimum_periods": "3",
+              "close_arrival": 0,
+              "close_departure": 0
+            }
+          }
+        }
+      ]
+    },
+    "2": {
+      "category_id": 2,
+      "category_type_id": "2",
+      "category_name": "Two Bedroom Chalet - Forest View",
+      "sort": 2,
+      "sites_available": {
+        "2026-10-31": 0
+      },
+      "sites_code": {
+        "2026-10-31": 3
+      },
+      "sites_message": {
+        "2026-10-31": "There is no availability for this date"
+      },
+      "stay_through_sites_available": 0,
+      "stay_through_sites_code": 3,
+      "stay_through_sites_message": "There is no longer availability for the dates given (<strong>31 Oct 2026 14:00</strong> to <strong>1 Nov 2026 10:00</strong>)",
+      "online_booking_url": "https://parksandresorts.rac.com.au/karri-valley/booking/?available_from=2026-10-31&available_to=2026-11-01&force_category_id=2&adults=2&children=0&infants=0&animals=0",
+      "tariffs_available": [
+        {
+          "tariff_label": "Standard Rate",
+          "tariff_success": "false",
+          "tariff_code": 6,
+          "tariff_message": "This Rate has a 2 Night Minimum",
+          "tariff_total": 416,
+          "tariffs_quoted": {
+            "2026-10-31": {
+              "amount": 416,
+              "minimum_periods": "2",
+              "close_arrival": 0,
+              "close_departure": 0
+            }
+          }
+        },
+        {
+          "tariff_label": "RAC Member Rate",
+          "tariff_success": "false",
+          "tariff_code": 6,
+          "tariff_message": "This Rate has a 2 Night Minimum",
+          "tariff_total": 383,
+          "tariffs_quoted": {
+            "2026-10-31": {
+              "amount": 383,
+              "minimum_periods": "2",
+              "close_arrival": 0,
+              "close_departure": 0
+            }
+          }
+        },
+        {
+          "tariff_label": "Stay & Save This Spring",
+          "tariff_success": "false",
+          "tariff_code": 6,
+          "tariff_message": "This Rate has a 3 Night Minimum",
+          "tariff_total": 333,
+          "tariffs_quoted": {
+            "2026-10-31": {
+              "amount": 333,
+              "minimum_periods": "3",
+              "close_arrival": 0,
+              "close_departure": 0
+            }
+          }
+        },
+        {
+          "tariff_label": "Stay & Save This Spring - RAC Member",
+          "tariff_success": "false",
+          "tariff_code": 6,
+          "tariff_message": "This Rate has a 3 Night Minimum",
+          "tariff_total": 306,
+          "tariffs_quoted": {
+            "2026-10-31": {
+              "amount": 306,
+              "minimum_periods": "3",
+              "close_arrival": 0,
+              "close_departure": 0
+            }
+          }
+        }
+      ]
+    },
+    "1": {
+      "category_id": 1,
+      "category_type_id": "2",
+      "category_name": "Three Bedroom Chalet - Forest View",
+      "sort": 3,
+      "sites_available": {
+        "2026-10-31": 3
+      },
+      "sites_code": {
+        "2026-10-31": 0
+      },
+      "sites_message": {
+        "2026-10-31": ""
+      },
+      "stay_through_sites_available": 3,
+      "stay_through_sites_code": 0,
+      "stay_through_sites_message": "",
+      "online_booking_url": "https://parksandresorts.rac.com.au/karri-valley/booking/?available_from=2026-10-31&available_to=2026-11-01&force_category_id=1&adults=2&children=0&infants=0&animals=0",
+      "tariffs_available": [
+        {
+          "tariff_label": "Standard Rate",
+          "tariff_success": "false",
+          "tariff_code": 6,
+          "tariff_message": "This Rate has a 2 Night Minimum",
+          "tariff_total": 481,
+          "tariffs_quoted": {
+            "2026-10-31": {
+              "amount": 481,
+              "minimum_periods": "2",
+              "close_arrival": 0,
+              "close_departure": 0
+            }
+          }
+        },
+        {
+          "tariff_label": "RAC Member Rate",
+          "tariff_success": "false",
+          "tariff_code": 6,
+          "tariff_message": "This Rate has a 2 Night Minimum",
+          "tariff_total": 443,
+          "tariffs_quoted": {
+            "2026-10-31": {
+              "amount": 443,
+              "minimum_periods": "2",
+              "close_arrival": 0,
+              "close_departure": 0
+            }
+          }
+        },
+        {
+          "tariff_label": "Stay & Save This Spring",
+          "tariff_success": "false",
+          "tariff_code": 6,
+          "tariff_message": "This Rate has a 3 Night Minimum",
+          "tariff_total": 385,
+          "tariffs_quoted": {
+            "2026-10-31": {
+              "amount": 385,
+              "minimum_periods": "3",
+              "close_arrival": 0,
+              "close_departure": 0
+            }
+          }
+        },
+        {
+          "tariff_label": "Stay & Save This Spring - RAC Member",
+          "tariff_success": "false",
+          "tariff_code": 6,
+          "tariff_message": "This Rate has a 3 Night Minimum",
+          "tariff_total": 354,
+          "tariffs_quoted": {
+            "2026-10-31": {
+              "amount": 354,
+              "minimum_periods": "3",
+              "close_arrival": 0,
+              "close_departure": 0
+            }
+          }
+        }
+      ]
+    },
+    "6": {
+      "category_id": 6,
+      "category_type_id": "2",
+      "category_name": "Two Bedroom Chalet - Lake View",
+      "sort": 4,
+      "sites_available": {
+        "2026-10-31": 0
+      },
+      "sites_code": {
+        "2026-10-31": 3
+      },
+      "sites_message": {
+        "2026-10-31": "There is no availability for this date"
+      },
+      "stay_through_sites_available": 0,
+      "stay_through_sites_code": 2,
+      "stay_through_sites_message": "This Site is closed as of 22 Nov 2017",
+      "online_booking_url": "https://parksandresorts.rac.com.au/karri-valley/booking/?available_from=2026-10-31&available_to=2026-11-01&force_category_id=6&adults=2&children=0&infants=0&animals=0",
+      "tariffs_available": [
+        {
+          "tariff_label": "Standard Rate",
+          "tariff_success": "false",
+          "tariff_code": 6,
+          "tariff_message": "This Rate has a 2 Night Minimum",
+          "tariff_total": 461,
+          "tariffs_quoted": {
+            "2026-10-31": {
+              "amount": 461,
+              "minimum_periods": "2",
+              "close_arrival": 0,
+              "close_departure": 0
+            }
+          }
+        },
+        {
+          "tariff_label": "RAC Member Rate",
+          "tariff_success": "false",
+          "tariff_code": 6,
+          "tariff_message": "This Rate has a 2 Night Minimum",
+          "tariff_total": 425,
+          "tariffs_quoted": {
+            "2026-10-31": {
+              "amount": 425,
+              "minimum_periods": "2",
+              "close_arrival": 0,
+              "close_departure": 0
+            }
+          }
+        }
+      ]
+    },
+    "5": {
+      "category_id": 5,
+      "category_type_id": "2",
+      "category_name": "Three Bedroom Chalet - Lake View",
+      "sort": 5,
+      "sites_available": {
+        "2026-10-31": 1
+      },
+      "sites_code": {
+        "2026-10-31": 0
+      },
+      "sites_message": {
+        "2026-10-31": ""
+      },
+      "stay_through_sites_available": 1,
+      "stay_through_sites_code": 0,
+      "stay_through_sites_message": "",
+      "online_booking_url": "https://parksandresorts.rac.com.au/karri-valley/booking/?available_from=2026-10-31&available_to=2026-11-01&force_category_id=5&adults=2&children=0&infants=0&animals=0",
+      "tariffs_available": [
+        {
+          "tariff_label": "Standard Rate",
+          "tariff_success": "false",
+          "tariff_code": 6,
+          "tariff_message": "This Rate has a 2 Night Minimum",
+          "tariff_total": 526,
+          "tariffs_quoted": {
+            "2026-10-31": {
+              "amount": 526,
+              "minimum_periods": "2",
+              "close_arrival": 0,
+              "close_departure": 0
+            }
+          }
+        },
+        {
+          "tariff_label": "RAC Member Rate",
+          "tariff_success": "false",
+          "tariff_code": 6,
+          "tariff_message": "This Rate has a 2 Night Minimum",
+          "tariff_total": 485,
+          "tariffs_quoted": {
+            "2026-10-31": {
+              "amount": 485,
+              "minimum_periods": "2",
+              "close_arrival": 0,
+              "close_departure": 0
+            }
+          }
+        }
+      ]
+    },
+    "12": {
+      "category_id": 12,
+      "category_type_id": "2",
+      "category_name": "Three Bedroom Chalet - Family Lake View",
+      "sort": 6,
+      "sites_available": {
+        "2026-10-31": 0
+      },
+      "sites_code": {
+        "2026-10-31": 3
+      },
+      "sites_message": {
+        "2026-10-31": "There is no availability for this date"
+      },
+      "stay_through_sites_available": 0,
+      "stay_through_sites_code": 3,
+      "stay_through_sites_message": "There is no longer availability for the dates given (<strong>31 Oct 2026 14:00</strong> to <strong>1 Nov 2026 10:00</strong>)",
+      "online_booking_url": "https://parksandresorts.rac.com.au/karri-valley/booking/?available_from=2026-10-31&available_to=2026-11-01&force_category_id=12&adults=2&children=0&infants=0&animals=0",
+      "tariffs_available": [
+        {
+          "tariff_label": "Standard Rate",
+          "tariff_success": "false",
+          "tariff_code": 6,
+          "tariff_message": "This Rate has a 2 Night Minimum",
+          "tariff_total": 546,
+          "tariffs_quoted": {
+            "2026-10-31": {
+              "amount": 546,
+              "minimum_periods": "2",
+              "close_arrival": 0,
+              "close_departure": 0
+            }
+          }
+        },
+        {
+          "tariff_label": "RAC Member Rate",
+          "tariff_success": "false",
+          "tariff_code": 6,
+          "tariff_message": "This Rate has a 2 Night Minimum",
+          "tariff_total": 503,
+          "tariffs_quoted": {
+            "2026-10-31": {
+              "amount": 503,
+              "minimum_periods": "2",
+              "close_arrival": 0,
+              "close_departure": 0
+            }
+          }
+        }
+      ]
+    },
+    "11": {
+      "category_id": 11,
+      "category_type_id": "2",
+      "category_name": "Two Bedroom Accessible Forest View Chalet",
+      "sort": 7,
+      "sites_available": {
+        "2026-10-31": 0
+      },
+      "sites_code": {
+        "2026-10-31": 3
+      },
+      "sites_message": {
+        "2026-10-31": "There is no availability for this date"
+      },
+      "stay_through_sites_available": 0,
+      "stay_through_sites_code": 2,
+      "stay_through_sites_message": "This Site is closed as of 1 Jul 2010",
+      "online_booking_url": "https://parksandresorts.rac.com.au/karri-valley/booking/?available_from=2026-10-31&available_to=2026-11-01&force_category_id=11&adults=2&children=0&infants=0&animals=0",
+      "tariffs_available": [
+        {
+          "tariff_label": "Standard Rate",
+          "tariff_success": "false",
+          "tariff_code": 6,
+          "tariff_message": "This Rate has a 2 Night Minimum",
+          "tariff_total": 416,
+          "tariffs_quoted": {
+            "2026-10-31": {
+              "amount": 416,
+              "minimum_periods": "2",
+              "close_arrival": 0,
+              "close_departure": 0
+            }
+          }
+        },
+        {
+          "tariff_label": "RAC Member Rate",
+          "tariff_success": "false",
+          "tariff_code": 6,
+          "tariff_message": "This Rate has a 2 Night Minimum",
+          "tariff_total": 383,
+          "tariffs_quoted": {
+            "2026-10-31": {
+              "amount": 383,
+              "minimum_periods": "2",
+              "close_arrival": 0,
+              "close_departure": 0
+            }
+          }
+        }
+      ]
+    },
+    "14": {
+      "category_id": 14,
+      "category_type_id": "7",
+      "category_name": "Ensuite Site",
+      "sort": 8,
+      "sites_available": {
+        "2026-10-31": 1
+      },
+      "sites_code": {
+        "2026-10-31": 0
+      },
+      "sites_message": {
+        "2026-10-31": ""
+      },
+      "stay_through_sites_available": 1,
+      "stay_through_sites_code": 0,
+      "stay_through_sites_message": "",
+      "online_booking_url": "https://parksandresorts.rac.com.au/karri-valley/booking/?available_from=2026-10-31&available_to=2026-11-01&force_category_id=14&adults=2&children=0&infants=0&animals=0",
+      "tariffs_available": [
+        {
+          "tariff_label": "Standard Rate",
+          "tariff_success": "true",
+          "tariff_code": 0,
+          "tariff_message": "",
+          "tariff_total": 103,
+          "tariffs_quoted": {
+            "2026-10-31": {
+              "amount": 103,
+              "minimum_periods": "1",
+              "close_arrival": 0,
+              "close_departure": 0
+            }
+          },
+          "online_cart_url": "<redacted>"
+        },
+        {
+          "tariff_label": "RAC Member Rate",
+          "tariff_success": "true",
+          "tariff_code": 0,
+          "tariff_message": "",
+          "tariff_total": 92,
+          "tariffs_quoted": {
+            "2026-10-31": {
+              "amount": 92,
+              "minimum_periods": "1",
+              "close_arrival": 0,
+              "close_departure": 0
+            }
+          },
+          "online_cart_url": "<redacted>"
+        }
+      ]
+    },
+    "13": {
+      "category_id": 13,
+      "category_type_id": "7",
+      "category_name": "Powered Site",
+      "sort": 9,
+      "sites_available": {
+        "2026-10-31": 12
+      },
+      "sites_code": {
+        "2026-10-31": 0
+      },
+      "sites_message": {
+        "2026-10-31": ""
+      },
+      "stay_through_sites_available": 12,
+      "stay_through_sites_code": 0,
+      "stay_through_sites_message": "",
+      "online_booking_url": "https://parksandresorts.rac.com.au/karri-valley/booking/?available_from=2026-10-31&available_to=2026-11-01&force_category_id=13&adults=2&children=0&infants=0&animals=0",
+      "tariffs_available": [
+        {
+          "tariff_label": "Standard Rate",
+          "tariff_success": "true",
+          "tariff_code": 0,
+          "tariff_message": "",
+          "tariff_total": 51,
+          "tariffs_quoted": {
+            "2026-10-31": {
+              "amount": 51,
+              "minimum_periods": "1",
+              "close_arrival": 0,
+              "close_departure": 0
+            }
+          },
+          "online_cart_url": "<redacted>"
+        },
+        {
+          "tariff_label": "RAC Member Rate",
+          "tariff_success": "true",
+          "tariff_code": 0,
+          "tariff_message": "",
+          "tariff_total": 45,
+          "tariffs_quoted": {
+            "2026-10-31": {
+              "amount": 45,
+              "minimum_periods": "1",
+              "close_arrival": 0,
+              "close_departure": 0
+            }
+          },
+          "online_cart_url": "<redacted>"
+        },
+        {
+          "tariff_label": "Stay & Save This Spring",
+          "tariff_success": "false",
+          "tariff_code": 6,
+          "tariff_message": "This Rate has a 3 Night Minimum",
+          "tariff_total": 51,
+          "tariffs_quoted": {
+            "2026-10-31": {
+              "amount": 51,
+              "minimum_periods": "3",
+              "close_arrival": 0,
+              "close_departure": 0
+            }
+          }
+        },
+        {
+          "tariff_label": "Stay & Save This Spring - RAC Member",
+          "tariff_success": "false",
+          "tariff_code": 6,
+          "tariff_message": "This Rate has a 3 Night Minimum",
+          "tariff_total": 45,
+          "tariffs_quoted": {
+            "2026-10-31": {
+              "amount": 45,
+              "minimum_periods": "3",
+              "close_arrival": 0,
+              "close_departure": 0
+            }
+          }
+        }
+      ]
+    },
+    "17": {
+      "category_id": 17,
+      "category_type_id": "7",
+      "category_name": "Powered Slab Site",
+      "sort": 10,
+      "sites_available": {
+        "2026-10-31": 21
+      },
+      "sites_code": {
+        "2026-10-31": 0
+      },
+      "sites_message": {
+        "2026-10-31": ""
+      },
+      "stay_through_sites_available": 21,
+      "stay_through_sites_code": 0,
+      "stay_through_sites_message": "",
+      "online_booking_url": "https://parksandresorts.rac.com.au/karri-valley/booking/?available_from=2026-10-31&available_to=2026-11-01&force_category_id=17&adults=2&children=0&infants=0&animals=0",
+      "tariffs_available": [
+        {
+          "tariff_label": "Standard Rate",
+          "tariff_success": "true",
+          "tariff_code": 0,
+          "tariff_message": "",
+          "tariff_total": 51,
+          "tariffs_quoted": {
+            "2026-10-31": {
+              "amount": 51,
+              "minimum_periods": "1",
+              "close_arrival": 0,
+              "close_departure": 0
+            }
+          },
+          "online_cart_url": "<redacted>"
+        },
+        {
+          "tariff_label": "RAC Member Rate",
+          "tariff_success": "true",
+          "tariff_code": 0,
+          "tariff_message": "",
+          "tariff_total": 45,
+          "tariffs_quoted": {
+            "2026-10-31": {
+              "amount": 45,
+              "minimum_periods": "1",
+              "close_arrival": 0,
+              "close_departure": 0
+            }
+          },
+          "online_cart_url": "<redacted>"
+        },
+        {
+          "tariff_label": "Stay & Save This Spring",
+          "tariff_success": "false",
+          "tariff_code": 6,
+          "tariff_message": "This Rate has a 3 Night Minimum",
+          "tariff_total": 51,
+          "tariffs_quoted": {
+            "2026-10-31": {
+              "amount": 51,
+              "minimum_periods": "3",
+              "close_arrival": 0,
+              "close_departure": 0
+            }
+          }
+        },
+        {
+          "tariff_label": "Stay & Save This Spring - RAC Member",
+          "tariff_success": "false",
+          "tariff_code": 6,
+          "tariff_message": "This Rate has a 3 Night Minimum",
+          "tariff_total": 45,
+          "tariffs_quoted": {
+            "2026-10-31": {
+              "amount": 45,
+              "minimum_periods": "3",
+              "close_arrival": 0,
+              "close_departure": 0
+            }
+          }
+        }
+      ]
+    },
+    "15": {
+      "category_id": 15,
+      "category_type_id": "7",
+      "category_name": "Unpowered Camper Site",
+      "sort": 11,
+      "sites_available": {
+        "2026-10-31": 27
+      },
+      "sites_code": {
+        "2026-10-31": 0
+      },
+      "sites_message": {
+        "2026-10-31": ""
+      },
+      "stay_through_sites_available": 27,
+      "stay_through_sites_code": 0,
+      "stay_through_sites_message": "",
+      "online_booking_url": "https://parksandresorts.rac.com.au/karri-valley/booking/?available_from=2026-10-31&available_to=2026-11-01&force_category_id=15&adults=2&children=0&infants=0&animals=0",
+      "tariffs_available": [
+        {
+          "tariff_label": "Standard Rate",
+          "tariff_success": "true",
+          "tariff_code": 0,
+          "tariff_message": "",
+          "tariff_total": 45,
+          "tariffs_quoted": {
+            "2026-10-31": {
+              "amount": 45,
+              "minimum_periods": "1",
+              "close_arrival": 0,
+              "close_departure": 0
+            }
+          },
+          "online_cart_url": "<redacted>"
+        },
+        {
+          "tariff_label": "RAC Member Rate",
+          "tariff_success": "true",
+          "tariff_code": 0,
+          "tariff_message": "",
+          "tariff_total": 38,
+          "tariffs_quoted": {
+            "2026-10-31": {
+              "amount": 38,
+              "minimum_periods": "1",
+              "close_arrival": 0,
+              "close_departure": 0
+            }
+          },
+          "online_cart_url": "<redacted>"
+        },
+        {
+          "tariff_label": "Stay & Save This Spring",
+          "tariff_success": "false",
+          "tariff_code": 6,
+          "tariff_message": "This Rate has a 3 Night Minimum",
+          "tariff_total": 45,
+          "tariffs_quoted": {
+            "2026-10-31": {
+              "amount": 45,
+              "minimum_periods": "3",
+              "close_arrival": 0,
+              "close_departure": 0
+            }
+          }
+        },
+        {
+          "tariff_label": "Stay & Save This Spring - RAC Member",
+          "tariff_success": "false",
+          "tariff_code": 6,
+          "tariff_message": "This Rate has a 3 Night Minimum",
+          "tariff_total": 38,
+          "tariffs_quoted": {
+            "2026-10-31": {
+              "amount": 38,
+              "minimum_periods": "3",
+              "close_arrival": 0,
+              "close_departure": 0
+            }
+          }
+        }
+      ]
+    }
+  }
+}

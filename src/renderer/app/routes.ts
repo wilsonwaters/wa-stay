@@ -4,8 +4,8 @@
  * and their stable names is in docs/design/shell.md.
  */
 import { matchPath } from 'react-router';
-import { PROVIDER_ID_PATTERN } from '../../shared/types/provider.types';
-import { parseStayParams, stayParamsQuery, type StayParams } from './stayParams';
+import { PROVIDER_ID_PATTERN, type UnitKind } from '../../shared/types/provider.types';
+import { parseStayParams, parseStayTypes, stayParamsQuery, type StayParams } from './stayParams';
 
 /** The route patterns (architecture-notes §12.10). */
 export const PATTERNS = {
@@ -32,12 +32,19 @@ export const LEGACY_REDIRECTS = [
 
 type ParamValue = string | number | null | undefined;
 export type PathParams = Record<string, ParamValue>;
-export type QueryParams = Record<string, ParamValue>;
+/** Query values; a list is written as one comma list (`stay=cabin,room`). */
+export type QueryParams = Record<string, ParamValue | readonly string[]>;
+
+/** A query key or value encoded as a form is (`URLSearchParams`: a space is `+`). */
+function encodeQuery(text: string): string {
+  return new URLSearchParams([['', text]]).toString().slice(1);
+}
 
 /**
  * Fills a pattern's `:params` (each one `encodeURIComponent`-ed, so an id may hold `/`, `?` or
  * spaces) and appends a query string. A missing optional `:param?` is dropped; a missing
- * required one throws. Empty query values are left out.
+ * required one throws. Empty query values are left out. A list value is written as a comma
+ * list with its commas readable and each item encoded (an empty list is left out).
  */
 export function buildPath(pattern: string, params: PathParams = {}, query?: QueryParams): string {
   const segments: string[] = [];
@@ -57,12 +64,16 @@ export function buildPath(pattern: string, params: PathParams = {}, query?: Quer
   }
   const path = segments.join('/') || '/';
 
-  const search = new URLSearchParams();
+  const parts: string[] = [];
   for (const [key, value] of Object.entries(query ?? {})) {
-    if (value !== undefined && value !== null && value !== '') search.append(key, String(value));
+    if (Array.isArray(value)) {
+      const items = value.filter((item) => item !== '');
+      if (items.length > 0) parts.push(`${encodeQuery(key)}=${items.map(encodeQuery).join(',')}`);
+    } else if (value !== undefined && value !== null && value !== '') {
+      parts.push(`${encodeQuery(key)}=${encodeQuery(String(value))}`);
+    }
   }
-  const queryString = search.toString();
-  return queryString ? `${path}?${queryString}` : path;
+  return parts.length > 0 ? `${path}?${parts.join('&')}` : path;
 }
 
 /**
@@ -76,6 +87,16 @@ export interface CreatePrefill {
   departure?: string;
   adults?: number;
   children?: number;
+  /** The stay types chosen on Explore, written `stay=cabin,room`. Never `other`. */
+  stay?: UnitKind[];
+}
+
+/**
+ * What a link to a place's page carries: the stay to check, and the stay types chosen on
+ * Explore (`stay=cabin`), which the page hands on to the create flows.
+ */
+export interface PlaceLinkQuery extends Partial<StayParams> {
+  stayTypes?: readonly UnitKind[];
 }
 
 /**
@@ -102,7 +123,8 @@ const MAX_LOCATION_LENGTH = 200;
 /**
  * Reads the prefill query (§12.10) a create flow was opened with. Values that are not valid
  * are left out: a provider id that is not one, a date that is not a calendar date, a departure
- * on or before the arrival, a guest count out of range. Infants are not part of the contract.
+ * on or before the arrival, a guest count out of range, a stay type that is not one (or
+ * `other`). Infants are not part of the contract.
  */
 export function parseCreatePrefill(search: string): CreatePrefill {
   const query = new URLSearchParams(search);
@@ -116,6 +138,8 @@ export function parseCreatePrefill(search: string): CreatePrefill {
   if (stay.departure) prefill.departure = stay.departure;
   if (stay.adults !== null) prefill.adults = stay.adults;
   if (stay.children !== null) prefill.children = stay.children;
+  const stayTypes = parseStayTypes(query.get('stay'));
+  if (stayTypes.length > 0) prefill.stay = stayTypes;
   return prefill;
 }
 
@@ -123,9 +147,13 @@ type Id = string | number;
 
 export const ROUTES = {
   explore: () => buildPath(PATTERNS.explore),
-  /** A place's detail page, with the stay to check (E2) when there is one. */
-  placeDetail: (providerId: string, externalId: string, stay?: Partial<StayParams>) =>
-    buildPath(PATTERNS.placeDetail, { providerId, externalId }, stayParamsQuery(stay)),
+  /** A place's detail page, with the stay to check (E2) and the stay types, when there are. */
+  placeDetail: (providerId: string, externalId: string, stay?: PlaceLinkQuery) =>
+    buildPath(
+      PATTERNS.placeDetail,
+      { providerId, externalId },
+      { ...stayParamsQuery(stay), stay: stay?.stayTypes }
+    ),
   watches: () => buildPath(PATTERNS.watches),
   watchNew: (prefill?: CreatePrefill) => buildPath(PATTERNS.watchNew, {}, { ...prefill }),
   watchDetail: (id: Id) => buildPath(PATTERNS.watchDetail, { id }),

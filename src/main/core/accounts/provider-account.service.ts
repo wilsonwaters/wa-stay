@@ -43,14 +43,34 @@
  *
  * **`recheck(id)`** checks once more after a payment window closes: the person may have
  * signed in on the provider's page while paying.
+ *
+ * **`credentials` accounts** (§12.35; brief R5, RO4): the person saves the details the provider
+ * asks for (`CredentialsAuth.fields`) in Settings → Accounts.
+ * - `saveCredentials(id, values, confirmed)` needs every declared field (trimmed, not empty, at
+ *   most 256 characters) and every confirmation ticked (`VALIDATION`, with `values.<key>` or
+ *   `confirmed`), then asks the provider's `signIn` (15 s, at interactive priority). Only a
+ *   `signed-in` answer stores the values, each as `account.<key>` in the provider's scoped
+ *   secret vault (`registry.secretsOf`), all or nothing. A `signed-out` one is `VALIDATION`, in
+ *   the provider's own words (`message`) when they repeat no part of a value. Saving again
+ *   replaces them; saves and removals for a provider run one after another.
+ * - The status is worked out from what is stored: signed in when every field has a readable
+ *   value. `isSignedIn` is never called and no request is made; `refreshStale` skips them.
+ * - `signOut(id)` deletes the values and stores `signed-out`: no session to clear, never
+ *   `ACCOUNT_BUSY`.
+ * - `copyCredential(id, key)` writes a saved, `copyable` value to the clipboard from main.
+ * - `onCredentialsChanged(id)` runs after each save and removal.
+ * A value is never logged, never put in an error message, and never returned: an account
+ * carries the field descriptors and `savedFields` (key names) only. The sign-in window
+ * (`signIn`, `openSignInLink`) stays `NOT_IMPLEMENTED` for them.
  */
 
 import type { EventSink } from '@shared/contracts/events';
-import type {
-  AccountStatus,
-  ProviderAccount,
-  ProviderId,
-  ProviderManifest,
+import {
+  ACCOUNT_VALUE_MAX_LENGTH,
+  type AccountStatus,
+  type ProviderAccount,
+  type ProviderId,
+  type ProviderManifest,
 } from '@shared/types/provider.types';
 import type {
   ProviderAccountRecord,
@@ -61,11 +81,19 @@ import type {
 import type { ProviderRegistry } from '../../providers/registry';
 import type { ProviderLogger } from '../../providers/sdk/context';
 import { ProviderAuthRequiredError, ProviderCapabilityError } from '../../providers/sdk/errors';
-import type { AccommodationProvider, BrowserSessionAuth } from '../../providers/sdk/provider';
+import { withRequestPriority } from '../../providers/sdk/pacing';
+import {
+  CREDENTIALS_MESSAGE_MAX_LENGTH,
+  type AccommodationProvider,
+  type BrowserSessionAuth,
+  type CredentialsAuth,
+  type CredentialsSignInResult,
+} from '../../providers/sdk/provider';
 import { matchesOrigin, matchesUrlPattern } from '../../providers/sdk/url-patterns';
 import { AppError } from '../../utils/app-error';
 import type {
   AccountGate,
+  Clipboard,
   ProviderSessionStore,
   ProviderWindowHandle,
   ProviderWindowOpener,
@@ -76,7 +104,7 @@ export interface AccountTimings {
   cacheMs: number;
   /** How long an answer that was not definite (`unknown`) is reused. */
   unknownCacheMs: number;
-  /** The most a check may take. */
+  /** The most a check may take: `isSignedIn`, or a `credentials` sign-in's `signIn`. */
   probeTimeoutMs: number;
   /** How often an open sign-in window is checked, while it shows the provider's own site. */
   pollMs: number;
@@ -96,16 +124,24 @@ export const DEFAULT_ACCOUNT_TIMINGS: Readonly<AccountTimings> = Object.freeze({
 });
 
 export interface ProviderAccountServiceDeps {
-  providers: Pick<ProviderRegistry, 'get' | 'list' | 'httpOf'>;
+  providers: Pick<ProviderRegistry, 'get' | 'list' | 'httpOf' | 'secretsOf'>;
   accounts: Pick<ProviderAccountRepository, 'get' | 'upsert'>;
   windows: ProviderWindowOpener;
   sessions: ProviderSessionStore;
+  /** Where `copyCredential` writes a saved value. */
+  clipboard: Clipboard;
   events: EventSink;
   /**
    * True while the provider's session holds something a sign-out would lose at `now` (the
    * service's clock): a queue place, a hold being placed, or a hold waiting for payment.
    */
   isBusy(providerId: ProviderId, now: Date): boolean;
+  /**
+   * Runs after a `credentials` account's values are saved, replaced or removed, with the
+   * provider id only (R16: drop its availability caches and re-arm its snipes). A failure is
+   * logged and never fails the save.
+   */
+  onCredentialsChanged?(providerId: ProviderId): void;
   logger: ProviderLogger;
   clock?: () => Date;
   timings?: Partial<AccountTimings>;
@@ -128,13 +164,23 @@ interface SignInSession {
 
 const REQUIRES_SIGN_IN_FOR_HOLDS = new Set(['required-for-holds', 'required']);
 
+/** Where a `credentials` field's value is kept in the provider's scoped secret vault. */
+export const credentialKey = (fieldKey: string): string => `account.${fieldKey}`;
+
+/** An error's name, never its message: a message may quote what was typed. */
+function errorName(error: unknown): string {
+  return error instanceof Error ? error.name : typeof error;
+}
+
 export class ProviderAccountService implements AccountGate {
   private readonly providers: ProviderAccountServiceDeps['providers'];
   private readonly repo: ProviderAccountServiceDeps['accounts'];
   private readonly windows: ProviderWindowOpener;
   private readonly sessions: ProviderSessionStore;
+  private readonly clipboard: Clipboard;
   private readonly events: EventSink;
   private readonly isBusy: (providerId: ProviderId, now: Date) => boolean;
+  private readonly onCredentialsChanged?: (providerId: ProviderId) => void;
   private readonly log: ProviderLogger;
   private readonly clock: () => Date;
   private readonly timings: AccountTimings;
@@ -147,6 +193,10 @@ export class ProviderAccountService implements AccountGate {
   /** Bumped by sign-out: a check that started before it records nothing. */
   private readonly epochs = new Map<ProviderId, number>();
   private readonly signIns = new Map<ProviderId, SignInSession>();
+  /** Each provider's last `credentials` save or removal: the next one waits for it. */
+  private readonly credentialQueues = new Map<ProviderId, Promise<void>>();
+  /** `<providerId>:<key>` of saved values that could not be read, warned about once. */
+  private readonly unreadable = new Set<string>();
   private startupTimer?: ReturnType<typeof setTimeout>;
   private disposed = false;
 
@@ -155,19 +205,32 @@ export class ProviderAccountService implements AccountGate {
     this.repo = deps.accounts;
     this.windows = deps.windows;
     this.sessions = deps.sessions;
+    this.clipboard = deps.clipboard;
     this.events = deps.events;
     this.isBusy = deps.isBusy;
+    this.onCredentialsChanged = deps.onCredentialsChanged;
     this.log = deps.logger.child({ module: 'accounts' });
     this.clock = deps.clock ?? (() => new Date());
     this.timings = { ...DEFAULT_ACCOUNT_TIMINGS, ...deps.timings };
   }
 
-  /** An account for every provider that has sign-in, from the stored rows. No network. */
-  list(): ProviderAccount[] {
-    return this.providers
-      .list()
-      .filter((manifest) => manifest.capabilities.account !== 'none')
-      .map((manifest) => this.toAccount(manifest, this.repo.get(manifest.id)));
+  /**
+   * An account for every provider that has sign-in, from the stored rows (and, for
+   * `credentials`, from what the vault holds). No network.
+   */
+  async list(): Promise<ProviderAccount[]> {
+    const accounts: ProviderAccount[] = [];
+    for (const manifest of this.providers.list()) {
+      if (manifest.capabilities.account === 'none') continue;
+      const provider = this.providers.get(manifest.id);
+      const auth = provider.auth;
+      accounts.push(
+        auth?.kind === 'credentials'
+          ? await this.credentialsAccount(provider, auth)
+          : this.toAccount(manifest, this.repo.get(manifest.id))
+      );
+    }
+    return accounts;
   }
 
   /** The stored (last definite) state. Synchronous; no network. */
@@ -178,6 +241,8 @@ export class ProviderAccountService implements AccountGate {
   /** Asks the provider whether its session is signed in (see the class comment). */
   status(providerId: ProviderId, options: { force?: boolean } = {}): Promise<ProviderAccount> {
     const provider = this.accountProvider(providerId);
+    if (provider.auth?.kind === 'credentials')
+      return this.credentialsStatus(provider, provider.auth);
     const inFlight = this.probes.get(providerId);
     if (inFlight) return inFlight.promise;
     if (!options.force) {
@@ -231,10 +296,14 @@ export class ProviderAccountService implements AccountGate {
     this.startSignIn(provider, auth, url);
   }
 
-  /** Signs out (see the class comment). */
+  /** Signs out, or for `credentials` removes the saved values (see the class comment). */
   async signOut(providerId: ProviderId): Promise<ProviderAccount> {
     const provider = this.accountProvider(providerId);
     const { manifest } = provider;
+    const auth = provider.auth;
+    if (auth?.kind === 'credentials') {
+      return this.serially(providerId, () => this.removeCredentials(provider, auth));
+    }
     if (this.isBusy(providerId, this.clock())) {
       throw new AppError(
         'ACCOUNT_BUSY',
@@ -261,6 +330,57 @@ export class ProviderAccountService implements AccountGate {
     this.log.info(`Account ${providerId}: signed out; its session was cleared`);
     this.events.emit('account:updated', account);
     return account;
+  }
+
+  /**
+   * Saves a `credentials` account's values once the person confirmed each statement and the
+   * provider's `signIn` accepted them (see the class comment). Replaces any saved values.
+   * `VALIDATION` for a provider that uses another sign-in, for missing, unknown, empty or
+   * too long values (`values.<key>`), for an unticked statement (`confirmed`) and when the
+   * provider refuses them; `PROVIDER_ERROR` when it could not tell; `INTERNAL` when they could
+   * not be stored (nothing is). No message quotes a value.
+   */
+  async saveCredentials(
+    providerId: ProviderId,
+    values: Readonly<Record<string, string>>,
+    confirmed: readonly string[]
+  ): Promise<ProviderAccount> {
+    const { provider, auth } = this.credentialsAuth(providerId);
+    const checked = checkCredentials(provider.manifest, auth, values, confirmed);
+    return this.serially(providerId, () => this.storeCredentials(provider, auth, checked));
+  }
+
+  /**
+   * Writes a saved `credentials` value to the clipboard, from main: the renderer never gets it.
+   * The field must be declared and `copyable` (`VALIDATION`) and saved (`NOT_FOUND`).
+   */
+  async copyCredential(providerId: ProviderId, key: string): Promise<void> {
+    const { provider, auth } = this.credentialsAuth(providerId);
+    const field = auth.fields.find((f) => f.key === key);
+    if (!field) {
+      throw new AppError('VALIDATION', `${provider.manifest.shortName} has no such detail`, {
+        issues: ['key'],
+      });
+    }
+    if (!field.copyable) {
+      throw new AppError('VALIDATION', `${field.label} can't be copied`, { issues: ['key'] });
+    }
+    let value: string | undefined;
+    try {
+      value = await this.providers.secretsOf(providerId).get(credentialKey(key));
+    } catch {
+      this.warnUnreadable(providerId, key);
+      throw new AppError('INTERNAL', `Couldn't read your saved ${field.label}. Add it again.`);
+    }
+    if (!value) throw new AppError('NOT_FOUND', `No ${field.label} is saved`);
+    try {
+      this.clipboard.writeText(value);
+    } catch (error) {
+      // The clipboard's own error is not passed on: only its name is logged
+      this.log.warn(`Account ${providerId}: ${key} could not be copied (${errorName(error)})`);
+      throw new AppError('INTERNAL', `Couldn't copy your ${field.label}. Try again.`);
+    }
+    this.log.info(`Account ${providerId}: ${key} copied to the clipboard`);
   }
 
   /**
@@ -312,6 +432,8 @@ export class ProviderAccountService implements AccountGate {
     for (const manifest of this.providers.list()) {
       if (this.disposed) return;
       if (manifest.capabilities.account === 'none') continue;
+      // Worked out from the vault whenever it is asked: nothing to refresh
+      if (this.providers.get(manifest.id).auth?.kind === 'credentials') continue;
       const last = this.repo.get(manifest.id)?.lastCheckedAt?.getTime();
       if (last !== undefined && this.clock().getTime() - last < this.timings.staleMs) continue;
       try {
@@ -348,7 +470,10 @@ export class ProviderAccountService implements AccountGate {
     return provider;
   }
 
-  /** The provider and its `browser-session` auth; other kinds are not built yet (§12.30). */
+  /**
+   * The provider and its `browser-session` auth. A `credentials` account has no window (the
+   * renderer saves its details instead); `automation` is not built yet (§12.30).
+   */
   private browserSessionAuth(providerId: ProviderId): {
     provider: AccommodationProvider;
     auth: BrowserSessionAuth;
@@ -362,6 +487,266 @@ export class ProviderAccountService implements AccountGate {
       );
     }
     return { provider, auth };
+  }
+
+  /** The provider and its `credentials` auth; `VALIDATION` for another kind. */
+  private credentialsAuth(providerId: ProviderId): {
+    provider: AccommodationProvider;
+    auth: CredentialsAuth;
+  } {
+    const provider = this.accountProvider(providerId);
+    const auth = provider.auth;
+    if (auth?.kind !== 'credentials') {
+      throw new AppError('VALIDATION', `${provider.manifest.shortName} doesn't use saved details`, {
+        issues: ['providerId'],
+      });
+    }
+    return { provider, auth };
+  }
+
+  /** Runs `task` once every earlier save or removal for the provider has settled. */
+  private serially<T>(providerId: ProviderId, task: () => Promise<T>): Promise<T> {
+    const previous = this.credentialQueues.get(providerId) ?? Promise.resolve();
+    const run = previous.then(task);
+    const settled = run.then(
+      () => undefined,
+      () => undefined
+    );
+    this.credentialQueues.set(providerId, settled);
+    void settled.then(() => {
+      if (this.credentialQueues.get(providerId) === settled)
+        this.credentialQueues.delete(providerId);
+    });
+    return run;
+  }
+
+  private async storeCredentials(
+    provider: AccommodationProvider,
+    auth: CredentialsAuth,
+    values: Readonly<Record<string, string>>
+  ): Promise<ProviderAccount> {
+    const { manifest } = provider;
+    const providerId = manifest.id;
+    const answer = await this.askProvider(provider, auth, values);
+    if (answer.state === 'signed-out') {
+      const refusal =
+        refusalMessage(answer.message, [values, answer.values]) ??
+        `${manifest.shortName} didn't accept these details`;
+      throw new AppError('VALIDATION', refusal, {
+        issues: auth.fields.map((field) => `values.${field.key}`),
+      });
+    }
+    if (answer.state !== 'signed-in') {
+      throw new AppError('PROVIDER_ERROR', "Couldn't check these details. Try again.");
+    }
+    if (this.disposed) throw new AppError('INTERNAL', 'WA Stay is closing; nothing was saved.');
+    let toStore = normalisedValues(auth, values, answer.values);
+    if (!toStore) {
+      this.log.warn(
+        `Account ${providerId}: its normalised values were ignored (an undeclared key, or a value that is not text, empty or too long); the typed ones are kept`
+      );
+      toStore = values;
+    }
+
+    const secrets = this.providers.secretsOf(providerId);
+    let written = 0;
+    try {
+      for (const field of auth.fields) {
+        await secrets.set(credentialKey(field.key), toStore[field.key]);
+        written++;
+      }
+    } catch (error) {
+      this.log.warn(`Account ${providerId}: the details could not be stored (${errorName(error)})`);
+      // Some values were already replaced: none of the set is kept, so no half of one is used
+      if (written > 0) await this.forgetCredentials(provider, auth).catch(() => undefined);
+      throw new AppError('INTERNAL', "Couldn't save your details on this computer. Try again.");
+    }
+
+    const now = this.clock();
+    const after = this.repo.upsert(
+      { providerId, status: 'signed-in', lastCheckedAt: now, lastSignedInAt: now },
+      now
+    );
+    this.clearUnreadable(providerId);
+    const saved = auth.fields.map((field) => field.key);
+    const account = this.toCredentialsAccount(manifest, auth, after, 'signed-in', saved);
+    this.log.info(`Account ${providerId}: details saved`);
+    this.events.emit('account:updated', account);
+    this.credentialsChanged(providerId);
+    return account;
+  }
+
+  /** The provider's `signIn` answer for the values, within the probe limit, or `unknown`. */
+  private async askProvider(
+    provider: AccommodationProvider,
+    auth: CredentialsAuth,
+    values: Readonly<Record<string, string>>
+  ): Promise<CredentialsSignInResult> {
+    const providerId = provider.manifest.id;
+    const controller = new AbortController();
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    // Bounded even when the provider ignores its signal
+    const timedOut = new Promise<never>((_, reject) => {
+      timer = setTimeout(() => {
+        controller.abort();
+        reject(new Error('timeout'));
+      }, this.timings.probeTimeoutMs);
+      timer.unref?.();
+    });
+    try {
+      // The person is waiting: any request it makes goes ahead of background work
+      const answer = await Promise.race([
+        withRequestPriority('interactive', () =>
+          auth.signIn({ ...values }, this.providers.httpOf(providerId), controller.signal)
+        ),
+        timedOut,
+      ]);
+      return answer?.state ? answer : { state: 'unknown' };
+    } catch (error) {
+      this.log.debug(
+        `Account ${providerId}: the details could not be checked (${errorName(error)})`
+      );
+      return { state: 'unknown' };
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+
+  /** Deletes the saved values and stores `signed-out` (never refused: no session to lose). */
+  private async removeCredentials(
+    provider: AccommodationProvider,
+    auth: CredentialsAuth
+  ): Promise<ProviderAccount> {
+    const account = await this.forgetCredentials(provider, auth);
+    this.log.info(`Account ${provider.manifest.id}: saved details removed`);
+    return account;
+  }
+
+  /** Deletes every `account.<key>`, stores `signed-out`, announces it and runs the hook. */
+  private async forgetCredentials(
+    provider: AccommodationProvider,
+    auth: CredentialsAuth
+  ): Promise<ProviderAccount> {
+    const { manifest } = provider;
+    const providerId = manifest.id;
+    const secrets = this.providers.secretsOf(providerId);
+    for (const field of auth.fields) await secrets.delete(credentialKey(field.key));
+    this.clearUnreadable(providerId);
+    const now = this.clock();
+    const after = this.repo.upsert({ providerId, status: 'signed-out', lastCheckedAt: now }, now);
+    const account = this.toCredentialsAccount(manifest, auth, after, 'signed-out', []);
+    this.events.emit('account:updated', account);
+    this.credentialsChanged(providerId);
+    return account;
+  }
+
+  private credentialsChanged(providerId: ProviderId): void {
+    const failed = (error: unknown) =>
+      this.log.warn(`Account ${providerId}: the change hook failed (${errorName(error)})`);
+    try {
+      const result: unknown = this.onCredentialsChanged?.(providerId);
+      if (result instanceof Promise) result.catch(failed);
+    } catch (error) {
+      failed(error);
+    }
+  }
+
+  /** The keys of the fields whose value is stored and readable. No network. */
+  private async savedFields(providerId: ProviderId, auth: CredentialsAuth): Promise<string[]> {
+    const secrets = this.providers.secretsOf(providerId);
+    const saved: string[] = [];
+    for (const field of auth.fields) {
+      try {
+        if (await secrets.get(credentialKey(field.key))) saved.push(field.key);
+      } catch {
+        this.warnUnreadable(providerId, field.key);
+      }
+    }
+    return saved;
+  }
+
+  /** Once per value (until it is saved or removed again), naming its key only. */
+  private warnUnreadable(providerId: ProviderId, key: string): void {
+    const id = `${providerId}:${key}`;
+    if (this.unreadable.has(id)) return;
+    this.unreadable.add(id);
+    this.log.warn(`Account ${providerId}: the saved ${key} can't be read; it counts as not saved`);
+  }
+
+  private clearUnreadable(providerId: ProviderId): void {
+    for (const id of [...this.unreadable]) {
+      if (id.startsWith(`${providerId}:`)) this.unreadable.delete(id);
+    }
+  }
+
+  /** A `credentials` account as stored: signed in when every field has a readable value. */
+  private async credentialsAccount(
+    provider: AccommodationProvider,
+    auth: CredentialsAuth
+  ): Promise<ProviderAccount> {
+    const { manifest } = provider;
+    const saved = await this.savedFields(manifest.id, auth);
+    const status = saved.length === auth.fields.length ? 'signed-in' : 'signed-out';
+    return this.toCredentialsAccount(manifest, auth, this.repo.get(manifest.id), status, saved);
+  }
+
+  /**
+   * `status` for a `credentials` account: no request. When the vault and the stored row
+   * disagree (a value became unreadable), the row follows the vault, once.
+   */
+  private async credentialsStatus(
+    provider: AccommodationProvider,
+    auth: CredentialsAuth
+  ): Promise<ProviderAccount> {
+    const account = await this.credentialsAccount(provider, auth);
+    const providerId = provider.manifest.id;
+    const signedIn = account.status === 'signed-in';
+    if (this.disposed || (this.repo.get(providerId)?.status === 'signed-in') === signedIn) {
+      return account;
+    }
+    const now = this.clock();
+    const after = this.repo.upsert(
+      {
+        providerId,
+        status: signedIn ? 'signed-in' : 'signed-out',
+        lastCheckedAt: now,
+        ...(signedIn ? { lastSignedInAt: now } : {}),
+      },
+      now
+    );
+    const recorded = this.toCredentialsAccount(
+      provider.manifest,
+      auth,
+      after,
+      account.status,
+      account.savedFields ?? []
+    );
+    this.log.info(`Account ${providerId}: ${recorded.status}`);
+    this.events.emit('account:updated', recorded);
+    return recorded;
+  }
+
+  private toCredentialsAccount(
+    manifest: Readonly<ProviderManifest>,
+    auth: CredentialsAuth,
+    record: ProviderAccountRecord | null | undefined,
+    status: ProviderAccount['status'],
+    saved: readonly string[]
+  ): ProviderAccount {
+    return {
+      ...this.toAccount(manifest, record),
+      status,
+      // Picked field by field: nothing else a provider put on a descriptor crosses to the renderer
+      fields: auth.fields.map(({ key, label, help, secret, copyable }) => ({
+        key,
+        label,
+        ...(help ? { help } : {}),
+        secret,
+        ...(copyable ? { copyable: true } : {}),
+      })),
+      confirmations: (auth.confirmations ?? []).map(({ key, label }) => ({ key, label })),
+      savedFields: [...saved],
+    };
   }
 
   private epochOf(providerId: ProviderId): number {
@@ -455,6 +840,7 @@ export class ProviderAccountService implements AccountGate {
     return {
       providerId: manifest.id,
       requirement: manifest.capabilities.account,
+      authKind: this.providers.get(manifest.id).auth?.kind ?? 'browser-session',
       status: record?.status ?? 'unknown',
       ...(record?.displayName ? { displayName: record.displayName } : {}),
       ...(record?.email ? { email: record.email } : {}),
@@ -601,4 +987,124 @@ export class ProviderAccountService implements AccountGate {
       );
     }
   }
+}
+
+/**
+ * The values to store: every declared field, trimmed (spaces and dashes inside are the
+ * provider's to reformat in `signIn`), not empty and at most `ACCOUNT_VALUE_MAX_LENGTH`
+ * characters; no undeclared key; every confirmation ticked. Otherwise `VALIDATION`, with the
+ * paths at fault (`values.<key>`, `confirmed`) and a message that never quotes a value.
+ */
+function checkCredentials(
+  manifest: Readonly<ProviderManifest>,
+  auth: CredentialsAuth,
+  values: Readonly<Record<string, string>>,
+  confirmed: readonly string[]
+): Record<string, string> {
+  const issues: string[] = [];
+  let message: string | undefined;
+  const fail = (path: string, text: string) => {
+    issues.push(path);
+    message ??= text;
+  };
+
+  const checked: Record<string, string> = {};
+  for (const field of auth.fields) {
+    const raw: unknown = Object.hasOwn(values, field.key) ? values[field.key] : undefined;
+    const value = typeof raw === 'string' ? raw.trim() : '';
+    if (!value) fail(`values.${field.key}`, `${field.label} is missing`);
+    else if ([...value].length > ACCOUNT_VALUE_MAX_LENGTH) {
+      fail(
+        `values.${field.key}`,
+        `${field.label} is too long (${ACCOUNT_VALUE_MAX_LENGTH} characters at most)`
+      );
+    } else checked[field.key] = value;
+  }
+  for (const key of Object.keys(values)) {
+    if (!auth.fields.some((field) => field.key === key)) {
+      fail(`values.${key}`, `${manifest.shortName} doesn't ask for that detail`);
+    }
+  }
+  const ticked = new Set(confirmed);
+  if ((auth.confirmations ?? []).some((confirmation) => !ticked.has(confirmation.key))) {
+    fail('confirmed', 'Tick each statement to save');
+  }
+
+  if (issues.length) throw new AppError('VALIDATION', message, { issues });
+  return checked;
+}
+
+/** How many characters in a row of a value a refusal may not repeat (`refusalMessage`). */
+const QUOTED_RUN = 4;
+
+/** Text as compared for quoting: NFKC, lower case, letters and digits only. */
+function comparable(text: string): string {
+  return text
+    .normalize('NFKC')
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}]/gu, '');
+}
+
+/**
+ * Whether `message` repeats any of `value`: any run of `QUOTED_RUN` characters of it (the whole
+ * value when it is shorter), compared as letters and digits only (`comparable`), with and
+ * without its leading zeros. So "ending 0123", "12345678…" and "1.234.567.890.123" all quote
+ * `1234567890123`, and "12345678" quotes `012345678`.
+ */
+function quotesValue(message: string, value: string): boolean {
+  const haystack = comparable(message);
+  const plain = comparable(value);
+  for (const form of new Set([plain, plain.replace(/^0+/, '')])) {
+    if (!form) continue;
+    if (form.length < QUOTED_RUN) {
+      if (haystack.includes(form)) return true;
+      continue;
+    }
+    for (let at = 0; at + QUOTED_RUN <= form.length; at++) {
+      if (haystack.includes(form.slice(at, at + QUOTED_RUN))) return true;
+    }
+  }
+  return false;
+}
+
+/**
+ * A refusal's own words (`CredentialsSignInResult.message`), or undefined when they cannot be
+ * shown: not text, empty, over `CREDENTIALS_MESSAGE_MAX_LENGTH` characters once trimmed, or
+ * repeating any part of a value it was given, typed or returned (`quotesValue`), so a
+ * provider's refusal never puts what was typed on screen, whole or in part.
+ */
+function refusalMessage(
+  message: unknown,
+  values: ReadonlyArray<Readonly<Record<string, unknown>> | undefined>
+): string | undefined {
+  if (typeof message !== 'string') return undefined;
+  const text = message.trim();
+  if (!text || [...text].length > CREDENTIALS_MESSAGE_MAX_LENGTH) return undefined;
+  const given = values.flatMap((set) =>
+    Object.values(set ?? {}).filter((value): value is string => typeof value === 'string')
+  );
+  return given.some((value) => quotesValue(text, value)) ? undefined : text;
+}
+
+/**
+ * The values to store: the typed ones, with any the provider's `signIn` returned in their
+ * place (`CredentialsSignInResult.values`), or null when what it returned breaks the rules
+ * (an undeclared key, or a value that is not text, empty or over `ACCOUNT_VALUE_MAX_LENGTH`
+ * characters once trimmed).
+ */
+function normalisedValues(
+  auth: CredentialsAuth,
+  typed: Readonly<Record<string, string>>,
+  returned: unknown
+): Record<string, string> | null {
+  if (returned === undefined) return { ...typed };
+  if (typeof returned !== 'object' || returned === null || Array.isArray(returned)) return null;
+  const values: Record<string, string> = { ...typed };
+  for (const [key, raw] of Object.entries(returned)) {
+    if (!auth.fields.some((field) => field.key === key) || typeof raw !== 'string') return null;
+    const value = raw.trim();
+    if (!value || [...value].length > ACCOUNT_VALUE_MAX_LENGTH) return null;
+    values[key] = value;
+  }
+  return values;
 }

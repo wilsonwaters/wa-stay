@@ -17,8 +17,9 @@ import {
 import type { BrowserAutomation } from './browser';
 import { PlaywrightBrowserAutomation } from './browser-automation';
 import type { HttpClient } from './http';
-import type { KeyValueStore } from './kv-store';
+import { withoutCoreKeys, type KeyValueStore } from './kv-store';
 import { freezeProviderManifest } from './manifest';
+import { createPacedHttpClient } from './pacing';
 import { createScopedSecretVault, type ScopedSecretVault, type SecretVaultLike } from './secrets';
 
 /** The logging surface providers use (Winston's logger satisfies it). */
@@ -38,14 +39,17 @@ export interface ProviderContext {
   readonly timezone: string;
   /** `manifest.limits`, or `DEFAULT_PROVIDER_LIMITS`. */
   readonly limits: Readonly<ProviderLimits>;
-  /** Bound to the provider's session partition, whose cookies its sign-in and payment windows share. */
+  /**
+   * Bound to the provider's session partition, whose cookies its sign-in and payment windows
+   * share. Paced by the core (`pacing.ts`) when `limits.minRequestIntervalMs` is above 0.
+   */
   readonly http: HttpClient;
   /**
    * Drives the installed Edge or Chrome (`PlaywrightBrowserAutomation`), with the provider's
    * own profile at `<providersDir>/<id>/browser`. Costs nothing until first used.
    */
   readonly browser: BrowserAutomation;
-  /** The provider's own key-value state. */
+  /** The provider's own key-value state. `core.*` keys are the app's: refused and never listed. */
   readonly state: KeyValueStore;
   /** Encrypted secrets, stored in `state` and readable only by this provider. */
   readonly secrets: ScopedSecretVault;
@@ -69,6 +73,11 @@ export interface ProviderContextDeps {
   providersDir: string;
   /** Development only: the browser executable to automate instead of detecting Edge or Chrome. */
   browserExecutablePath?: string;
+  /**
+   * Test-only (fixture mode): `createHttp`'s client as it is, never paced, so recorded
+   * answers come at once.
+   */
+  unpaced?: boolean;
   clock?: () => Date;
 }
 
@@ -79,14 +88,21 @@ export function createProviderContext(
 ): ProviderContext {
   const frozen = freezeProviderManifest(manifest);
   const id = frozen.id;
-  const state = deps.createState(id);
+  // The core's `core.*` keys are out of the provider's reach
+  const state = withoutCoreKeys(deps.createState(id), id);
   const logger = deps.logger.child({ provider: id });
+  const limits = Object.freeze(providerLimits(frozen));
+  const transport = deps.createHttp(id);
+  const intervalMs = limits.minRequestIntervalMs ?? 0;
   return Object.freeze({
     id,
     manifest: frozen,
     timezone: frozen.timezone,
-    limits: Object.freeze(providerLimits(frozen)),
-    http: deps.createHttp(id),
+    limits,
+    http:
+      intervalMs > 0 && !deps.unpaced
+        ? createPacedHttpClient(transport, { intervalMs })
+        : transport,
     browser: new PlaywrightBrowserAutomation({
       providerId: id,
       providerName: frozen.name,

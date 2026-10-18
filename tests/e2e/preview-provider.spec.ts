@@ -175,7 +175,7 @@ test.describe('preview a provider', () => {
       const noUnits = answered.getByText(/^No .+ were listed for these dates$/);
       const failed = stayCard
         .getByRole('alert')
-        .or(stayCard.getByText(/waiting queue right now|Too many checks/));
+        .or(stayCard.getByText(/waiting queue right now|asked WA Stay to slow down/));
       await step(
         `"Check availability" on the first place's page gave no answer for ${range}`,
         async () => {
@@ -206,7 +206,7 @@ test.describe('preview a provider', () => {
       }
     } else {
       await expect(
-        stayCard.getByText(`${shortName} doesn't share availability with WA Stay`, { exact: false })
+        stayCard.getByText("WA Stay can't check availability here", { exact: false })
       ).toBeVisible();
     }
     await screenshot(window, testInfo, 'place');

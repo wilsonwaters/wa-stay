@@ -16,8 +16,9 @@
 
 import path from 'path';
 import type Database from 'better-sqlite3';
-import { app, powerMonitor } from 'electron';
+import { app, clipboard, powerMonitor } from 'electron';
 import { SnipeReleaseMode, SnipeStatus } from '@shared/types/common.types';
+import { providerUnitKinds } from '@shared/utils/unit-noun';
 import { ProviderAccountService } from '../core/accounts/provider-account.service';
 import { LocationCatalogService } from '../core/catalog/location-catalog.service';
 import { closeDatabase } from '../database/connection';
@@ -50,6 +51,7 @@ import { JobScheduler } from '../scheduler/job-scheduler';
 import { RendererEvents } from '../ipc/events';
 import { TrustedWebContents } from '../ipc/trusted-web-contents';
 import { BUILT_IN_PROVIDERS, registerBuiltInProviders } from '../providers';
+import { ProviderExperiments } from '../providers/experiments';
 import { ProviderRegistry } from '../providers/registry';
 import {
   createProviderContext,
@@ -104,6 +106,8 @@ export interface AppContainer {
   readonly profile: LocalProfile;
   /** The accommodation providers: `providerFactories`, by default the built-in ones. */
   readonly providers: ProviderRegistry;
+  /** The providers' experiments: the person's choices, applied when the providers register. */
+  readonly experiments: ProviderExperiments;
   /** Every provider's locations: sync, search, detail and availability (`catalog.*`). */
   readonly catalogService: LocationCatalogService;
   readonly notifierDispatcher: NotificationDispatcher;
@@ -113,7 +117,11 @@ export interface AppContainer {
   readonly documentWindows: DocumentWindows;
   /** The person's account with each provider: status, in-app sign-in, sign-out. */
   readonly accounts: ProviderAccountService;
-  /** Paying for a snipe's or watch's hold in a payment window (`*.openPayment`). */
+  /**
+   * Paying for a snipe's or watch's hold in a payment window (`*.openPayment`), and letting one
+   * go (`*.releaseHold`, before a delete, and on a payment window's close where the provider
+   * asks for it).
+   */
   readonly holdPayments: HoldPaymentService;
   readonly bookingService: BookingService;
   readonly notificationService: NotificationService;
@@ -165,6 +173,11 @@ export interface ContainerOptions {
    * notification; false when there is no window or the app is quitting.
    */
   readonly showMainWindow?: () => boolean;
+  /**
+   * Opens an alert's booking page in the system browser (`shell.openExternal`), after a click
+   * on its desktop notification has opened its page in the app.
+   */
+  readonly openExternal?: (url: string) => Promise<void>;
 }
 
 export function createContainer({
@@ -176,6 +189,7 @@ export function createContainer({
   fixtureMode,
   providerFactories = BUILT_IN_PROVIDERS,
   showMainWindow,
+  openExternal,
 }: ContainerOptions): AppContainer {
   // Lazy: no safeStorage call and no key file until the first secret is read or written
   const vault = new SecretVault({
@@ -228,11 +242,40 @@ export function createContainer({
     providersDir: path.join(app.getPath('userData'), 'providers'),
     // Development only (§12.34): a packaged build always detects Edge or Chrome itself.
     browserExecutablePath: fromSource ? process.env.WA_STAY_BROWSER_PATH : undefined,
+    // Recorded answers need no pacing: fixture mode stays fast for the smoke tests.
+    unpaced: Boolean(fixtureMode),
+  };
+  // One booking per night across snipes and auto-hold watches; it also knows the holds in flight
+  const nightGuard = new NightGuard(repositories.snipes, repositories.watches);
+  // Turning off a provider's holds, or signing out, would lose:
+  // - a queue place: any snipe in the queue, and any snipe sniping through it (its checks carry
+  //   the queue session on the provider's partition), alert snipes included;
+  // - a hold being placed: a hold snipe sniping, or any hold whose `holds.create` still runs;
+  // - a hold awaiting payment;
+  // - a hold being let go (`holds.release` running: R18).
+  // An alert snipe that uses no queue needs no session while it checks. A snipe through the
+  // queue and waiting for its release (WAITING_RELEASE) is not counted, as before R13.
+  let releasingHold: (providerId: string) => boolean = () => false;
+  const isBusy = (providerId: string, now: Date): boolean => {
+    const snipes = repositories.snipes;
+    return (
+      nightGuard.reserving(providerId) ||
+      releasingHold(providerId) ||
+      snipes.countByStatus(providerId, [SnipeStatus.QUEUEING]) > 0 ||
+      snipes.countByStatus(providerId, [SnipeStatus.SNIPING], { accessGateEnabled: true }) > 0 ||
+      snipes.countByStatus(providerId, [SnipeStatus.SNIPING, SnipeStatus.HELD], {
+        action: 'hold',
+      }) > 0 ||
+      repositories.watches.countUnexpiredHolds(providerId, now) > 0
+    );
   };
   const providers = new ProviderRegistry({ logger });
+  // The person's experiment choices apply here, as each provider registers: after a restart
+  const experiments = new ProviderExperiments({ state: providerState, providers, isBusy, logger });
   registerBuiltInProviders(providers, (manifest) => createProviderContext(manifest, providerDeps), {
     factories: providerFactories,
     logger,
+    experiments,
   });
 
   const catalogService = new LocationCatalogService({
@@ -272,19 +315,27 @@ export function createContainer({
     accounts: repositories.providerAccounts,
     windows: providerWindows,
     sessions: providerWindows,
+    // `accounts.copyCredential`: main writes a saved value, so it never reaches the renderer
+    clipboard: { writeText: (text) => clipboard.writeText(text) },
     events: rendererEvents,
-    // Signing out would lose a queue place, a hold being placed, or a hold awaiting payment.
-    isBusy: (providerId, now) =>
-      repositories.snipes.countByStatus(providerId, [
-        SnipeStatus.QUEUEING,
-        SnipeStatus.SNIPING,
-        SnipeStatus.HELD,
-      ]) > 0 || repositories.watches.countUnexpiredHolds(providerId, now) > 0,
+    isBusy,
+    // Saved details changed (an RAC member number saved, replaced or removed): the provider's
+    // availability answers are asked again (prices and free nights change with membership),
+    // and its snipes ask for their release instants again (the member pre-sale moves them).
+    // The renderer drops its own answers on `account:updated`. Nothing else is touched.
+    onCredentialsChanged: (providerId) => {
+      catalogService.forgetAvailability(providerId);
+      scheduler.rearmSnipes(providerId);
+    },
     logger,
   });
 
   // A provider's short name (`ParkStay`), for emails and desktop notification titles
   const providerName = (id: string): string | undefined => providers.tryGet(id)?.manifest.shortName;
+  // Its manifest, to check an alert's booking link against its website
+  const providerManifest = (id: string) => providers.tryGet(id)?.manifest;
+  // Its default unit kinds, for what an alert calls units nothing else names (R9)
+  const unitKindsOfProvider = (id: string) => providerUnitKinds(providers.tryGet(id)?.manifest);
   const notifierDispatcher = new NotificationDispatcher(repositories.notifiers, [
     new SmtpEmailNotifier({ providerName, logoPath: getEmailLogoPath() }),
   ]);
@@ -297,10 +348,16 @@ export function createContainer({
     repositories.notifications,
     notifierDispatcher,
     rendererEvents,
-    { providerName, showMainWindow, preferences: notificationPreferences }
+    {
+      providerName,
+      providerManifest,
+      providerUnitKinds: unitKindsOfProvider,
+      showMainWindow,
+      openExternal,
+      preferences: notificationPreferences,
+    }
   );
   // Core services resolve every provider through the registry and its capabilities.
-  const nightGuard = new NightGuard(repositories.snipes, repositories.watches);
   const bookingService = new BookingService({
     bookings: repositories.bookings,
     providers,
@@ -314,6 +371,8 @@ export function createContainer({
     events: rendererEvents,
     // The stored (last definite) sign-in state; no network on the hold path
     accountState: (providerId) => accounts.storedState(providerId),
+    // A holds experiment turned off: no new hold before the restart
+    holdsTurningOff: (providerId) => experiments.holdsTurningOff(providerId),
   });
   const siteSniperService = new SiteSniperService({
     snipes: repositories.snipes,
@@ -323,6 +382,7 @@ export function createContainer({
     events: rendererEvents,
     // Only for providers whose holds need an account (ParkStay's is optional)
     accounts,
+    holdsTurningOff: (providerId) => experiments.holdsTurningOff(providerId),
   });
   const holdPayments = new HoldPaymentService({
     providers,
@@ -338,6 +398,7 @@ export function createContainer({
     locations: repositories.locations,
     logger,
   });
+  releasingHold = (providerId) => holdPayments.releasing(providerId);
   const autoUpdater = new AutoUpdaterService(rendererEvents);
   const scheduler = new JobScheduler({
     watches: watchService,
@@ -386,6 +447,7 @@ export function createContainer({
     rendererEvents,
     profile,
     providers,
+    experiments,
     catalogService,
     notifierDispatcher,
     providerWindows,

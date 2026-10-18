@@ -5,10 +5,10 @@
  * `register(factory, context)` checks, in order:
  * 1. the provider id, and that it is not taken;
  * 2. the factory's manifest: `ProviderManifestSchema`, then the manifest-flag rules
- *    (`MANIFEST_RULES`), e.g. `snipes` needs `holds`, `availability` and release modes;
+ *    (`MANIFEST_RULES`), e.g. `snipes` needs `availability` and release modes (§12.35);
  * 3. the context, built from the parsed manifest when `context` is a function;
- * 4. the provider the factory builds: links, a valid `auth` definition, and a module behind
- *    every capability (`CONSISTENCY_RULES`).
+ * 4. the provider the factory builds: links, a valid `auth` definition, a module behind every
+ *    capability, and the hold release hooks with their flag (`CONSISTENCY_RULES`).
  *
  * A core service that checked a capability (or used `require`) can therefore rely on the
  * module being there. The registry hands out a frozen plain provider object carrying the
@@ -17,12 +17,14 @@
  */
 
 import {
+  AccountConfirmationsSchema,
   AccountFieldsSchema,
   ProviderIdSchema,
   type BooleanCapability,
   type ProviderId,
   type ProviderManifest,
 } from '@shared/types/provider.types';
+import { applyExperiments } from './experiments';
 import type { ProviderContext, ProviderLogger } from './sdk/context';
 import {
   ProviderCapabilityError,
@@ -30,6 +32,7 @@ import {
   UnknownProviderError,
 } from './sdk/errors';
 import type { HttpClient } from './sdk/http';
+import type { ScopedSecretVault } from './sdk/secrets';
 import { parseProviderManifest } from './sdk/manifest';
 import { isHttpsOriginPattern, isHttpsUrlPattern } from './sdk/url-patterns';
 import {
@@ -55,7 +58,8 @@ interface CapabilityModules {
     availability: AvailabilityModule & Required<Pick<AvailabilityModule, 'search'>>;
   };
   holds: { holds: HoldsModule };
-  snipes: { availability: AvailabilityModule; holds: HoldsModule; release: ReleasePolicy };
+  // Holds are optional: a snipe without them alerts (§12.35)
+  snipes: { availability: AvailabilityModule; holds?: HoldsModule; release: ReleasePolicy };
   bookingImport: { bookings: BookingsModule & Required<Pick<BookingsModule, 'get'>> };
   accessGate: { access: AccessGate };
 }
@@ -81,14 +85,13 @@ export interface ConsistencyRule {
 const fn = (value: unknown): boolean => typeof value === 'function';
 const hasCheck = (p: AccommodationProvider): boolean => fn(p.availability?.check);
 
-/** Manifest-flag rules (§12.30). Exported so tests and the contract suite can name them. */
-export const MANIFEST_RULES: readonly ManifestRule[] = [
+/** The manifest-flag rules on the manifest as it is. */
+const FLAG_RULES: readonly ManifestRule[] = [
   {
-    rule: 'snipes needs holds and availability',
+    // Holds are optional: a snipe without them alerts (§12.35, amends §12.30)
+    rule: 'snipes needs availability',
     violation: ({ capabilities: c }) =>
-      c.snipes && !(c.holds && c.availability)
-        ? 'capability snipes needs capabilities holds and availability'
-        : undefined,
+      c.snipes && !c.availability ? 'capability snipes needs capability availability' : undefined,
   },
   {
     rule: 'snipes needs release modes',
@@ -103,6 +106,32 @@ export const MANIFEST_RULES: readonly ManifestRule[] = [
       const gated = (m.releaseModes ?? []).filter((mode) => mode.usesAccessGate);
       return gated.length && !m.capabilities.accessGate
         ? `release mode ${gated.map((mode) => mode.id).join(', ')} uses the access gate but capability accessGate is off`
+        : undefined;
+    },
+  },
+  {
+    rule: 'minRequestIntervalMs needs maxConcurrentRequests 1',
+    // A paced provider's requests go one at a time (`sdk/pacing.ts`).
+    violation: ({ limits }) =>
+      limits?.minRequestIntervalMs && limits.maxConcurrentRequests !== 1
+        ? `limits.minRequestIntervalMs needs limits.maxConcurrentRequests 1, not ${limits.maxConcurrentRequests}`
+        : undefined,
+  },
+];
+
+/** Manifest-flag rules (§12.30). Exported so tests and the contract suite can name them. */
+export const MANIFEST_RULES: readonly ManifestRule[] = [
+  ...FLAG_RULES,
+  {
+    rule: 'experiments keep the flag rules',
+    // Turned on, every experiment together still leaves a manifest the flag rules accept.
+    violation: (m) => {
+      const ids = (m.experiments ?? []).map((e) => e.id);
+      if (!ids.length) return undefined;
+      const applied = applyExperiments(m, ids);
+      const problems = FLAG_RULES.map((r) => r.violation(applied)).filter((v) => v);
+      return problems.length
+        ? `with experiment ${ids.join(', ')} on: ${problems.join('; ')}`
         : undefined;
     },
   },
@@ -138,6 +167,12 @@ export function authViolation(auth: ProviderAuth): string | undefined {
     case 'credentials':
       if (!AccountFieldsSchema.safeParse(auth.fields).success) {
         return 'credentials auth needs fields (at least one, unique alphanumeric keys)';
+      }
+      if (
+        auth.confirmations !== undefined &&
+        !AccountConfirmationsSchema.safeParse(auth.confirmations).success
+      ) {
+        return 'credentials auth confirmations need labels and unique alphanumeric keys';
       }
       return fn(auth.signIn) ? undefined : 'credentials auth needs signIn';
     case 'automation':
@@ -192,6 +227,29 @@ export const CONSISTENCY_RULES: readonly ConsistencyRule[] = [
         : undefined,
   },
   {
+    // The hold panel's "Let it go" needs a way to let go. With holds off (an experiment that is
+    // not on) the flag may stand alone: no hold is placed, so none is offered.
+    rule: 'holdRelease',
+    violation: (p) =>
+      p.manifest.holdRelease && p.manifest.capabilities.holds && !fn(p.holds?.release)
+        ? 'manifest holdRelease needs holds.release'
+        : undefined,
+  },
+  {
+    rule: 'holds.release',
+    violation: (p) =>
+      fn(p.holds?.release) && !p.manifest.holdRelease
+        ? 'holds.release needs manifest holdRelease'
+        : undefined,
+  },
+  {
+    rule: 'holds.releaseOnPaymentClose',
+    violation: (p) =>
+      p.holds?.releaseOnPaymentClose && !fn(p.holds.release)
+        ? 'holds.releaseOnPaymentClose needs holds.release'
+        : undefined,
+  },
+  {
     rule: 'holds payment origins',
     violation: (p) =>
       p.holds?.paymentOrigins && !p.holds.paymentOrigins.every(isHttpsOriginPattern)
@@ -208,9 +266,8 @@ export const CONSISTENCY_RULES: readonly ConsistencyRule[] = [
   {
     rule: 'snipes',
     violation: (p) =>
-      p.manifest.capabilities.snipes &&
-      !(hasCheck(p) && p.holds !== undefined && fn(p.release?.computeReleaseAt))
-        ? 'capability snipes needs availability, holds and release'
+      p.manifest.capabilities.snipes && !(hasCheck(p) && fn(p.release?.computeReleaseAt))
+        ? 'capability snipes needs availability and release'
         : undefined,
   },
   {
@@ -374,13 +431,25 @@ export class ProviderRegistry {
 
   /**
    * The provider's HTTP client (its context's `http`): bound to the provider's session
-   * partition, the one its sign-in and payment windows share. The account service asks a
+   * partition, the one its sign-in and payment windows share, and paced when the provider is,
+   * so a check through it waits in the provider's queue. The account service asks a
    * provider's `auth.isSignedIn` with it. Throws `UnknownProviderError`.
    */
   httpOf(id: ProviderId): HttpClient {
     const entry = this.entries.get(id);
     if (!entry) throw new UnknownProviderError(id);
     return entry.ctx.http;
+  }
+
+  /**
+   * The provider's scoped secret vault (its context's `secrets`), the one the provider reads
+   * with `ctx.secrets`. The account service keeps a `credentials` sign-in's values there.
+   * Throws `UnknownProviderError`.
+   */
+  secretsOf(id: ProviderId): ScopedSecretVault {
+    const entry = this.entries.get(id);
+    if (!entry) throw new UnknownProviderError(id);
+    return entry.ctx.secrets;
   }
 
   /** Every manifest (parsed and frozen), sorted by name. */

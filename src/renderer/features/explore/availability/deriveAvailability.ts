@@ -6,15 +6,23 @@
  * The counts are the provider's own: `availableUnits` are units free on every night of the
  * stay, `bookableUnits` the units that can be booked online at all. A unit that is free on
  * some nights only is not available, and nothing here reads a night the provider did not
- * report as booked: with no entry for a place, its state is `unknown`.
+ * report as booked: with no entry for a place, its state is `unknown`. A provider with no unit
+ * total (RAC) leaves `bookableUnits` out: the place reads "27 spots free", or "None free", and
+ * only a total of 0 reads "Not open".
+ *
+ * With stay types chosen, a place that has other kinds too counts only the chosen kinds'
+ * units (`byKind`), or says "check dates" when its provider does not count them apart: a
+ * figure about cabins is never one that may include sites.
  */
 
 import type { LocationSummary } from '../../../../shared/types/catalog.types';
 import type {
   BulkAvailabilityEntry,
   ProviderCapabilities,
+  UnitKind,
 } from '../../../../shared/types/provider.types';
-import { unitNoun } from '../../../components/locationFormat';
+import { unitKindsOf } from '../../../../shared/utils/unit-kinds';
+import { nounForKinds } from '../../../../shared/utils/unit-noun';
 
 /** The states, in the order they take precedence (see `deriveAvailability`). */
 export type AvailabilityState =
@@ -39,9 +47,13 @@ export type AvailabilityState =
  */
 export type ProviderAvailabilityStatus = 'idle' | 'loading' | 'success' | 'error' | 'unsupported';
 
+/**
+ * `bookableUnits` is the provider's total, left out when it gives none (RAC): an `available`
+ * place then reads "{n} free", never "N of M".
+ */
 export type PlaceAvailability =
-  | { state: 'available'; availableUnits: number; bookableUnits: number }
-  | { state: 'full'; bookableUnits: number }
+  | { state: 'available'; availableUnits: number; bookableUnits?: number }
+  | { state: 'full'; bookableUnits?: number }
   /** `queue`: the provider's waiting queue is up (its access gate), not a fault. */
   | { state: 'error'; queue: boolean }
   | { state: Exclude<AvailabilityState, 'available' | 'full' | 'error'> };
@@ -57,6 +69,8 @@ export interface AvailabilityInput {
   errorCode?: string;
   /** The provider's entry for this place, when it gave one. */
   entry?: BulkAvailabilityEntry;
+  /** The stay types chosen on Explore; none means every kind. */
+  stayTypes?: readonly UnitKind[];
 }
 
 /** A provider count as a whole number of units: anything else counts as none. */
@@ -65,15 +79,86 @@ function units(value: unknown): number {
 }
 
 /**
+ * A provider's total as whole units, or undefined when it left the total out (`undefined` or
+ * `null`): "no total", never 0, which means none can be booked.
+ */
+function totalOf(value: unknown): number | undefined {
+  return value === undefined || value === null ? undefined : units(value);
+}
+
+interface UnitCounts {
+  available: number;
+  /** Undefined: the provider gave no total. */
+  bookable?: number;
+}
+
+/**
+ * The unit kinds a place's counts are about: the stay types chosen that it has, else all of its
+ * own (`unitKindsOf`). What its availability calls its units ("27 spots", "3 cabins").
+ */
+export function countedKinds(
+  location: Pick<LocationSummary, 'kind' | 'unitKinds'>,
+  stayTypes: readonly UnitKind[] = []
+): UnitKind[] {
+  const kinds = unitKindsOf(location);
+  const chosen = kinds.filter((kind) => stayTypes.includes(kind));
+  return chosen.length > 0 ? chosen : kinds;
+}
+
+/**
+ * The counts that answer for the stay types chosen: the entry's totals when none is chosen or
+ * the place has no kind that is not chosen; else the chosen kinds' counts from `byKind`
+ * summed (a chosen kind it leaves out counts none), or null when it counts none of them. The
+ * sum has no total when any kind summed has none.
+ */
+function chosenCounts(
+  location: Pick<LocationSummary, 'kind' | 'unitKinds'>,
+  entry: BulkAvailabilityEntry,
+  stayTypes: readonly UnitKind[]
+): UnitCounts | null {
+  const totals = { available: units(entry.availableUnits), bookable: totalOf(entry.bookableUnits) };
+  if (stayTypes.length === 0) return totals;
+  const kinds = unitKindsOf(location);
+  const chosen = kinds.filter((kind) => stayTypes.includes(kind));
+  if (chosen.length === kinds.length) return totals;
+  // Passed through as the provider gives it: anything but an object counts as no entry.
+  const { byKind } = entry;
+  const countsOf = (kind: UnitKind) => {
+    const counts = byKind && typeof byKind === 'object' ? byKind[kind] : undefined;
+    return counts && typeof counts === 'object' ? counts : undefined;
+  };
+  if (!chosen.some((kind) => countsOf(kind))) return null;
+  return chosen.reduce<UnitCounts>(
+    (sum, kind) => {
+      const counts = countsOf(kind);
+      // A kind left out counts none; a kind whose total is left out leaves the sum without one
+      const bookable = counts ? totalOf(counts.bookableUnits) : 0;
+      return {
+        available: sum.available + units(counts?.availableUnits),
+        bookable:
+          sum.bookable === undefined || bookable === undefined
+            ? undefined
+            : sum.bookable + bookable,
+      };
+    },
+    { available: 0, bookable: 0 }
+  );
+}
+
+/**
  * The place's availability state. Precedence, first match wins: `no-dates` (no stay),
  * `offline-booking` (not bookable online), `check-dates` (the provider checks one place at a
  * time but not in bulk), `not-supported` (no availability at all), `error`, `loading`, then
  * from the provider's entry `available` (a unit free every night), `full` (no unit free every
- * night, some bookable) or `none-open` (none bookable: not released, closed or too far ahead), and
- * `unknown` when the provider answered without this place.
+ * night, some bookable or no total given) or `none-open` (a total of 0: not released, closed or
+ * too far ahead), and `unknown` when the provider answered without this place.
+ *
+ * With `stayTypes` chosen and the place having a kind not chosen, the entry's counts for the
+ * chosen kinds it has (`byKind`) decide instead of its totals, and without any it is
+ * `check-dates`.
  */
 export function deriveAvailability(
-  location: Pick<LocationSummary, 'bookingMode'>,
+  location: Pick<LocationSummary, 'bookingMode' | 'kind' | 'unitKinds'>,
   input: AvailabilityInput
 ): PlaceAvailability {
   if (!input.staySet) return { state: 'no-dates' };
@@ -100,11 +185,12 @@ export function deriveAvailability(
   }
   const { entry } = input;
   if (!entry) return { state: 'unknown' };
-  const available = units(entry.availableUnits);
-  const bookable = units(entry.bookableUnits);
-  if (available > 0)
-    return { state: 'available', availableUnits: available, bookableUnits: bookable };
-  if (bookable > 0) return { state: 'full', bookableUnits: bookable };
+  const counts = chosenCounts(location, entry, input.stayTypes ?? []);
+  if (!counts) return { state: 'check-dates' };
+  const { available, bookable } = counts;
+  const withTotal = bookable === undefined ? {} : { bookableUnits: bookable };
+  if (available > 0) return { state: 'available', availableUnits: available, ...withTotal };
+  if (bookable === undefined || bookable > 0) return { state: 'full', ...withTotal };
   return { state: 'none-open' };
 }
 
@@ -130,20 +216,30 @@ export const NO_STATE_PILL = '–';
 export const LOADING_PILL = '···';
 
 /**
- * How a state reads on a map pill and a card, with the unit noun of the place's kind
- * ("8 of 24 sites available", "2 of 6 cabins available"). Null with no dates: nothing shows.
+ * How a state reads on a map pill and a card, with the noun of the unit kinds it counts
+ * (`countedKinds`: "8 of 24 sites available", "2 of 6 cabins available", "27 of 40 spots
+ * available" at a place of several kinds). Without a provider total: "27 free" on the pill and
+ * "27 spots free" or "1 cabin free" on the card. Null with no dates: nothing shows.
  */
 export function availabilityLabel(
   availability: PlaceAvailability,
-  kind: string,
+  kinds: readonly UnitKind[],
   shortName: string
 ): AvailabilityLabel | null {
-  const noun = unitNoun(kind);
+  const noun = nounForKinds(kinds);
   switch (availability.state) {
     case 'no-dates':
       return null;
     case 'available': {
       const { availableUnits: free, bookableUnits: total } = availability;
+      // No provider total (RAC): what is free, and no "of M"
+      if (total === undefined) {
+        return {
+          pill: `${free} free`,
+          card: `${free} ${free === 1 ? noun.one : noun.many} free`,
+          tone: 'available',
+        };
+      }
       // A provider total below the free count would read "8 of 3": say only what is free.
       if (total >= free) {
         return {
@@ -173,7 +269,7 @@ export function availabilityLabel(
     case 'not-supported':
       return {
         pill: NO_STATE_PILL,
-        card: `Availability not shared by ${shortName}`,
+        card: `Check dates on ${shortName}`,
         tone: 'neutral',
       };
     case 'unknown':

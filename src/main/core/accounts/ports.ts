@@ -102,3 +102,12 @@ export interface AccountGate {
   /** The stored (last definite) state; synchronous, no network. */
   storedState(providerId: ProviderId): AccountStatus['state'];
 }
+
+/**
+ * The system clipboard (Electron's `clipboard`, wired in `app/container.ts`; a fake in tests).
+ * `accounts.copyCredential` writes a saved value here from main, so the value never reaches
+ * the renderer. Nothing clears it later: copying is the person's own action.
+ */
+export interface Clipboard {
+  writeText(text: string): void;
+}

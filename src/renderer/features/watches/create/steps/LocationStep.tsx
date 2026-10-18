@@ -1,7 +1,7 @@
 import { useFormContext } from 'react-hook-form';
 import type { ProviderManifest } from '../../../../../shared/types/provider.types';
 import { LocationCombobox } from '../../../../components/LocationCombobox';
-import { kindLabel, unitCountLabel } from '../../../../components/locationFormat';
+import { kindLabel, placeNoun, unitCountLabel } from '../../../../components/locationFormat';
 import { Card } from '../../../../components/ui';
 import { useSetWatchField } from '../../form/useSetWatchField';
 import type { WatchFormValues } from '../../form/watchFormSchema';
@@ -27,6 +27,9 @@ export function LocationStep({ manifest, place, placeLoading }: LocationStepProp
         providerName={manifest.shortName}
         value={location}
         onChange={(next) => {
+          // Another place has other units and stay types. A link's stay types are kept for
+          // the first place chosen, which checks them once its units load.
+          if (location && next?.externalId !== location.externalId) set('unitKinds', []);
           set('location', next);
           set('unitIds', []);
         }}
@@ -47,7 +50,10 @@ export function LocationStep({ manifest, place, placeLoading }: LocationStepProp
                 location.areaName,
                 location.kind ? kindLabel(location.kind) : undefined,
                 location.kind && location.unitCount
-                  ? unitCountLabel(location.kind, location.unitCount)
+                  ? unitCountLabel(
+                      location.unitCount,
+                      placeNoun(place ?? { kind: location.kind }, manifest)
+                    )
                   : undefined,
               ]
                 .filter(Boolean)

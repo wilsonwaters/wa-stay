@@ -5,6 +5,11 @@
  * Emails carry the WA Stay brand: the sender name, the subject prefix, the wordmark (with the
  * icon as an inline image when it exists) and D1 palette colours (`@shared/constants/brand`).
  * Each email names the provider it is about, when there is one.
+ *
+ * An alert that carries the provider's booking page (`bookingUrl`, brief R7) gets a "Book on
+ * {shortName}" link, so the person can book from a phone: a coral text button in the HTML and
+ * a plain line in the text, https only. An alert about a hold WA Stay placed (`heldInApp`)
+ * says first where the hold is.
  */
 
 import fs from 'fs';
@@ -22,6 +27,7 @@ import {
   SMTP_PRESETS,
   SMTPPreset,
 } from '@shared/types';
+import { httpsLink } from '../../booking-link';
 import { BaseNotifier } from './base.notifier';
 
 /** The `cid:` of the inline icon beside the wordmark. */
@@ -41,6 +47,13 @@ export interface SmtpEmailNotifierOptions {
    * and shown beside the wordmark if the file exists.
    */
   logoPath?: string;
+}
+
+/** The "Book on {shortName}" link of an alert. */
+interface BookingAction {
+  url: string;
+  /** "Book on ParkStay", or "Book on the provider's website" for a provider the app does not know. */
+  label: string;
 }
 
 /** What an email says, in both forms. */
@@ -288,11 +301,16 @@ export class SmtpEmailNotifier extends BaseNotifier {
     const provider = message.providerId ? this.providerName(message.providerId) : undefined;
     const link = httpLink(message.actionUrl);
     const logo = this.logoPath && fs.existsSync(this.logoPath) ? this.logoPath : undefined;
+    const bookingUrl = httpsLink(message.bookingUrl);
+    const booking: BookingAction | undefined = bookingUrl
+      ? { url: bookingUrl, label: `Book on ${provider ?? "the provider's website"}` }
+      : undefined;
+    const holdNote = message.heldInApp ? heldInAppNote(provider, booking !== undefined) : undefined;
 
     return {
       subject: this.buildSubject(message, provider),
-      html: this.buildHtmlEmail(message, provider, link, logo !== undefined),
-      text: this.buildTextEmail(message, provider, link),
+      html: this.buildHtmlEmail(message, provider, link, logo !== undefined, booking, holdNote),
+      text: this.buildTextEmail(message, provider, link, booking, holdNote),
       attachments: logo ? [{ filename: 'wa-stay.png', path: logo, cid: LOGO_CID }] : [],
     };
   }
@@ -317,7 +335,9 @@ export class SmtpEmailNotifier extends BaseNotifier {
     message: NotificationMessage,
     provider: string | undefined,
     link: string | undefined,
-    hasLogo: boolean
+    hasLogo: boolean,
+    booking?: BookingAction,
+    holdNote?: string
   ): string {
     const c = BRAND_COLORS;
     const esc = (text: string) => this.escapeHtml(text);
@@ -340,6 +360,26 @@ export class SmtpEmailNotifier extends BaseNotifier {
               </p>`
       )
       .join('\n              ');
+
+    const note = holdNote
+      ? `<p style="margin: 0 0 16px 0; color: ${c.text}; font-size: 16px; line-height: 1.5;">
+                ${esc(holdNote)}
+              </p>`
+      : '';
+
+    // A text link styled as the one coral button, never an image: it reads without images
+    const bookButton = booking
+      ? `<p style="margin: 0 0 16px 0;">
+                <a href="${esc(booking.url)}"
+                   style="display: inline-block;
+                          background-color: ${c.accent};
+                          color: ${c.accentText};
+                          font-weight: bold;
+                          padding: 12px 24px;
+                          text-decoration: none;
+                          border-radius: 8px;">${esc(booking.label)}</a>
+              </p>`
+      : '';
 
     const actionButton = link
       ? `<a href="${esc(link)}"
@@ -387,6 +427,10 @@ export class SmtpEmailNotifier extends BaseNotifier {
                 ${esc(message.message)}
               </p>
 
+              ${note}
+
+              ${bookButton}
+
               ${actionButton}
 
               <hr style="border: none; border-top: 1px solid ${c.border}; margin: 24px 0;">
@@ -407,7 +451,9 @@ export class SmtpEmailNotifier extends BaseNotifier {
   private buildTextEmail(
     message: NotificationMessage,
     provider: string | undefined,
-    link: string | undefined
+    link: string | undefined,
+    booking?: BookingAction,
+    holdNote?: string
   ): string {
     let text = `${APP_NAME}\n\n`;
     text += `${message.title}\n\n`;
@@ -417,6 +463,9 @@ export class SmtpEmailNotifier extends BaseNotifier {
     if (message.locationName || provider) text += '\n';
 
     text += `${message.message}\n`;
+
+    if (holdNote) text += `\n${holdNote}\n`;
+    if (booking) text += `\n${booking.label}: ${booking.url}\n`;
 
     if (link) {
       text += `\nView details: ${link}\n`;
@@ -463,6 +512,21 @@ export class SmtpEmailNotifier extends BaseNotifier {
       toEmail: toEmail || email,
     };
   }
+}
+
+/**
+ * What an email about a hold WA Stay placed says first: the hold is in the app on the computer
+ * that placed it; with a booking link, that the person can book on the provider's website instead.
+ */
+function heldInAppNote(provider: string | undefined, hasBookingLink: boolean): string {
+  const inApp =
+    `This hold is in ${APP_NAME} on the computer that placed it. ` +
+    `Open ${APP_NAME} there to pay before it expires.`;
+  if (!hasBookingLink) return inApp;
+  return (
+    `${inApp} Away from that computer? You can book on ${provider ?? "the provider's website"} instead. ` +
+    `What ${APP_NAME} held may show as taken there until the hold ends.`
+  );
 }
 
 /** The URL when it is an absolute http(s) URL; anything else (`javascript:`, a route) is dropped. */

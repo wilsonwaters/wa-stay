@@ -1,0 +1,78 @@
+{
+  "routes": [
+    {
+      "method": "GET",
+      "path": "/busselton/book-now/",
+      "file": "book-now-busselton.html"
+    },
+    {
+      "method": "GET",
+      "path": "/margaret-river/book-now/",
+      "file": "book-now-margaret-river.html"
+    },
+    {
+      "method": "POST",
+      "path": "/wp-content/themes/parks-and-resorts/template-parts/components/booking-engine/availability-ajax.php",
+      "form": {
+        "blog_id": "6"
+      },
+      "file": "availability-busselton-2026-11-06-2n.json"
+    },
+    {
+      "method": "POST",
+      "path": "/wp-content/themes/parks-and-resorts/template-parts/components/booking-engine/availability-ajax.php",
+      "form": {
+        "blog_id": "9"
+      },
+      "file": "availability-cable-beach-2026-11-06-2n.json"
+    },
+    {
+      "method": "POST",
+      "path": "/wp-content/themes/parks-and-resorts/template-parts/components/booking-engine/availability-ajax.php",
+      "form": {
+        "blog_id": "5"
+      },
+      "file": "availability-cervantes-2026-11-06-2n.json"
+    },
+    {
+      "method": "POST",
+      "path": "/wp-content/themes/parks-and-resorts/template-parts/components/booking-engine/availability-ajax.php",
+      "form": {
+        "blog_id": "10"
+      },
+      "file": "availability-esperance-2026-11-06-2n.json"
+    },
+    {
+      "method": "POST",
+      "path": "/wp-content/themes/parks-and-resorts/template-parts/components/booking-engine/availability-ajax.php",
+      "form": {
+        "blog_id": "8"
+      },
+      "file": "availability-margaret-river-2026-11-06-2n.json"
+    },
+    {
+      "method": "POST",
+      "path": "/wp-content/themes/parks-and-resorts/template-parts/components/booking-engine/availability-ajax.php",
+      "form": {
+        "blog_id": "3"
+      },
+      "file": "availability-exmouth-2026-11-06-2n.json"
+    },
+    {
+      "method": "POST",
+      "path": "/wp-content/themes/parks-and-resorts/template-parts/components/booking-engine/availability-ajax.php",
+      "form": {
+        "blog_id": "7"
+      },
+      "file": "availability-karri-valley-2026-11-06-2n.json"
+    },
+    {
+      "method": "POST",
+      "path": "/wp-content/themes/parks-and-resorts/template-parts/components/booking-engine/availability-ajax.php",
+      "form": {
+        "blog_id": "2"
+      },
+      "file": "availability-monkey-mia-2026-11-06-2n.json"
+    }
+  ]
+}

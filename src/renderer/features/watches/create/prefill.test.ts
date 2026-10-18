@@ -74,4 +74,26 @@ describe('parseWatchPrefill', () => {
     });
     expect(parse('adults=two').adults).toBeUndefined();
   });
+
+  it('reads the stay types, deduplicated, and says when the link named one it cannot use', () => {
+    expect(parse('provider=parkstay&location=20&stay=cabin')).toEqual({
+      providerId: 'parkstay',
+      locationId: '20',
+      unitKinds: ['cabin'],
+      notices: [],
+    });
+    expect(parse('stay=cabin,cabin').unitKinds).toEqual(['cabin']);
+    expect(parse('stay=bogus')).toEqual({
+      notices: ["The link's stay type couldn't be used, so choose one."],
+    });
+    // Cabins kept: only the unusable one is said to be left out (R9, routed R6 note)
+    expect(parse('stay=cabin,other')).toEqual({
+      unitKinds: ['cabin'],
+      notices: ["One of the link's stay types couldn't be used, so it was left out."],
+    });
+  });
+
+  it('ignores an empty stay value, with no notice', () => {
+    expect(parse('provider=parkstay&stay=')).toEqual({ providerId: 'parkstay', notices: [] });
+  });
 });

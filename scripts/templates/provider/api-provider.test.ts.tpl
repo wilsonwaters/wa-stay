@@ -10,6 +10,7 @@
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
+import { isProviderBookingLink } from '@main/core/booking-link';
 import { ProviderHttpError } from '@main/providers/sdk';
 import { ProviderRegistry } from '@main/providers/registry';
 import { FixtureHttpClient } from '@main/testing/fixture-http-client';
@@ -30,9 +31,13 @@ import {
 const FIXTURES_DIR = path.join(__dirname, '../fixtures/providers');
 /** Where a FixtureHttpClient logs a request that no fixture answers (it fails, unsent). */
 const UNEXPECTED_LOG = path.join(os.tmpdir(), `{{ID}}-unexpected-${process.pid}.log`);
-/** Any https addresses do: a FixtureHttpClient answers by path and never sends anything. */
+/** Any https address does: a FixtureHttpClient answers by path and never sends anything. */
 const API_URL = 'https://api.{{ID}}.test';
-const SITE_URL = 'https://www.{{ID}}.test';
+/**
+ * The manifest's website: the links are built on it, as booking links must be (the contract
+ * suite checks). Nothing is sent to it.
+ */
+const SITE_URL = new URL({{CAMEL}}Manifest.website).origin;
 const STAY: StayQuery = { arrival: '2026-11-10', departure: '2026-11-12', adults: 2 };
 // @if search
 /** Western Australia, `[west, south, east, north]`. */
@@ -195,6 +200,8 @@ describe('{{NAME_JS}}', () => {
     if ({{CONST}}_API_URL || {{CONST}}_SITE_URL) {
       expect({{CONST}}_API_URL).toMatch(/^https:\/\//);
       expect({{CONST}}_SITE_URL).toMatch(/^https:\/\//);
+      // The links are built on it, so it must be on the manifest's website, as booking links are
+      expect(isProviderBookingLink({{CAMEL}}Manifest, {{CONST}}_SITE_URL)).toBe(true);
       return;
     }
     const log = path.join(os.tmpdir(), `{{ID}}-placeholders-${process.pid}.log`);

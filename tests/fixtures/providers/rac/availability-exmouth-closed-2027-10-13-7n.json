@@ -1,0 +1,100 @@
+{
+  "_fixture": "Trimmed from RAC Parks & Resorts' availability answer for RAC Exmouth Cape Holiday Park (blog 3), 13-20 Oct 2027, 2 adults, fetched anonymously; only the fields WA Stay reads, the NewBook key and cart addresses redacted. (Fetched 16 Oct 2026, 23:41 Perth.)",
+  "success": "true",
+  "message": "",
+  "timestamp": "2026-10-16 23:41:56",
+  "timezone": "Australia/Perth",
+  "api_key": "<redacted>",
+  "data": {
+    "4": {
+      "category_id": 4,
+      "category_type_id": "1",
+      "category_name": "One Bedroom Family Cabin with External Bathroom",
+      "sort": 6,
+      "sites_available": {
+        "2027-10-13": 0,
+        "2027-10-14": 0,
+        "2027-10-15": 0,
+        "2027-10-16": 0,
+        "2027-10-17": 0,
+        "2027-10-18": 0,
+        "2027-10-19": 0
+      },
+      "sites_code": {
+        "2027-10-13": 3,
+        "2027-10-14": 3,
+        "2027-10-15": 3,
+        "2027-10-16": 9,
+        "2027-10-17": 9,
+        "2027-10-18": 9,
+        "2027-10-19": 9
+      },
+      "sites_message": {
+        "2027-10-13": "There is no availability for this date",
+        "2027-10-14": "There is no availability for this date",
+        "2027-10-15": "There is no availability for this date",
+        "2027-10-16": "Maximum Advance Days has been exceeded, so there are no Sites available",
+        "2027-10-17": "Maximum Advance Days has been exceeded, so there are no Sites available",
+        "2027-10-18": "Maximum Advance Days has been exceeded, so there are no Sites available",
+        "2027-10-19": "Maximum Advance Days has been exceeded, so there are no Sites available"
+      },
+      "stay_through_sites_available": 0,
+      "stay_through_sites_code": 2,
+      "stay_through_sites_message": "This Site is closed as of Tue 9 Jun 2026",
+      "online_booking_url": "https://parksandresorts.rac.com.au/exmouth/booking/?available_from=2027-10-13&available_to=2027-10-20&force_category_id=4&adults=2&children=0&infants=0&animals=0",
+      "tariffs_available": [
+        {
+          "tariff_label": "Standard Rate",
+          "tariff_success": "false",
+          "tariff_code": 11,
+          "tariff_message": "This Rate is Stop Sold",
+          "tariff_total": 6993,
+          "tariffs_quoted": {
+            "2027-10-13": {
+              "amount": 999,
+              "minimum_periods": "2",
+              "close_arrival": 0,
+              "close_departure": 0
+            },
+            "2027-10-14": {
+              "amount": 999,
+              "minimum_periods": "2",
+              "close_arrival": 0,
+              "close_departure": 0
+            },
+            "2027-10-15": {
+              "amount": 999,
+              "minimum_periods": "2",
+              "close_arrival": 0,
+              "close_departure": 0
+            },
+            "2027-10-16": {
+              "amount": 999,
+              "minimum_periods": "2",
+              "close_arrival": 0,
+              "close_departure": 0
+            },
+            "2027-10-17": {
+              "amount": 999,
+              "minimum_periods": "2",
+              "close_arrival": 0,
+              "close_departure": 0
+            },
+            "2027-10-18": {
+              "amount": 999,
+              "minimum_periods": "2",
+              "close_arrival": 0,
+              "close_departure": 0
+            },
+            "2027-10-19": {
+              "amount": 999,
+              "minimum_periods": "2",
+              "close_arrival": 0,
+              "close_departure": 0
+            }
+          }
+        }
+      ]
+    }
+  }
+}

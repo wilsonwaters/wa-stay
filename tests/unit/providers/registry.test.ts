@@ -6,6 +6,7 @@
  */
 
 import { BUILT_IN_PROVIDERS, registerBuiltInProviders } from '@main/providers';
+import { withExperiments } from '@main/providers/experiments';
 import { parkstayFactory } from '@main/providers/parkstay';
 import {
   CONSISTENCY_RULES,
@@ -23,7 +24,11 @@ import {
   type ProviderAuth,
   type ProviderContext,
 } from '@main/providers/sdk';
-import type { ProviderManifest } from '@shared/types/provider.types';
+import {
+  DEFAULT_PROVIDER_LIMITS,
+  ProviderLimitsSchema,
+  type ProviderManifest,
+} from '@shared/types/provider.types';
 import {
   createFakeProvider,
   createMemoryLogger,
@@ -31,6 +36,11 @@ import {
   testManifest,
   type FakeProvider,
 } from '@tests/utils/fake-provider';
+import {
+  createFakePacedProvider,
+  pacedContext,
+  RecordingHttpClient,
+} from '@tests/utils/fake-paced-provider';
 
 function register(registry: ProviderRegistry, provider: FakeProvider): AccommodationProvider {
   return registry.register(provider.factory, createTestProviderContext);
@@ -207,15 +217,25 @@ describe('ProviderRegistry.register', () => {
     const cases: Array<[rule: string, options: Parameters<typeof createFakeProvider>[0], RegExp]> =
       [
         [
-          'snipes needs holds and availability',
-          { capabilities: { holds: false } },
-          /capability snipes needs capabilities holds and availability/,
+          'snipes needs availability',
+          { capabilities: { availability: false } },
+          /capability snipes needs capability availability/,
         ],
         ['snipes needs release modes', {}, /capability snipes needs at least one release mode/],
         [
           'usesAccessGate needs accessGate',
           {},
           /release mode daily_rollover, scheduled uses the access gate but capability accessGate is off/,
+        ],
+        [
+          'minRequestIntervalMs needs maxConcurrentRequests 1',
+          {},
+          /limits\.minRequestIntervalMs needs limits\.maxConcurrentRequests 1, not 4/,
+        ],
+        [
+          'experiments keep the flag rules',
+          { capabilities: { snipes: false } },
+          /with experiment sniping on: capability snipes needs at least one release mode/,
         ],
       ];
 
@@ -235,12 +255,90 @@ describe('ProviderRegistry.register', () => {
           usesAccessGate: mode.id !== 'cancellation',
         }));
       }
+      if (rule === 'minRequestIntervalMs needs maxConcurrentRequests 1') {
+        fake.manifest.limits = {
+          ...fake.manifest.limits!,
+          minRequestIntervalMs: 10_000,
+          maxConcurrentRequests: 4,
+        };
+      }
+      if (rule === 'experiments keep the flag rules') {
+        // Off, the manifest is fine; on, Site Sniper would have no release mode
+        fake.manifest.experiments = [
+          { id: 'sniping', label: 'Site Sniper', description: 'Snipes.', turnsOn: ['snipes'] },
+        ];
+      }
       expectRegistrationError(fake, message);
     });
 
-    it('snipes also needs availability on', () => {
-      const fake = createFakeProvider({ capabilities: { availability: false } });
-      expectRegistrationError(fake, /snipes needs capabilities holds and availability/);
+    it('a snipes provider without holds registers: its snipes alert (§12.35)', () => {
+      const fake = createFakeProvider({ capabilities: { holds: false } });
+      expect(fake.holds).toBeUndefined();
+      const registry = new ProviderRegistry();
+      register(registry, fake);
+      const provider = registry.require('fake', 'snipes');
+      expect(provider.holds).toBeUndefined();
+      expect(typeof provider.availability.check).toBe('function');
+      expect(typeof provider.release.computeReleaseAt).toBe('function');
+      expect(() => registry.require('fake', 'holds')).toThrow(ProviderCapabilityError);
+    });
+
+    it('snipes without availability, or without a release policy, is still refused', () => {
+      expectRegistrationError(
+        createFakeProvider({ capabilities: { availability: false, holds: false } }),
+        /capability snipes needs capability availability/
+      );
+      const noRelease = createFakeProvider({ capabilities: { holds: false } });
+      delete noRelease.release;
+      expectRegistrationError(noRelease, /capability snipes needs availability and release/);
+      const noCheck = createFakeProvider({ capabilities: { holds: false } });
+      delete noCheck.availability;
+      expectRegistrationError(noCheck, /capability snipes needs availability and release/);
+    });
+
+    it('a paced provider with maxConcurrentRequests 1, or an interval of 0 with any, registers', () => {
+      const paced = createFakeProvider();
+      paced.manifest.limits = {
+        ...paced.manifest.limits!,
+        minRequestIntervalMs: 10_000,
+        maxConcurrentRequests: 1,
+      };
+      expect(() => register(new ProviderRegistry(), paced)).not.toThrow();
+      const unpaced = createFakeProvider();
+      unpaced.manifest.limits = { ...unpaced.manifest.limits!, minRequestIntervalMs: 0 };
+      expect(() => register(new ProviderRegistry(), unpaced)).not.toThrow();
+    });
+
+    it.each([-1, 1.5, 60_001])(
+      'the schema rejects minRequestIntervalMs %s, and registration names it',
+      (value) => {
+        expect(
+          ProviderLimitsSchema.safeParse({
+            ...DEFAULT_PROVIDER_LIMITS,
+            minRequestIntervalMs: value,
+          }).success
+        ).toBe(false);
+        const fake = createFakeProvider();
+        fake.manifest.limits = {
+          ...fake.manifest.limits!,
+          maxConcurrentRequests: 1,
+          minRequestIntervalMs: value,
+        };
+        expectRegistrationError(fake, /invalid manifest \(limits\.minRequestIntervalMs: /);
+      }
+    );
+
+    it('the schema accepts 0 and 60 000, and a manifest without the limit', () => {
+      for (const value of [0, 60_000]) {
+        expect(
+          ProviderLimitsSchema.safeParse({
+            ...DEFAULT_PROVIDER_LIMITS,
+            minRequestIntervalMs: value,
+          }).success
+        ).toBe(true);
+      }
+      expect(ProviderLimitsSchema.safeParse(DEFAULT_PROVIDER_LIMITS).success).toBe(true);
+      expect(DEFAULT_PROVIDER_LIMITS).not.toHaveProperty('minRequestIntervalMs');
     });
 
     it('modes that do not use the gate are fine without one', () => {
@@ -289,6 +387,24 @@ describe('ProviderRegistry.register', () => {
         /capability holds needs holds\.create and holds\.paymentUrl/,
       ],
       [
+        'holdRelease',
+        { holdRelease: {} },
+        (p) => delete p.holds!.release,
+        /manifest holdRelease needs holds\.release/,
+      ],
+      [
+        'holds.release',
+        { holdRelease: {} },
+        (p) => delete p.manifest.holdRelease,
+        /holds\.release needs manifest holdRelease/,
+      ],
+      [
+        'holds.releaseOnPaymentClose',
+        {},
+        (p) => ((p.holds as { releaseOnPaymentClose?: boolean }).releaseOnPaymentClose = true),
+        /holds\.releaseOnPaymentClose needs holds\.release/,
+      ],
+      [
         'holds payment origins',
         {},
         (p) => ((p.holds as { paymentOrigins?: string[] }).paymentOrigins = ['https://*.au']),
@@ -303,7 +419,7 @@ describe('ProviderRegistry.register', () => {
           ]),
         /access\.waitingRoomOrigins must be https origins or https:\/\/\*\.<domain> patterns/,
       ],
-      ['snipes', {}, (p) => delete p.release, /snipes needs availability, holds and release/],
+      ['snipes', {}, (p) => delete p.release, /snipes needs availability and release/],
       [
         'release modes supported',
         {},
@@ -345,6 +461,58 @@ describe('ProviderRegistry.register', () => {
         throw new Error('boom');
       };
       expectRegistrationError(fake, /rejects release mode daily_rollover, scheduled, cancellation/);
+    });
+
+    describe('hold release hooks (R18)', () => {
+      it('holdRelease with holds.release, and releaseOnPaymentClose, register', () => {
+        const fake = createFakeProvider({ holdRelease: { onPaymentClose: true } });
+        const registered = register(new ProviderRegistry(), fake);
+        expect(registered.manifest.holdRelease).toBe(true);
+        expect(registered.holds?.release).toBe(fake.holds!.release);
+        expect(registered.holds?.releaseOnPaymentClose).toBe(true);
+      });
+
+      it('with holds off, holdRelease alone is fine (an experiment that turns holds on, off)', () => {
+        const alone = createFakeProvider({
+          capabilities: { holds: false, snipes: false },
+          holdRelease: {},
+        });
+        expect(alone.holds).toBeUndefined();
+        expect(register(new ProviderRegistry(), alone).manifest.holdRelease).toBe(true);
+
+        const experiment = {
+          id: 'autoCart',
+          label: 'Hold in the cart',
+          description: 'Holds a stay in the cart.',
+          turnsOn: ['holds' as const],
+        };
+        const off = createFakeProvider({ experiments: [experiment], holdRelease: {} });
+        const registeredOff = register(new ProviderRegistry(), off);
+        expect(registeredOff.manifest.capabilities.holds).toBe(false);
+        expect(registeredOff.holds).toBeUndefined();
+
+        const on = createFakeProvider({ experiments: [experiment], holdRelease: {} });
+        const registeredOn = new ProviderRegistry().register(
+          withExperiments(on.factory, ['autoCart']),
+          createTestProviderContext
+        );
+        expect(registeredOn.manifest.capabilities.holds).toBe(true);
+        expect(typeof registeredOn.holds?.release).toBe('function');
+      });
+
+      it('a provider without any of them (ParkStay) is unchanged', () => {
+        const fake = createFakeProvider();
+        const registered = register(new ProviderRegistry(), fake);
+        expect(registered.manifest.holdRelease).toBeUndefined();
+        expect(registered.holds?.release).toBeUndefined();
+        expect(parkstayFactory.manifest.holdRelease).toBeUndefined();
+      });
+
+      it('holdRelease must be a boolean', () => {
+        const fake = createFakeProvider({ holdRelease: {} });
+        (fake.manifest as unknown as { holdRelease: string }).holdRelease = 'yes';
+        expectRegistrationError(fake, /holdRelease/);
+      });
     });
 
     it('turning a capability off lets the module go', () => {
@@ -417,6 +585,31 @@ describe('ProviderRegistry.register', () => {
         null,
       ],
       [
+        'credentials with confirmations and a copyable field',
+        {
+          kind: 'credentials',
+          fields: [{ key: 'memberNumber', label: 'Member number', secret: true, copyable: true }],
+          confirmations: [{ key: 'own', label: 'This is my own member number.' }],
+          signIn: signedIn,
+          isSignedIn: signedIn,
+        },
+        null,
+      ],
+      [
+        'credentials with duplicate confirmation keys',
+        {
+          kind: 'credentials',
+          fields: [{ key: 'memberNumber', label: 'Member number', secret: true }],
+          confirmations: [
+            { key: 'own', label: 'Mine' },
+            { key: 'own', label: 'Still mine' },
+          ],
+          signIn: signedIn,
+          isSignedIn: signedIn,
+        },
+        /credentials auth confirmations need labels and unique alphanumeric keys/,
+      ],
+      [
         'credentials without fields',
         { kind: 'credentials', fields: [], signIn: signedIn, isSignedIn: signedIn },
         /credentials auth needs fields/,
@@ -483,10 +676,37 @@ describe('ProviderRegistry lookups', () => {
     register(registry, fake2);
   });
 
+  it("secretsOf returns the provider context's scoped secret vault (the one ctx.secrets is); unknown ids throw", async () => {
+    expect(registry.secretsOf('fake')).toBe(fake.ctx?.secrets);
+    await registry.secretsOf('fake').set('account.memberNumber', '1234567890123');
+    await expect(fake.ctx!.secrets.get('account.memberNumber')).resolves.toBe('1234567890123');
+    await expect(fake2.ctx!.secrets.get('account.memberNumber')).resolves.toBeUndefined();
+    expect(() => registry.secretsOf('nope')).toThrow(UnknownProviderError);
+  });
+
   it('httpOf returns the HTTP client of the provider context; unknown ids throw', () => {
     expect(registry.httpOf('fake')).toBe(fake.ctx?.http);
     expect(registry.httpOf('fake').providerId).toBe('fake');
     expect(() => registry.httpOf('nope')).toThrow(UnknownProviderError);
+  });
+
+  it("httpOf of a paced provider is its paced client, so the account check waits in the provider's queue", async () => {
+    jest.useFakeTimers();
+    try {
+      const inner = new RecordingHttpClient({ providerId: 'paced', delayMs: 3_000 });
+      const paced = createFakePacedProvider();
+      registry.register(paced.factory, (manifest) => pacedContext(manifest, inner));
+
+      const http = registry.httpOf('paced');
+      expect(http).toBe(paced.ctx?.http);
+      expect(http).not.toBe(inner);
+      void paced.ctx!.http.getJson('https://paced.example/sync');
+      void http.getJson('https://paced.example/api/profile');
+      await jest.advanceTimersByTimeAsync(60_000);
+      expect(inner.requests[1].sentAt - inner.requests[0].endedAt!).toBe(10_000);
+    } finally {
+      jest.useRealTimers();
+    }
   });
 
   it('get("nope") throws UnknownProviderError; tryGet returns undefined', () => {

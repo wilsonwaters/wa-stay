@@ -13,8 +13,8 @@
 
 <p align="center">
   A map of every place, availability for your dates, watches that tell you when a site frees
-  up, and help getting hard-to-book sites, from the providers that own them. ParkStay WA's
-  national-park campgrounds come first; RAC Parks &amp; Resorts is planned next.
+  up, and help getting hard-to-book sites, from the providers that own them: ParkStay WA's
+  national-park campgrounds and RAC Parks &amp; Resorts' holiday parks.
 </p>
 
 <p align="center">
@@ -26,7 +26,7 @@
 </p>
 
 WA Stay is a Windows desktop app. It grew out of an app that automated ParkStay campground
-bookings: ParkStay is now one **provider** among the ones to come, and existing users are
+bookings: ParkStay is now one **provider** of several, and existing users are
 [upgraded automatically](#upgrading-from-wa-parkstay-bookings), data and all.
 
 ![Explore: a search pill with dates and guests, filter chips, a list of campgrounds with availability for 10 to 12 November, and a map of Western Australia with pins showing free sites](docs/images/explore.png)
@@ -34,24 +34,31 @@ bookings: ParkStay is now one **provider** among the ones to come, and existing 
 ## Features
 
 - **Explore.** Every place from every provider on a map of WA and in a list: search by place,
-  park or region; filter by provider, type, region, facilities, online booking and
-  availability; add your dates and guests to see how many sites are free on every pin and card.
+  park or region; filter by provider, stay type (camping, cabins, rooms, dorms, glamping),
+  region, facilities, online booking and availability; add your dates and guests to see how
+  many sites or cabins are free on every pin and card.
   Without a map token it works as a list.
 - **Place pages.** Photos, the provider's description and facilities, the park and region,
   every site night by night with prices for your dates, and links to book or read more on the
   provider's own site.
 - **Watches.** Choose a place, dates and the sites you want; WA Stay checks on a schedule (from
   every 15 minutes to daily) and tells you when something frees up, even for only some nights,
-  with a price limit if you like. For ParkStay a watch can also hold the site for you.
+  with a price limit if you like. Clicking the alert opens the provider's booking page for your
+  dates, and the email's link works on your phone. For ParkStay a watch can also hold the site
+  for you.
 - **Notifications.** An in-app notification list, desktop notifications that open the right
   page, and email through your own email account (Gmail, Outlook or any SMTP server).
 - **The DBCA queue.** WA Stay waits in ParkStay's virtual queue when it is on, shows your place,
   and keeps the session alive while it is needed.
 - **Provider accounts.** Sign in to ParkStay in the app, on ParkStay's own page (optional;
-  holds work without it).
-- **Site Sniper** *(coming soon)*. Hold a hard-to-get site the moment it is released: when
-  ParkStay opens a new date, at a scheduled block release, or when someone cancels. You pay for
-  the hold on ParkStay's own page, in the app.
+  holds work without it). Save your RAC member number for members' rates and the members'
+  pre-sale (optional; kept encrypted on your computer, and WA Stay never sends it: you type it
+  at RAC's checkout, and WA Stay can copy it for you).
+- **Site Sniper** *(coming soon)*. Catch a hard-to-get site the moment it is released: when a
+  provider opens new dates, at a release time you set, or, for ParkStay, when someone cancels.
+  It alerts you with a link to book, or holds the site for you to pay for on the provider's own
+  page, in the app (ParkStay). RAC snipes alert, timed to its school-holiday releases and, with
+  your member number, the members' pre-sale.
 - **Bookings** *(coming soon)*. Your trips from every provider in one place, with links to
   manage them on the provider's site; holds you pay for in the app are added for you.
 - **Private and local.** Your data stays on your computer. WA Stay has no account, cloud
@@ -69,11 +76,13 @@ Site Sniper and Bookings work but are still being finished, so the navigation ma
 
 | Provider | Status | Explore | Availability | Watches | Site Sniper | Holds and payment | Account |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| **ParkStay WA** (DBCA national-park campgrounds) | Built in | Yes, 169 campgrounds | Yes, per night with prices | Yes | Coming soon | Yes (30-minute holds, paid on ParkStay) | Optional |
-| **RAC Parks & Resorts** | Planned | | | | | | |
+| **ParkStay WA** (DBCA national-park campgrounds) | Built in | Yes, 169 campgrounds | Yes, per night with prices | Yes | Coming soon (alert or hold) | Yes (30-minute holds, paid on ParkStay) | Optional |
+| **RAC Parks & Resorts** (holiday parks and resorts) | Built in | Yes, 8 parks | Yes, per category and night with prices (members' rates with your member number) | Yes | Coming soon (release alerts) | Off by default (an experimental cart, paid on RAC's own page) | Optional (your member number) |
 
 Providers are modules behind a provider SDK, so more can be added, including sites with no
-API: see [adding a provider](docs/providers/adding-a-provider.md).
+API: see [adding a provider](docs/providers/adding-a-provider.md). Each built-in provider has its
+own page: [ParkStay WA](docs/providers/parkstay/README.md) and
+[RAC Parks & Resorts](docs/providers/rac/README.md).
 
 ## Download
 

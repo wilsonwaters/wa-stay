@@ -1,7 +1,7 @@
 /**
  * One booking per night (`core/holds/night-guard.ts`): HELD (unexpired) and BOOKED snipes,
  * held (unexpired) and booked auto-hold watches and holds still in flight block a hold on any
- * shared night of the same provider; an expired hold does not.
+ * shared night of the same provider; an expired hold does not, nor does an ALERTED snipe.
  */
 
 import { openDatabase } from '@main/database/connection';
@@ -64,6 +64,22 @@ describe('NightGuard', () => {
     snipes.setBooked(held.id, 'B1');
     expect(lapsed.tryReserve(request('2026-12-02', '2026-12-04')).ok).toBe(false);
     expect(snipes.findById(held.id)?.status).toBe(SnipeStatus.BOOKED);
+  });
+
+  it('an ALERTED snipe reserves no night: it holds nothing (R12)', () => {
+    const alerted = snipe('2026-12-01', '2026-12-03');
+    snipes.markAlerted(alerted.id, { at: NOW, unitId: 'u1' });
+    expect(snipes.findById(alerted.id)?.status).toBe(SnipeStatus.ALERTED);
+
+    // Every night of its stay is free for another snipe or watch of the provider
+    for (const owner of [
+      { kind: 'snipe', id: 99 },
+      { kind: 'watch', id: 5 },
+    ] as const) {
+      const reserved = guard.tryReserve({ ...request('2026-12-01', '2026-12-03'), owner });
+      expect(reserved.ok).toBe(true);
+      if (reserved.ok) reserved.reservation.release();
+    }
   });
 
   it('blocks the nights of a watch whose auto-hold placed a hold', () => {
@@ -130,5 +146,23 @@ describe('NightGuard', () => {
     });
     if (first.ok) first.reservation.release();
     expect(guard.tryReserve(request('2026-12-02', '2026-12-04', 'fake', 2)).ok).toBe(true);
+  });
+
+  it('reserving(providerId): a hold is being placed on that provider until its reservation is released (R17 review)', () => {
+    expect(guard.reserving('fake')).toBe(false);
+    const first = guard.tryReserve(request('2026-12-01', '2026-12-03', 'fake', 1));
+    const other = guard.tryReserve(request('2026-12-01', '2026-12-03', 'fake2', 2));
+
+    expect(guard.reserving('fake')).toBe(true);
+    expect(guard.reserving('fake2')).toBe(true);
+    expect(guard.reserving('parkstay')).toBe(false);
+    if (first.ok) {
+      first.reservation.release();
+      first.reservation.release();
+    }
+    expect(guard.reserving('fake')).toBe(false);
+    expect(guard.reserving('fake2')).toBe(true);
+    if (other.ok) other.reservation.release();
+    expect(guard.reserving('fake2')).toBe(false);
   });
 });

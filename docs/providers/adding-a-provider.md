@@ -1,7 +1,7 @@
 # Adding a provider
 
-A **provider** is a module that brings one accommodation source into WA Stay: ParkStay WA
-today, RAC Parks & Resorts next, perhaps Hipcamp or a holiday-park chain later. This guide
+A **provider** is a module that brings one accommodation source into WA Stay: ParkStay WA and
+RAC Parks & Resorts are built in, and Hipcamp or a holiday-park chain could follow. This guide
 takes you from nothing to a provider that shows up on Explore, in the create flows and in
 Settings, with tests. You change nothing in the core services, the IPC contract or the
 renderer: they find providers through the registry and read what each one can do from its
@@ -265,24 +265,27 @@ export const exampleApiManifest: ProviderManifest = {
 | `stayFields` | Provider-specific stay inputs ([below](#stay-fields)). |
 | `releaseModes` | Site Sniper's release modes, when `capabilities.snipes` ([below](#release-modes)). |
 | `bulkAvailabilityStayFields` | What bulk availability depends on ([below](#bulk-availability-stay-fields)). |
+| `experiments` | What you ship switched off, for the person to turn on ([below](#experiments)). |
 
 ### Location kinds
 
 `locationKinds` comes from a fixed list (`LOCATION_KINDS` in `src/shared/types/provider.types.ts`).
-A place's kind sets its label and what its units are called on Explore's cards and the place
-page ("2 of 6 cabins available"):
+A place's kind sets its label. What its units are called, on Explore's cards, the place page and
+in alerts ("2 of 6 cabins available"), comes from their unit kinds (each unit's `unitKind`, else
+the place's `unitKinds`): one stay type gives its own noun (site, cabin, room, bunk or tent), and
+more than one, or `other`, gives "spots". A place that gives no unit kinds has those of its kind:
 
 | Kind | Shown as | Its units are called |
 | --- | --- | --- |
 | `campground` | Campground | sites |
 | `caravan-park` | Caravan park | sites |
-| `holiday-park` | Holiday park | sites |
+| `holiday-park` | Holiday park | spots |
 | `cabin` | Cabin | cabins |
 | `hut` | Hut | bunks |
 | `glamping` | Glamping | tents |
-| `farm-stay` | Farm stay | rooms |
-| `home` | Home | rooms |
-| `other` | Place to stay | units |
+| `farm-stay` | Farm stay | spots |
+| `home` | Home | spots |
+| `other` | Place to stay | spots |
 
 Map the provider's own words to these with an explicit table, and a word you do not know to
 `other` (so keep `other` in `locationKinds`).
@@ -300,7 +303,7 @@ behind it (`CONSISTENCY_RULES` and `MANIFEST_RULES` in `src/main/providers/regis
 | `bulkAvailability` | `availability.search` | Free-unit counts on Explore's pins and cards, "Available only" |
 | `watches` | `availability.check` | The provider in Watches |
 | `holds` | `holds.create` and `holds.paymentUrl` | "Hold a site automatically when found" on watches, and the payment window ([holds](#6-holds)) |
-| `snipes` | `availability`, `holds` and `release`, plus at least one release mode that `release.supports()` accepts | The provider in Site Sniper |
+| `snipes` | `availability` and `release`, plus at least one release mode that `release.supports()` accepts; `holds` is optional | The provider in Site Sniper: its snipes alert with a link to book on its site when the dates are free, or, with `holds`, can hold one for the person to pay |
 | `bookingImport` | `bookings.get` | "Import booking" on the Bookings page |
 | `accessGate` | `access` | Queue handling and the access-status chip; required by any release mode with `usesAccessGate` |
 | `account` | `auth` unless `none` | A row in Settings → Accounts ([sign-in](#7-sign-in)) |
@@ -322,10 +325,32 @@ context gives the effective values as `ctx.limits`.
 | Limit | What reads it |
 | --- | --- |
 | `minWatchIntervalMinutes` | The watch form offers no shorter interval, and the scheduler runs a shorter stored one at this interval (`core/watches/next-check.ts`). |
-| `maxConcurrentRequests` | The watch loop runs at most `min(2, maxConcurrentRequests)` checks at once for the provider, and a `search` catalogue's area searches stay within it. **Your module enforces it for every request it sends**, with `createLimiter` from the SDK: Example Parks sends its catalogue, availability, hold and sign-in check requests through one limiter, reading each answer inside it, and the scaffold's API provider limits its requests the same way. A browser provider's `withPage` calls already run one at a time. |
+| `maxConcurrentRequests` | The watch loop runs at most `min(2, maxConcurrentRequests)` checks at once for the provider, and a `search` catalogue's area searches stay within it. **Your module enforces it for every request it sends**, with `createLimiter` from the SDK: Example Parks sends its catalogue, availability, hold and sign-in check requests through one limiter, reading each answer inside it, and the scaffold's API provider limits its requests the same way. A limiter starts the tasks the person is waiting on before background ones ([pacing](#limits)). A browser provider's `withPage` calls already run one at a time. |
 | `catalogTtlHours` | How long a synced catalogue stays fresh before the catalogue service syncs it again; for a `search` catalogue, how long an area or text search is not repeated. |
+| `minRequestIntervalMs` | Optional, 0 to 60 000 ms; 0 or absent leaves the provider unpaced. For a site that asks for a gap between automated requests (a `Crawl-delay`, or its terms), the core paces `ctx.http` itself: one request in flight, each starting only this long after the previous one ended. It needs `maxConcurrentRequests: 1`, or the provider does not register. |
 
 A browser provider should use `maxConcurrentRequests: 1` and generous intervals.
+
+**Pacing.** With `minRequestIntervalMs`, the core keeps the provider to one request in flight
+through one queue: the clients `ctx.http.withDefaults` returns and the sign-in check's client
+share it, and a redirect chain counts as one request. Requests the person is waiting on (a
+place's page and its check, Explore's availability for their dates, "Check now" on a watch) are
+`interactive`: they go ahead of waiting background requests, after a 1 s gap. Everything else
+(the catalogue sync, scheduled watch checks, snipes, the sign-in check) is `background` and
+waits the full gap. The core labels each call's requests itself, so your module needs no
+change; `HttpRequestOptions.priority` (`'interactive'` or `'background'`) overrides the label
+for one request. Long-lived work your module starts during an interactive call (a timer, a
+keep-alive) inherits the interactive priority, so pass `priority: 'background'` for its
+requests. A request's `timeoutMs` counts from when it is sent, not while it waits, and an
+aborted `signal` takes a waiting request out of the queue at once. `HttpRequestOptions.onSend`
+is called when the request is sent (when its turn comes), never for one aborted while it
+waits: a module that calls off stale work (RAC's bulk search, when the dates change) can then
+call off what is still waiting and let what the site is already answering finish. A module's own
+`createLimiter` honours priorities as well: it starts a waiting interactive task before waiting
+background ones (first in, first out within each), and the task keeps its caller's priority,
+so the person's request still goes next. Pacing covers `ctx.http` only, not `ctx.browser`'s
+pages, and fixture mode is never paced. Each call's deadline grows with the gaps it may wait
+([timeouts](#timeouts)), so ask for as few requests per call as you can.
 
 ### Stay fields
 
@@ -338,7 +363,7 @@ against the descriptor (type, options, `min`/`max`, `pattern`, `required`) and f
 | `type` | Drawn as | Its value in `params` | Checked against |
 | --- | --- | --- | --- |
 | `select` | A select of its `options` (at least one, each `{ value, label }`) | The chosen option's `value`, a string | `options` |
-| `number` | A stepper | A number | `min` and `max` |
+| `number` | A stepper | A whole number (a count) | `min` and `max`, whole numbers too |
 | `text` | A text field | A string | `pattern`, a regular expression the whole value must match |
 | `boolean` | A checkbox | `true` or `false` | |
 
@@ -369,13 +394,27 @@ interface ReleaseModeDescriptor {
   label: string; // "When new dates open"
   description: string;
   usesAccessGate: boolean; // a snipe in this mode waits in the provider's queue
+  maxWindowMinutes?: number; // the longest a snipe keeps trying after the release (1–1440)
   fields?: StayFieldDescriptor[]; // extra inputs this mode needs
 }
 ```
 
 Site Sniper shows them as choices, and the core asks your `release.computeReleaseAt({ mode,
 … })` for the instant. A mode with `usesAccessGate` needs `capabilities.accessGate`.
-ParkStay's modes are `daily_rollover`, `scheduled` and `cancellation`.
+`maxWindowMinutes` caps how long a snipe keeps checking after the release: the core clamps
+the snipe's window to it, so a provider whose terms ask for gentle use can bound it (a snipe
+also never polls faster than `release.pollFloorMs`). It bounds timed releases only, a mode
+whose `computeReleaseAt` gives an instant: a `cancellation` mode has no release instant and no
+window, so it polls (at `pollFloorMs.continuous` at the fastest) until it ends some other way.
+ParkStay's modes are `daily_rollover`, `scheduled` and `cancellation`, with no cap. RAC's are
+`daily_rollover` and `scheduled`, each capped at 30 minutes, with a 10 s `pollFloorMs.window`.
+
+Without `holds`, every snipe of the provider is an alert: when the dates are free it ends
+**Alert sent** with a desktop alert and email that link to your booking page (the unit's
+`bookingUrl`, else the check's, else `links.booking(externalId, stay, unitId)`), and holds
+nothing. With `holds`, the person chooses per snipe (`action: 'alert' | 'hold'`). A 403 or 429
+from your client while a snipe checks or holds (`isProviderBlock`) ends it **Failed** with the
+reason: nothing retries it.
 
 ### Bulk availability stay fields
 
@@ -384,6 +423,47 @@ Bulk answers are cached by stay. `bulkAvailabilityStayFields` lists the stay fie
 the cached answer instead of asking the provider again. Example Parks reads only the dates;
 ParkStay reads the dates and the gear type, so changing the number of guests on Explore costs
 no request.
+
+### Experiments
+
+Something your provider can do but should not do for everyone yet, such as placing holds before
+anyone has paid for one end to end, ships as an experiment: declared in the manifest, off until
+the person turns it on.
+
+```ts
+interface ProviderExperiment {
+  id: string; // a lower-case letter, then 1–31 letters or digits, e.g. 'autoCart'; never changes
+  label: string; // the switch's label
+  description: string; // one or two sentences under it
+  warning?: string; // shown in the confirm dialog before it is turned on
+  turnsOn: BooleanCapability[]; // capabilities that are off in your manifest
+}
+```
+
+- **Where the person turns it on.** Your row in Settings → Accounts gets an "Experimental" group,
+  shown to everyone, with a switch per experiment. Turning one on asks first, with the
+  description and the warning; turning one off does not.
+- **When it takes effect: after a restart.** At start-up the app registers your provider with the
+  experiments that are on: the capabilities they turn on are on in the manifest the registry
+  freezes, so in `ctx.manifest` and on every screen, with the experiment marked `applied: true`
+  (never set `applied` yourself: a provider whose manifest does is not registered). Build the
+  modules behind them only when `ctx.manifest` has them on
+  (`holds: ctx.manifest.capabilities.holds ? createHolds(ctx) : undefined`), so with the
+  experiment off no code path can reach them. If your provider cannot register with an
+  experiment on (a module missing), it registers without it, the log says why, and the switch
+  reads "Couldn't turn on".
+- **Holds stop at once.** Turning off an experiment that turns on `holds` is refused while a hold
+  or snipe needs your provider. Once it is off, the app places no new hold on your provider until
+  the restart: a watch says so in its alert, and a snipe alerts instead of holding (a new snipe
+  is an alert snipe).
+- **What it may turn on.** Only boolean capabilities that are off in your manifest, never
+  `account` or `catalogMode`, and every experiment on together must still pass the manifest
+  rules (`MANIFEST_RULES`: Site Sniper turned on needs holds, availability and a release mode).
+- **The person's choice is not yours.** The app keeps it in your `provider_state` under
+  `core.experiments`, which your `ctx.state` cannot reach. To test your provider with an
+  experiment on, register `withExperiments(factory, ['autoCart'])`
+  (`src/main/providers/experiments.ts`) instead of the factory: the contract suite runs on it
+  as on any provider.
 
 ## 3. The provider context
 
@@ -396,7 +476,7 @@ reaches for globals, never imports `electron`, an HTTP library, the database or 
 | `id`, `manifest`, `timezone`, `limits` | From your manifest (limits with defaults applied). |
 | `http` | Your `HttpClient` ([below](#the-httpclient)). |
 | `browser` | A `BrowserAutomation` that drives the installed Edge or Chrome, with your own persistent profile at `<userData>/providers/<id>/browser`. It costs nothing until first used ([browser providers](browser-providers.md)). |
-| `state` | Your own key-value store (`provider_state` table, namespaced by your id). |
+| `state` | Your own key-value store (`provider_state` table, namespaced by your id). Keys starting `core.` are the app's: getting, setting or deleting one rejects, and `list` leaves them out. |
 | `secrets` | Your encrypted secrets (`ScopedSecretVault`): ciphertext from the app's SecretVault (Electron `safeStorage`), stored in your state under `secret:<key>`, readable only by your provider. Never put a secret in `state`. |
 | `logger` | A child logger tagged `{ provider: id }`. Never log cookies, tokens, form values or personal details; log URLs without query strings. |
 | `clock` | The current time. Use it rather than `new Date()`, so tests can fix it. |
@@ -436,8 +516,11 @@ They all behave the same:
   no response a `ProviderHttpError` with status 0, an abort an `AbortError`. `request` itself
   resolves for any status: check `response.status`.
 
-If the provider blocks library user agents, send a browser one (ParkStay's `headers.ts`). In
-the app, the partition's user agent already matches Electron's Chromium.
+If the provider blocks library user agents, send a browser one (ParkStay's `headers.ts`, from
+the SDK's `browserIdentity()`). In the app, the partition already presents the browser its
+windows present: Electron's Chromium on the person's operating system, with the app's
+languages. The client rewrites a request's user agent, and any client hints or
+`Accept-Language` it carries, to match; it adds none. Never rotate or vary them.
 
 ## 4. An API provider
 
@@ -695,11 +778,32 @@ The rules the normalised types carry (`src/shared/types/provider.types.ts`,
   stable id as `externalId`, never a position in a list.
 - **`LocationSummary`** needs a `kind` from your `locationKinds`, a `bookingMode` (`online`,
   `offline`, `external` or `application`), coordinates, `imageUrls` (absolute https only) and
-  `amenities` (plain words). `area`, `summary`, `unitCount`, `infoUrl` and `bookingUrl` are
-  optional.
+  `amenities` (plain words). `area`, `summary`, `unitKinds`, `unitCount`, `infoUrl` and
+  `bookingUrl` are optional.
+- **Unit kinds** say what a person sleeps in, the same words for every provider: `campsite`
+  (a site for a tent, caravan or campervan), `cabin` (a cabin, chalet, cottage or villa),
+  `room`, `dorm` (a bed in a shared room or hut), `glamping` or `other` (`UNIT_KINDS` in
+  `src/shared/types/provider.types.ts`). People filter places by them. A place's `unitKinds`
+  lists every kind it has. Leave it out and main derives it from `kind`:
+
+  | `kind` | Derived `unitKinds` |
+  | --- | --- |
+  | `campground`, `caravan-park` | `campsite` |
+  | `holiday-park` | `campsite`, `cabin` |
+  | `cabin` | `cabin` |
+  | `hut` | `dorm` |
+  | `glamping` | `glamping` |
+  | `farm-stay`, `home`, `other` | `other` |
+
+  Set it when the place has other kinds than that (a campground with glamping tents, a holiday
+  park with cabins only). Main drops unknown values and duplicates, and uses the derived list
+  when nothing is left, so a location always has at least one. Each unit can say what it is
+  with `unitKind`, on `UnitSummary` and on `UnitAvailability`; on a detail's units, main drops
+  a value that is not a unit kind and keeps the unit.
 - **`LocationDetail`** adds `units` (`UnitSummary[]`), and optionally `descriptionHtml` and a
-  `releaseInfo` sentence. Return the provider's HTML as you found it: main sanitises it
-  (`sanitizeProviderHtml`) before it crosses IPC, and its links open in the system browser.
+  `releaseInfo` sentence. Its `unitKinds`, when you give none, are the stored summary's.
+  Return the provider's HTML as you found it: main sanitises it (`sanitizeProviderHtml`)
+  before it crosses IPC, and its links open in the system browser.
   A description in titled parts can be `sections` (`{ title, html }`, in the provider's order;
   the place page shows them as an accordion, the first open, instead of `descriptionHtml`), and
   short notices `notices` (`{ level: 'warning' | 'caution' | 'info', text }`, plain text). Main
@@ -714,8 +818,42 @@ The rules the normalised types carry (`src/shared/types/provider.types.ts`,
 - **Availability.** `check` returns a `LocationAvailability`: one `UnitAvailability` per unit,
   each with one `NightStatus` per night of the stay (`available`, `booked`, `closed`,
   `not-released` or `unknown`, and `price` when known), `fullyAvailable` only when every night
-  is `available`, and `total` when every night has a price. Honour `unitIds` (only those
-  units) and set `bookingUrl` to a stay-specific deep link when the provider has one.
+  is `available` and the stay meets the unit's stay rules, and `total` when every night has a
+  price. Honour `unitIds` (only those units) and set `bookingUrl` to a stay-specific deep link
+  when the provider has one; a unit
+  may carry its own `bookingUrl` too (the page for that unit or category and the stay). A
+  booking link is what "Book on {shortName}" opens from a watch's alert, its email and its
+  page: an absolute https URL on your own site (your `website`'s host, or a subdomain of it,
+  which the core and the contract suite check), a public page that works with no sign-in and
+  no app session, on a phone too, and **never** a URL that adds to a cart, holds or books when
+  it is opened.
+- **Stay rules and rates** (all optional). A night you have room on but refuse for this stay
+  (too short, too long, or arriving or leaving on a refused day) is `unknown` with
+  `reason: 'min-stay'`, as a night free only on another unit is `unknown` with
+  `reason: 'split'`. Say which rule where you can: a night's `minNights` (the fewest nights for
+  a stay arriving that night), `noArrival: true` (no arrivals on that date) and
+  `noDeparture: true` (no departures), and a unit's `minNights` (the minimum for a stay
+  arriving on the asked arrival; a night's own comes first). Matching never counts a
+  `min-stay` night, trims a partial run to days that take arrivals and departures, and drops
+  it when shorter than its minimum, so a watch never alerts on a stay you would refuse; the
+  contract suite checks that a stay under a unit's minimum (the arrival night's `minNights`,
+  else the unit's) is not `fullyAvailable` and has no `available` night without a reason, and
+  that no `min-stay` night is `available`. A unit's `priceNote` says which rate its prices are, in
+  plain text ("RAC member rate"), shown under its name. A `UnitSummary`'s `minNights` is the
+  unit's usual minimum, for the watch and snipe steps' warning; leave it out where the minimum
+  depends on the dates (the night grid explains it after a check).
+- **Free counts** (optional). When one unit stands for several booked alike (a category or class
+  of sites, where the provider says how many are free), set its `freeCount`: how many it has
+  free for the whole stay, a whole number of at least 1 when the unit is `fullyAvailable`,
+  else 0, on every unit of the check (RAC: each category's sites free for the whole stay).
+  Every count of what is free for a stay adds these up (`freeUnitsOf`,
+  `src/shared/utils/free-units.ts`): the place page's summary, a watch's alert, email, card and
+  Check now, so they say the same number as your bulk `availableUnits` should. Such a provider
+  has no total of its units, so those counts give no "of M" and say "free" ("51 spots free for
+  all 2 nights"). Without it each unit counts as one ("2 of 5 sites free"). The contract suite
+  checks the numbers (`freeCountViolations`). Set `unitsAreTypes: true` on the location's
+  detail too, so its page lists such units as types ("Bookable as 6 spot types") rather than
+  counting them as places to stay.
 - **Dates and time zones.** Stays are calendar dates: never turn them into `Date` objects and
   back (a time zone shifts them). Convert to the provider's own format with a string
   transform, as ParkStay's `toParkStayDate` does (`2026-11-10` → `2026/11/10`). "Today" is
@@ -736,7 +874,8 @@ it has an answer for:
 | --- | --- |
 | `key` | The place's location key, `makeLocationKey(ctx.id, externalId)`. Main keeps only entries for places of this provider that are in the stored catalogue (and in the area Explore shows). |
 | `availableUnits` | How many units are free on **every** night of the stay. A unit free on some nights only does not count. |
-| `bookableUnits` | How many units can be booked online for these dates at all, free or not: the place's total, or 0 when none can be booked (not released yet, closed, or past the provider's booking window). |
+| `bookableUnits` | Optional: how many units can be booked online for these dates at all, free or not: the place's total, or 0 when none can be booked (not released yet, closed, or past the provider's booking window). Leave it out when the provider gives no unit total (RAC counts free units only); 0 still means none can be booked. |
+| `byKind` | Optional: the same two counts for each unit kind the place has, e.g. `{ campsite: { availableUnits: 2, bookableUnits: 5 }, cabin: { availableUnits: 0, bookableUnits: 3 } }`, so a filter on cabins counts only the cabins. Set it for a place with more than one kind. Each kind's `bookableUnits` is optional too, by the same rule; a sum of kinds has no total when any kind in it has none. Main passes it on as you give it. |
 
 The names invite a swap: `availableUnits` is the smaller number, the free ones, and
 `bookableUnits` the total. Explore reads them as:
@@ -744,12 +883,13 @@ The names invite a swap: `availableUnits` is the smaller number, the free ones, 
 | Entry | The card says |
 | --- | --- |
 | `availableUnits` above 0 | "2 of 5 sites available" (only "2 sites available" if `bookableUnits` is smaller) |
-| `availableUnits` 0, `bookableUnits` above 0 | "No site free every night" |
+| `availableUnits` above 0, no `bookableUnits` | "2 sites free" ("2 free" on its map pin), never "of" a total |
+| `availableUnits` 0, `bookableUnits` above 0 or left out | "No site free every night" |
 | Both 0 | "No sites open for these dates" |
 | No entry for the place | "Availability unknown" |
 
 So leave out a place you have no answer for rather than send zeros, which would read as full or
-not open. ParkStay's own names read the other way round (its `total_available` is a
+not open, and leave out `bookableUnits` rather than guess a total. ParkStay's own names read the other way round (its `total_available` is a
 campground's site count, `total_bookable` the sites free every night): map a provider's numbers
 by what they mean, not by their names.
 
@@ -782,7 +922,7 @@ closes after 5 minutes without a call, and on quit. [Browser providers](browser-
 has the details.
 
 Sign-in by browser automation (`auth.kind: 'automation'`) is declared and validated but **not
-implemented**: the account service supports only `browser-session` ([sign-in](#7-sign-in)).
+implemented**: the account service supports `browser-session` and `credentials` ([sign-in](#7-sign-in)).
 
 ### The example
 
@@ -1169,15 +1309,51 @@ export function createExampleHolds(options: ExampleHoldsOptions): HoldsModule {
   Without it the app cannot tell when a payment completes. Be strict: Example Parks wants its
   own confirmation path with this hold's reference, and the reference on the page; ParkStay
   wants its `/success/` page with this hold's hash and its booking number.
+- **`expiresAtEstimated: true`** on a `HoldSuccess` says `expiresAt` is your guess, not a time
+  the provider gave (a cart page with no countdown). The app then says "about": "Held until
+  about 10:42 am", "within about 10 minutes" in the alert and its email. The night guard and
+  `HOLD_EXPIRED` use the guess as it is, so guess short rather than long.
 - **Never place a real hold** in a test or a trial run. Example Parks' holds are tested on a
   recorded 201 and a loopback server (`tests/unit/docs/example-providers.test.ts`).
 
+### Letting a hold go
+
+A provider whose hold should not outlive the person's interest (a cart the person declined, or
+left) can let it go before it runs out. Three optional pieces, all checked at registration:
+
+- **`holds.release({ reference, unitId?, expiresAt }, signal)`** resolves to
+  `{ outcome: 'released' }` when you let the hold go, or `{ outcome: 'gone' }` when you no longer
+  held it (paid, expired, or removed on your own page). Reject only when you could not ask (a
+  failed request, a 403 or 429, an abort): the hold then stays payable until it runs out, and
+  nothing retries it.
+- **`holds.releaseOnPaymentClose: true`**: the core also calls `release` when the payment window
+  closes with no confirmed payment (never when its first page failed, and never on quit). Needs
+  `release`.
+- **`manifest.holdRelease: true`**: the hold panel offers **Let it go** beside **Pay now**, and
+  `watches.releaseHold` / `snipes.releaseHold` call `release`. With `capabilities.holds` on it
+  needs `holds.release`, and `holds.release` needs it. With holds off (an
+  [experiment](#experiments) not turned on) it may stand alone.
+
+**The provider decides.** The core never takes "the window closed and no confirmation was read"
+as unpaid: without a `bookedReference` it cannot tell. So look at your own side first: if the
+stay is no longer in the hold (the person may have paid in the window), answer `gone` and touch
+nothing, never a booking. The person then reads "{shortName} no longer holds it. If you paid,
+look for {shortName}'s confirmation email." A `released` hold reads "You let it go." (or "Let go
+when the payment window closed."). Either way the core ends the hold now, so the night guard
+frees its nights; a snipe ends Expired, a watch keeps its hold, expired.
+
+The core calls `release` at interactive priority (as it does `create`), at most once at a time per
+hold, within `releaseTimeoutMs` ([timeouts](#timeouts)). Deleting a watch or snipe whose hold has
+not run out lets it go first; a failure there is logged and the delete goes ahead.
+
 ## 7. Sign-in
 
-Required unless `capabilities.account` is `none`. The only sign-in the app implements is
-**`browser-session`**: the person signs in on the provider's own pages, in an app window on
+Required unless `capabilities.account` is `none`. The app implements two kinds. With
+**`browser-session`** the person signs in on the provider's own pages, in an app window on
 your session partition, so the cookies they get are the ones `ctx.http`, holds and the payment
-window use. Example Parks' account is `optional`:
+window use. With **`credentials`** the person saves a detail the provider asks for, such as a
+member number, in Settings → Accounts ([saved details](#saved-details-credentials)). Example
+Parks' account is `optional`, with `browser-session`:
 
 <!-- region: tests/fixtures/providers/example-api/auth.ts#auth -->
 
@@ -1263,10 +1439,54 @@ export function createExampleAuth(options: {
 - Settings → Accounts shows the provider's row with "Connect" and "Sign out". Sign-out clears
   only your partition, and is refused (`ACCOUNT_BUSY`) while a snipe or hold needs it.
 
+### Saved details (`credentials`)
+
+For a provider whose checkout asks for a detail rather than a sign-in (a member number), the
+person saves it once, and WA Stay keeps it encrypted on the computer. A `credentials` auth has:
+
+- **`fields`** (`AccountFieldDescriptor[]`, at least one, unique alphanumeric keys): a `label`,
+  an optional `help` line, `secret` (masked as it is typed) and `copyable` (default false). A
+  copyable field gets a "Copy {label}" button: main puts the saved value on the clipboard, for
+  the person to paste at your checkout, and the window never sees it. Leave `copyable` off for a
+  password.
+- **`confirmations`** (optional, unique alphanumeric keys): statements the person ticks before
+  Save works, such as "This is my own member number". The core refuses a save without every one
+  (`VALIDATION`, issue `confirmed`), so the rule holds whatever the window does.
+- **`signIn(values, http, signal)`**: your check, before anything is stored. It gets every
+  declared field, trimmed at both ends, none empty and none over 256 characters (the core refuses
+  the rest with `VALIDATION`, issue `values.<key>`); reformatting, such as removing spaces or
+  dashes inside a number, is yours. It runs within 15 s, at interactive priority. Answer
+  `signed-in` to store the values, `signed-out` to refuse them ("{shortName} didn't accept these
+  details", or your own `message`, such as "That doesn't look like an RAC member number": plain
+  text, at most 200 characters, and ignored when it quotes what was typed), or `unknown` when you
+  cannot tell; a rejection counts as `unknown`, and nothing is stored. A local check (the
+  format) needs no request at all. Never put a value in an error message, a log line, or a
+  request that does not need it.
+- **Your own form of a value:** a `signed-in` answer may carry `values`
+  (`CredentialsSignInResult`), and the core stores those instead of what was typed, so the saved
+  value, the one `ctx.secrets` reads and the one "Copy" puts on the clipboard are yours: a
+  member number typed "1234 5678 9012" can be kept as "123456789012". Declared keys only, each a
+  string that is not empty and at most 256 characters once trimmed; a key you leave out keeps
+  what was typed. Anything else is ignored (the core logs a warning that names no value) and
+  the typed values are stored.
+- **`isSignedIn`** must exist but is never called: the account counts as signed in when every
+  field has a stored value, worked out on the computer with no request. Return `unknown`.
+
+The core keeps each value as `account.<key>` in your scoped secret vault, so your modules read
+it with `ctx.secrets.get('account.<key>')` (undefined when nothing is saved). Saving again
+replaces every value, all or nothing. Settings → Accounts shows "Add {label}", then "{label}
+saved" with Replace, Remove and Copy; Remove (`accounts.signOut`) deletes the values, clears no
+session and is never refused. A copyable saved value also gets "Copy {label}" beside "Book on
+{shortName}" and "Pay now". After each save and removal the core asks your availability again
+(nothing cached is kept) and re-arms your `daily_rollover` snipes, so prices and release times
+that depend on the value follow it. No value is ever sent back to the window or written to a
+log. Read only whether a value is saved where you can (RAC's `membership.ts` gives its modules
+a boolean), so no other module ever has it.
+
 | `kind` | How the person signs in | Status |
 | --- | --- | --- |
 | `browser-session` | On the provider's own pages, in an app window on your partition, as above. | Implemented. ParkStay uses it ([sign-in](parkstay/authentication.md)). |
-| `credentials` | The app asks for `fields` (`AccountFieldDescriptor`, secret ones kept in `ctx.secrets`) and calls `signIn(values, http)`. | Declared and validated; the account service does not implement it yet. |
+| `credentials` | The app asks for `fields`, with `confirmations` ticked, and calls `signIn(values, http)`; the values are kept in `ctx.secrets` as `account.<key>`. | Implemented ([saved details](#saved-details-credentials)). RAC uses it for the person's member number. |
 | `automation` | `signIn(browser)` signs in through browser automation. | Declared and validated; the account service does not implement it yet. |
 
 ## 8. Other optional modules
@@ -1304,12 +1524,24 @@ interface AccessGate {
 When dates become bookable, for Site Sniper (`release`). ParkStay: `release-policy.ts`.
 
 - `supports(mode)` must accept every `releaseModes` id (the registry checks it).
-- `computeReleaseAt({ mode, externalId, stay, params, requestedAt, now, signal })` returns the
-  instant the stay opens, or `null` for "poll continuously" (a cancellation mode).
+- `computeReleaseAt({ mode, externalId, stay, params, requestedAt, unitIds, unitKinds,
+  windowMs, now, signal })` returns the instant the stay opens, or `null` for "poll
+  continuously" (a cancellation mode). `unitIds` and `unitKinds` are the snipe's unit choice
+  (none: any unit), for a policy that times a category differently. `windowMs` is how long the
+  snipe keeps trying after the release (its window, clamped to `maxWindowMinutes`; none for an
+  availability check), for a policy that refuses a release that has passed. A stay it cannot
+  time (RAC: school holidays not announced yet, dates past its release calendar, Cable Beach's
+  dry season, dates already open) is a `ProviderError`
+  whose message the person sees: the core refuses the snipe with `VALIDATION` on `releaseAt`.
+  The core asks a `daily_rollover` snipe's instant again each time it arms one (start, resume,
+  a daily re-arm), keeping the stored one when it is refused then, so read whatever can change
+  (a saved member number, a calendar) at every call rather than keeping it.
 - `describe(externalId)` returns a sentence for the location's page, such as "Bookings open
   180 days ahead at 2:00 am AWST".
 - `pollFloorMs: { window, continuous }` are the fastest the core may poll inside a release
   window and continuously. Pick them for the provider's capacity, not yours.
+- `availability.check` can say when a stay not released yet opens: `release: { open: false,
+  opensAt }`, with `opensAt` from the same policy (Site Sniper's release step shows it).
 
 ### Bookings
 
@@ -1319,19 +1551,25 @@ on a booking.
 
 ### Links and dispose
 
-`links.location(externalId)` and `links.booking(externalId, stay?)` are required (return
-`null` when there is no page); they must be absolute https URLs. `dispose()` is called on quit,
-after the access gate's; the registry also closes your browser.
+`links.location(externalId)` and `links.booking(externalId, stay?, unitId?)` are required
+(return `null` when there is no page); they must be absolute https URLs. With a stay,
+`links.booking` is a booking link (the rule under **Availability** in
+[An API provider](#4-an-api-provider)): the core asks it for a watch's alert with the stay
+found and the unit, which you may ignore (ParkStay does). `dispose()` is called on quit, after
+the access gate's; the registry also closes your browser.
 
 ## 9. Timeouts, failures and retries
 
 ### Timeouts
 
 The core bounds every call it makes to a provider. These are fixed, the same for every
-provider: the manifest's `limits` set how often and how many, not how long. Keep each call well
-inside its bound; a call that runs over is aborted through its `signal`. The catalogue's bounds
-are `DEFAULT_CATALOG_TIMINGS` in `src/main/core/catalog/location-catalog.service.ts`, and the
-sign-in check's is `DEFAULT_ACCOUNT_TIMINGS` in `src/main/core/accounts/provider-account.service.ts`.
+provider, except that a paced provider's grow with its gaps (below): the manifest's `limits`
+set how often and how many, not how long. Keep each call well inside its bound; a call that
+runs over is aborted through its `signal`. The catalogue's bounds are `DEFAULT_CATALOG_TIMINGS`
+in `src/main/core/catalog/location-catalog.service.ts` (a paced provider's from
+`pacedDeadlineMs` in `catalog-helpers.ts` beside it), the sign-in check's is
+`DEFAULT_ACCOUNT_TIMINGS` in `src/main/core/accounts/provider-account.service.ts`, and a hold's
+release's is `DEFAULT_HOLD_PAYMENT_TIMINGS` in `src/main/core/holds/hold-payment.service.ts`.
 
 | Call | Bound | What happens then |
 | --- | --- | --- |
@@ -1342,8 +1580,21 @@ sign-in check's is `DEFAULT_ACCOUNT_TIMINGS` in `src/main/core/accounts/provider
 | One page of a `search` catalogue's area or text search, `searchTimeoutMs` | 20 s | That search fails (earlier pages are kept), and is not asked again for 60 s (`searchErrorTtlMs`). |
 | One `ctx.http` request | 30 s (`timeoutMs`) | `ProviderTimeoutError`. |
 | One `ctx.browser.withPage` call | 60 s (`timeoutMs`) | Playwright's `TimeoutError`. |
-| A sign-in check (`isSignedIn`), `probeTimeoutMs` | 15 s | The account shows as unknown, never signed out. |
-| A watch check, a hold | none from the core | Only your own request and page timeouts apply. |
+| A sign-in check (`isSignedIn`), or a `credentials` save's `signIn`, `probeTimeoutMs` | 15 s | The account shows as unknown, never signed out; a save stores nothing. |
+| A watch check, a hold (`create`) | none from the core | Only your own request and page timeouts apply. |
+| Letting a hold go (`holds.release`), `releaseTimeoutMs` | 30 s | The release is aborted and the hold stays until it runs out; a decline answers `PROVIDER_ERROR`. |
+
+A paced provider's catalogue bounds (`minRequestIntervalMs` above 0) grow with the gaps a call
+may wait: for each request the call counts, the bound adds the gap before it (1 s for the
+person's requests, the provider's own interval for background ones) and a 10 s allowance. A
+place's detail and its check count 2 requests (their own and one already in flight ahead of
+them), so a paced provider's bulk `search` must send its requests one after another, never all
+at once: a place page opened meanwhile then waits for one of them, not the whole search. Explore's
+availability (bulk `availability.search`) and a `full` catalogue sync count one per stored place,
+and at least 1. With a 10 s interval and 8 places, Explore's availability gets
+20 s + 8 × 11 s = 108 s, and a sync 60 s + 8 × 20 s = 220 s. A hold's release counts 2
+requests at the person's gap (30 s + 2 × 11 s = 52 s). A `search` catalogue's pages and the
+sign-in check keep their bounds.
 
 Other timings from the same table: the first sync starts once the window has been open for
 5 s (`startDelayMs`), stale catalogues are looked at every 60 minutes (`recheckMs`), a detail is
@@ -1364,6 +1615,9 @@ never for a time.
 - **HTTP 429** reaches the person as `RATE_LIMITED`, and is never retried at once. The core does
   not read `Retry-After` (`ProviderHttpError` does not keep headers). If the provider asks you
   to slow down, raise `minWatchIntervalMinutes`, lower `maxConcurrentRequests`, and fetch less.
+  If it asks for a gap between requests, set `minRequestIntervalMs` with
+  `maxConcurrentRequests: 1`: the core then sends one request at a time, the person's first
+  after a 1 s gap, and background work after the full gap ([pacing](#limits)).
 - **Do not retry in a loop inside a module**, and never sleep and try again. Throw a
   `ProviderError` with a message the person can act on, and let the next scheduled run try.
 
@@ -1422,10 +1676,10 @@ personal detail.
 
 `FixtureHttpClient` (`src/main/testing/fixture-http-client.ts`) answers requests from recorded
 responses: a folder per provider with a `manifest.json` of routes (`method`, `path`, and
-optionally `query`, `status`, `contentType`) and the files they name. The host is not compared,
-so any https address does, and a request that no route answers fails without being sent
-([the route format](../../tests/e2e/fixtures/http/README.md#manifest)). It is the client the app
-uses in fixture mode, so the same format serves Jest and the Electron smoke tests:
+optionally `query`, `form`, `status`, `contentType`) and the files they name. The host is not
+compared, so any https address does, and a request that no route answers fails without being
+sent ([the route format](../../tests/e2e/fixtures/http/README.md#manifest)). It is the client
+the app uses in fixture mode, so the same format serves Jest and the Electron smoke tests:
 
 <!-- region: tests/unit/docs/example-providers.test.ts#test-fixtures -->
 
@@ -1448,9 +1702,11 @@ function fixtureContext(manifest: ProviderManifest) {
 
 A route with `query` answers only a request with those values, so a fixture can prove the
 provider sent the right parameters (Example Parks' availability route answers only
-`siteType=powered` for the stay). When a test needs answers that differ for the same request
-(a refusal, a slow server, a wrong shape), serve them from a loopback server with
-`NodeHttpClient`, as the example's tests do.
+`siteType=powered` for the stay). A route with `form` answers only a request whose body, read
+as a form (`postForm`), has those fields, so POSTs to one address are told apart by what they
+send. When a test needs answers that differ for the same request (a refusal, a slow server, a
+wrong shape), serve them from a loopback server with `NodeHttpClient`, as the example's tests
+do.
 
 ### The contract suite
 
@@ -1468,7 +1724,7 @@ first listed place and a two-night stay 30 days ahead):
 | `links` | `location` and `booking` (with and without the stay) for `sample`, and `manageBooking('REF-1')` | Each is an absolute https URL or `null`. |
 | `catalog` | `listLocations()`, or every `searchArea` page over `searchBbox` (default: the whole world); `getLocation` for `sample` and for `unknownExternalId` | At least one place; unique keys that round-trip and name the provider; kinds from `locationKinds`; a detail with the same key and a `units` array; an unknown place rejects with a `ProviderError`; every call rejects with an `AbortError` for a signal aborted before it and one aborted during it. |
 | `search` catalogue | `searchArea` page after page over `searchBbox`; `searchText(searchText)` if there is one | Items inside the box (to 0.01°); a `nextCursor` that is a non-empty string, changes, and ends within 100 pages; an abort honoured on the first and the next page; `searchText` finds places of this provider, and honours an abort. |
-| `availability` | `check` for `sample` and for `unknownExternalId`; `search(stay)` if there is one | Nights only inside the stay, under the location key, with a `checkedAt` date; an unknown place rejects with a `ProviderError`; `search`'s keys name the provider; both honour an abort. |
+| `availability` | `check` for `sample` and for `unknownExternalId`; `search(stay)` if there is one | Nights only inside the stay, under the location key, with a `checkedAt` date; every `bookingUrl` (the place's and each unit's) https on your own site, as the core takes it (`bookingLinkViolations`); an unknown place rejects with a `ProviderError`; `search`'s keys name the provider; both honour an abort. |
 | `access` | `status()`, `onStatus()` and its unsubscribe, `holdOpen()` released twice, `ensure()` | The status names the provider; `ensure` honours an abort. |
 | `release` | `computeReleaseAt` for every release mode | A `Date` or `null`; `pollFloorMs` above 0; an abort honoured. |
 | `holds` | `create({ externalId, stay })`, only with a signal aborted before the call or at once after it starts | It rejects with an `AbortError`. Nothing about a hold's answer is checked, and no hold is placed: test refusals, the answer's shape and `bookedReference` yourself, on recorded responses or a loopback server, as the example does. |
@@ -1658,8 +1914,11 @@ Once registered, with no other change:
 - **Watches and Site Sniper** list the provider in their first step when it has the
   capability, with its stay fields and release modes. A watch's location step searches the
   stored catalogue (and, for a `search` catalogue with `searchText`, the provider).
-- **Settings → Accounts** shows its row and, with `browser-session`, its sign-in.
-- **Notifications** name the provider; desktop titles start with its `shortName`.
+- **Settings → Accounts** shows its row and, with `browser-session`, its sign-in; with
+  `credentials`, its saved details (add, replace, remove, copy).
+- **Notifications** name the provider; desktop titles start with its `shortName`. A watch's
+  alert opens your booking page for the stay it found (a click on the desktop notification,
+  and "Book on {shortName}" in its email and on the watch's page).
 
 ## Checklist
 
@@ -1676,6 +1935,7 @@ What a finished provider looks like. (The steps to get there are in
 - [ ] Raw responses validated; words mapped explicitly; unknown is never `available`.
 - [ ] `check` and `search` work without `stay.params` (the field's default).
 - [ ] Only https image URLs; HTML left for main to sanitise.
+- [ ] Booking links on your own site, public, prefilled where they can be, and never a cart.
 - [ ] Every module honours its `AbortSignal`, stays inside the core's timeouts, and fails with
       a `ProviderError`; no retry loops.
 - [ ] Holds: refusals are results; `bookedReference` accepts only this hold's confirmation.

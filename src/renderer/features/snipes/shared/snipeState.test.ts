@@ -33,6 +33,8 @@ describe('primaryActionFor', () => {
     [SnipeStatus.BOOKED, false, 'booking'],
     [SnipeStatus.EXPIRED, false, 'arm-again'],
     [SnipeStatus.FAILED, false, 'arm-again'],
+    // An alert holds nothing, so it may be armed again (§12.35)
+    [SnipeStatus.ALERTED, false, 'arm-again'],
   ])('%s (active %s) leads with %s', (status, isActive, action) => {
     expect(primaryActionFor({ status, isActive })).toBe(action);
   });

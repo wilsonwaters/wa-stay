@@ -1,17 +1,19 @@
 import { useCallback } from 'react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { unwrap } from './client';
 import { useApiEvent } from './events';
 import { queryKeys } from './queryKeys';
 
+import type { ProviderExperimentState } from '../../shared/contracts';
 import type {
   AccessStatus,
   BooleanCapability,
   ProviderCapabilities,
+  ProviderId,
   ProviderManifest,
 } from '../../shared/types/provider.types';
 
-export type { ProviderCapabilities, ProviderManifest };
+export type { ProviderCapabilities, ProviderExperimentState, ProviderManifest };
 
 /** The on/off capabilities a flow can filter providers by (`account`/`catalogMode` are not). */
 export type ProviderCapability = BooleanCapability;
@@ -46,6 +48,41 @@ export function useProvidersWith(capability?: ProviderCapability) {
     [capability]
   );
   return useQuery({ queryKey: queryKeys.providers.list(), queryFn: listProviders, select });
+}
+
+/**
+ * A provider's experiments (`providers.experiments`): each one's stored choice (`enabled`) and
+ * whether it is on in this run (`active`); a change takes effect when WA Stay restarts. Ask
+ * only for a provider whose manifest declares experiments (`enabled` false asks nothing).
+ */
+export function useProviderExperiments(providerId: ProviderId, enabled = true) {
+  return useQuery({
+    queryKey: queryKeys.providers.experiments(providerId),
+    queryFn: () => unwrap((api) => api.providers.experiments(providerId)),
+    enabled,
+  });
+}
+
+/**
+ * Turns an experiment on or off from the next start (`providers.setExperiment`); main's answer
+ * replaces the provider's experiments. Rejects with `ACCOUNT_BUSY` for turning off one that
+ * turns on holds while a stay is held.
+ */
+export function useSetExperiment() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      providerId,
+      experimentId,
+      enabled,
+    }: {
+      providerId: ProviderId;
+      experimentId: string;
+      enabled: boolean;
+    }) => unwrap((api) => api.providers.setExperiment(providerId, experimentId, enabled)),
+    onSuccess: (states, { providerId }) =>
+      queryClient.setQueryData(queryKeys.providers.experiments(providerId), states),
+  });
 }
 
 const updatedAt = (status: AccessStatus | undefined) =>

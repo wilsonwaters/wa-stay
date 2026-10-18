@@ -4,15 +4,17 @@ import type { ProviderManifest } from '../../../../shared/types/provider.types';
 import type { Watch } from '../../../../shared/types/watch.types';
 import { formatPrice } from '../../../components/nightGridModel';
 import { partyLabel, stayNightsLabel, stayDatesLabel } from '../../../components/stay/stayFormat';
+import { isMixedPlace, placeUnitKinds, stayTypesText } from '../../../components/stay/stayTypes';
 import { relativeTime, timeInZone } from '../../../components/timeFormat';
 import { StatusPill } from '../../../components/ui';
 import { intervalLabel } from '../form/watchFormSchema';
 import type { UnitNoun } from '../../../components/nightGridModel';
 import {
   autoHoldLabel,
+  heldNoun,
   statusPillFor,
   unitNameOf,
-  unitNounFor,
+  watchNoun,
   type WatchState,
 } from '../shared/watchState';
 
@@ -42,7 +44,10 @@ export interface WatchSummaryProps {
   manifest: ProviderManifest | undefined;
   today: string;
   now: Date;
-  /** The place's units (its catalogue detail), for the chosen units' names. */
+  /**
+   * The place's units (its catalogue detail), for the chosen units' names and, at a place
+   * whose units are of more than one kind, the stay type.
+   */
   units?: readonly UnitSummary[];
 }
 
@@ -60,9 +65,17 @@ function chosenUnits(watch: Watch, units: readonly UnitSummary[] | undefined, no
 /** The watch's stay, preferences and status, side by side (no cards inside cards). */
 export function WatchSummary({ watch, state, manifest, today, now, units }: WatchSummaryProps) {
   const { stay } = watch;
-  const noun = unitNounFor(manifest);
+  // The units it wants (its last check's), else the chosen units, its stay types or the place's
+  const chosen = units?.filter(
+    (u) => watch.unitIds.includes(u.unitId) || watch.unitIds.includes(u.unitName)
+  );
+  const noun = watchNoun(watch, manifest, {
+    about: watch.lastAvailability ?? chosen,
+    placeUnits: units,
+  });
   const zone = manifest?.timezone ?? 'Australia/Perth';
   const params = (manifest?.stayFields ?? []).filter((f) => watch.stayParams[f.key] !== undefined);
+  const showStayType = watch.unitKinds.length > 0 || isMixedPlace(units && placeUnitKinds(units));
   return (
     <div className="grid gap-8 md:grid-cols-3">
       <Group title="Stay">
@@ -82,6 +95,7 @@ export function WatchSummary({ watch, state, manifest, today, now, units }: Watc
         })}
       </Group>
       <Group title="Preferences">
+        {showStayType && <Item label="Stay type">{stayTypesText(watch.unitKinds)}</Item>}
         <Item label={`Preferred ${noun.many}`}>
           {watch.unitIds.length ? chosenUnits(watch, units, noun) : `Any ${noun.one}`}
         </Item>
@@ -101,14 +115,16 @@ export function WatchSummary({ watch, state, manifest, today, now, units }: Watc
               watch,
               state,
               noun,
-              watch.hold ? timeInZone(new Date(watch.hold.expiresAt), zone, now) : undefined
+              watch.hold
+                ? `${watch.hold.expiresEstimated ? 'about ' : ''}${timeInZone(new Date(watch.hold.expiresAt), zone, now)}`
+                : undefined
             )}
           </Item>
         )}
       </Group>
       <Group title="Status">
         <Item label="State">
-          <StatusPill {...statusPillFor(state)} />
+          <StatusPill {...statusPillFor(state, heldNoun(watch, manifest, units))} />
         </Item>
         <Item label="Last checked">
           {watch.lastCheckedAt ? (

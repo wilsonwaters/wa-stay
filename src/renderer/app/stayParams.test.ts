@@ -1,4 +1,13 @@
-import { clampStayParams, hasDates, parseStayParams, stayParamsQuery } from './stayParams';
+import {
+  clampStayParams,
+  hasDates,
+  hasUnusableStayType,
+  unusableStayTypeNotice,
+  isStayType,
+  parseStayParams,
+  parseStayTypes,
+  stayParamsQuery,
+} from './stayParams';
 
 describe('parseStayParams', () => {
   it('reads the dates and the party', () => {
@@ -99,5 +108,42 @@ describe('clampStayParams', () => {
 
   it('keeps the party whatever happens to the dates', () => {
     expect(clampStayParams(stay('2020-01-01', '2020-01-03'), RULES).adults).toBe(2);
+  });
+});
+
+describe('stay types', () => {
+  it('knows the five stay types, and not "other"', () => {
+    expect(['campsite', 'cabin', 'room', 'dorm', 'glamping'].every(isStayType)).toBe(true);
+    expect(isStayType('other')).toBe(false);
+    expect(isStayType('castle')).toBe(false);
+    expect(isStayType(undefined)).toBe(false);
+  });
+
+  it('reads a `stay` value in its order, without unknown values, "other", blanks or repeats', () => {
+    expect(parseStayTypes('glamping, cabin,,other,cabin,castle')).toEqual(['glamping', 'cabin']);
+    expect(parseStayTypes('')).toEqual([]);
+    expect(parseStayTypes(null)).toEqual([]);
+  });
+
+  it('tells when a `stay` value names something that is not a stay type, ignoring blanks and repeats', () => {
+    expect(hasUnusableStayType('cabin,castle')).toBe(true);
+    expect(hasUnusableStayType('other')).toBe(true);
+    expect(hasUnusableStayType('cabin,cabin, room,')).toBe(false);
+    expect(hasUnusableStayType('')).toBe(false);
+    expect(hasUnusableStayType(null)).toBe(false);
+  });
+
+  it('says to choose a stay type when none is usable, else that only the rest were left out', () => {
+    expect(unusableStayTypeNotice('castle')).toBe(
+      "The link's stay type couldn't be used, so choose one."
+    );
+    expect(unusableStayTypeNotice('cabin,bogus')).toBe(
+      "One of the link's stay types couldn't be used, so it was left out."
+    );
+    expect(unusableStayTypeNotice('cabin,bogus,castle,bogus')).toBe(
+      "Some of the link's stay types couldn't be used, so they were left out."
+    );
+    expect(unusableStayTypeNotice('cabin,room')).toBeUndefined();
+    expect(unusableStayTypeNotice(null)).toBeUndefined();
   });
 });

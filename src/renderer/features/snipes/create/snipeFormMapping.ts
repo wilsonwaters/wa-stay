@@ -1,7 +1,7 @@
 /**
  * Between the snipe form and the snipes contract (V4): the timing conversions (seconds and
- * minutes in the form, ms in the contract), what create sends, the name a new snipe gets, and
- * which field a `VALIDATION` issue from main names. Calendar dates stay `YYYY-MM-DD` strings;
+ * minutes in the form, ms in the contract), what create sends (its `action` always), the name a
+ * new snipe gets, and which field a `VALIDATION` issue from main names. Calendar dates stay `YYYY-MM-DD` strings;
  * no user id (main resolves the local profile). Pure.
  */
 import { SnipeReleaseMode } from '../../../../shared/types/common.types';
@@ -76,8 +76,10 @@ export function toSnipeInput(
       ...(values.infants > 0 ? { infants: values.infants } : {}),
     },
     ...(values.unitIds.length ? { unitIds: values.unitIds } : {}),
+    ...(values.unitKinds.length ? { unitKinds: values.unitKinds } : {}),
     ...(Object.keys(stayParams).length ? { stayParams } : {}),
     releaseMode: values.releaseMode as SnipeReleaseMode,
+    action: values.action,
     ...(releaseAt ? { releaseAt } : {}),
     ...(manifest?.capabilities.accessGate
       ? {
@@ -99,6 +101,7 @@ const TOP_LEVEL: Partial<Record<string, SnipeFieldName>> = {
   providerId: 'providerId',
   name: 'name',
   releaseMode: 'releaseMode',
+  action: 'action',
   accessGateEnabled: 'accessGateEnabled',
   leadTimeSeconds: 'leadTimeSeconds',
   pollIntervalMs: 'pollIntervalSeconds',

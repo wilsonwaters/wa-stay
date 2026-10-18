@@ -5,6 +5,7 @@ import {
   handoffPrefill,
   linkHost,
   placeKey,
+  rateLimitedMessage,
   resolvePlaceLinks,
   sameStay,
   stayQueryOf,
@@ -133,6 +134,25 @@ describe('handoffPrefill', () => {
       location: 'a/b',
     });
   });
+
+  it('keeps the stay types chosen on Explore as `stay`, and leaves none out', () => {
+    expect(
+      handoffPrefill('parkstay', '20', { arrival: '2026-11-06', departure: '2026-11-08' }, [
+        'cabin',
+        'room',
+      ])
+    ).toEqual({
+      provider: 'parkstay',
+      location: '20',
+      arrival: '2026-11-06',
+      departure: '2026-11-08',
+      stay: ['cabin', 'room'],
+    });
+    expect(handoffPrefill('parkstay', '20', {}, [])).toEqual({
+      provider: 'parkstay',
+      location: '20',
+    });
+  });
 });
 
 describe('stayQueryOf and sameStay', () => {
@@ -194,5 +214,13 @@ describe('checkFailure', () => {
     expect(checkFailure({ code: 'RATE_LIMITED' }, ungated)).toBe('rate-limit');
     expect(checkFailure({ code: 'PROVIDER_ERROR' }, gated)).toBe('other');
     expect(checkFailure(undefined, gated)).toBe('other');
+  });
+
+  it("says a rate limit in the provider's name, with no length of time that may be wrong", () => {
+    expect(rateLimitedMessage('ParkStay')).toBe(
+      'ParkStay asked WA Stay to slow down. Try again later.'
+    );
+    expect(rateLimitedMessage('RAC')).toBe('RAC asked WA Stay to slow down. Try again later.');
+    expect(rateLimitedMessage('RAC')).not.toMatch(/minute|hour/);
   });
 });

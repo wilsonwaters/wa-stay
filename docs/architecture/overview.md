@@ -36,7 +36,7 @@ src/
 │   │                 # provider sign-in/payment windows, launch at login, quit hold, local profile
 │   ├── core/         # provider-agnostic services: catalog, watches, snipes, bookings, holds,
 │   │                 # accounts, notifications (+ notifiers/), stay-param rules
-│   ├── providers/    # sdk/ (the provider SDK), registry.ts, index.ts (built-ins), parkstay/
+│   ├── providers/    # sdk/ (the provider SDK), registry.ts, index.ts (built-ins), parkstay/, rac/
 │   ├── database/     # connection.ts (schema and every migration), repositories/
 │   ├── ipc/          # handle.ts, sender guard, renderer events, handlers/ (one per namespace)
 │   ├── scheduler/    # job scheduler: watch loop, snipe timer chains, retention job
@@ -101,6 +101,7 @@ flowchart TD
     core["Core services<br/>catalog · watches · snipes · bookings · holds · accounts · notifications"]
     registry["ProviderRegistry<br/>manifests, capability checks"]
     parkstay["ParkStay WA provider<br/>providers/parkstay/"]
+    rac["RAC Parks & Resorts provider<br/>providers/rac/"]
     next["Next provider<br/>providers/your-id/"]
     subgraph ctx["ProviderContext (one per provider)"]
       http["HttpClient<br/>ElectronSessionHttpClient (app)<br/>NodeHttpClient (tests)"]
@@ -114,8 +115,10 @@ flowchart TD
   ipc --> core
   core --> registry
   registry --> parkstay
+  registry --> rac
   registry --> next
   parkstay --> ctx
+  rac --> ctx
   next --> ctx
 ```
 
@@ -124,10 +127,12 @@ namespace method. The preload sends it over IPC to main, where `ipc/handle.ts` c
 sender is the app's own window, validates the payload with the method's zod schema and calls
 the handler. The handler calls a core service, which never names a provider: it asks the
 `ProviderRegistry` for one by id or by capability, and calls the module the capability
-guarantees. Each provider (ParkStay today) is built by its factory from a `ProviderContext`
-that gives it everything it may use: an `HttpClient` on its own Electron session partition (a
-Node client with an in-memory cookie jar in tests), browser automation on the installed Edge or
-Chrome, its own key-value state, its own encrypted secrets, a logger and a clock. Answers flow
+guarantees. Each provider (ParkStay WA and RAC Parks & Resorts today) is built by its factory
+from a `ProviderContext` that gives it everything it may use: an `HttpClient` on its own
+Electron session partition (a Node client with an in-memory cookie jar in tests; paced, one
+request at a time, for a provider that asks for a pause, such as RAC), browser automation on the
+installed Edge or Chrome, its own key-value state, its own encrypted secrets, a logger and a
+clock. Answers flow
 back the same way as an `APIResponse`; events (a watch updated, a notification, the queue
 state) go from main to the window through `rendererEvents`.
 
@@ -138,20 +143,20 @@ The provider SDK and how to add a provider: [Providers](../providers/README.md) 
 
 One SQLite file, `<userData>/wa-stay.db`. `src/main/database/connection.ts` holds the schema
 and every migration; each runs in one transaction with a foreign-key check, and the database
-records the versions applied. At version 10 the tables are:
+records the versions applied. At version 12 the tables are:
 
 | Table | Holds |
 | --- | --- |
 | `users` | The local profile (one row, id 1): name, phone, an email hint. Nothing may delete it. |
 | `watches` | Availability watches: provider, location, stay (`YYYY-MM-DD` dates, party, `stay_params`), units, interval, last result and availability, automatic-hold fields. |
-| `site_snipes` | Snipes: provider, location, stay, release mode and time, access-gate use, timing, status, hold and payment fields. |
+| `site_snipes` | Snipes: provider, location, stay, release mode and time, access-gate use, timing, what it does when the dates are free (hold or alert), status, hold and payment fields, and what an alert found. |
 | `bookings` | Bookings, unique per `(provider_id, booking_reference)`. |
 | `notifications` | In-app notifications, with the provider they belong to. Deleted after 30 days. |
 | `notifiers` | Outbound notifier settings (email SMTP); the config is a SecretVault envelope. |
 | `notification_delivery_logs` | Each notifier delivery; deleted after 30 days. |
 | `settings` | Typed key-value settings (`SETTING_KEYS`). |
 | `provider_accounts` | The person's account state with each provider (no secrets). |
-| `provider_state` | Each provider's key-value state: the DBCA queue session, release times, scoped secrets. |
+| `provider_state` | Each provider's key-value state: the DBCA queue session, release times, scoped secrets; and the app's own `core.*` keys, which the provider cannot reach: catalogue sync times and the person's experiment choices (`core.experiments`). |
 | `locations`, `locations_fts` | The synced catalogue of every provider, with an FTS5 index for search. |
 | `maintenance` | Pending maintenance tasks (the post-v9 VACUUM). |
 | `migrations` | The versions applied. |
@@ -164,6 +169,8 @@ records the versions applied. At version 10 the tables are:
 | v8 | Provider-aware: `provider_id` and generic location, stay and unit columns on watches, snipes and bookings; calendar dates; the local profile row; `provider_accounts`, `provider_state` (the queue session moved there) and `locations` with FTS5. |
 | v9 | The v1.x ParkStay password columns dropped (run with `secure_delete`, then VACUUM); watch hold fields; `maintenance`. |
 | v10 | The never-written `job_logs` table dropped. |
+| v11 | Unit kinds: `unit_kinds` on locations (filled from each place's kind), watches and snipes. |
+| v12 | Release-alert snipes: `action` (`hold` for every existing snipe) and `alert` on snipes; `hold_expires_estimated` on watches and snipes. |
 
 Migration tests start from SQL dumps of a real v5 (v1.2.0) and v6 database
 (`tests/fixtures/db/`).
@@ -184,7 +191,9 @@ The baseline (architecture-notes §7), as built:
 - **Secrets** are encrypted by the SecretVault with Electron `safeStorage` (Windows DPAPI,
   macOS Keychain, a Linux keyring), or a local AES-256-GCM key file where no OS encryption
   exists. Secrets are write-only over IPC: the SMTP password is never sent back to the window
-  (`hasPassword` instead). v1.x ciphertexts are migrated once.
+  (`hasPassword` instead), nor is an account detail a provider asks for, such as a member
+  number (`savedFields` instead; main copies it to the clipboard on request). v1.x ciphertexts
+  are migrated once.
 - **Provider windows** (sign-in, payment) show the provider's own pages on its session
   partition, sandboxed, with no script of the app's, a top-level origin allow-list, and every
   permission request and certificate error refused.
@@ -208,7 +217,7 @@ and v1.x auto-update finds WA Stay through GitHub's redirect from the renamed re
    (`%APPDATA%\parkstay-bookings\parkstay.db`, else the snapshot) to `wa-stay.db` with
    SQLite's online backup, writes `migration.json`, and leaves the v1.x folder untouched as
    the backup. A failed copy asks Retry, Start fresh or Quit.
-3. The migrations bring the copy to v10; the secret migration re-encrypts its notifier
+3. The migrations bring the copy to v12; the secret migration re-encrypts its notifier
    settings; the v1.x ParkStay password is dropped.
 4. A welcome notice says where the old data is kept, and launch at login is re-registered under
    WA Stay (with "Start minimised" on, as v1.x always started hidden).

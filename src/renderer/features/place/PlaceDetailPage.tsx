@@ -12,8 +12,8 @@ import {
   useProviders,
 } from '../../api';
 import { buildPath, PATTERNS, placeLinkState, ROUTES } from '../../app/routes';
-import { stayParamsQuery, type StayParams } from '../../app/stayParams';
-import { areaLine, kindLabel, unitNoun } from '../../components/locationFormat';
+import { parseStayTypes, stayParamsQuery, type StayParams } from '../../app/stayParams';
+import { areaLine, kindLabel, placeNoun } from '../../components/locationFormat';
 import {
   BackLink,
   Badge,
@@ -40,6 +40,7 @@ import {
   checkFailure,
   handoffPrefill,
   placeKey,
+  rateLimitedMessage,
   resolvePlaceLinks,
   sameStay,
   stayQueryOf,
@@ -197,6 +198,12 @@ export default function PlaceDetailPage() {
   const minDate = todayIn(manifest?.timezone ?? FALLBACK_TIME_ZONE);
   const { stay, setStay } = usePlaceStay({ minDate, maxNights: MAX_NIGHTS });
   const currentStay = useMemo(() => stayQueryOf(stay), [stay]);
+  // The stay types chosen on Explore (`stay=cabin`), handed on to the create flows.
+  const { search } = useLocation();
+  const stayTypes = useMemo(
+    () => parseStayTypes(new URLSearchParams(search).get('stay')),
+    [search]
+  );
 
   // ---- Check availability ---------------------------------------------------------------
   // A provider may leave the units out altogether; that reads as none.
@@ -236,7 +243,7 @@ export default function PlaceDetailPage() {
       if (kind === 'access-gate') {
         announce(`${shortName} has a waiting queue right now. Try again in a few minutes.`);
       } else if (kind === 'rate-limit') {
-        announce('Too many checks in a short time. Try again in a minute.');
+        announce(rateLimitedMessage(shortName));
       }
       // Anything else shows an alert, which announces itself.
       return;
@@ -283,7 +290,8 @@ export default function PlaceDetailPage() {
     );
   }
 
-  const noun = unitNoun(detail?.kind ?? 'other');
+  // Its units' kinds once loaded, else its own (a cached summary's), else its provider's
+  const noun = placeNoun(detail, manifest);
   const links = detail
     ? resolvePlaceLinks(detail, manifest?.website, checked ? check.data?.bookingUrl : undefined)
     : {};
@@ -293,7 +301,7 @@ export default function PlaceDetailPage() {
       : !manifest?.capabilities.availability
         ? {
             kind: 'unavailable',
-            message: `${shortName} doesn't share availability with WA Stay. Check dates on their website.`,
+            message: `WA Stay can't check availability here. Check dates on ${shortName}'s website.`,
           }
         : units.length === 0
           ? {
@@ -320,7 +328,7 @@ export default function PlaceDetailPage() {
   const onGuestsChange = (next: Guests) =>
     setStay({ adults: next.adults, children: next.children, infants: next.infants });
 
-  const prefill = handoffPrefill(providerId, externalId, stay);
+  const prefill = handoffPrefill(providerId, externalId, stay, stayTypes);
   const area = detail ? areaLine(detail) : '';
   const online = detail?.bookingMode === 'online';
 
@@ -385,6 +393,7 @@ export default function PlaceDetailPage() {
             the place; from 1024 px it is the sticky right-hand column. */}
         <div className="lg:sticky lg:top-22 lg:col-start-2 lg:row-start-1">
           <StayCard
+            providerId={providerId}
             shortName={shortName}
             dates={dates}
             guests={guests}
@@ -402,6 +411,7 @@ export default function PlaceDetailPage() {
             links={links}
             watchHref={manifest?.capabilities.watches ? ROUTES.watchNew(prefill) : undefined}
             snipeHref={manifest?.capabilities.snipes ? ROUTES.snipeNew(prefill) : undefined}
+            unitNoun={noun}
           />
         </div>
 
@@ -427,7 +437,12 @@ export default function PlaceDetailPage() {
           )}
           {detail && <FacilitiesSection amenities={detail.amenities} />}
           {loaded && detail && (
-            <SitesSection units={units} unitCount={detail.unitCount} kind={detail.kind} />
+            <SitesSection
+              units={units}
+              unitCount={detail.unitCount}
+              unitsAreTypes={detail.unitsAreTypes === true}
+              noun={noun}
+            />
           )}
           {loaded && detail && <BookingRulesSection releaseInfo={detail.releaseInfo} />}
         </div>

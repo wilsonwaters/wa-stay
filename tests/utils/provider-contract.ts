@@ -7,8 +7,14 @@
  *   }));
  *
  * It checks that the manifest is valid, the capabilities match the modules, location keys
- * round-trip, every module honours `AbortSignal`, failures are `ProviderError`s, and links
- * are absolute https URLs. Modules the provider does not have are skipped. For a
+ * round-trip, every module honours `AbortSignal`, failures are `ProviderError`s, links are
+ * absolute https URLs, and every booking link a check returns (the location's and each
+ * unit's `bookingUrl`) is on the provider's own site (`bookingLinkViolations`, the core's
+ * `isProviderBookingLink`), and that a stay under a unit's minimum is refused: the unit is
+ * not `fullyAvailable` and its nights with room are `min-stay`, never `available`
+ * (`stayRuleViolations`), and that free counts are whole numbers on every unit or none
+ * (`freeCountViolations`). Modules the
+ * provider does not have are skipped. For a
  * browser-driven provider, `openPages` lets it check that no call leaves a page open.
  *
  * A `search`-mode catalogue is also checked over `searchBbox` (`searchAreaViolations`): its
@@ -25,14 +31,18 @@ import {
   type CatalogModule,
   type ProviderContext,
 } from '@main/providers/sdk';
+import { isProviderBookingLink } from '@main/core/booking-link';
+import { minimumNights } from '@main/core/watches/matching';
 import { TEXT_SEARCH_MIN_CHARS } from '@main/core/catalog/location-catalog.service';
 import { providerViolations, ProviderRegistry } from '@main/providers/registry';
 import type { BoundingBox, LocationSummary } from '@shared/types/catalog.types';
 import {
   ProviderManifestSchema,
+  type LocationAvailability,
   type ProviderManifest,
   type StayQuery,
 } from '@shared/types/provider.types';
+import { nightsBetween } from '@shared/utils/calendar-date';
 import { makeLocationKey, parseLocationKey } from '@shared/utils/location-key';
 import { createTestProviderContext } from './fake-provider';
 
@@ -204,6 +214,101 @@ export async function searchTextViolations(
   return (items as LocationSummary[])
     .filter((item) => item.key !== makeLocationKey(providerId, item.externalId))
     .map((item) => `searchText("${text}"): ${item.key} is not a location of ${providerId}`);
+}
+
+/**
+ * What is wrong with the booking links of a check's answer, as messages ([] when nothing):
+ * a `bookingUrl` (the location's, or a unit's) that the core would refuse, because it is not
+ * https on the provider's own site (`isProviderBookingLink`: the website's host, or a
+ * subdomain of it, with no user name or password). Alerts never carry such a link.
+ */
+export function bookingLinkViolations(
+  manifest: Pick<ProviderManifest, 'website'>,
+  result: Pick<LocationAvailability, 'bookingUrl' | 'units'>
+): string[] {
+  const links: Array<[string, string | undefined]> = [
+    ['the location', result.bookingUrl],
+    ...result.units.map((unit): [string, string | undefined] => [
+      `unit ${unit.unitId}`,
+      unit.bookingUrl,
+    ]),
+  ];
+  return links
+    .filter(([, url]) => url !== undefined && !isProviderBookingLink(manifest, url))
+    .map(([owner, url]) => `${owner}'s bookingUrl ${url} is not on ${manifest.website}`);
+}
+
+/**
+ * What is wrong with the stay rules of a check's answer for `stay`, as messages ([] when
+ * nothing). A unit whose minimum for the stay (the core's `minimumNights`: the arrival night's
+ * `minNights`, else the unit's) is more than the stay's nights must not be `fullyAvailable`,
+ * and must not have an `available` night with no reason: the stay is refused, so its nights
+ * with room are `unknown` with `reason: 'min-stay'`. Nor may a `min-stay` night be
+ * `available`. A watch must never alert on a stay the provider would refuse, and the night grid
+ * must not show it free.
+ */
+export function stayRuleViolations(
+  stay: Pick<StayQuery, 'arrival' | 'departure'>,
+  result: Pick<LocationAvailability, 'units'>
+): string[] {
+  const stayNights = nightsBetween(stay.arrival, stay.departure);
+  const violations: string[] = [];
+  for (const unit of result.units) {
+    const arrivalNight = unit.nights.find((night) => night.date === stay.arrival);
+    const minimum = minimumNights(unit, arrivalNight);
+    if (minimum > stayNights) {
+      if (unit.fullyAvailable) {
+        violations.push(
+          `unit ${unit.unitId} is fullyAvailable for ${stayNights} nights, under its minNights ${minimum}`
+        );
+      }
+      const free = unit.nights.filter(
+        (night) => night.state === 'available' && night.reason === undefined
+      );
+      if (free.length > 0) {
+        violations.push(
+          `unit ${unit.unitId}'s nights ${free.map((night) => night.date).join(', ')} are ` +
+            `available with no reason, under its ${minimum}-night minimum for ${stayNights} ` +
+            `nights (they are min-stay)`
+        );
+      }
+    }
+    for (const night of unit.nights) {
+      if (night.reason === 'min-stay' && night.state === 'available') {
+        violations.push(`unit ${unit.unitId}'s night ${night.date} is min-stay but available`);
+      }
+    }
+  }
+  return violations;
+}
+
+/**
+ * What is wrong with the free counts of a check's answer, as messages ([] when nothing). A
+ * unit's `freeCount` (the units it stands for that are free for the whole stay) is a whole
+ * number: at least 1 when the unit is `fullyAvailable`, else 0. A provider sets it on every unit
+ * of a check or on none, so a count of what is free can tell whether the provider has a total
+ * ("2 of 5 sites free") or not ("51 spots free").
+ */
+export function freeCountViolations(result: Pick<LocationAvailability, 'units'>): string[] {
+  const violations: string[] = [];
+  const counted = result.units.filter((unit) => unit.freeCount !== undefined);
+  if (counted.length > 0 && counted.length < result.units.length) {
+    const missing = result.units.filter((unit) => unit.freeCount === undefined);
+    violations.push(
+      `units ${missing.map((unit) => unit.unitId).join(', ')} have no freeCount, but others do`
+    );
+  }
+  for (const unit of counted) {
+    const count = unit.freeCount;
+    if (typeof count !== 'number' || !Number.isInteger(count) || count < 0) {
+      violations.push(`unit ${unit.unitId}'s freeCount ${String(count)} is not a whole number`);
+    } else if (unit.fullyAvailable && count < 1) {
+      violations.push(`unit ${unit.unitId} is fullyAvailable with freeCount ${count}`);
+    } else if (!unit.fullyAvailable && count !== 0) {
+      violations.push(`unit ${unit.unitId} is not fullyAvailable, but its freeCount is ${count}`);
+    }
+  }
+  return violations;
 }
 
 /** A promise that rejects with an AbortError (the caller aborted). */
@@ -406,6 +511,24 @@ export function describeProviderContract(
             expect(night.date >= stay.arrival && night.date < stay.departure).toBe(true);
           }
         }
+      });
+
+      it("returns booking links on the provider's own site (https, its website's host)", async () => {
+        if (!provider.availability) return;
+        const result = await provider.availability.check(externalId, stay);
+        expect(bookingLinkViolations(provider.manifest, result)).toEqual([]);
+      });
+
+      it('never offers a stay its own stay rules refuse', async () => {
+        if (!provider.availability) return;
+        const result = await provider.availability.check(externalId, stay);
+        expect(stayRuleViolations(stay, result)).toEqual([]);
+      });
+
+      it('counts free units as whole numbers, on every unit or none (freeCount)', async () => {
+        if (!provider.availability) return;
+        const result = await provider.availability.check(externalId, stay);
+        expect(freeCountViolations(result)).toEqual([]);
       });
 
       it('searches with keys of this provider', async () => {

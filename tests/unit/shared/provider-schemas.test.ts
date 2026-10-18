@@ -4,6 +4,7 @@
  */
 
 import {
+  AccountConfirmationsSchema,
   AccountFieldsSchema,
   CalendarDateSchema,
   DEFAULT_PROVIDER_LIMITS,
@@ -12,6 +13,7 @@ import {
   providerLimits,
   ProviderManifestSchema,
   StayQuerySchema,
+  type ProviderExperiment,
   type ProviderManifest,
 } from '@shared/types/provider.types';
 import { CATALOG_MAX_LIMIT, CatalogQuerySchema } from '@shared/types/catalog.types';
@@ -275,6 +277,14 @@ describe('ProviderManifestSchema', () => {
     ['a select without options', (m) => (m.stayFields![0].options = []), 'stayFields.0.options'],
     ['a bad pattern', (m) => (m.stayFields![1].pattern = '(['), 'stayFields.1.pattern'],
     ['min above max', (m) => (m.stayFields![2].min = 9), 'stayFields.2.min'],
+    // A number stay field is a count: whole numbers bound and start it (R16)
+    ['a fractional number min', (m) => (m.stayFields![2].min = 0.5), 'stayFields.2.min'],
+    ['a fractional number max', (m) => (m.stayFields![2].max = 2.5), 'stayFields.2.max'],
+    [
+      'a fractional number default',
+      (m) => (m.stayFields![2].default = 1.5),
+      'stayFields.2.default',
+    ],
     [
       'a default of the wrong type',
       (m) => (m.stayFields![2].default = 'one'),
@@ -294,6 +304,135 @@ describe('ProviderManifestSchema', () => {
     ],
   ])('rejects %s', (_label, change, path) => {
     expect(issuesAt(ProviderManifestSchema.safeParse(withChange(change)))).toContain(path);
+  });
+
+  it.each([1, 30, 1440])("accepts a release mode's maxWindowMinutes of %s (R12)", (minutes) => {
+    const capped = withChange((m) => (m.releaseModes![0].maxWindowMinutes = minutes));
+    expect(issuesAt(ProviderManifestSchema.safeParse(capped))).toEqual([]);
+  });
+
+  it.each([0, -5, 1441, 1.5])(
+    "rejects a release mode's maxWindowMinutes of %s (R12)",
+    (minutes) => {
+      const capped = withChange((m) => (m.releaseModes![0].maxWindowMinutes = minutes));
+      expect(issuesAt(ProviderManifestSchema.safeParse(capped))).toEqual([
+        'releaseModes.0.maxWindowMinutes',
+      ]);
+    }
+  );
+});
+
+describe('ProviderManifestSchema: experiments (R17)', () => {
+  /** Watches and availability on; holds and snipes off, behind the experiment. */
+  const base: ProviderManifest = testManifest('expstay', {
+    capabilities: {
+      ...testManifest('expstay').capabilities,
+      catalog: true,
+      availability: true,
+      watches: true,
+    },
+  });
+  const autoCart: ProviderExperiment = {
+    id: 'autoCart',
+    label: 'Hold a stay in the cart',
+    description: 'When a watch finds your stay, WA Stay puts it in the cart for you.',
+    warning: 'Only after a booking of your own has worked.',
+    turnsOn: ['holds'],
+  };
+  const withExperiments = (...experiments: ProviderExperiment[]): ProviderManifest => ({
+    ...base,
+    experiments,
+  });
+
+  it('accepts a valid experiment, with or without a warning, and keeps it when parsed', () => {
+    const parsed = ProviderManifestSchema.safeParse(withExperiments(autoCart));
+    expect(issuesAt(parsed)).toEqual([]);
+    expect(parsed.success && parsed.data.experiments).toEqual([autoCart]);
+    const { warning: _warning, ...plain } = autoCart;
+    expect(issuesAt(ProviderManifestSchema.safeParse(withExperiments(plain)))).toEqual([]);
+    expect(issuesAt(ProviderManifestSchema.safeParse(base))).toEqual([]);
+  });
+
+  it.each<[string, () => ProviderManifest, string]>([
+    [
+      'a duplicate id',
+      () => withExperiments(autoCart, { ...autoCart, label: 'Again' }),
+      'experiments',
+    ],
+    [
+      'an id with a hyphen',
+      () => withExperiments({ ...autoCart, id: 'auto-cart' }),
+      'experiments.0.id',
+    ],
+    [
+      'an id starting with a capital',
+      () => withExperiments({ ...autoCart, id: 'AutoCart' }),
+      'experiments.0.id',
+    ],
+    ['a one-letter id', () => withExperiments({ ...autoCart, id: 'a' }), 'experiments.0.id'],
+    ['an empty label', () => withExperiments({ ...autoCart, label: ' ' }), 'experiments.0.label'],
+    [
+      'an empty description',
+      () => withExperiments({ ...autoCart, description: '' }),
+      'experiments.0.description',
+    ],
+    [
+      'an empty warning',
+      () => withExperiments({ ...autoCart, warning: '' }),
+      'experiments.0.warning',
+    ],
+    [
+      'an empty turnsOn',
+      () => withExperiments({ ...autoCart, turnsOn: [] }),
+      'experiments.0.turnsOn',
+    ],
+    [
+      'an unknown capability',
+      () => withExperiments({ ...autoCart, turnsOn: ['autoCart' as 'holds'] }),
+      'experiments.0.turnsOn.0',
+    ],
+    [
+      'account (not a boolean capability)',
+      () => withExperiments({ ...autoCart, turnsOn: ['account' as 'holds'] }),
+      'experiments.0.turnsOn.0',
+    ],
+    [
+      'catalogMode (not a boolean capability)',
+      () => withExperiments({ ...autoCart, turnsOn: ['catalogMode' as 'holds'] }),
+      'experiments.0.turnsOn.0',
+    ],
+    [
+      'a capability already on',
+      () => withExperiments({ ...autoCart, turnsOn: ['holds', 'watches'] }),
+      'experiments.0.turnsOn.1',
+    ],
+    [
+      'an applied experiment whose capability is off',
+      () => withExperiments({ ...autoCart, applied: true }),
+      'experiments.0.turnsOn.0',
+    ],
+  ])('refuses %s', (_label, manifest, path) => {
+    expect(issuesAt(ProviderManifestSchema.safeParse(manifest()))).toContain(path);
+  });
+
+  it('says why a capability already on is refused', () => {
+    const parsed = ProviderManifestSchema.safeParse(
+      withExperiments({ ...autoCart, turnsOn: ['watches'] })
+    );
+    expect(parsed.success).toBe(false);
+    expect(parsed.error?.issues.map((i) => i.message)).toEqual([
+      'Capability watches is already on, so experiment autoCart cannot turn it on',
+    ]);
+  });
+
+  it('accepts an applied manifest: the capabilities its applied experiments turn on are on', () => {
+    const second: ProviderExperiment = { ...autoCart, id: 'cartToo', turnsOn: ['holds'] };
+    const applied: ProviderManifest = {
+      ...withExperiments({ ...autoCart, applied: true }, second),
+      capabilities: { ...base.capabilities, holds: true },
+    };
+    // `cartToo` is not applied, but `holds` is on through `autoCart`
+    expect(issuesAt(ProviderManifestSchema.safeParse(applied))).toEqual([]);
   });
 });
 
@@ -339,5 +478,41 @@ describe('AccountFieldsSchema (credentials sign-in fields)', () => {
     ],
   ])('rejects %s', (_label, fields) => {
     expect(AccountFieldsSchema.safeParse(fields).success).toBe(false);
+  });
+
+  it('a field may be copyable (R15); it must say so with a boolean', () => {
+    const memberNumber = { key: 'memberNumber', label: 'Member number', secret: true };
+    expect(AccountFieldsSchema.safeParse([{ ...memberNumber, copyable: true }]).success).toBe(true);
+    expect(AccountFieldsSchema.safeParse([memberNumber]).success).toBe(true);
+    expect(AccountFieldsSchema.safeParse([{ ...memberNumber, copyable: 'yes' }]).success).toBe(
+      false
+    );
+  });
+});
+
+describe('AccountConfirmationsSchema (statements ticked before a credentials save)', () => {
+  it('accepts none, or statements with alphanumeric keys and a label', () => {
+    expect(AccountConfirmationsSchema.safeParse([]).success).toBe(true);
+    expect(
+      AccountConfirmationsSchema.safeParse([
+        { key: 'own', label: 'This is my own member number.' },
+        { key: 'stay', label: 'I will be staying.' },
+      ]).success
+    ).toBe(true);
+  });
+
+  it.each<[string, unknown]>([
+    ['an empty label', [{ key: 'own', label: '  ' }]],
+    ['a key with a hyphen', [{ key: 'my-own', label: 'Mine' }]],
+    ['no label', [{ key: 'own' }]],
+    [
+      'duplicate keys',
+      [
+        { key: 'own', label: 'Mine' },
+        { key: 'own', label: 'Still mine' },
+      ],
+    ],
+  ])('rejects %s', (_label, confirmations) => {
+    expect(AccountConfirmationsSchema.safeParse(confirmations).success).toBe(false);
   });
 });

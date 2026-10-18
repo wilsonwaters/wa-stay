@@ -152,7 +152,7 @@ export function ImportBookingDialog({
       open={open}
       onClose={onClose}
       title="Import booking"
-      description="WA Stay looks the booking up on the provider's site and adds it here."
+      description="WA Stay looks the booking up on the provider's website and adds it here."
       closeOnOverlayClick={false}
       footer={
         <>

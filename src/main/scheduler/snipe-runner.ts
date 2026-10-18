@@ -4,8 +4,12 @@
  *   arm ─► EXPIRED (window closed, or the arrival date has passed)
  *    ├─► ARMED ─(warm-up: releaseAt − lead)─► QUEUEING* ─► WAITING_RELEASE ─(release)─► SNIPING
  *    └─► SNIPING (continuous polling, or the release has already come within the window)
- *   SNIPING ─poll─► HELD | FAILED | EXPIRED, or the provider's queue ─► QUEUEING* ─► SNIPING
+ *   SNIPING ─poll─► HELD | ALERTED | FAILED | EXPIRED, or the provider's queue ─► QUEUEING* ─► SNIPING
  *   (* only when the snipe uses the provider's access gate)
+ *
+ * HELD, ALERTED, FAILED and EXPIRED are terminal (`TERMINAL_SNIPE_STATUSES`): a run ends there
+ * and nothing re-arms it, at start or after a resume. A provider that turns an attempt away
+ * (403, 429) ends it FAILED, so no further check is made.
  *
  * Correctness rules:
  * - **One chain per snipe.** Each `arm` starts a new run with a new generation token and its
@@ -41,6 +45,12 @@ export const MAX_TIMER_MS = 2_000_000_000;
 /** How often a far-off release is re-armed. */
 export const REARM_INTERVAL_MS = 24 * 60 * 60 * 1000;
 
+/** Why a snipe's window closed, by what it does when the dates are free. */
+export const WINDOW_CLOSED_MESSAGE = {
+  hold: 'The snipe window closed without a hold',
+  alert: 'The window closed before the dates were free',
+} as const;
+
 interface SnipeRun {
   /** The generation token: the run is current while the runner's map holds this one. */
   readonly gen: number;
@@ -54,6 +64,11 @@ interface SnipeRun {
   releaseGate?: () => void;
   /** The step in flight (release-time refresh, queue, attempt). */
   inFlight?: Promise<void>;
+  /**
+   * What the provider times the release by changed while a step was in flight
+   * (`rearmProvider`): the run is re-armed once its attempt settles, instead of polling on.
+   */
+  rearmPending?: boolean;
 }
 
 /** Wraps a release so it runs once, however often it is called. */
@@ -130,6 +145,31 @@ export class SnipeRunner {
       this.retime(snipe.id, run);
     }
     this.armHoldExpiries();
+  }
+
+  /**
+   * After something the provider times a release by has changed (the person's saved details
+   * for it: an RAC member number moves the member pre-sale), its snipes whose release the
+   * provider works out (`daily_rollover`) ask for it again: each one armed (a refresh in flight
+   * is aborted) or sniping between two checks starts a new run, whose prepare asks the
+   * provider for the instant again. One with a check in flight is not interrupted (it may be
+   * placing a hold): it is re-armed once that check settles, unless the check ended it
+   * (`rearmPending`). An active snipe with no run is armed. Other providers' snipes are
+   * untouched.
+   */
+  rearmProvider(providerId: string): void {
+    if (this.stopped) return;
+    for (const snipe of this.snipes.getActive()) {
+      if (snipe.providerId !== providerId) continue;
+      const run = this.runs.get(snipe.id);
+      if (!run) {
+        this.arm(snipe.id);
+        continue;
+      }
+      if (snipe.releaseMode !== SnipeReleaseMode.DAILY_ROLLOVER) continue;
+      if (snipe.status === SnipeStatus.ARMED || !run.inFlight) this.arm(snipe.id);
+      else run.rearmPending = true;
+    }
   }
 
   /** Starts (or restarts) the snipe's chain with a new generation. */
@@ -281,7 +321,7 @@ export class SnipeRunner {
       return undefined;
     }
     if (window && plan.windowEnd && now.getTime() >= plan.windowEnd.getTime()) {
-      this.snipes.expire(id, 'The snipe window closed without a hold');
+      this.snipes.expire(id, WINDOW_CLOSED_MESSAGE[snipe.action]);
       this.finish(id, run);
       return undefined;
     }
@@ -411,6 +451,12 @@ export class SnipeRunner {
     if (!this.isCurrent(id, run)) return;
 
     if (outcome.next === 'done') return this.finish(id, run);
+    if (run.rearmPending) {
+      // The provider's timing changed during the check: ask for the release again
+      log.info(`Snipe ${id}: re-armed after its check (gen ${run.gen})`);
+      this.arm(id);
+      return;
+    }
     if (outcome.next === 'access-gate' && plan.gate) {
       const snipe = this.live(id);
       if (!snipe) return this.finish(id, run);

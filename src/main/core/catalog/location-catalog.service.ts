@@ -18,12 +18,21 @@
  *   each provider's failure separately. It never waits in a provider's queue: a gated
  *   provider answers with an `access-gate` error entry at once, and that error (or a
  *   `timeout`) is reused for 60 s per stay, so map pans during a queue ask nothing.
+ *   `forgetAvailability(providerId)` drops one provider's bulk and per-location answers (the
+ *   container calls it when the person's saved details for it change: an RAC member number
+ *   changes its prices and free nights); an answer still in flight then is not kept.
  * - **Automatic sync** (`start`) begins 5 s after the window is up and re-checks hourly,
  *   only for stale providers, and never while one of the provider's snipes is queueing or
  *   sniping (a 1.2 MB fetch must not compete with a release). While a provider has no cached
  *   locations at all (a first launch offline), a failed automatic sync is retried after
  *   1, 2 and 5 minutes before the hourly schedule takes over. Manual refresh always runs.
  * - **Freshness.** A timestamp in the future (the clock was set back) counts as stale.
+ * - **Pacing.** A detail, a location's check and bulk availability are asked at interactive
+ *   priority (`withRequestPriority`: the person is waiting); syncs and searches stay
+ *   background. A paced provider's deadline grows with the requests a call may wait for
+ *   (`pacedDeadlineMs`): 2 for a detail or a check (its own and one in flight ahead of it),
+ *   one per stored place for bulk availability and for a sync. A paced provider's bulk search
+ *   sends its requests one after another, so a check waits for one of them, not the search.
  *
  * - **Search-mode catalogues** (`catalogMode: 'search'`, §12.30) cannot list every location,
  *   so they are never synced. A `search` with a map area (`bbox`) asks each of them in scope
@@ -67,6 +76,7 @@ import {
   type LocationNotice,
   type LocationSection,
   type LocationSummary,
+  type UnitSummary,
 } from '@shared/types/catalog.types';
 import {
   providerLimits,
@@ -77,8 +87,13 @@ import {
 } from '@shared/types/provider.types';
 import type { EventSink } from '@shared/contracts/events';
 import { bboxContains, catalogSearchArea } from '@shared/utils/catalog-area';
-import { makeLocationKey, parseLocationKey } from '@shared/utils/location-key';
+import {
+  LOCATION_KEY_SEPARATOR,
+  makeLocationKey,
+  parseLocationKey,
+} from '@shared/utils/location-key';
 import { stayKeyFor } from '@shared/utils/stay-key';
+import { cleanUnitKinds, isUnitKind, unitKindsOf } from '@shared/utils/unit-kinds';
 import {
   searchWords,
   type LocationRepository,
@@ -88,6 +103,7 @@ import type { ProviderRegistry } from '../../providers/registry';
 import type { ProviderLogger } from '../../providers/sdk/context';
 import { createLimiter, type Limiter } from '../../providers/sdk/concurrency';
 import { sanitizeProviderHtml } from '../../providers/sdk/html';
+import { withRequestPriority } from '../../providers/sdk/pacing';
 import type {
   AccommodationProvider,
   FullCatalogModule,
@@ -99,6 +115,7 @@ import { AppError } from '../../utils/app-error';
 import {
   catalogErrorCode,
   errorMessage,
+  pacedDeadlineMs,
   stayCacheKey,
   summaryFromHtml,
   withDeadline,
@@ -294,6 +311,8 @@ export class LocationCatalogService {
   private readonly bulkErrorCache = new Map<string, Cached<unknown>>();
   private readonly checks = new Map<string, Promise<LocationAvailability>>();
   private readonly checkCache = new Map<string, Cached<LocationAvailability>>();
+  /** Bumped per provider by `forgetAvailability`: an answer asked for before it is not kept. */
+  private readonly availabilityGenerations = new Map<ProviderId, number>();
   /** Area and text searches in flight, by `searchKey`. */
   private readonly searchRuns = new Map<string, Promise<void>>();
   /** Finished area and text searches, by `searchKey`, oldest first. */
@@ -468,7 +487,12 @@ export class LocationCatalogService {
   }
 
   private hasRows(id: ProviderId): boolean {
-    return (this.locations.countByProvider()[id] ?? 0) > 0;
+    return this.storedCount(id) > 0;
+  }
+
+  /** How many of the provider's locations are stored. */
+  private storedCount(id: ProviderId): number {
+    return this.locations.countByProvider()[id] ?? 0;
   }
 
   private syncProvider(provider: AccommodationProvider, force: boolean): Promise<void> {
@@ -478,22 +502,37 @@ export class LocationCatalogService {
     if (this.stopped || !this.syncableMode(provider)) return Promise.resolve();
     if (!force && this.isFresh(provider, this.syncState(id))) return Promise.resolve();
 
-    const run = this.runSync(id, provider.catalog as FullCatalogModule).finally(() => {
+    const run = this.runSync(provider, provider.catalog as FullCatalogModule).finally(() => {
       this.syncs.delete(id);
     });
     this.syncs.set(id, run);
     return run;
   }
 
-  /** One sync. Resolves either way; a failure is recorded, never thrown. */
-  private async runSync(id: ProviderId, catalog: FullCatalogModule): Promise<void> {
+  /**
+   * One sync, in the background. Resolves either way; a failure is recorded, never thrown. A
+   * paced provider's deadline allows a request per stored place.
+   */
+  private async runSync(
+    provider: AccommodationProvider,
+    catalog: FullCatalogModule
+  ): Promise<void> {
+    const id = provider.manifest.id;
     try {
-      const listed = await withDeadline(id, this.timings.syncTimeoutMs, this.lifetime.signal, (s) =>
+      const deadlineMs = pacedDeadlineMs(
+        this.timings.syncTimeoutMs,
+        providerLimits(provider.manifest),
+        {
+          requests: this.storedCount(id),
+          priority: 'background',
+        }
+      );
+      const listed = await withDeadline(id, deadlineMs, this.lifetime.signal, (s) =>
         catalog.listLocations(s)
       );
       if (this.stopped) return;
       if (!Array.isArray(listed)) throw new Error(`${id} did not list its locations`);
-      const cached = this.locations.countByProvider()[id] ?? 0;
+      const cached = this.storedCount(id);
       if (listed.length === 0 && cached > 0) {
         throw new Error(`${id} listed no locations; the ${cached} cached ones are kept`);
       }
@@ -853,7 +892,9 @@ export class LocationCatalogService {
 
     const cached = this.locations.getDetail(providerId, externalId);
     if (cached && this.within(cached.fetchedAt.getTime(), this.timings.detailTtlMs)) {
-      return publicDetail({ ...cached.detail, fetchedAt: cached.fetchedAt.toISOString() });
+      return publicDetail(
+        withUnitKinds({ ...cached.detail, fetchedAt: cached.fetchedAt.toISOString() }, summary)
+      );
     }
 
     const cacheKey = makeLocationKey(providerId, externalId);
@@ -870,11 +911,12 @@ export class LocationCatalogService {
       if (this.stopped) throw error;
       this.logger.warn(`Detail of ${cacheKey} could not be fetched; serving the cache`, error);
       if (cached) {
-        return publicDetail({
-          ...cached.detail,
-          fetchedAt: cached.fetchedAt.toISOString(),
-          stale: true,
-        });
+        return publicDetail(
+          withUnitKinds(
+            { ...cached.detail, fetchedAt: cached.fetchedAt.toISOString(), stale: true },
+            summary
+          )
+        );
       }
       return { ...summary, units: [], stale: true };
     }
@@ -917,15 +959,23 @@ export class LocationCatalogService {
     previous: ProviderLocationDetail | undefined
   ): Promise<ProviderLocationDetail> {
     const { providerId, externalId } = summary;
-    const fetched = await withDeadline(
-      providerId,
+    // The person is waiting (the place page): interactive, and a paced provider's deadline
+    // allows for its own request and one already in flight.
+    const deadlineMs = pacedDeadlineMs(
       this.timings.detailTimeoutMs,
-      this.lifetime.signal,
-      (signal) =>
+      providerLimits(provider.manifest),
+      {
+        requests: 2,
+        priority: 'interactive',
+      }
+    );
+    const fetched = await withDeadline(providerId, deadlineMs, this.lifetime.signal, (signal) =>
+      withRequestPriority('interactive', () =>
         provider.catalog!.getLocation(externalId, signal, {
           summary,
           ...(previous ? { previous } : {}),
         })
+      )
     );
     const at = this.clock();
     // Defence in depth: whatever the provider did, main sanitises before IPC.
@@ -937,15 +987,18 @@ export class LocationCatalogService {
     const sections = cleanSections(fetched.sections, provider.manifest.website, dropImages);
     const notices = cleanNotices(fetched.notices);
     const documents = cleanDocuments(fetched.documents);
-    const detail: ProviderLocationDetail = {
-      ...fetched,
-      key: summary.key,
-      providerId,
-      externalId,
-      units: Array.isArray(fetched.units) ? fetched.units : [],
-      fetchedAt: at.toISOString(),
-      documents,
-    };
+    const detail: ProviderLocationDetail = withUnitKinds(
+      {
+        ...fetched,
+        key: summary.key,
+        providerId,
+        externalId,
+        units: Array.isArray(fetched.units) ? fetched.units : [],
+        fetchedAt: at.toISOString(),
+        documents,
+      },
+      summary
+    );
     if (descriptionHtml) detail.descriptionHtml = descriptionHtml;
     else delete detail.descriptionHtml;
     if (sections.length > 0) detail.sections = sections;
@@ -971,6 +1024,28 @@ export class LocationCatalogService {
   // -------------------------------------------------------------------------------------
 
   /**
+   * Forgets every availability answer of `providerId`: its bulk answers and errors and its
+   * per-location checks. The next ask goes to the provider; a call already in flight still
+   * answers its callers, but its answer is not kept, and a new call does not join it. Other
+   * providers' answers stay.
+   */
+  forgetAvailability(providerId: ProviderId): void {
+    this.availabilityGenerations.set(providerId, this.availabilityGeneration(providerId) + 1);
+    const bulkPrefix = `${providerId}|`;
+    const checkPrefix = `${providerId}${LOCATION_KEY_SEPARATOR}`;
+    for (const map of [this.bulk, this.bulkCache, this.bulkErrorCache]) {
+      for (const key of [...map.keys()]) if (key.startsWith(bulkPrefix)) map.delete(key);
+    }
+    for (const map of [this.checks, this.checkCache]) {
+      for (const key of [...map.keys()]) if (key.startsWith(checkPrefix)) map.delete(key);
+    }
+  }
+
+  private availabilityGeneration(providerId: ProviderId): number {
+    return this.availabilityGenerations.get(providerId) ?? 0;
+  }
+
+  /**
    * Bulk availability for `stay` from every `bulkAvailability` provider (or those in
    * `providerIds`; unknown ids are ignored), in parallel. Entries are limited to locations in
    * the catalogue, and to `bbox` when given. A provider that fails is listed in `errors`
@@ -991,7 +1066,7 @@ export class LocationCatalogService {
     const settled = await Promise.allSettled(
       providers.map((p) =>
         this.bulkFor(
-          p.manifest.id,
+          p,
           (signal) => p.availability.search(stay, signal),
           stayKeyFor(stay, p.manifest.bulkAvailabilityStayFields)
         )
@@ -1021,15 +1096,17 @@ export class LocationCatalogService {
   }
 
   /**
-   * One provider's bulk availability for a stay: cached, single-flight, with a deadline. An
+   * One provider's bulk availability for a stay: cached, single-flight, interactive (Explore
+   * is waiting), with a deadline that allows a paced provider a request per stored place. An
    * `access-gate` or `timeout` failure is cached too (for `bulkErrorTtlMs`), so while a
    * queue is up the provider is not asked again for every map pan.
    */
   private bulkFor(
-    providerId: ProviderId,
+    provider: AccommodationProvider,
     search: (signal: AbortSignal) => Promise<BulkAvailabilityEntry[]>,
     stayKey: string
   ): Promise<BulkAvailabilityEntry[]> {
+    const providerId = provider.manifest.id;
     const key = `${providerId}|${stayKey}`;
     const hit = this.bulkCache.get(key);
     if (hit && this.within(hit.at, this.timings.bulkTtlMs)) return Promise.resolve(hit.value);
@@ -1040,36 +1117,47 @@ export class LocationCatalogService {
     const running = this.bulk.get(key);
     if (running) return running;
 
-    const run = withDeadline(
-      providerId,
+    const deadlineMs = pacedDeadlineMs(
       this.timings.availabilityTimeoutMs,
+      providerLimits(provider.manifest),
+      { requests: this.storedCount(providerId), priority: 'interactive' }
+    );
+    const generation = this.availabilityGeneration(providerId);
+    const current = () => generation === this.availabilityGeneration(providerId);
+    const run: Promise<BulkAvailabilityEntry[]> = withDeadline(
+      providerId,
+      deadlineMs,
       this.lifetime.signal,
-      search
+      (signal) => withRequestPriority('interactive', () => search(signal))
     )
       .then(
         (entries) => {
           // Keyed by the stay it answers, so a stay that changed meanwhile is never filled.
-          this.bulkErrorCache.delete(key);
-          this.remember(this.bulkCache, key, entries, this.timings.bulkTtlMs);
+          if (current()) {
+            this.bulkErrorCache.delete(key);
+            this.remember(this.bulkCache, key, entries, this.timings.bulkTtlMs);
+          }
           return entries;
         },
         (error: unknown) => {
           const code = catalogErrorCode(error);
-          if (!this.stopped && (code === 'access-gate' || code === 'timeout')) {
+          if (!this.stopped && current() && (code === 'access-gate' || code === 'timeout')) {
             this.remember(this.bulkErrorCache, key, error, this.timings.bulkErrorTtlMs);
           }
           throw error;
         }
       )
-      .finally(() => this.bulk.delete(key));
+      .finally(() => {
+        if (this.bulk.get(key) === run) this.bulk.delete(key);
+      });
     this.bulk.set(key, run);
     return run;
   }
 
   /**
-   * One location's availability for `stay`, unit by unit and night by night. Reused for
-   * 60 s per location and stay. Throws `UnknownProviderError`, `ProviderCapabilityError` or
-   * the provider's error.
+   * One location's availability for `stay`, unit by unit and night by night (interactive: the
+   * place page is waiting). Reused for 60 s per location and stay. Throws
+   * `UnknownProviderError`, `ProviderCapabilityError` or the provider's error.
    */
   checkLocation(key: string, stay: StayQuery): Promise<LocationAvailability> {
     const { providerId, externalId } = parseLocationKey(key);
@@ -1080,17 +1168,30 @@ export class LocationCatalogService {
     const running = this.checks.get(cacheKey);
     if (running) return running;
 
-    const run = withDeadline(
-      providerId,
+    const deadlineMs = pacedDeadlineMs(
       this.timings.availabilityTimeoutMs,
+      providerLimits(provider.manifest),
+      { requests: 2, priority: 'interactive' }
+    );
+    const generation = this.availabilityGeneration(providerId);
+    const run: Promise<LocationAvailability> = withDeadline(
+      providerId,
+      deadlineMs,
       this.lifetime.signal,
-      (signal) => provider.availability.check(externalId, stay, { signal })
+      (signal) =>
+        withRequestPriority('interactive', () =>
+          provider.availability.check(externalId, stay, { signal })
+        )
     )
       .then((availability) => {
-        this.remember(this.checkCache, cacheKey, availability, this.timings.checkTtlMs);
+        if (generation === this.availabilityGeneration(providerId)) {
+          this.remember(this.checkCache, cacheKey, availability, this.timings.checkTtlMs);
+        }
         return availability;
       })
-      .finally(() => this.checks.delete(cacheKey));
+      .finally(() => {
+        if (this.checks.get(cacheKey) === run) this.checks.delete(cacheKey);
+      });
     this.checks.set(cacheKey, run);
     return run;
   }
@@ -1171,6 +1272,26 @@ function httpsUrl(value: unknown): string | undefined {
   } catch {
     return undefined;
   }
+}
+
+/**
+ * The detail with its own unit kinds cleaned, or else the summary's (never empty), and each
+ * unit whose `unitKind` is not a `UnitKind` without it (the unit is kept).
+ */
+function withUnitKinds<T extends ProviderLocationDetail>(detail: T, summary: LocationSummary): T {
+  const own = cleanUnitKinds(detail.unitKinds);
+  const cleanUnit = (unit: UnitSummary): UnitSummary => {
+    if (unit === null || typeof unit !== 'object' || !('unitKind' in unit)) return unit;
+    if (isUnitKind(unit.unitKind)) return unit;
+    const kept = { ...unit };
+    delete kept.unitKind;
+    return kept;
+  };
+  return {
+    ...detail,
+    unitKinds: own.length > 0 ? own : unitKindsOf(summary),
+    ...(Array.isArray(detail.units) ? { units: detail.units.map(cleanUnit) } : {}),
+  };
 }
 
 /**

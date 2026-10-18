@@ -8,38 +8,11 @@
 
 import fs from 'fs';
 import path from 'path';
-import { readDoc, ROOT } from './markdown';
+import { pathsIn, readDoc, ROOT, tableRows } from './markdown';
 
 const DOC = 'docs/providers/parkstay/endpoints.md';
 const PARKSTAY_DIR = path.join(ROOT, 'src/main/providers/parkstay');
 const NOT_REAL = 'Not a real route';
-
-interface Row {
-  section: string;
-  cells: string[];
-}
-
-/** Every data row of every table, with the `##` section it is in. */
-function tableRows(text: string): Row[] {
-  const rows: Row[] = [];
-  let section = '';
-  let header: string[] | null = null;
-  for (const line of text.split('\n')) {
-    const heading = /^##\s+(.+)$/.exec(line);
-    if (heading) section = heading[1].trim();
-    if (!line.startsWith('|')) {
-      header = null;
-      continue;
-    }
-    const cells = line
-      .slice(1, line.endsWith('|') ? -1 : undefined)
-      .split('|')
-      .map((cell) => cell.trim());
-    if (!header) header = cells;
-    else if (!cells.every((cell) => /^:?-+:?$/.test(cell))) rows.push({ section, cells });
-  }
-  return rows;
-}
 
 function parkstaySources(dir = PARKSTAY_DIR): string {
   return fs
@@ -51,9 +24,6 @@ function parkstaySources(dir = PARKSTAY_DIR): string {
     })
     .join('\n');
 }
-
-/** The backticked paths in a cell. */
-const pathsIn = (cell: string): string[] => [...cell.matchAll(/`([^`]+)`/g)].map((m) => m[1]);
 
 describe(DOC, () => {
   const rows = tableRows(readDoc(DOC));

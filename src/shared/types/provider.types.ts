@@ -50,6 +50,26 @@ export const LOCATION_KINDS = [
 
 export const LocationKindSchema = z.enum(LOCATION_KINDS);
 
+/**
+ * What a person sleeps in, the same words for every provider: a site to camp on (tent,
+ * caravan, campervan), a cabin (or a chalet, cottage, villa), a room, a bed in a shared room
+ * or hut, or a glamping tent. A place can have several (`LocationSummary.unitKinds`); a unit
+ * is one (`UnitSummary.unitKind`). `other` is anything else, and never a filter option. The
+ * groups people choose from are `STAY_TYPES` (`shared/utils/unit-kinds.ts`).
+ */
+export type UnitKind = 'campsite' | 'cabin' | 'room' | 'dorm' | 'glamping' | 'other';
+
+export const UNIT_KINDS = [
+  'campsite',
+  'cabin',
+  'room',
+  'dorm',
+  'glamping',
+  'other',
+] as const satisfies readonly UnitKind[];
+
+export const UnitKindSchema = z.enum(UNIT_KINDS);
+
 export type BookingMode = 'online' | 'offline' | 'external' | 'application';
 
 export const BOOKING_MODES = [
@@ -83,7 +103,7 @@ export interface ProviderCapabilities {
   bulkAvailability: boolean;
   /** Usable in Watches. */
   watches: boolean;
-  /** Usable in Site Sniper (needs availability, holds and a release policy). */
+  /** Usable in Site Sniper (needs availability and a release policy; holds optional, §12.35). */
   snipes: boolean;
   holds: boolean;
   bookingImport: boolean;
@@ -94,6 +114,46 @@ export interface ProviderCapabilities {
 
 /** The capability flags that are booleans: what `registry.require` and `withCapability` take. */
 export type BooleanCapability = Exclude<keyof ProviderCapabilities, 'account' | 'catalogMode'>;
+
+/** Every `BooleanCapability`. */
+export const BOOLEAN_CAPABILITIES = [
+  'catalog',
+  'availability',
+  'bulkAvailability',
+  'watches',
+  'snipes',
+  'holds',
+  'bookingImport',
+  'accessGate',
+] as const satisfies readonly BooleanCapability[];
+assertTypeEquals<(typeof BOOLEAN_CAPABILITIES)[number], BooleanCapability>(true);
+
+/** An experiment's id: a lower-case letter, then 1–31 letters or digits, e.g. `autoCart`. */
+export const EXPERIMENT_ID_PATTERN = /^[a-z][A-Za-z0-9]{1,31}$/;
+
+/**
+ * Something a provider can do but ships switched off: the person turns it on in Settings →
+ * Accounts, on the provider's row, and it takes effect when WA Stay restarts. WA Stay then
+ * registers the provider with `turnsOn` on, so its factory sees them on in `ctx.manifest`
+ * and builds their modules.
+ */
+export interface ProviderExperiment {
+  /** Stored with the person's choice, so it never changes once shipped. */
+  id: string;
+  /** The switch's label, e.g. "Hold a stay in the cart". */
+  label: string;
+  /** One or two sentences under the switch. */
+  description: string;
+  /** Shown in the confirm dialog before the person turns it on. */
+  warning?: string;
+  /** Boolean capabilities, each off in the manifest, that the experiment turns on. */
+  turnsOn: BooleanCapability[];
+  /**
+   * Set by WA Stay on the manifest it registers with the experiment on (`withExperiments`),
+   * whose `turnsOn` capabilities are then on. A provider never sets it.
+   */
+  applied?: boolean;
+}
 
 /**
  * How hard the app may use a provider (§12.30). Core services read them from the provider
@@ -106,6 +166,12 @@ export interface ProviderLimits {
   maxConcurrentRequests: number;
   /** How long a synced catalogue stays fresh. */
   catalogTtlHours: number;
+  /**
+   * Polite pacing: the core sends the provider's requests one at a time, starting each at
+   * least this long (ms, 0–60 000) after the previous one ended; a request the person
+   * triggered waits a shorter gap. 0 or absent: unpaced. Needs `maxConcurrentRequests: 1`.
+   */
+  minRequestIntervalMs?: number;
 }
 
 export const DEFAULT_PROVIDER_LIMITS: Readonly<ProviderLimits> = Object.freeze({
@@ -122,23 +188,48 @@ export function providerLimits(manifest: Pick<ProviderManifest, 'limits'>): Prov
 /**
  * How a person signs in to a provider (§12.30):
  * - `browser-session`: on the provider's own pages, in an app window on its partition;
- * - `credentials`: the app asks for the fields in `AccountFieldDescriptor`s and keeps the
- *   secret ones in the provider's scoped secret vault;
+ * - `credentials`: the app asks for the fields in `AccountFieldDescriptor`s and keeps every
+ *   value in the provider's scoped secret vault (`account.<key>`);
  * - `automation`: browser automation signs in for the person.
  *
- * Only `browser-session` is implemented (V6); the others are declared and validated.
+ * `browser-session` (V6) and `credentials` (R15) are implemented; `automation` is declared and
+ * validated only.
  */
 export type ProviderAuthKind = 'browser-session' | 'credentials' | 'automation';
 
-/** One input of a `credentials` sign-in, rendered generically by the renderer. */
+/**
+ * One input of a `credentials` sign-in, rendered generically by the renderer. Every value is
+ * kept in the provider's scoped secret vault (`account.<key>`) and never sent back to the
+ * renderer, whether it is `secret` or not.
+ */
 export interface AccountFieldDescriptor {
   /** e.g. `email`, `password`. */
   key: string;
   label: string;
   help?: string;
-  /** Stored only in the scoped secret vault and never sent back to the renderer. */
+  /** Masked as it is typed. */
   secret: boolean;
+  /**
+   * The person can copy the saved value, to paste at the provider's checkout: main writes it
+   * to the clipboard, so it never reaches the renderer. Default false, so a password is never
+   * put on the clipboard.
+   */
+  copyable?: boolean;
 }
+
+/**
+ * A statement the person ticks before a `credentials` sign-in can be saved, such as "This is
+ * my own member number". The account service refuses a save without every one.
+ */
+export interface AccountConfirmation {
+  /** Alphanumeric, unique within the sign-in. */
+  key: string;
+  /** The statement, shown as its checkbox's label. */
+  label: string;
+}
+
+/** The most characters a `credentials` value may have, once trimmed. */
+export const ACCOUNT_VALUE_MAX_LENGTH = 256;
 
 /** Where a stay field is used. §12.1, §12.18 (`appliesTo` is canonical). */
 export type StayFieldUse = 'availability' | 'watch' | 'snipe' | 'hold';
@@ -156,7 +247,7 @@ export interface StayFieldDescriptor {
   type: 'select' | 'number' | 'text' | 'boolean';
   /** For `select`. */
   options?: { value: string; label: string }[];
-  /** For `number`. */
+  /** For `number`, a whole number (a count): its value, `min`, `max` and `default` are whole. */
   min?: number;
   max?: number;
   /** For `text`: a regular expression the whole value must match, e.g. `^\d{4}$`. */
@@ -176,6 +267,13 @@ export interface ReleaseModeDescriptor {
   description: string;
   /** Whether a snipe in this mode waits in the provider's access gate. */
   usesAccessGate: boolean;
+  /**
+   * The longest a snipe in this mode keeps trying after the release, in whole minutes (1 to
+   * 1440): the core clamps the snipe's window to it (§12.35). None: the person's choice. It
+   * bounds timed releases only (a mode whose `computeReleaseAt` gives an instant): a mode with
+   * no release instant (`cancellation`) has no window, and polls until it ends otherwise.
+   */
+  maxWindowMinutes?: number;
   /** Extra inputs this mode needs. */
   fields?: StayFieldDescriptor[];
 }
@@ -228,6 +326,14 @@ export interface ProviderManifest {
    * absent.
    */
   bulkAvailabilityStayFields?: StayKeyField[];
+  /** What the provider ships switched off, for the person to turn on (`ProviderExperiment`). */
+  experiments?: ProviderExperiment[];
+  /**
+   * The provider can let a hold go before it runs out (`holds.release`): the hold panel offers
+   * "Let it go". With `capabilities.holds` on it needs `holds.release`; with holds off (an
+   * experiment not turned on) it may stand alone.
+   */
+  holdRelease?: boolean;
 }
 
 /** Values for a provider's `stayFields`, keyed by `StayFieldDescriptor.key`. */
@@ -250,11 +356,16 @@ export interface StayQuery {
 export type NightState = 'available' | 'booked' | 'closed' | 'not-released' | 'unknown';
 
 /**
- * Why a night is not `available` although the provider reported room: `split`, free, but not
- * on the same unit as the available nights next to it (a unit that stands for several, such
- * as a class of sites booked whole stays on one site). Matching treats it as not available.
+ * Why a night is not `available` although the provider reported room. The night's state is
+ * `unknown` with either reason, and matching never counts it (even beside `available`: the
+ * reason wins).
+ * - `split`: free, but not on the same unit as the available nights next to it (a unit that
+ *   stands for several, such as a class of sites booked whole stays on one site).
+ * - `min-stay`: the provider has room that night but refuses this stay under its stay rules:
+ *   too short, too long, or arriving or leaving on a refused day. Say which rule with the
+ *   night's `minNights`, `noArrival` and `noDeparture` where the provider says.
  */
-export type NightReason = 'split';
+export type NightReason = 'split' | 'min-stay';
 
 export interface NightStatus {
   /** Calendar date `YYYY-MM-DD`. */
@@ -264,22 +375,63 @@ export interface NightStatus {
   /** The provider's own wording, e.g. `Booked` or `$30.00`. */
   label?: string;
   reason?: NightReason;
+  /**
+   * The fewest nights a stay arriving this night may have, when the provider has a minimum: a
+   * whole number, which comes before the unit's (1 is no minimum). 0, a negative or a fraction
+   * is ignored.
+   */
+  minNights?: number;
+  /** No arrivals on this date: a stay may not start this night. */
+  noArrival?: true;
+  /** No departures on this date: a stay may not end the morning of this date. */
+  noDeparture?: true;
 }
 
 export interface UnitAvailability {
   unitId: string;
   unitName: string;
   unitType?: string;
+  /** What the unit is, when the provider says (as on `UnitSummary`). */
+  unitKind?: UnitKind;
   /**
    * Unit ids the caller asked about (`unitIds`, `knownUnitIds`) that name this unit by an id
    * the provider used for it before, e.g. a site of a class the provider now lists as one unit.
    */
   aliases?: string[];
   nights: NightStatus[];
-  /** Every night of the stay is available. */
+  /** Every night of the stay is available, and the stay meets the unit's stay rules. */
   fullyAvailable: boolean;
+  /**
+   * How many units this entry stands for that are free for the whole stay, when it stands for
+   * several that are booked alike (RAC: a category, by how many of its sites are free for the
+   * whole stay): a whole number, at least 1 when `fullyAvailable`, else 0. Left out, the entry
+   * is one unit. Every count of what is free for a stay (Explore, the place page, a watch and
+   * its alert) adds it up (`freeUnitsOf`, `src/shared/utils/free-units.ts`). A provider that
+   * sets it gives no total of its units, so those counts give no "of M"; set it on every unit
+   * of a check, or on none.
+   */
+  freeCount?: number;
   /** Price for the whole stay, when known. */
   total?: number;
+  /**
+   * The fewest nights a stay arriving on the asked arrival may have, when the provider has a
+   * minimum (a night's own `minNights` comes first). A whole number; 0, 1, a negative or a
+   * fraction is no rule.
+   */
+  minNights?: number;
+  /**
+   * Which rate the prices are, as plain text, e.g. "RAC member rate". Shown under the unit's
+   * name ("Rate: RAC member rate"), as text, never HTML; an empty note is not shown.
+   */
+  priceNote?: string;
+  /**
+   * The booking page for this unit and the stay asked about, prefilled where the provider can
+   * (place, dates, guests, unit or category): what "Book on {shortName}" opens from an alert.
+   * A booking link is an absolute https URL on the provider's own site (`manifest.website`'s
+   * host, or a subdomain of it); a public page that works with no sign-in and no app session,
+   * on a phone too; and never a URL that adds to a cart, holds or books when it is opened.
+   */
+  bookingUrl?: string;
 }
 
 export interface LocationAvailability {
@@ -288,16 +440,26 @@ export interface LocationAvailability {
   /** ISO timestamp. */
   checkedAt: string;
   units: UnitAvailability[];
-  release?: { opensAt?: string; open: boolean };
-  /** A stay-specific deep link (§12.17). Prefer it over `LocationDetail.bookingUrl`. */
+  /**
+   * Whether the stay's nights are released yet: `open`, and when not, `opensAt` (ISO) when the
+   * provider can time it, or `refused` (§12.35): why its release policy can't, in its own words
+   * ("…opens its dry-season dates on set days. Choose a time you set, or set a watch.").
+   */
+  release?: { opensAt?: string; open: boolean; refused?: string };
+  /**
+   * A stay-specific deep link (§12.17). Prefer it over `LocationDetail.bookingUrl`. A booking
+   * link, by the rule on `UnitAvailability.bookingUrl`: https on the provider's own site, a
+   * public page that needs no sign-in, never one that adds to a cart, holds or books.
+   */
   bookingUrl?: string;
 }
 
 /**
  * One place's availability for a stay, from a provider's bulk `availability.search`: counts of
- * units, not nights. Explore shows "2 of 5 sites available" (`availableUnits` above 0), "No site
- * free every night" (none free, some bookable) or "No sites open for these dates" (none
- * bookable). A place the provider has no answer for gets no entry, and reads as unknown.
+ * units, not nights. Explore shows "2 of 5 sites available" (`availableUnits` above 0), "27
+ * spots free" (above 0, with no total), "No site free every night" (none free, some bookable)
+ * or "No sites open for these dates" (none bookable). A place the provider has no answer for
+ * gets no entry, and reads as unknown.
  */
 export interface BulkAvailabilityEntry {
   /** The place's location key, `makeLocationKey(providerId, externalId)`. */
@@ -309,9 +471,18 @@ export interface BulkAvailabilityEntry {
   availableUnits: number;
   /**
    * How many units can be booked online for the stay's dates at all, free or not: the place's
-   * total, or 0 when none can be (not released yet, closed, or past the booking window).
+   * total, or 0 when none can be (not released yet, closed, or past the booking window). Left
+   * out when the provider has no unit total (RAC counts free units only); 0 still means none
+   * can be booked.
    */
-  bookableUnits: number;
+  bookableUnits?: number;
+  /**
+   * The same two counts for each kind of unit the place has, so a filter on what people sleep
+   * in can count only those units. Set it at a place with more than one kind; a kind left out
+   * has no count. Its `bookableUnits` is left out, as above, when the provider has no total.
+   * Passed through as the provider gives it.
+   */
+  byKind?: Partial<Record<UnitKind, { availableUnits: number; bookableUnits?: number }>>;
 }
 
 /** The state of a provider's waiting room or queue. */
@@ -342,6 +513,8 @@ export interface AccountStatus {
 export interface ProviderAccount {
   providerId: ProviderId;
   requirement: AccountRequirement;
+  /** How the person signs in: on the provider's pages, or with details saved in the app. */
+  authKind: ProviderAuthKind;
   status: AccountStatus['state'];
   displayName?: string;
   email?: string;
@@ -349,6 +522,12 @@ export interface ProviderAccount {
   lastSignedInAt?: string;
   /** ISO timestamp. */
   lastCheckedAt?: string;
+  /** `credentials` only: the details the app asks for. */
+  fields?: AccountFieldDescriptor[];
+  /** `credentials` only: the statements the person ticks to save them. */
+  confirmations?: AccountConfirmation[];
+  /** `credentials` only: the keys of the fields that have a stored value. Never a value. */
+  savedFields?: string[];
 }
 
 // ---------------------------------------------------------------------------------------
@@ -436,6 +615,15 @@ export const StayFieldDescriptorSchema = z
     if (field.default !== undefined && typeof field.default !== DEFAULT_TYPE[field.type]) {
       ctx.addIssue({ code: 'custom', path: ['default'], message: `Not a ${field.type} value` });
     }
+    // A number field is a count: what bounds or starts it is a whole number too
+    if (field.type === 'number') {
+      for (const key of ['min', 'max', 'default'] as const) {
+        const value = field[key];
+        if (typeof value === 'number' && !Number.isInteger(value)) {
+          ctx.addIssue({ code: 'custom', path: [key], message: 'Not a whole number' });
+        }
+      }
+    }
   });
 assertTypeEquals<z.input<typeof StayFieldDescriptorSchema>, StayFieldDescriptor>(true);
 assertTypeEquals<z.output<typeof StayFieldDescriptorSchema>, StayFieldDescriptor>(true);
@@ -450,16 +638,41 @@ export const ReleaseModeDescriptorSchema = z.object({
   label: nonEmpty,
   description: nonEmpty,
   usesAccessGate: z.boolean(),
+  maxWindowMinutes: z.number().int().min(1).max(1440).optional(),
   fields: z.array(StayFieldDescriptorSchema).optional(),
 });
 assertTypeEquals<z.input<typeof ReleaseModeDescriptorSchema>, ReleaseModeDescriptor>(true);
 assertTypeEquals<z.output<typeof ReleaseModeDescriptorSchema>, ReleaseModeDescriptor>(true);
 
+export const ExperimentIdSchema = z
+  .string()
+  .regex(
+    EXPERIMENT_ID_PATTERN,
+    'Experiment ids are a lower-case letter, then 1–31 letters or digits'
+  );
+
+export const ProviderExperimentSchema = z.object({
+  id: ExperimentIdSchema,
+  label: nonEmpty,
+  description: nonEmpty,
+  warning: nonEmpty.optional(),
+  turnsOn: z.array(z.enum(BOOLEAN_CAPABILITIES)).min(1),
+  applied: z.boolean().optional(),
+});
+assertTypeEquals<z.input<typeof ProviderExperimentSchema>, ProviderExperiment>(true);
+assertTypeEquals<z.output<typeof ProviderExperimentSchema>, ProviderExperiment>(true);
+
+/** A `credentials` field's or confirmation's key: a letter, then letters and digits. */
+export const AccountKeySchema = z
+  .string()
+  .regex(/^[A-Za-z][A-Za-z0-9]*$/, 'Account field keys are alphanumeric');
+
 export const AccountFieldDescriptorSchema = z.object({
-  key: z.string().regex(/^[A-Za-z][A-Za-z0-9]*$/, 'Account field keys are alphanumeric'),
+  key: AccountKeySchema,
   label: nonEmpty,
   help: z.string().optional(),
   secret: z.boolean(),
+  copyable: z.boolean().optional(),
 });
 assertTypeEquals<z.input<typeof AccountFieldDescriptorSchema>, AccountFieldDescriptor>(true);
 assertTypeEquals<z.output<typeof AccountFieldDescriptorSchema>, AccountFieldDescriptor>(true);
@@ -473,6 +686,16 @@ export const AccountFieldsSchema = z
     'Account field keys must be unique'
   );
 
+export const AccountConfirmationSchema = z.object({ key: AccountKeySchema, label: nonEmpty });
+assertTypeEquals<z.input<typeof AccountConfirmationSchema>, AccountConfirmation>(true);
+assertTypeEquals<z.output<typeof AccountConfirmationSchema>, AccountConfirmation>(true);
+
+/** A `credentials` sign-in's confirmations: any number, with unique keys. */
+export const AccountConfirmationsSchema = z.array(AccountConfirmationSchema).refine(
+  uniqueBy((c: AccountConfirmation) => c.key),
+  'Account confirmation keys must be unique'
+);
+
 export const ProviderLimitsSchema = z.object({
   minWatchIntervalMinutes: z.number().int().min(1).max(1440),
   maxConcurrentRequests: z.number().int().min(1).max(32),
@@ -480,6 +703,7 @@ export const ProviderLimitsSchema = z.object({
     .number()
     .positive()
     .max(24 * 30),
+  minRequestIntervalMs: z.number().int().min(0).max(60_000).optional(),
 });
 assertTypeEquals<z.input<typeof ProviderLimitsSchema>, ProviderLimits>(true);
 assertTypeEquals<z.output<typeof ProviderLimitsSchema>, ProviderLimits>(true);
@@ -507,43 +731,71 @@ const StayKeyFieldSchema = z.union([
   ),
 ]);
 
-export const ProviderManifestSchema = z.object({
-  id: ProviderIdSchema,
-  name: nonEmpty,
-  shortName: nonEmpty.max(24),
-  description: nonEmpty,
-  website: z.url().refine((url) => url.startsWith('https://'), 'The website must be https'),
-  integration: z.enum(['api', 'browser', 'hybrid']),
-  brand: z.object({
-    color: z.string().regex(/^#[0-9a-fA-F]{6}$/, 'Brand colour is #RRGGBB'),
-    monogram: z.string().regex(/^[A-Z0-9]{1,3}$/, 'Monogram is 1–3 capitals or digits'),
-  }),
-  locationKinds: z.array(LocationKindSchema).min(1),
-  timezone: z.string().refine(isTimeZone, 'Not an IANA time zone'),
-  currency: z.string().regex(/^[A-Z]{3}$/, 'Currency is an ISO 4217 code such as AUD'),
-  capabilities: ProviderCapabilitiesSchema,
-  limits: ProviderLimitsSchema.optional(),
-  stayFields: z
-    .array(StayFieldDescriptorSchema)
-    .refine(
-      uniqueBy((f: StayFieldDescriptor) => f.key),
-      'Stay field keys must be unique'
-    )
-    .optional(),
-  releaseModes: z
-    .array(ReleaseModeDescriptorSchema)
-    .refine(
-      uniqueBy((m: ReleaseModeDescriptor) => m.id),
-      'Release mode ids must be unique'
-    )
-    .optional(),
-  bulkAvailabilityStayFields: z
-    .array(StayKeyFieldSchema)
-    .refine(
-      (fields) => fields.includes('arrival') && fields.includes('departure'),
-      'Bulk availability always depends on both dates'
-    )
-    .optional(),
-});
+export const ProviderManifestSchema = z
+  .object({
+    id: ProviderIdSchema,
+    name: nonEmpty,
+    shortName: nonEmpty.max(24),
+    description: nonEmpty,
+    website: z.url().refine((url) => url.startsWith('https://'), 'The website must be https'),
+    integration: z.enum(['api', 'browser', 'hybrid']),
+    brand: z.object({
+      color: z.string().regex(/^#[0-9a-fA-F]{6}$/, 'Brand colour is #RRGGBB'),
+      monogram: z.string().regex(/^[A-Z0-9]{1,3}$/, 'Monogram is 1–3 capitals or digits'),
+    }),
+    locationKinds: z.array(LocationKindSchema).min(1),
+    timezone: z.string().refine(isTimeZone, 'Not an IANA time zone'),
+    currency: z.string().regex(/^[A-Z]{3}$/, 'Currency is an ISO 4217 code such as AUD'),
+    capabilities: ProviderCapabilitiesSchema,
+    limits: ProviderLimitsSchema.optional(),
+    stayFields: z
+      .array(StayFieldDescriptorSchema)
+      .refine(
+        uniqueBy((f: StayFieldDescriptor) => f.key),
+        'Stay field keys must be unique'
+      )
+      .optional(),
+    releaseModes: z
+      .array(ReleaseModeDescriptorSchema)
+      .refine(
+        uniqueBy((m: ReleaseModeDescriptor) => m.id),
+        'Release mode ids must be unique'
+      )
+      .optional(),
+    bulkAvailabilityStayFields: z
+      .array(StayKeyFieldSchema)
+      .refine(
+        (fields) => fields.includes('arrival') && fields.includes('departure'),
+        'Bulk availability always depends on both dates'
+      )
+      .optional(),
+    experiments: z
+      .array(ProviderExperimentSchema)
+      .refine(
+        uniqueBy((e: ProviderExperiment) => e.id),
+        'Experiment ids must be unique'
+      )
+      .optional(),
+    holdRelease: z.boolean().optional(),
+  })
+  // An experiment turns on capabilities that are off, and they are on only once it is applied
+  // (`withExperiments`), by itself or by another applied experiment.
+  .superRefine((manifest, ctx) => {
+    const experiments = manifest.experiments ?? [];
+    const applied = new Set(experiments.filter((e) => e.applied).flatMap((e) => e.turnsOn));
+    experiments.forEach((experiment, index) => {
+      experiment.turnsOn.forEach((capability, at) => {
+        const on = manifest.capabilities[capability] === true;
+        if (on === applied.has(capability)) return;
+        ctx.addIssue({
+          code: 'custom',
+          path: ['experiments', index, 'turnsOn', at],
+          message: on
+            ? `Capability ${capability} is already on, so experiment ${experiment.id} cannot turn it on`
+            : `Experiment ${experiment.id} is applied but capability ${capability} is off`,
+        });
+      });
+    });
+  });
 assertTypeEquals<z.input<typeof ProviderManifestSchema>, ProviderManifest>(true);
 assertTypeEquals<z.output<typeof ProviderManifestSchema>, ProviderManifest>(true);

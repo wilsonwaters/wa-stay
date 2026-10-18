@@ -1,6 +1,7 @@
 import { useId, type ReactNode } from 'react';
 import { Link } from 'react-router';
 import { BellRing, CalendarClock } from 'lucide-react';
+import { CopyCredentialButton } from '../../components/accounts/CopyCredentialButton';
 import { ExternalLink } from '../../components/ExternalLink';
 import {
   Badge,
@@ -17,7 +18,8 @@ import {
 } from '../../components/ui';
 import { buttonClassName } from '../../components/ui/Button';
 import { InfoLink, MoreInformationLink } from './PlaceSections';
-import type { CheckFailure, PlaceLinks } from './placeModel';
+import type { UnitNoun } from '../../components/nightGridModel';
+import { rateLimitedMessage, type CheckFailure, type PlaceLinks } from './placeModel';
 
 /** The longest stay the dates allow (EQ6), as on Explore. */
 export const MAX_NIGHTS = 30;
@@ -29,6 +31,8 @@ export type CheckAbility =
   | { kind: 'unavailable'; message: string; showInfoLink?: boolean };
 
 export interface StayCardProps {
+  /** The place's provider: a saved member number of its gets "Copy …" beside Book. */
+  providerId: string;
   shortName: string;
   dates: DateRange;
   guests: Guests | undefined;
@@ -50,6 +54,8 @@ export interface StayCardProps {
   /** The create-flow hand-offs, when the provider offers them. */
   watchHref?: string;
   snipeHref?: string;
+  /** What the place's units are called: "Snipe a site". */
+  unitNoun: UnitNoun;
 }
 
 function FailureNotice({
@@ -69,7 +75,7 @@ function FailureNotice({
     );
   }
   if (failure === 'rate-limit') {
-    return <Notice tone="warning">Too many checks in a short time. Try again in a minute.</Notice>;
+    return <Notice tone="warning">{rateLimitedMessage(shortName)}</Notice>;
   }
   return (
     <Notice
@@ -88,9 +94,11 @@ function FailureNotice({
  * "Check your dates": the stay (dates and guests, kept in the page's address), Check
  * availability, and the ways on from here: book on the provider's site, watch, snipe, or read
  * more there. One coral action at a time (design-language.md, principle 2): Check until the
- * dates are checked, then Book.
+ * dates are checked, then Book. A detail the person saved for the provider that its checkout
+ * asks for (an RAC member number) gets "Copy {label}" right after Book.
  */
 export function StayCard({
+  providerId,
   shortName,
   dates,
   guests,
@@ -108,6 +116,7 @@ export function StayCard({
   links,
   watchHref,
   snipeHref,
+  unitNoun,
 }: StayCardProps) {
   const headingId = useId();
   const bookIsNext = checked || ability.kind === 'unavailable';
@@ -186,6 +195,7 @@ export function StayCard({
               Book on {shortName}
             </ExternalLink>
           )}
+          {links.book && <CopyCredentialButton providerId={providerId} fullWidth />}
           {watchHref && (
             <Link
               to={watchHref}
@@ -201,12 +211,12 @@ export function StayCard({
               className={buttonClassName({ variant: 'secondary', fullWidth: true })}
             >
               <CalendarClock size={18} aria-hidden="true" />
-              {/* The name comes whole from the hidden text: "Snipe a site, coming soon". */}
-              <span aria-hidden="true">Snipe a site</span>
+              {/* The name comes whole from the hidden text: "Snipe a cabin, coming soon". */}
+              <span aria-hidden="true">Snipe a {unitNoun.one}</span>
               <span aria-hidden="true">
                 <Badge tone="sun">Soon</Badge>
               </span>
-              <VisuallyHidden>Snipe a site, coming soon</VisuallyHidden>
+              <VisuallyHidden>Snipe a {unitNoun.one}, coming soon</VisuallyHidden>
             </Link>
           )}
         </div>

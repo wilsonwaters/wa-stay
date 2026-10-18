@@ -115,3 +115,23 @@ export function useOpenWatchPayment() {
     },
   });
 }
+
+/**
+ * "Let it go": asks main to let the watch's automatic hold go. Resolves with the watch, its hold
+ * ended and why (`lastError`), which goes straight into the cache. A failure (the hold ended
+ * meanwhile, the provider did not answer) refetches the watch, so the page shows what is true.
+ */
+export function useReleaseWatchHold() {
+  const queryClient = useQueryClient();
+  const invalidate = useInvalidateWatches();
+  return useMutation({
+    mutationFn: (id: number): Promise<Watch> => unwrap((api) => api.watches.releaseHold(id)),
+    onSuccess: (watch: Watch) => {
+      queryClient.setQueryData(queryKeys.watches.detail(watch.id), watch);
+      void invalidate();
+    },
+    onError: () => {
+      void invalidate();
+    },
+  });
+}

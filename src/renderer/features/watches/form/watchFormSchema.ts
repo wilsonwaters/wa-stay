@@ -12,10 +12,14 @@ import { MIN_WATCH_INTERVAL_MINUTES } from '../../../../shared/constants/app-con
 import {
   LOCATION_KINDS,
   providerLimits,
+  UNIT_KINDS,
   type ProviderManifest,
   type StayFieldDescriptor,
+  type UnitKind,
 } from '../../../../shared/types/provider.types';
+import { DEFAULT_UNIT_NOUN, type UnitNoun } from '../../../components/nightGridModel';
 import { stayFieldIssue, stayFieldsFor } from '../../../components/stay/stayFields';
+import { holdNeedsChoice } from '../../../components/stay/stayTypes';
 
 const locationSchema = z.object({
   externalId: z.string(),
@@ -36,6 +40,8 @@ const shape = z.object({
   infants: z.number(),
   stayParams: z.record(z.string(), z.union([z.string(), z.number(), z.boolean()]).optional()),
   unitIds: z.array(z.string()),
+  /** The stay types wanted, in stay-type order; none means any. */
+  unitKinds: z.array(z.enum(UNIT_KINDS)),
   /** As typed: '' is no limit. Never `valueAsNumber`, which turns '' into NaN. */
   maxPrice: z.string(),
   checkIntervalMinutes: z.number(),
@@ -119,10 +125,33 @@ export interface WatchFormContext {
   keepArrival?: string;
   /** Edit: the stored check interval, which the list may no longer offer, is accepted unchanged. */
   keepInterval?: number;
+  /**
+   * The kinds of the place's units (`placeUnitKinds`), once its detail has loaded. At a mixed
+   * place an automatic hold needs a stay type or a unit; without them nothing is enforced here
+   * (main then alerts instead of holding).
+   */
+  placeKinds?: readonly UnitKind[];
+  /** What a unit is called here, for the hold rule's message. */
+  noun?: UnitNoun;
+}
+
+/**
+ * Why an automatic hold at a mixed place needs one stay type or a unit chosen first (none, or
+ * more than one, is chosen). "Your stay" is the step, and the Edit section, they are chosen in.
+ */
+export function holdChoiceMessage(place: string, noun: UnitNoun): string {
+  return `${place} has more than one stay type. Choose one stay type or a ${noun.one} under "Your stay" to hold one automatically.`;
 }
 
 /** The form's rules for one provider. */
-export function watchFormSchema({ manifest, today, keepArrival, keepInterval }: WatchFormContext) {
+export function watchFormSchema({
+  manifest,
+  today,
+  keepArrival,
+  keepInterval,
+  placeKinds,
+  noun = DEFAULT_UNIT_NOUN,
+}: WatchFormContext) {
   const fields = watchStayFields(manifest);
   const intervals = intervalOptions(manifest, keepInterval);
   return shape.superRefine((v, ctx) => {
@@ -148,6 +177,14 @@ export function watchFormSchema({ manifest, today, keepArrival, keepInterval }: 
     if (!intervals.includes(v.checkIntervalMinutes)) {
       issue(['checkIntervalMinutes'], 'Choose how often to check');
     }
+    if (
+      v.autoHold &&
+      manifest?.capabilities.holds &&
+      placeKinds &&
+      holdNeedsChoice(placeKinds, v.unitKinds, v.unitIds)
+    ) {
+      issue(['autoHold'], holdChoiceMessage(v.location?.name ?? 'This place', noun));
+    }
     if (!v.name.trim()) issue(['name'], 'Give the watch a name');
     else if (v.name.trim().length > 200) issue(['name'], 'Keep the name to 200 characters');
     if (v.notes.length > 1000) issue(['notes'], 'Keep notes to 1,000 characters');
@@ -171,7 +208,7 @@ export function stepFields(
     case 'stay':
       return ['arrival', 'departure', 'adults', ...params(fields.watch), 'maxPrice'];
     case 'alerts':
-      return ['checkIntervalMinutes', ...(autoHold ? params(fields.hold) : [])];
+      return ['checkIntervalMinutes', 'autoHold', ...(autoHold ? params(fields.hold) : [])];
     default:
       return ['name', 'notes'];
   }

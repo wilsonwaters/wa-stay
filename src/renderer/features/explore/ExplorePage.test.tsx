@@ -75,7 +75,7 @@ describe('Explore (list-only)', () => {
       within(filters)
         .getAllByRole('button')
         .map((b) => b.textContent)
-    ).toEqual(['Provider', 'Type', 'Region', 'Facilities', 'Book online', 'Available only']);
+    ).toEqual(['Provider', 'Stay type', 'Region', 'Facilities', 'Book online', 'Available only']);
     expect(resultsHeading()).toHaveTextContent('169 places');
     // 40 cards first.
     expect(cards()).toHaveLength(40);
@@ -209,16 +209,88 @@ describe('Explore (list-only)', () => {
     expect(currentRoute()).toBe('/?online=1');
   });
 
-  it('filters by type, and hides the Type chip when every place is the same kind', async () => {
-    const { user, unmount } = await renderExplore();
-    await choose(user, 'Type', ['Holiday park']);
-    await waitFor(() => expect(resultsHeading()).toHaveTextContent(/^5 places$/));
-    expect(currentRoute()).toBe('/?kinds=holiday-park');
-    unmount();
+  it('filters by stay type: "Cabins & villas" gives stay=cabin, unitKinds [cabin] and 7 places', async () => {
+    const { user, mock } = await renderExplore();
+    const stayType = chip('Stay type');
+    await user.click(stayType);
+    const popover = screen.getByRole('dialog', { name: 'Stay type' });
+    // Checkboxes in group order (not A to Z), each with the places it gives; no Rooms here.
+    expect(
+      within(popover)
+        .getAllByRole('checkbox')
+        .map((box) => box.getAttribute('aria-label'))
+    ).toEqual([
+      'Camping, 145 places',
+      'Cabins & villas, 7 places',
+      'Dorms, 1 place',
+      'Glamping, 2 places',
+    ]);
+    expect(within(popover).getByText('Places with any of these')).toBeInTheDocument();
+    await user.click(within(popover).getByRole('checkbox', { name: 'Cabins & villas, 7 places' }));
+    await user.click(within(popover).getByRole('button', { name: 'Done' }));
 
+    // Done returns focus to the chip, which says how many are chosen.
+    const chosen = chip('Stay type, 1 selected');
+    expect(chosen).toHaveFocus();
+    expect(chosen).toHaveTextContent(/^Stay type· 1$/);
+    expect(currentRoute()).toBe('/?stay=cabin');
+    await waitFor(() => expect(resultsHeading()).toHaveTextContent(/^7 places$/));
+    expect(mock?.api.catalog.search).toHaveBeenCalledWith({ unitKinds: ['cabin'], limit: 5000 });
+    const cabins = PARKSTAY_LOCATIONS.filter((p) => ['holiday-park', 'cabin'].includes(p.kind));
+    expect(cards()).toHaveLength(7);
+    for (const place of cabins) {
+      expect(screen.getByRole('link', { name: place.name })).toBeInTheDocument();
+    }
+
+    // Clear all clears the stay types too.
+    await user.click(screen.getByRole('button', { name: 'Clear all' }));
+    await waitFor(() => expect(resultsHeading()).toHaveTextContent(/^169 places$/));
+    expect(currentRoute()).toBe('/');
+    expect(chip('Stay type')).toBeInTheDocument();
+  });
+
+  it('closes the Stay type popover with Escape, back on its chip', async () => {
+    const { user } = await renderExplore('/?stay=dorm', catalogApi(), '1 place');
+    const stayType = chip('Stay type, 1 selected');
+    await user.click(stayType);
+    expect(screen.getByRole('dialog', { name: 'Stay type' })).toBeInTheDocument();
+    await user.keyboard('{Escape}');
+    expect(screen.queryByRole('dialog', { name: 'Stay type' })).not.toBeInTheDocument();
+    expect(chip('Stay type, 1 selected')).toHaveFocus();
+  });
+
+  it('hides the Stay type chip for a catalogue of campgrounds only', async () => {
     const campgrounds = PARKSTAY_LOCATIONS.filter((p) => p.kind === 'campground');
     await renderExplore('/', catalogApi({ items: campgrounds }), '139 places');
-    expect(screen.queryByRole('button', { name: /^Type/ })).not.toBeInTheDocument();
+    expect(
+      within(screen.getByRole('group', { name: 'Filters' }))
+        .getAllByRole('button')
+        .map((b) => b.textContent)
+    ).toEqual(['Provider', 'Region', 'Facilities', 'Book online', 'Available only']);
+  });
+
+  it('keeps a stay type no place has, checked with no places, and still listed', async () => {
+    const { user } = await renderExplore(
+      '/?stay=room',
+      catalogApi(),
+      'No places match your search'
+    );
+    expect(currentRoute()).toBe('/?stay=room');
+    await user.click(chip('Stay type, 1 selected'));
+    const rooms = within(screen.getByRole('dialog', { name: 'Stay type' })).getByRole('checkbox', {
+      name: 'Rooms, 0 places',
+    });
+    expect(rooms).toBeChecked();
+    expect(rooms).toBeEnabled();
+  });
+
+  it("opens a place with Explore's stay types, for its hand-off to a watch", async () => {
+    await renderExplore('/?stay=dorm', catalogApi(), '1 place');
+    const hut = PARKSTAY_LOCATIONS.find((p) => p.kind === 'hut')!;
+    expect(screen.getByRole('link', { name: hut.name })).toHaveAttribute(
+      'href',
+      `#/places/parkstay/${hut.externalId}?stay=dorm`
+    );
   });
 
   it('always shows the Provider chip, with the one catalogue provider', async () => {
@@ -292,6 +364,18 @@ describe('Explore (list-only)', () => {
       /places$/
     );
     await waitFor(() => expect(currentRoute()).toBe('/?regions=Pilbara&online=1'));
+  });
+
+  it('drops the old `kinds`, unknown stay types and "other" from the address, in place', async () => {
+    const { mock } = await renderExplore(
+      '/?kinds=holiday-park&stay=cabin,castle,other',
+      catalogApi(),
+      '7 places'
+    );
+    await waitFor(() => expect(currentRoute()).toBe('/?stay=cabin'));
+    expect(mock?.api.catalog.search).not.toHaveBeenCalledWith(
+      expect.objectContaining({ kinds: expect.anything() })
+    );
   });
 
   it('keeps dates and guests in the URL for the detail page', async () => {

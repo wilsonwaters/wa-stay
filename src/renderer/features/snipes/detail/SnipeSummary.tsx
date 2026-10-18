@@ -4,10 +4,13 @@ import type { UnitSummary } from '../../../../shared/types/catalog.types';
 import type { ProviderManifest } from '../../../../shared/types/provider.types';
 import type { SiteSnipe } from '../../../../shared/types/site-sniper.types';
 import { partyLabel, stayDatesLabel, stayNightsLabel } from '../../../components/stay/stayFormat';
+import { isMixedPlace, placeUnitKinds, stayTypesText } from '../../../components/stay/stayTypes';
 import { relativeTime } from '../../../components/timeFormat';
+import { windowCapMinutes } from '../create/snipeAction';
 import { msToMinutes, msToSeconds } from '../create/snipeFormMapping';
 import { releaseText, stayFieldText } from '../shared/snipeFormat';
-import { unitLabel, unitNounFor } from '../shared/snipeState';
+import { heldUnitNoun, snipeNoun } from '../shared/snipeNouns';
+import { unitLabel } from '../shared/snipeState';
 
 function Group({ title, children }: { title: string; children: ReactNode }) {
   const id = `snipe-summary-${title.toLowerCase()}`;
@@ -35,18 +38,28 @@ export interface SnipeSummaryProps {
   manifest: ProviderManifest | undefined;
   today: string;
   now: Date;
-  /** The place's units (its catalogue detail), for the chosen units' names. */
+  /**
+   * The place's units (its catalogue detail), for the chosen units' names and, at a place
+   * whose units are of more than one kind, the stay type.
+   */
   units?: readonly UnitSummary[];
 }
 
-/** The snipe's stay, and its release and timing, side by side. */
+/**
+ * The snipe's stay, and its release, what it does when the dates are free ("When free") and
+ * its timing, side by side. How long it keeps trying is the window it runs with: cut to the
+ * release mode's limit (`maxWindowMinutes`), as main cuts an older row's.
+ */
 export function SnipeSummary({ snipe, manifest, today, now, units }: SnipeSummaryProps) {
   const { stay } = snipe;
-  const noun = unitNounFor(manifest);
+  const noun = snipeNoun(snipe, manifest, units);
   const names = new Map((units ?? []).map((u) => [u.unitId, u.unitName]));
   const fields = (manifest?.stayFields ?? []).filter((f) => snipe.stayParams[f.key] !== undefined);
   const continuous = snipe.releaseMode === SnipeReleaseMode.CANCELLATION;
   const releaseAt = snipe.releaseAt ? new Date(snipe.releaseAt) : undefined;
+  const showStayType = snipe.unitKinds.length > 0 || isMixedPlace(units && placeUnitKinds(units));
+  const cap = windowCapMinutes(manifest, snipe.releaseMode);
+  const windowMinutes = Math.min(msToMinutes(snipe.windowDurationMs), cap ?? Infinity);
 
   return (
     <div className="grid gap-8 sm:grid-cols-2">
@@ -61,6 +74,7 @@ export function SnipeSummary({ snipe, manifest, today, now, units }: SnipeSummar
             {stayFieldText(field, snipe.stayParams[field.key])}
           </Item>
         ))}
+        {showStayType && <Item label="Stay type">{stayTypesText(snipe.unitKinds)}</Item>}
         <Item label={`Preferred ${noun.many}`}>
           {snipe.unitIds.length
             ? snipe.unitIds.map((id) => unitLabel(id, noun, names)).join(', ')
@@ -69,11 +83,12 @@ export function SnipeSummary({ snipe, manifest, today, now, units }: SnipeSummar
       </Group>
       <Group title="Release">
         <Item label="When">{releaseText(manifest, snipe.releaseMode, releaseAt, now)}</Item>
+        <Item label="When free">
+          {snipe.action === 'alert' ? 'Alert me' : `Hold a ${noun.one}`}
+        </Item>
         {!continuous && <Item label="Starts early">{snipe.leadTimeSeconds} seconds before</Item>}
         <Item label="Checks">Every {msToSeconds(snipe.pollIntervalMs)} seconds</Item>
-        {!continuous && (
-          <Item label="Keeps trying">For {msToMinutes(snipe.windowDurationMs)} minutes</Item>
-        )}
+        {!continuous && <Item label="Keeps trying">For {windowMinutes} minutes</Item>}
         <Item label="Most attempts">{snipe.maxAttempts > 0 ? snipe.maxAttempts : 'No limit'}</Item>
         {manifest?.capabilities.accessGate && (
           <Item label="Queue">
@@ -88,8 +103,8 @@ export function SnipeSummary({ snipe, manifest, today, now, units }: SnipeSummar
 export default SnipeSummary;
 
 /** The snipe's record so far, under its progress: attempts, the last try, and re-arming. */
-export function SnipeRecord({ snipe, manifest, now }: Omit<SnipeSummaryProps, 'today' | 'units'>) {
-  const noun = unitNounFor(manifest);
+export function SnipeRecord({ snipe, manifest, now, units }: Omit<SnipeSummaryProps, 'today'>) {
+  const noun = heldUnitNoun(snipe, manifest, units);
   const finished = snipe.status === SnipeStatus.HELD || snipe.status === SnipeStatus.BOOKED;
   return (
     <dl className="flex flex-col gap-2 text-sm">
