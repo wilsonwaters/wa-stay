@@ -514,8 +514,10 @@ describe('HoldPaymentService: letting a hold go', () => {
     });
 
     it('Pay now while a release runs answers VALIDATION "The hold is being let go."; once it fails, Pay now opens', async () => {
-      setUp({ holdRelease: {}, delays: { holds: 30 } });
+      setUp({ holdRelease: {} });
       const snipe = heldSnipe();
+      // The release stays in flight until the test lets it end, however slow the machine
+      const resume = h.fake.pauseNext('holds');
       h.fake.failNext('holds', new Error('offline'));
       const declining = service.releaseSnipeHold(snipe.id).catch((e: unknown) => e);
       await until(() => releases().length === 1);
@@ -527,19 +529,25 @@ describe('HoldPaymentService: letting a hold go', () => {
       expect(HOLD_RELEASING_MESSAGE).toBe('The hold is being let go.');
       expect(windows.requests).toEqual([]);
 
+      resume();
       expect(toApiError(await declining).code).toBe('PROVIDER_ERROR');
       await expect(service.openForSnipe(snipe.id)).resolves.toBeUndefined();
       expect(windows.requests).toHaveLength(1);
     });
 
     it('a decline while a close is letting the hold go joins it: one call', async () => {
-      setUp({ holdRelease: { onPaymentClose: true }, delays: { holds: 20 } });
+      setUp({ holdRelease: { onPaymentClose: true } });
       const watch = heldWatch();
+      const resume = h.fake.pauseNext('holds');
       await service.openForWatch(watch.id);
       windows.last.close();
       await until(() => releases().length === 1);
 
-      const answer = await service.releaseWatchHold(watch.id);
+      const declining = service.releaseWatchHold(watch.id);
+      // Let the decline reach the release it joins before that release ends
+      for (let turn = 0; turn < 20; turn++) await new Promise((r) => setTimeout(r, 0));
+      resume();
+      const answer = await declining;
 
       expect(releases()).toHaveLength(1);
       expect(answer.lastError).toBe(RELEASED_ON_CLOSE_MESSAGE);
@@ -565,11 +573,13 @@ describe('HoldPaymentService: letting a hold go', () => {
     });
 
     it('a row booked while the provider was asked is left alone', async () => {
-      setUp({ holdRelease: {}, delays: { holds: 20 } });
+      setUp({ holdRelease: {} });
       const watch = heldWatch();
+      const resume = h.fake.pauseNext('holds');
       const declining = service.releaseWatchHold(watch.id);
       await until(() => releases().length === 1);
       h.watchRepo.setBooked(watch.id);
+      resume();
 
       await expect(declining).resolves.toMatchObject({ lastResult: WatchResult.BOOKED });
       expect(h.watchRepo.findById(watch.id)?.lastError).toBeUndefined();

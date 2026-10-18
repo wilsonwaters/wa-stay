@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.1.0] - 2026-10-18
+
 ### Added
 
 - **RAC Parks & Resorts**, WA Stay's second provider: its eight open holiday parks and resorts on Explore beside ParkStay's campgrounds, each park's categories (powered sites, cabins, rooms, dorms, glamping) night by night with prices and RAC's stay rules, its free counts for your dates on Explore, watches, and Site Sniper release alerts timed to RAC's 364-day window and its school-holiday releases (#52, #57, #58, #61).
@@ -27,6 +29,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Alerts and screens name what was found by its kind ("Cabins available at …", "A spot is free at …" for several kinds), not always "site" (#56).
 - Settings → Notifications no longer says "site" for what a watch finds or holds (#67).
 - A place's check that the provider rate-limits says "{provider} asked WA Stay to slow down. Try again later." rather than "Try again in a minute", which was wrong for RAC's longer pause (#67).
+- An RAC park counts what is free the same way everywhere: a watch's alert and its email, "Check now", the watch's card and page, and the park's page now say how many sites (or cabins…) are free for the whole stay, as Explore does ("51 spots free"; "Found 51 sites free"), not how many kinds ("Found 1 site available", "1 of 2 spots free"), and give no "of" total. The park's page lists its kinds of site and cabin as types ("Bookable as 6 spot types") rather than "6 spots". ParkStay's counts are unchanged.
+- WA Stay's requests to a provider now describe the same browser as the provider's pages in WA Stay's own windows: the same browser version and brand (no longer "Google Chrome"), the operating system WA Stay runs on, and the same languages (English, Australia first).
 
 ### Fixed
 

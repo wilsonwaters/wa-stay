@@ -290,16 +290,22 @@ export function FacilitiesSection({ amenities }: { amenities: readonly string[] 
 
 /**
  * Sites: how many, by type ("Tent site × 12"), how many guests they take, and every unit's
- * name behind "Show all {n} sites". Hidden when the provider lists no units.
+ * name behind "Show all {n} sites". Hidden when the provider lists no units. When each unit is
+ * a type the provider books by (`unitsAreTypes`: RAC's categories), there is no count of
+ * places to stay: "Bookable as 6 spot types", by type ("Cabins: 2 types"), behind "Show all 6
+ * spot types", so nothing reads as a count beside the free count of the night grid.
  */
 export function SitesSection({
   units,
   unitCount,
+  unitsAreTypes = false,
   noun,
 }: {
   units: readonly UnitSummary[];
   /** The place's own count (the catalogue's), which can differ from the units listed. */
   unitCount?: number;
+  /** Each unit is a type standing for several (`LocationDetail.unitsAreTypes`). */
+  unitsAreTypes?: boolean;
   /** What the place's units are called (`placeNoun`). */
   noun: UnitNoun;
 }) {
@@ -310,27 +316,32 @@ export function SitesSection({
   const count = unitCount && unitCount > 0 ? unitCount : units.length;
   // A provider can list kinds of unit rather than each one (ParkStay's "One site - select on
   // arrival" for 56 sites): then the list is of unit types, and says so.
-  const byType = count !== units.length;
+  const byType = unitsAreTypes || count !== units.length;
+  const types = `${units.length} ${noun.one} ${units.length === 1 ? 'type' : 'types'}`;
   const listed = byType
     ? units.length === 1
       ? `Show the ${noun.one} type`
-      : `Show all ${units.length} ${noun.one} types`
+      : `Show all ${types}`
     : units.length === 1
       ? `Show the ${noun.one}`
       : `Show all ${units.length} ${noun.many}`;
   return (
     <PlaceSection title={title}>
-      <p className="text-base font-semibold text-fg">{unitCountLabel(count, noun)}</p>
-      {byType && (
-        <p className="mt-1 text-base text-fg-secondary">
-          Bookable as {units.length} {noun.one} {units.length === 1 ? 'type' : 'types'}
-        </p>
+      {unitsAreTypes ? (
+        <p className="text-base font-semibold text-fg">Bookable as {types}</p>
+      ) : (
+        <p className="text-base font-semibold text-fg">{unitCountLabel(count, noun)}</p>
+      )}
+      {byType && !unitsAreTypes && (
+        <p className="mt-1 text-base text-fg-secondary">Bookable as {types}</p>
       )}
       {breakdown.some((group) => group.type !== null) && (
         <ul role="list" className="mt-2 flex flex-col gap-1 text-base text-fg-secondary">
           {breakdown.map((group) => (
             <li key={group.type ?? ''} className="tabular-nums">
-              {group.type ?? 'Other'} × {group.count}
+              {unitsAreTypes
+                ? `${group.type ?? 'Other'}: ${group.count} ${group.count === 1 ? 'type' : 'types'}`
+                : `${group.type ?? 'Other'} × ${group.count}`}
             </li>
           ))}
         </ul>

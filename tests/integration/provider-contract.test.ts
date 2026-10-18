@@ -13,6 +13,7 @@ import {
   bookingLinkViolations,
   defaultSearchText,
   describeProviderContract,
+  freeCountViolations,
   searchAreaViolations,
   searchTextViolations,
   stayRuleViolations,
@@ -339,6 +340,57 @@ describe('the stay-rule checks of the contract suite', () => {
     expect(stayRuleViolations(stay, { units: [unit] })).toEqual([
       "unit u1's night 2026-11-10 is min-stay but available",
     ]);
+  });
+});
+
+describe('the free-count checks of the contract suite', () => {
+  const stay = { arrival: '2026-11-10', departure: '2026-11-12', adults: 2 };
+  const unit = (unitId: string, fullyAvailable: boolean, freeCount?: unknown) => ({
+    unitId,
+    unitName: `Category ${unitId}`,
+    fullyAvailable,
+    nights: [],
+    ...(freeCount !== undefined ? { freeCount: freeCount as number } : {}),
+  });
+
+  it('pass a provider that counts no units (each unit is one), as FakeProvider does', async () => {
+    const result = await createFakeProvider().availability!.check('1', stay);
+    expect(result.units.some((u) => u.freeCount !== undefined)).toBe(false);
+    expect(freeCountViolations(result)).toEqual([]);
+  });
+
+  it('pass whole counts on every unit: 1 or more when free for the whole stay, else 0', () => {
+    expect(
+      freeCountViolations({
+        units: [unit('c1', true, 51), unit('c2', false, 0), unit('c3', true, 1)],
+      })
+    ).toEqual([]);
+  });
+
+  it('fail a count that is not a whole number, or that disagrees with fullyAvailable', () => {
+    expect(
+      freeCountViolations({
+        units: [
+          unit('c1', true, 2.5),
+          unit('c2', true, -1),
+          unit('c3', true, '4'),
+          unit('c4', true, 0),
+          unit('c5', false, 3),
+        ],
+      })
+    ).toEqual([
+      "unit c1's freeCount 2.5 is not a whole number",
+      "unit c2's freeCount -1 is not a whole number",
+      "unit c3's freeCount 4 is not a whole number",
+      'unit c4 is fullyAvailable with freeCount 0',
+      'unit c5 is not fullyAvailable, but its freeCount is 3',
+    ]);
+  });
+
+  it('fail counts on some units only: a count of what is free could not tell if there is a total', () => {
+    expect(
+      freeCountViolations({ units: [unit('c1', true, 51), unit('c2', false), unit('c3', true)] })
+    ).toEqual(['units c2, c3 have no freeCount, but others do']);
   });
 });
 

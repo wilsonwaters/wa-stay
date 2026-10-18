@@ -13,7 +13,9 @@
  *   arrivals or departures. A night it refuses under them (`reason: 'min-stay'`), like any
  *   night with a reason, is never free, whatever its state.
  * - Full match: a unit with every night available that passes the price rule and the stay
- *   rules, so a provider's `fullyAvailable` alone never alerts on a stay it would refuse.
+ *   rules, so a provider's `fullyAvailable` alone never alerts on a stay it would refuse. It
+ *   keeps the unit's `freeCount` (the units it stands for, such as RAC's sites of a category),
+ *   so an alert counts what is free as Explore does (`freeUnitsOf`).
  * - Partial matches: per unit, each run of consecutive available nights that passes the
  *   price rule, as its own stay (`departure` is the morning after the run's last night),
  *   trimmed to a day it takes arrivals and a day it takes departures, and dropped when shorter
@@ -153,6 +155,8 @@ function toMatch(
     arrival: nights[0].date,
     departure: addDays(nights[nights.length - 1].date, 1),
     partial,
+    // A whole-stay match counts the units its unit stands for (`freeUnitsOf`); a run, its dates
+    ...(!partial && unit.freeCount !== undefined ? { freeCount: unit.freeCount } : {}),
     priceKnown: price.priceKnown,
     ...(price.total !== undefined ? { total: price.total } : {}),
   };

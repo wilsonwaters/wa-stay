@@ -122,6 +122,13 @@ export interface LocationDetail extends LocationSummary {
   /** Documents about the location (its map), opened by main; absent when there are none. */
   documents?: LocationDocument[];
   units: UnitSummary[];
+  /**
+   * Each unit is a type the provider books by, standing for several places to stay (RAC's
+   * categories, whose free sites a check counts in `UnitAvailability.freeCount`), not one place
+   * to stay. The place page then lists them as types ("Bookable as 6 spot types") and never
+   * counts them as units, which would contradict the free count beside them.
+   */
+  unitsAreTypes?: boolean;
   /** A human sentence, e.g. "Bookings open 180 days ahead at midnight AWST". */
   releaseInfo?: string;
   /** ISO timestamp the detail was fetched from the provider. */

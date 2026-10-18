@@ -49,9 +49,20 @@ provider, the place and your dates, and opens on "Your stay"). Five steps:
     start on a day that takes arrivals and end on one that takes departures, and a run
     shorter than its minimum (the arrival night's) is dropped, so a watch never alerts on a
     stay the provider would refuse.
+- **Counts** of what is free for the stay are Explore's: each full match counts the units it
+  stands for (`UnitAvailability.freeCount`, added up by `freeUnitsOf` in
+  `src/shared/utils/free-units.ts`), else one. A provider whose units are single sites counts
+  one each (ParkStay: "Found 3 sites available", "2 of 3 sites free for all 2 nights"); RAC's
+  units are categories, each counting its sites free for the whole stay, with no total and in
+  Explore's word, "free" (`freeUnitsWord`): "Found 51 sites free", "51 sites free for all 2
+  nights", where Explore says "51 spots free". The alert, its email, Check now, the watch's
+  card and its night grid all count this way, and the night grid's notes and "Show all" name
+  RAC's categories as types, never as a count of sites. A partial match describes nights, not
+  a count ("2 of 3 nights available").
 - **Results** are kept on the watch: the last result, when it last ran and runs next, how
-  many times it has found something, and the last availability, which its page shows night by
-  night.
+  many times it has found something, and the last availability (with each unit's count),
+  which its page shows night by night. A check stored before counts reads one per unit until
+  the next check.
 - **When the arrival date has passed** (in the provider's time zone), the watch stops.
 - **Check now** runs a check at once, whether or not the watch is active.
 
@@ -167,7 +178,9 @@ Until then an RAC watch only alerts. With it on, RAC's automatic hold is its car
 Alerts name units by what they are: "Sites available at Bungarra" for ParkStay's campsites,
 "Cabins available at …" or "Cabin held at …" for cabins, and "spots" when the units found are of
 more than one stay type ("Found 3 spots available at …"). The words come from the units found or
-held, else the watch's or snipe's stay types, else the provider's usual kind of place.
+held, else the watch's or snipe's stay types, else the provider's usual kind of place. The
+number is Explore's count of what is free for the whole stay ([above](#what-a-check-does)): at
+an RAC park, the sites of every category found, not the categories.
 
 ### Where they appear
 

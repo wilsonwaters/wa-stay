@@ -7,7 +7,7 @@ _Last updated: 2026-10-17 (orchestrator)_
 Branch `ccr-573ddb1d-hir0sq` (from `main` at `4bd5d62`, the v2.0.0 release). The brief is the Project 2 section of `ai-state/brief.md`.
 
 ## Phase
-Phase 6 (completion). All 20 tasks and the system-verification fix are merged on `ccr-573ddb1d-hir0sq` and pushed. System verification: success criteria 1–9 met; full gate green. Waiting on the stakeholder: the PR (RO1), the stakeholder actions below, and RQ1, RQ4, RQ6–RQ8.
+Phase 6 (completion). All 20 tasks and the system-verification fix are merged on `ccr-573ddb1d-hir0sq` and pushed. System verification: success criteria 1–9 met; full gate green. Waiting on the stakeholder: the PR (RO1), the stakeholder actions below, and RQ6 and RQ8.
 
 ## Currently in flight
 - PR #68 (`ccr-573ddb1d-hir0sq` → `main`) opened at the stakeholder's request; it closes #48–#67 on merge.
@@ -16,14 +16,14 @@ Phase 6 (completion). All 20 tasks and the system-verification fix are merged on
 - Retake screenshots with a `pk.` Mapbox token: `npm run docs:screenshots`, `npm run site:screenshots` (`docs/images/explore.png` and the site hero still show the old "Type" chip; alt text still true).
 - First genuine auto-cart booking before recommending the switch (RQ2): follow `docs/providers/rac/README.md` "Verifying it".
 - Read-only look at availability around the 3 Feb (members) and 5 Feb 2027 (public) pre-sale (RQ3); keep `src/main/providers/rac/release-calendar.ts` current before 2 Feb 2028 (`docs/providers/rac/release-calendar.md`).
-- Decide RQ1 (ask RAC), RQ4 (non-commercial), RQ6 (Cable Beach dry season), RQ7 (count wording), RQ8 (let-go deadline).
+- Decide RQ6 (Cable Beach dry season) and RQ8 (let-go deadline). RQ7 decided and built (counts as on Explore); asking RAC for approval and the commercial-use question were dropped by the stakeholder (2026-10-17).
 
 ## Known issues (small, not blocking)
-- [Low] RAC count wording (RQ7).
 - [Low, test fixtures] e2e fixtures lack book-now pages for Cable Beach, Cervantes and Esperance; availability routes match any dates, so the release preview reads "already open" in fixture mode.
 - Left from reviews: a stored hold-ending marker (needs a migration); the Electron-only Advanced timing focus bug; a provider-supplied Settings purpose line; the held-alert email could say the stay is in the RAC cart; `rearmProvider` gives up an access-gate place (harmless for RAC).
 
 ## Completed
+- **RQ7 counts merged** (`2ed647a`, after PR #68 opened): every screen counts what is free as Explore does (`UnitAvailability.freeCount`, one helper `src/shared/utils/free-units.ts`): Busselton reads "51 spots free" on Explore and its page, "Found 51 sites free" in a watch's alert and email; RAC shows no "of M"; a park's page lists RAC's categories as types ("Bookable as 6 spot types", `LocationDetail.unitsAreTypes`); the night grid's notes give no category numbers; ParkStay unchanged. Review REQUEST-CHANGES (the Spots section contradicted the count) → fixes → APPROVE. Also on the PR: a CI flake on Windows (`hold-release.test.ts`, a 30 ms in-flight window) fixed with the fake provider's `pauseNext` (`f59ff85`). Gate on the merge: 6002 tests, test:tz 8, e2e 29.
 - **System verification fix merged** (`82a848d`): the app shell listens for snipe updates, so a snipe's release time is current after a member number is saved or removed in Settings (refetch coalesced per query client); renderer test and an e2e check of the member and public times. Gate on the lane: 5945 tests, test:tz 8, e2e 29.
 - **System verification** (at `d0685b8`): criteria 1–9 met; every RAC terms rule mapped to enforcement and a test; 15 axe scans, 0 violations; no member number, cart address or token in logs, request logs or the database; no flakes on re-runs.
 - **R20 (#67) merged**: `docs/providers/rac/` (README with "Verifying it" for the stakeholder's first genuine booking, `endpoints.md` with a status legend and a doc test binding it to the code, `release-calendar.md` with the 2 Feb 2028 refresh deadline); user guide, watches, Site Sniper, security (member number, clipboard sync, cart guard), troubleshooting, overview, providers READMEs, README, CLAUDE.md; website RAC row (`--provider-rac`), independence notice, Questions (member number kept encrypted and never sent; NewBook photo host); CHANGELOG `[Unreleased]`. Code: a check in flight during a watch edit keeps nothing (a provider block still recorded); the place page's rate-limit message is provider-neutral; Settings copy without "site". Review APPROVE-WITH-MINORS → fixes → APPROVE (part 1); cart part APPROVE (22 cart claims true), last doc lines fixed in `e8b9917`. Gate: 5943 tests, test:tz 8, e2e 29, RAC preview passed.

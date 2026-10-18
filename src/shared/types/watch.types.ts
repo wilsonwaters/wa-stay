@@ -142,6 +142,12 @@ export interface WatchMatch {
   arrival: string;
   departure: string;
   partial: boolean;
+  /**
+   * For a whole-stay match, how many units its unit stands for (`UnitAvailability.freeCount`),
+   * when the provider counts them: the alert and Check now add them up (`freeUnitsOf`). A
+   * partial match never has one.
+   */
+  freeCount?: number;
   /** Whether every night of the match has a price; `maxPrice` applies only then. */
   priceKnown: boolean;
   /** The sum of the nightly prices, when every night has one. */

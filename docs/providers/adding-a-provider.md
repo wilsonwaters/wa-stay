@@ -516,8 +516,11 @@ They all behave the same:
   no response a `ProviderHttpError` with status 0, an abort an `AbortError`. `request` itself
   resolves for any status: check `response.status`.
 
-If the provider blocks library user agents, send a browser one (ParkStay's `headers.ts`). In
-the app, the partition's user agent already matches Electron's Chromium.
+If the provider blocks library user agents, send a browser one (ParkStay's `headers.ts`, from
+the SDK's `browserIdentity()`). In the app, the partition already presents the browser its
+windows present: Electron's Chromium on the person's operating system, with the app's
+languages. The client rewrites a request's user agent, and any client hints or
+`Accept-Language` it carries, to match; it adds none. Never rotate or vary them.
 
 ## 4. An API provider
 
@@ -839,6 +842,18 @@ The rules the normalised types carry (`src/shared/types/provider.types.ts`,
   plain text ("RAC member rate"), shown under its name. A `UnitSummary`'s `minNights` is the
   unit's usual minimum, for the watch and snipe steps' warning; leave it out where the minimum
   depends on the dates (the night grid explains it after a check).
+- **Free counts** (optional). When one unit stands for several booked alike (a category or class
+  of sites, where the provider says how many are free), set its `freeCount`: how many it has
+  free for the whole stay, a whole number of at least 1 when the unit is `fullyAvailable`,
+  else 0, on every unit of the check (RAC: each category's sites free for the whole stay).
+  Every count of what is free for a stay adds these up (`freeUnitsOf`,
+  `src/shared/utils/free-units.ts`): the place page's summary, a watch's alert, email, card and
+  Check now, so they say the same number as your bulk `availableUnits` should. Such a provider
+  has no total of its units, so those counts give no "of M" and say "free" ("51 spots free for
+  all 2 nights"). Without it each unit counts as one ("2 of 5 sites free"). The contract suite
+  checks the numbers (`freeCountViolations`). Set `unitsAreTypes: true` on the location's
+  detail too, so its page lists such units as types ("Bookable as 6 spot types") rather than
+  counting them as places to stay.
 - **Dates and time zones.** Stays are calendar dates: never turn them into `Date` objects and
   back (a time zone shifts them). Convert to the provider's own format with a string
   transform, as ParkStay's `toParkStayDate` does (`2026-11-10` → `2026/11/10`). "Today" is

@@ -49,7 +49,7 @@
  * is `unknown` with `min-stay`.
  *
  * **The stay.** `fullyAvailable` only when every night is available, the whole stay has a site
- * (`stay_through_sites_available` above 0, with code 0), a tariff counts, and the arrival night
+ * (`stay_through_sites_available` 1 or more, with code 0), a tariff counts, and the arrival night
  * takes arrivals and this many nights. When some nights are booked, closed or not released, the
  * free nights stay `available`, so partial matches still work. Otherwise the free nights become,
  * in this order:
@@ -63,6 +63,11 @@
  *    stay-through code 2, 4, 6, 7 or 8;
  * 5. `not-released`: the deciding tariff's code 5, or the stay-through code 9;
  * 6. `unknown` otherwise.
+ *
+ * **Free count.** A category is one unit that stands for its sites: `freeCount` is how many of
+ * them are free for the whole stay, the whole number of `stay_through_sites_available`
+ * (`wholeUnits`), when the category is `fullyAvailable`, else 0. Explore's free counts
+ * (`bulk.ts`) add up the same numbers, so Explore, the place page and a watch count alike.
  *
  * Messages are plain text: tags stripped, entities decoded, every part RAC joined with `; `
  * kept. Dates are calendar strings throughout, never `Date` objects.
@@ -391,11 +396,16 @@ type Verdict =
   | { state: 'closed'; message?: string }
   | { state: 'not-released' };
 
+/** A count from RAC as whole units: a positive number rounded down, anything else none. */
+export function wholeUnits(value: number | undefined): number {
+  return value !== undefined && Number.isFinite(value) && value > 0 ? Math.floor(value) : 0;
+}
+
 /** No site is free for the whole stay, though RAC said nothing else is wrong with it. */
 function noSiteForStay(category: RawCategory): boolean {
   const code = category.stay_through_sites_code;
-  const free = category.stay_through_sites_available ?? 0;
-  return (code === 0 && free <= 0) || (code !== undefined && BOOKED_SITE_CODES.has(code));
+  const free = wholeUnits(category.stay_through_sites_available);
+  return (code === 0 && free === 0) || (code !== undefined && BOOKED_SITE_CODES.has(code));
 }
 
 function verdictOf(category: RawCategory, deciding: RawTariff | undefined, rulesRefuse: boolean) {
@@ -424,7 +434,7 @@ function minStayNight(date: string, rules: StayRules): NightStatus {
 /** What a category's answer says about a unit, before its id, name, kind and link. */
 export type CategoryAvailability = Pick<
   UnitAvailability,
-  'nights' | 'fullyAvailable' | 'total' | 'minNights' | 'priceNote'
+  'nights' | 'fullyAvailable' | 'freeCount' | 'total' | 'minNights' | 'priceNote'
 >;
 
 /**
@@ -473,8 +483,8 @@ export function categoryAvailability(
   const minimum = arrivalRules.minNights ?? 1;
   const tooShort = minimum > nights.length;
   const allFree = nights.length > 0 && unitNights.every((night) => night.state === 'available');
-  const stayHasSite =
-    category.stay_through_sites_code === 0 && (category.stay_through_sites_available ?? 0) > 0;
+  const stayFree = wholeUnits(category.stay_through_sites_available);
+  const stayHasSite = category.stay_through_sites_code === 0 && stayFree > 0;
   const fullyAvailable =
     allFree &&
     stayHasSite &&
@@ -508,7 +518,12 @@ export function categoryAvailability(
   // Every night keeps its closed days, free or not: a partial stay may end on a taken night
   unitNights = unitNights.map((night) => ({ ...night, ...closedDaysOf(rulesTariff, night.date) }));
 
-  const result: CategoryAvailability = { nights: unitNights, fullyAvailable };
+  const result: CategoryAvailability = {
+    nights: unitNights,
+    fullyAvailable,
+    // The sites free for the whole stay, as Explore counts them; none when the stay is not free
+    freeCount: fullyAvailable ? stayFree : 0,
+  };
   const total = priceTariff?.tariff_total;
   if (fullyAvailable && total !== undefined && unitNights.every((n) => n.price !== undefined)) {
     result.total = total;

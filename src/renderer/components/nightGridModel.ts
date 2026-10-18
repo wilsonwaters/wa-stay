@@ -6,6 +6,7 @@
 import { format } from 'date-fns';
 import type { NightState, NightStatus, UnitAvailability } from '../../shared/types/provider.types';
 import { eachNight } from '../../shared/utils/calendar-date';
+import { countsFreeUnits, freeUnitsOf } from '../../shared/utils/free-units';
 import { MIXED_UNIT_NOUN, type UnitNoun } from '../../shared/utils/unit-noun';
 import { parseIsoDate } from './ui/calendar';
 
@@ -99,6 +100,13 @@ export interface AvailabilitySummary {
   known: number;
   /** Free for the whole stay. */
   fully: number;
+  /**
+   * Set when the provider counts its units (`freeCount`, `countsFreeUnits`): the units the
+   * `fully` ones stand for, as Explore counts them (`freeUnitsOf`: RAC's sites of each category
+   * free for the whole stay). Such a provider gives no total of its units, so the summary line
+   * then says what is free, never "of M".
+   */
+  freeUnits?: number;
   /** Taken on some nights, free on others. */
   partly: number;
   /** Not settled yet: some nights are not released for booking. */
@@ -131,12 +139,14 @@ export function summariseAvailability(
     notReleased: 0,
     unknown: 0,
     nights: nights.length,
+    ...(countsFreeUnits(units) ? { freeUnits: 0 } : {}),
   };
   for (const unit of units) {
     const standing = unitStanding(unit, nights);
     if (standing === 'free') {
       summary.known += 1;
       summary.fully += 1;
+      if (summary.freeUnits !== undefined) summary.freeUnits += freeUnitsOf(unit);
     } else if (standing === 'taken') {
       summary.known += 1;
       if (nights.some((date) => nightOf(unit, date).state === 'available')) summary.partly += 1;
@@ -168,10 +178,17 @@ const span = (nights: number) => (nights === 1 ? '1 night' : `all ${nights} nigh
 
 /**
  * The summary line, counting only units whose known nights settle the stay: "8 of 20 sites
- * free for all 2 nights". With none settled, it says why: the nights are not released yet,
- * or `source` (the provider's short name) did not say.
+ * free for all 2 nights". A provider that counts its units (`freeUnits`) gives no total, so
+ * its line counts what is free as Explore does: "51 spots free for all 2 nights", or "No spots
+ * free for all 2 nights", never "of M". With none settled, it says why: the nights are not
+ * released yet, or `source` (the provider's short name) did not say.
  */
 export function summaryLine(summary: AvailabilitySummary, noun: UnitNoun, source: string): string {
+  const { freeUnits } = summary;
+  if (summary.known > 0 && freeUnits !== undefined) {
+    const free = freeUnits > 0 ? `${freeUnits} ${plural(freeUnits, noun)}` : `No ${noun.many}`;
+    return `${free} free for ${span(summary.nights)}`;
+  }
   if (summary.known > 0) {
     return `${summary.fully} of ${summary.known} ${plural(summary.known, noun)} free for ${span(
       summary.nights
@@ -186,7 +203,12 @@ function dayLabel(date: string): string {
   return format(parseIsoDate(date), 'EEE d MMM');
 }
 
-/** The units the summary line leaves out, and why. */
+/**
+ * The units the summary line leaves out, and why. A provider that counts its units
+ * (`freeUnits`: each row a type standing for several, such as RAC's categories) gets no number
+ * of rows, which would read as a count beside its free count: "Some spots need a stay of at
+ * least 3 nights."
+ */
 export function summaryNotes(
   summary: AvailabilitySummary,
   noun: UnitNoun,
@@ -194,6 +216,12 @@ export function summaryNotes(
 ): string[] {
   const notes: string[] = [];
   const { notReleased, unknown } = summary;
+  const rowsAreTypes = summary.freeUnits !== undefined;
+  /** "2 sites need" / "1 site needs", or "Some spots need" when rows are types. */
+  const some = (count: number, verbs: [one: string, many: string]): string =>
+    rowsAreTypes
+      ? `Some ${noun.many} ${verbs[1]}`
+      : `${count} ${plural(count, noun)} ${count === 1 ? verbs[0] : verbs[1]}`;
   if ((summary.split ?? 0) > 0) {
     notes.push(`Free on some nights, but not on one ${noun.one} for the whole stay.`);
   }
@@ -201,31 +229,48 @@ export function summaryNotes(
     .map(([minimum, count]) => [Number(minimum), count] as const)
     .sort(([a], [b]) => a - b);
   for (const [minimum, count] of minimums) {
-    notes.push(
-      `${count} ${plural(count, noun)} ${count === 1 ? 'needs' : 'need'} a stay of at least ${minimum} nights.`
-    );
+    notes.push(`${some(count, ['needs', 'need'])} a stay of at least ${minimum} nights.`);
   }
   if (summary.noArrival) {
     const { date, units } = summary.noArrival;
     notes.push(
       units === summary.total
         ? `No arrivals on ${dayLabel(date)}.`
-        : `${units} ${plural(units, noun)} ${units === 1 ? 'takes' : 'take'} no arrivals on ${dayLabel(date)}.`
+        : `${some(units, ['takes', 'take'])} no arrivals on ${dayLabel(date)}.`
     );
   }
   if (notReleased > 0 && summary.known > 0) {
     notes.push(
-      `${notReleased} more ${plural(notReleased, noun)} ${
-        notReleased === 1 ? 'has' : 'have'
-      } nights that aren't released yet.`
+      rowsAreTypes
+        ? `Some other ${noun.many} have nights that aren't released yet.`
+        : `${notReleased} more ${plural(notReleased, noun)} ${
+            notReleased === 1 ? 'has' : 'have'
+          } nights that aren't released yet.`
     );
   }
   if (unknown > 0 && (summary.known > 0 || notReleased > 0)) {
     notes.push(
-      `${source} didn't say which nights are free for ${unknown} more ${plural(unknown, noun)}.`
+      rowsAreTypes
+        ? `${source} didn't say which nights are free for some other ${noun.many}.`
+        : `${source} didn't say which nights are free for ${unknown} more ${plural(unknown, noun)}.`
     );
   }
   return notes;
+}
+
+/**
+ * "Show all 24 sites" and "Show fewer sites", or, when each row is a type standing for several
+ * (a provider that counts its units, such as RAC's categories), "Show all 12 spot types": the
+ * rows are never counted as units beside the free count.
+ */
+export function showAllLabel(
+  showAll: boolean,
+  rows: number,
+  noun: UnitNoun,
+  rowsAreTypes: boolean
+): string {
+  const what = rowsAreTypes ? `${noun.one} types` : noun.many;
+  return showAll ? `Show fewer ${what}` : `Show all ${rows} ${what}`;
 }
 
 /** Why "Fully available only" shows no rows, and what to do about it. */
