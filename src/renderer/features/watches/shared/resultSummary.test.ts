@@ -49,7 +49,8 @@ describe('resultSummary', () => {
         makeUnit('cat:9', NIGHTS, undefined, { unitName: 'Drive-thru Site', freeCount: 3 }),
       ],
     });
-    expect(resultSummary(watch, SITES)).toBe('54 sites available');
+    // Explore's word for a provider that counts its units: "free"
+    expect(resultSummary(watch, SITES)).toBe('54 sites free');
   });
 
   it('counts the nights with something free for a partial result', () => {
@@ -129,11 +130,11 @@ describe('runResultMessage', () => {
     const powered = { ...match('cat:4', '2099-12-11', '2099-12-13'), freeCount: 51 };
     expect(
       runResultMessage({ ...base, found: true, matches: [powered] }, watch, SITES, undefined)
-    ).toBe('51 sites available at Osprey Bay');
+    ).toBe('51 sites free at Osprey Bay');
     const one = { ...match('cat:9', '2099-12-11', '2099-12-13'), freeCount: 1 };
     expect(
       runResultMessage({ ...base, found: true, matches: [one] }, watch, SITES, undefined)
-    ).toBe('1 site available at Osprey Bay');
+    ).toBe('1 site free at Osprey Bay');
   });
 
   it('counts the nights partial runs cover', () => {

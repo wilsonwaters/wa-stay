@@ -5,7 +5,7 @@
  * "Check now". RAC's trimmed availability answer (`fixtures/http/rac/`, moved to those nights
  * by `support/dated-fixtures.ts`) frees the powered site, so the watch page shows the night grid,
  * counting the powered site's 51 sites free for the whole stay as Explore does ("51 sites
- * available", "51 sites free for all 2 nights", never one per category or "of M"), and "Book on
+ * free", "51 sites free for all 2 nights", never one per category or "of M"), and "Book on
  * RAC", whose link is RAC's booking page for the powered site, never its cart. The link is never
  * followed. Fixture mode refuses no request.
  */
@@ -80,7 +80,7 @@ test('an RAC watch for camping at Busselton finds the powered site and links to 
   await expect(window.getByRole('table', { name: /^Availability by night, / })).toBeVisible();
   // Explore's count for Busselton: the powered site's 51 sites, not one category of two
   const availability = window.getByRole('region', { name: 'Availability', exact: true });
-  await expect(availability.getByText('51 sites available', { exact: true })).toBeVisible();
+  await expect(availability.getByText('51 sites free', { exact: true })).toBeVisible();
   await expect(
     availability.getByText('51 sites free for all 2 nights', { exact: true })
   ).toBeVisible();

@@ -8,9 +8,11 @@
  *   spots free for all 2 nights", never "of M": RAC gives no total of its sites);
  * - a watch: `watches:run-now`'s matches and its Check now toast, its alert and the alert's
  *   email, and the watch's card and night grid from `watches:get`.
- * Each says the same number: the sites free for the whole stay of every category free for it,
- * as RAC counts them (`stay_through_sites_available`), never one per category. Only the noun
- * differs, following the units each counts (a watch's found units, a place's kinds).
+ * Each says the same number, in Explore's word ("free"): the sites free for the whole stay of
+ * every category free for it, as RAC counts them (`stay_through_sites_available`), never one per
+ * category. Only the noun differs, following the units each counts (a watch's found units, a
+ * place's kinds). Every check also passes the contract suite's free-count rules
+ * (`freeCountViolations`), which a count on a category that is not free breaks.
  */
 
 import fs from 'fs';
@@ -42,6 +44,7 @@ import type { CatalogAvailabilityResult } from '@shared/types/catalog.types';
 import { addDays, eachNight } from '@shared/utils/calendar-date';
 import { sumFreeUnits } from '@shared/utils/free-units';
 import { fakeDateOnly } from '@tests/utils/core-harness';
+import { freeCountViolations } from '@tests/utils/provider-contract';
 import { containerSecrets, removeUserData } from '@tests/utils/fake-safe-storage';
 import {
   FakeIpcMain,
@@ -190,6 +193,7 @@ describe('RAC free counts agree: Explore, the place page, a watch, its alert and
     const emails = mockSendMail.mock.calls.map(([mail]) => mail);
 
     return {
+      checked,
       counts: {
         explore: entry.availableUnits,
         placePage: placeSummary.freeUnits,
@@ -224,30 +228,41 @@ describe('RAC free counts agree: Explore, the place page, a watch, its alert and
     // watch, the sites it found
     expect(words.card).toBe('51 spots free');
     expect(words.placeLine).toBe('51 spots free for all 2 nights');
-    expect(words.toast).toBe('51 sites available at RAC Busselton Holiday Park');
-    expect(words.watchCard).toBe('51 sites available');
+    expect(words.toast).toBe('51 sites free at RAC Busselton Holiday Park');
+    expect(words.watchCard).toBe('51 sites free');
     expect(words.watchLine).toBe('51 sites free for all 2 nights');
     expect(words.alerts).toEqual([
       {
         title: 'Sites available at RAC Busselton Holiday Park',
-        message: expect.stringMatching(
-          /^Found 51 sites available at RAC Busselton Holiday Park for /
-        ),
+        message: expect.stringMatching(/^Found 51 sites free at RAC Busselton Holiday Park for /),
       },
     ]);
     expect(words.emails).toHaveLength(1);
     expect(words.emails[0].text).toContain(words.alerts[0].message);
-    expect(words.emails[0].html).toContain(
-      'Found 51 sites available at RAC Busselton Holiday Park'
-    );
+    expect(words.emails[0].html).toContain('Found 51 sites free at RAC Busselton Holiday Park');
   });
 
   it.each(ANSWERS.map((answer) => [answer.file, answer] as const))(
     'every screen counts the same: %s',
     async (_, { park, stay }) => {
-      const { counts, words } = await everywhere(park, stay);
+      const { checked, counts, words } = await everywhere(park, stay);
       const free = counts.explore;
       expect(counts).toEqual({ explore: free, placePage: free, watchRun: free, watchPage: free });
+
+      // The check keeps the contract's free-count rules, free categories included; a count on a
+      // category that is not free for the stay breaks them
+      expect(freeCountViolations(checked)).toEqual([]);
+      const notFree = checked.units.filter((unit) => !unit.fullyAvailable);
+      if (notFree.length > 0) {
+        const miscounted = {
+          units: checked.units.map((unit) =>
+            unit.fullyAvailable ? unit : { ...unit, freeCount: 3 }
+          ),
+        };
+        expect(freeCountViolations(miscounted)).toEqual(
+          notFree.map((unit) => `unit ${unit.unitId} is not fullyAvailable, but its freeCount is 3`)
+        );
+      }
 
       // No "of M" anywhere: RAC gives no total of its sites
       for (const line of [words.card, words.placeLine, words.watchLine]) {
@@ -257,11 +272,11 @@ describe('RAC free counts agree: Explore, the place page, a watch, its alert and
         expect(words.card).toMatch(new RegExp(`^${free} \\w+ free$`));
         expect(words.placeLine).toMatch(new RegExp(`^${free} \\w+ free for `));
         expect(words.watchLine).toMatch(new RegExp(`^${free} \\w+ free for `));
-        expect(words.watchCard).toMatch(new RegExp(`^${free} \\w+ available$`));
-        expect(words.toast).toMatch(new RegExp(`^${free} \\w+ available at ${park.name}$`));
+        expect(words.watchCard).toMatch(new RegExp(`^${free} \\w+ free$`));
+        expect(words.toast).toMatch(new RegExp(`^${free} \\w+ free at ${park.name}$`));
         expect(words.alerts).toHaveLength(1);
         expect(words.alerts[0].message).toMatch(
-          new RegExp(`^Found ${free} \\w+ available at ${park.name} for `)
+          new RegExp(`^Found ${free} \\w+ free at ${park.name} for `)
         );
         expect(words.emails).toHaveLength(1);
         expect(words.emails[0].text).toContain(words.alerts[0].message);

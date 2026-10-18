@@ -36,3 +36,12 @@ export function sumFreeUnits(units: readonly Counted[]): number {
 export function countsFreeUnits(units: readonly Counted[]): boolean {
   return units.some((unit) => unit.freeCount !== undefined);
 }
+
+/**
+ * The word after a count of the units free for the whole stay: "free" when the provider counts
+ * its units (`countsFreeUnits`), as Explore says it ("51 spots free"), else "available" (ParkStay's
+ * "3 sites available").
+ */
+export function freeUnitsWord(units: readonly Counted[]): 'free' | 'available' {
+  return countsFreeUnits(units) ? 'free' : 'available';
+}
