@@ -110,7 +110,7 @@ in its `screenshots` artifact and commit them. It pushes nothing itself.
 The page describes the app, so a change to what the app does or shows changes the page in the
 same pull request ([CLAUDE.md, "Website"](../CLAUDE.md#website) has the list). In particular:
 
-- **A provider ships:** add its row to the providers list ("Different providers, one app"), with
+- **A provider ships:** add its row to the providers list ("Different booking sites, one search"), with
   `data-provider="<id>"`, its manifest name and monogram, and what WA Stay does with it. Add its
   brand colour as `--provider-<id>` in `site/styles.css`, with a
   `[data-provider='<id>'] .provider__badge` rule. The site test checks the row against the
@@ -134,8 +134,10 @@ gone stale: read the page against the change.
 - **Say only what is true**, in the app's voice: Australian English and sentence case, with
   "checks as often as every 15 minutes" rather than "never miss a site". A feature still marked
   "Soon" in the app is described as coming, never as available.
-- **Provider-neutral copy.** WA Stay brings different providers into one app, so the copy speaks
-  of places, sites and providers. A provider is named only in its providers row and in the
+- **Provider-neutral copy.** WA Stay brings different booking sites into one search, so the copy
+  speaks of places, sites and booking sites. "Provider" is a word for the code: on the page, as in
+  the app, a provider is a "booking site", and where a sentence needs no noun it has none ("the
+  booking page", "pay there"). A provider is named only in its providers row and in the
   independence notice: WA Stay is not made by or affiliated with the providers it shows
   (including DBCA, which runs ParkStay WA, and RAC, which runs RAC Parks & Resorts) or with
   Tourism WA, and it is not a government service. Nothing of a provider's own goes on the page

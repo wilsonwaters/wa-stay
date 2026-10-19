@@ -33,7 +33,9 @@ describe('NewWatchPage prefill (§12.10)', () => {
     expect(
       await screen.findByRole('heading', { level: 2, name: 'Step 3 of 5: Your stay' })
     ).toBeInTheDocument();
-    expect(within(stepList()).getByRole('button', { name: 'Provider, done' })).toBeInTheDocument();
+    expect(
+      within(stepList()).getByRole('button', { name: 'Booking site, done' })
+    ).toBeInTheDocument();
     expect(within(stepList()).getByRole('button', { name: 'Location, done' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Dates Sat 12 – Mon 14 Dec' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /^Guests 2 adults/ })).toBeInTheDocument();
@@ -68,9 +70,9 @@ describe('NewWatchPage prefill (§12.10)', () => {
   it('opens on the provider step for a provider it cannot watch', async () => {
     renderWithApp({ route: '/watches/new?provider=rac&location=9', api: api() });
     expect(
-      await screen.findByRole('heading', { level: 2, name: 'Step 1 of 5: Provider' })
+      await screen.findByRole('heading', { level: 2, name: 'Step 1 of 5: Booking site' })
     ).toBeInTheDocument();
-    expect(screen.getByText(/provider isn't available/)).toBeInTheDocument();
+    expect(screen.getByText(/booking site isn't available/)).toBeInTheDocument();
   });
 
   it('names the place from its detail and offers its units on Your stay', async () => {

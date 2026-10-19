@@ -48,7 +48,7 @@ test('an RAC watch for camping at Busselton finds the powered site and links to 
   await expectHeadingFocused(window, 'New watch');
   const steps = window.getByRole('navigation', { name: 'New watch steps' });
   await expectCurrentStep(steps, 'Your stay');
-  await expect(steps.getByRole('button', { name: 'Provider, done' })).toBeVisible();
+  await expect(steps.getByRole('button', { name: 'Booking site, done' })).toBeVisible();
 
   // 2. Your stay: camping, from RAC's categories at Busselton (sites and cabins)
   const stayType = window.getByRole('group', { name: 'Stay type' });

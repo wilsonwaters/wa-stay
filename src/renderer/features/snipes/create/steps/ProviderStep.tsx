@@ -17,14 +17,14 @@ export function ProviderStep({ onProviderChange }: ProviderStepProps) {
   return (
     <ProviderPicker
       capability="snipes"
-      label="Which provider"
-      hint="The moment what you choose is released, Site Sniper alerts you or, where the provider allows it, holds it for you."
+      label="Which booking site"
+      hint="The moment what you choose is released, Site Sniper alerts you or, where the booking site allows it, holds it for you."
       note={(provider) => (provider.capabilities.holds ? undefined : 'Alerts only')}
       value={providerId || undefined}
       onChange={(id) => {
         if (id !== providerId) onProviderChange(id);
       }}
-      emptyMessage="No provider supports Site Sniper yet"
+      emptyMessage="No booking site supports Site Sniper yet"
     />
   );
 }

@@ -43,9 +43,9 @@ test('creates a ParkStay snipe through the provider-first flow', async ({ launch
   await expectRoute(window, '/site-sniper/new');
   await expectHeadingFocused(window, 'New snipe');
 
-  // 1. Provider: the only provider with Site Sniper, chosen for you but shown.
+  // 1. Booking site: the only provider with Site Sniper, chosen for you but shown.
   const steps = window.getByRole('navigation', { name: 'New snipe steps' });
-  await expectCurrentStep(steps, 'Provider');
+  await expectCurrentStep(steps, 'Booking site');
   await expect(window.getByRole('radio', { name: 'ParkStay WA' })).toBeChecked();
   await window.getByRole('button', { name: 'Continue' }).click();
 

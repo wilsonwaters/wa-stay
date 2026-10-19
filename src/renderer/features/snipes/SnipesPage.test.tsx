@@ -170,12 +170,12 @@ describe('SnipesPage', () => {
     const { unmount } = renderWithProviders(<SnipesPage />);
     expect(
       await screen.findByText(
-        'Catch a hard-to-get site the moment it is released: Site Sniper alerts you or, where the provider allows it, tries to hold it for you to pay for.'
+        'Catch a hard-to-get site the moment it is released: Site Sniper alerts you or, where the booking site allows it, tries to hold it for you to pay for.'
       )
     ).toBeInTheDocument();
     expect(
       await screen.findByText(
-        'A snipe waits for a place’s sites to be released, then alerts you the moment they open or, where the provider allows it, tries to hold one for you.'
+        'A snipe waits for a place’s sites to be released, then alerts you the moment they open or, where the booking site allows it, tries to hold one for you.'
       )
     ).toBeInTheDocument();
     unmount();
@@ -203,15 +203,15 @@ describe('SnipesPage', () => {
       api: { providers: { list: jest.fn().mockResolvedValue(ok([FAKE_MANIFEST])) } },
     });
     expect(
-      await screen.findByRole('heading', { name: 'No provider supports Site Sniper yet' })
+      await screen.findByRole('heading', { name: 'No booking site supports Site Sniper yet' })
     ).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'New snipe' })).toBeDisabled();
     expect(screen.getByRole('button', { name: 'New snipe' })).toHaveAccessibleDescription(
-      'No provider supports Site Sniper yet'
+      'No booking site supports Site Sniper yet'
     );
     expect(
       screen.getByText(
-        'When a provider that releases its dates on a schedule is added, you can create a snipe here.'
+        'When a booking site that releases its dates on a schedule is added, you can create a snipe here.'
       )
     ).toBeInTheDocument();
   });

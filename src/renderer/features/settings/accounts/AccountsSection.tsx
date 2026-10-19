@@ -125,7 +125,7 @@ export function AccountsSection() {
 
   return (
     <>
-      <ul aria-label="Provider accounts" className="divide-y divide-border">
+      <ul aria-label="Booking site accounts" className="divide-y divide-border">
         {providers.data.map((manifest) => (
           <AccountRow
             key={manifest.id}

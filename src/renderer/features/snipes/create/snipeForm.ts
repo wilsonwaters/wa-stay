@@ -166,7 +166,7 @@ export function snipeFormSchema({
       if (v.notes.length > 1000) issue(['notes'], 'Keep notes to 1,000 characters');
     };
 
-    if (!v.providerId) issue(['providerId'], 'Choose a provider');
+    if (!v.providerId) issue(['providerId'], 'Choose a booking site');
     if (!v.location) issue(['location'], 'Choose a location');
     if (!v.arrival || !v.departure) issue(['arrival'], 'Choose your check-in and check-out dates');
     else if (v.arrival < today) issue(['arrival'], "Check-in can't be in the past");

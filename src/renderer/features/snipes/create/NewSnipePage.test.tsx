@@ -29,7 +29,7 @@ describe('NewSnipePage', () => {
     renderWithApp({ route: '/site-sniper/new', api: api() });
     expect(
       await screen.findByText(
-        'Choose a place, your dates and when its sites are released. Site Sniper alerts you the moment one opens or, where the provider allows it, tries to hold it; you book and pay yourself.'
+        'Choose a place, your dates and when its sites are released. Site Sniper alerts you the moment one opens or, where the booking site allows it, tries to hold it; you book and pay yourself.'
       )
     ).toBeInTheDocument();
   });
@@ -37,11 +37,11 @@ describe('NewSnipePage', () => {
   it('without a provider for Site Sniper, says so in words of dates, not units', async () => {
     renderWithApp({ route: '/site-sniper/new', api: api({}, [FAKE_MANIFEST]) });
     expect(
-      await screen.findByRole('heading', { name: 'No provider supports Site Sniper yet' })
+      await screen.findByRole('heading', { name: 'No booking site supports Site Sniper yet' })
     ).toBeInTheDocument();
     expect(
       screen.getByText(
-        'When a provider that releases its dates on a schedule is added, you can create a snipe here.'
+        'When a booking site that releases its dates on a schedule is added, you can create a snipe here.'
       )
     ).toBeInTheDocument();
   });
@@ -142,7 +142,7 @@ describe('NewSnipePage', () => {
     const notice = await screen.findByText("Some of the link couldn't be used");
     const list = notice.closest('[role="status"]') as HTMLElement;
     expect(
-      within(list).getByText("Fake Stay doesn't offer Site Sniper, so choose a provider.")
+      within(list).getByText("Fake Stay doesn't offer Site Sniper, so choose a booking site.")
     ).toBeInTheDocument();
     expect(within(list).getByText(/The link's dates couldn't be used/)).toBeInTheDocument();
   });

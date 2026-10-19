@@ -64,7 +64,7 @@ function SnipeDetailView({ snipe, manifest, updating: fetching }: ViewProps) {
   const manifestOf = useCallback(() => manifest, [manifest]);
   const alert = useStatusAnnouncements(snipes, manifestOf);
   const { location } = snipe;
-  const provider = manifest?.shortName ?? 'the provider';
+  const provider = manifest?.shortName ?? 'the booking site';
   const today = providerToday(manifest, now);
 
   return (

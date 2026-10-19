@@ -456,7 +456,7 @@ export class SiteSniperService {
     this.repo.setResult(
       id,
       SnipeResult.ERROR,
-      `UNKNOWN_PROVIDER: Unknown provider "${providerId}"`
+      `UNKNOWN_PROVIDER: Unknown booking site "${providerId}"`
     );
     this.changed(id);
   }

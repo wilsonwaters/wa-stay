@@ -110,7 +110,7 @@ export const row = (name: string) => {
   return heading.closest('li') as HTMLElement;
 };
 export const rows = async () => {
-  const list = await screen.findByRole('list', { name: 'Provider accounts' });
+  const list = await screen.findByRole('list', { name: 'Booking site accounts' });
   return within(list).getAllByRole('listitem');
 };
 

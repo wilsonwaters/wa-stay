@@ -40,5 +40,5 @@ export function alertBookingUrl(snipe: Pick<SiteSnipe, 'alert'>): string | undef
  */
 export function alertedMessage(snipe: SiteSnipe, manifest: ProviderManifest | undefined): string {
   const unit = alertedUnitLabel(snipe, manifest) ?? `A ${heldUnitNoun(snipe, manifest).one}`;
-  return `${snipe.name}: ${unit} is free. Book on ${manifest?.shortName ?? 'the provider'}.`;
+  return `${snipe.name}: ${unit} is free. Book on ${manifest?.shortName ?? 'the booking site'}.`;
 }

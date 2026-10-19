@@ -270,6 +270,7 @@ Rules:
 - **Open Day plans** (§12.38): in a `remindOnly` release mode the new-snipe flow's Stay step shows the provider's booking rules (`StayRulesPanel`, `components/stay/`, with suggested dates as buttons), and its Release step the stay's release from them (`usePlanRelease` over `catalog.stayRules`, never `catalog.checkLocation`) and `PlanReminders` (`features/snipes/shared/`: the reminders at their times, the checklist as "Have ready", "Site Sniper only reminds you…") in place of "When the dates are free" and Advanced timing; "Create plan" sends `action: 'remind'` and no timing. A plan's card and page read "Reminders set" then "Reminders sent", say the next reminder, and have no attempts, timing, Run now or (once reminded or expired) Arm again; its page has "Open {shortName}" and, once reminded, "Watch for cancellations" (the watch flow with its stay). The place page's Site Sniper hand-off reads "Set release reminders" where every mode only reminds, and is offered only for dates not yet on sale
 - **Provider notices** (§12.36, `components/providers/ProviderNoticeDialog.tsx`: the notice as text, Continue once its checkbox is ticked, Not now; `useNoticeGate`): asked on the place page's Check availability, on the watch flow's provider step and before Create watch, and from Explore's one notice per provider ("{shortName} checks dates once you've read and accepted its notice."), whose cards read "Read {shortName}'s notice to check dates"; accepting asks that provider's checks and counts again, withdrawing drops them
 - **Key components:** `components/ui/` primitives (Button, Dialog, Combobox, Menu, Popover, Switch, RadioCard, Stepper, Chip, ProviderBadge, … — `docs/design/components.md`); shared blocks StepFlow, ProviderPicker, ProviderNoticeDialog, LocationCombobox, ProviderStayFields, StayTypeChips, StayRulesPanel, UnitPicker, NightGrid, LocationCard, PlacePhoto, Countdown, ConnectAccountPrompt, CopyCredentialButton, ComingSoonBanner; shell and system surfaces TopNav, AccountMenu, Tray, NotificationBell, AccessStatusChip, UpdateCard, AboutPanel/AboutDialog, Logo (`components/brand/Logo.tsx`)
+- **Booking sites** (§12.39): copy a person reads calls a provider a "booking site" ("Booking site" filter, "Which booking site", "Unknown booking site"), never a "provider"; code, IPC, the database and the docs for developers keep "provider". The unit-noun guard lets "booking site" through
 - Renderer rules (§8): data only through `renderer/api/` hooks; UI only from `components/ui` and design tokens (`tests/unit/design/token-guard.test.ts`); lucide icons, no emoji; tests assert roles and accessible names, never class names
 
 ## Website
@@ -290,12 +291,13 @@ Rules:
   | Explore: search, filters, the map, availability | The hero; "See what's free before you plan the drive" |
   | A place's page | "Every site, night by night" |
   | Watches, notifications, automatic holds | "Booked out? Set a watch" |
-  | Providers (`BUILT_IN_PROVIDERS`) | "Different providers, one app": one row per shipped provider, showing its manifest name, monogram and brand colour, and what WA Stay does with it |
+  | Providers (`BUILT_IN_PROVIDERS`) | "Different booking sites, one search": one row per shipped provider, showing its manifest name, monogram and brand colour, and what WA Stay does with it |
   | Site Sniper, Bookings (marked "Soon") | "Coming next". When a "Soon" pill goes, move the feature out of this section and into its own |
   | Settings, accounts, updates, platforms, data | "Questions", and the two download sections |
 - **Screenshots:** when a screen they show changes, retake them with `npm run site:screenshots` (`tests/site/`; it needs a Mapbox token, and a machine that can load ParkStay's photos: GitHub's runners could not). The docs' screenshots can also be retaken with the repository's token by the **Screenshots** workflow (`.github/workflows/screenshots.yml`: run it from the Actions tab or label a pull request `screenshots`; it uploads `docs/images/` as the `screenshots` artifact and pushes nothing). Then update the images' sizes and alt text in `site/index.html`; the site test checks the sizes.
 - **Copy:**
   - plain and non-technical, never the architecture;
+  - a provider is a "booking site", as in the app (architecture-notes §12.39);
   - provider-neutral: a provider is named only in its providers row and in the independence notice;
   - only what is true, in the design language's voice (`docs/design/design-language.md`);
   - "Soon" features are described as coming.

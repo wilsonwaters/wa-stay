@@ -148,7 +148,7 @@ test('an RAC member number: saved with its statements, copied beside "Book on RA
 
   // 1. Settings → Accounts: RAC's row, nothing saved
   await chooseAccountMenuItem(window, 'Settings');
-  const accounts = window.getByRole('list', { name: 'Provider accounts' });
+  const accounts = window.getByRole('list', { name: 'Booking site accounts' });
   const racRow = accounts
     .getByRole('listitem')
     .filter({ has: window.getByRole('heading', { level: 3, name: 'RAC Parks & Resorts' }) });

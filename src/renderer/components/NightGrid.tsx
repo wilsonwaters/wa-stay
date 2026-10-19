@@ -209,7 +209,7 @@ export function NightGrid({
   departure,
   unitNoun = DEFAULT_UNIT_NOUN,
   currency,
-  source = 'The provider',
+  source = 'The booking site',
   caption,
   summaryRef,
   children,

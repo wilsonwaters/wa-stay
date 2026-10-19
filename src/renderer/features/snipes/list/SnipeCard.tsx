@@ -49,7 +49,7 @@ export function SnipeCard({ snipe, manifest, today, place, placeLoading }: Snipe
   const holds = snipe.action === 'hold';
   const [confirming, setConfirming] = useState(false);
   const { location, stay } = snipe;
-  const provider = manifest?.shortName ?? 'the provider';
+  const provider = manifest?.shortName ?? 'the booking site';
 
   return (
     <Card

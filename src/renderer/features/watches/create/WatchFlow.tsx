@@ -35,7 +35,7 @@ import { useNoticeGate } from '../../../components/providers/ProviderNoticeDialo
 import { providerToday } from '../../../components/stay/providerToday';
 
 const STEPS: (FlowStep & { id: FlowStepId })[] = [
-  { id: 'provider', title: 'Provider' },
+  { id: 'provider', title: 'Booking site' },
   { id: 'location', title: 'Location' },
   { id: 'stay', title: 'Your stay' },
   { id: 'alerts', title: 'Alerts' },
@@ -214,7 +214,7 @@ export function WatchFlow({ manifests, initialValues, initialStep, notices = [] 
         >
           {step === 'provider' && <ProviderStep onProviderChange={changeProvider} />}
           {step !== 'provider' && !manifest && (
-            <Notice tone="warning">Choose a provider first.</Notice>
+            <Notice tone="warning">Choose a booking site first.</Notice>
           )}
           {step === 'location' && manifest && (
             <LocationStep manifest={manifest} place={detail.data} placeLoading={detail.isLoading} />

@@ -99,9 +99,9 @@ dates not yet on sale.
 **Site Sniper → New snipe**, or **Snipe a site** on a place's page (which fills in the place
 and dates). The flow has five steps:
 
-1. **Provider**: whose sites to snipe. Only providers with Site Sniper are listed; with one,
-   it is chosen for you but still shown. A provider that places no holds says **Alerts
-   only**.
+1. **Booking site** (the provider): whose sites to snipe. Only providers with Site Sniper are
+   listed; with one, it is chosen for you but still shown. A provider that places no holds says
+   **Alerts only**.
 2. **Location**: the place (a campground, a holiday park…).
 3. **Your stay**: dates and guests, plus the provider's own fields (ParkStay: Camping with,
    Vehicles, Postcode), the **Stay type** at a place whose units are of more than one kind, and

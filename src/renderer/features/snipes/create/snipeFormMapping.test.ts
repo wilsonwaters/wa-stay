@@ -154,7 +154,7 @@ describe('parseSnipePrefill', () => {
     );
     expect(prefill.providerId).toBeUndefined();
     expect(prefill.notices).toEqual([
-      "ParkStay doesn't offer Site Sniper, so choose a provider.",
+      "ParkStay doesn't offer Site Sniper, so choose a booking site.",
       "The link's place couldn't be used, so choose a location.",
       "The link's dates couldn't be used (they have passed or are out of order), so choose your dates.",
     ]);

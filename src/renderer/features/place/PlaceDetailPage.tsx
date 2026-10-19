@@ -119,7 +119,7 @@ function PlaceUnavailable({ stay }: { stay: StayParams }) {
         headingLevel={1}
         icon={<MapPinOff size={24} />}
         title="This place isn't available"
-        description="The provider may no longer list it, or the link is out of date."
+        description="The booking site may no longer list it, or the link is out of date."
         actions={
           <BackToExplore stay={stay} className={buttonClassName({ variant: 'secondary' })} />
         }

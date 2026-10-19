@@ -64,7 +64,7 @@ Existing files move into this layout as their stream touches them. Do not leave 
 
 | Term | Meaning | ParkStay mapping |
 |---|---|---|
-| **Provider** | An accommodation source module (`parkstay`, later `rac`, `airbnb`, …) | ParkStay (DBCA) |
+| **Provider** | An accommodation source module (`parkstay`, later `rac`, `airbnb`, …); a "booking site" in copy a person reads (§12.39) | ParkStay (DBCA) |
 | **Location** | A bookable place shown on the map: campground, holiday park, property | Campground |
 | **Area** | The parent grouping of a location: park, town or region | Park (+ district/region) |
 | **Unit** | An individually bookable thing at a location: site, cabin, room | Campsite |
@@ -395,3 +395,8 @@ interface ProviderContext {
     - *Contract suite:* `describeProviderContract` takes `releaseSample` (an `externalId` and a stay whose release is still to come) for a provider whose policy refuses a stay already on sale.
     - *Not built:* per-reminder switches, and the checklist and a "Search on" line in the reminder email.
     - *Tests:* `tests/unit/scheduler/plan-reminders.test.ts` (the real core and Stay Rottnest on fake timers: armed for the Open Day, the three reminders on time, one notification for two plans, only the latest when missed and within 30 minutes, a moved release, the refusals), the plan cases in `tests/unit/core/notifications/notification-snipe-alert.test.ts`, the renderer's flow, page, card and state tests (`*.plan.test.*` under `features/snipes/`), and `tests/e2e/rottnest-plan.spec.ts`, which starts with no Stay Rottnest routes and no notice, so a request would be refused and logged.
+39. **Booking sites in copy (stakeholder decision, 2026-10-19; amends §2's vocabulary for the UI).** "Provider" is an internal word that confused people, so copy a person reads calls a provider a **booking site**, in the app and on the website. Code, IPC, the database, logs, the SDK and the developer docs keep "provider" (§2 still holds there).
+    - *App:* the Explore filter, the first step of the watch, snipe and add-booking flows and the Watches and Bookings filters are "Booking site"; the snipe flow's group is "Which booking site"; `ProviderBadge`'s fallback is "Unknown booking site"; the Settings → Accounts list is named "Booking site accounts"; empty states, refusals and fallbacks name a booking site ("No booking site supports watches yet", "Choose a booking site", "Book on the booking site" when the short name is unknown). `AppError`'s default messages and the snipe's unknown-provider error say "booking site"; the SDK's own error messages (developer-facing, with raw ids) are unchanged. The email alert's details row is "Booking site". "Mail provider" and "email provider" stay: they are not accommodation providers.
+    - *Where a sentence needs no noun it has none* ("the booking page", "pay there"), and the provider's short name wins where it is known ("Book on RAC").
+    - *Website:* "Different booking sites, one search", the nav's "Booking sites" (`#booking-sites`), and "booking site" wherever the page said "provider"; the independence notice names "the organisations whose places it shows". Class names and `data-provider` stay.
+    - *Guard:* `tests/unit/copy/unit-noun-guard.test.ts` allows "booking site(s)", which is never a unit noun, and still fails on a "site" beside it.

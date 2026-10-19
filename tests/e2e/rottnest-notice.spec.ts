@@ -124,7 +124,7 @@ test('Stay Rottnest is asked nothing until its notice is accepted; withdrawing a
   // 5. Settings → Accounts: accepted today; Withdraw asks first
   await chooseAccountMenuItem(window, 'Settings');
   const row = window
-    .getByRole('list', { name: 'Provider accounts' })
+    .getByRole('list', { name: 'Booking site accounts' })
     .getByRole('listitem')
     .filter({ has: window.getByRole('heading', { level: 3, name: 'Stay Rottnest' }) });
   const today = new Intl.DateTimeFormat('en-AU', {

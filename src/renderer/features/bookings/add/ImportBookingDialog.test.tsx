@@ -111,9 +111,9 @@ describe('ImportBookingDialog', () => {
     );
     expect(await screen.findAllByRole('radio')).toHaveLength(2);
     await user.click(screen.getByRole('button', { name: 'Import booking' }));
-    expect(screen.getByText('Choose a provider to continue.')).toBeInTheDocument();
+    expect(screen.getByText('Choose a booking site to continue.')).toBeInTheDocument();
     await user.click(screen.getByRole('radio', { name: 'Stays Co' }));
-    expect(screen.queryByText('Choose a provider to continue.')).toBeNull();
+    expect(screen.queryByText('Choose a booking site to continue.')).toBeNull();
     expect(await reference()).toHaveAccessibleDescription(
       'Find it in your Stays confirmation email.'
     );

@@ -16,10 +16,10 @@ export function BookingFilters({ params, providerOptions, onChange }: BookingFil
       {providerOptions && (
         <div className="flex flex-col gap-1.5">
           <span aria-hidden="true" className="text-sm font-semibold text-fg">
-            Provider
+            Booking site
           </span>
           <SegmentedControl
-            label="Provider"
+            label="Booking site"
             options={providerOptions}
             value={params.provider ?? ALL}
             onValueChange={(value) =>

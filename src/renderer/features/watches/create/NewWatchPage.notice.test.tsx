@@ -92,7 +92,7 @@ describe('NewWatchPage: a provider with a notice', () => {
 
     await user.click(button('Continue'));
     expect(dialog()).toBeVisible();
-    expect(screen.getByRole('heading', { level: 2, name: /Provider$/ })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 2, name: /Booking site$/ })).toBeInTheDocument();
 
     await accept(user);
     expect(await screen.findByRole('heading', { level: 2, name: /Location$/ })).toBeInTheDocument();
@@ -108,7 +108,7 @@ describe('NewWatchPage: a provider with a notice', () => {
     await user.click(button('Continue'));
     await user.click(within(dialog()).getByRole('button', { name: 'Not now' }));
     expect(screen.queryByRole('dialog')).toBeNull();
-    expect(screen.getByRole('heading', { level: 2, name: /Provider$/ })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 2, name: /Booking site$/ })).toBeInTheDocument();
     expect(mock.providers.acceptNotice).not.toHaveBeenCalled();
   });
 

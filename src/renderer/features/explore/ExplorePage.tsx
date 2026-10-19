@@ -299,7 +299,7 @@ export default function ExplorePage() {
   const availableOnlyUnavailable = !stay
     ? 'Add dates to filter by availability'
     : manifestsQuery.isSuccess && bulkProviders.length === 0
-      ? "Availability filtering isn't supported by these providers"
+      ? "Availability filtering isn't supported by these booking sites"
       : undefined;
   const availableOnly = params.avail && !availableOnlyUnavailable;
 

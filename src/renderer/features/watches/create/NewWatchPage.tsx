@@ -20,7 +20,7 @@ export function NewWatchPage() {
     body = (
       <Notice
         tone="danger"
-        title="Providers couldn't be loaded"
+        title="Booking sites couldn't be loaded"
         actions={
           <Button variant="secondary" size="sm" onClick={() => void providers.refetch()}>
             Try again
@@ -34,8 +34,8 @@ export function NewWatchPage() {
     body = (
       <EmptyState
         size="md"
-        title="No provider supports watches yet"
-        description="When a provider that can be watched is added, you can create a watch here."
+        title="No booking site supports watches yet"
+        description="When a booking site that can be watched is added, you can create a watch here."
       />
     );
   } else {

@@ -22,13 +22,13 @@ function Picker({
   return (
     <ProviderPicker
       capability={anyProvider ? undefined : 'watches'}
-      label="Provider"
+      label="Booking site"
       value={value}
       onChange={(id) => {
         setValue(id);
         onChange(id);
       }}
-      emptyMessage="No provider supports watches yet"
+      emptyMessage="No booking site supports watches yet"
     />
   );
 }
@@ -42,7 +42,7 @@ describe('ProviderPicker', () => {
     renderWithProviders(<Picker />, {
       api: providers([PARKSTAY_MANIFEST, BROWSE_ONLY_MANIFEST, FAKE_MANIFEST]),
     });
-    const group = await screen.findByRole('radiogroup', { name: 'Provider' });
+    const group = await screen.findByRole('radiogroup', { name: 'Booking site' });
     expect(group).toBeInTheDocument();
     expect(screen.getByRole('radio', { name: 'ParkStay WA' })).not.toBeChecked();
     expect(screen.getByRole('radio', { name: 'Fake Stay Holidays' })).toBeInTheDocument();
@@ -53,7 +53,7 @@ describe('ProviderPicker', () => {
     renderWithProviders(<Picker anyProvider />, {
       api: providers([PARKSTAY_MANIFEST, BROWSE_ONLY_MANIFEST, FAKE_MANIFEST]),
     });
-    await screen.findByRole('radiogroup', { name: 'Provider' });
+    await screen.findByRole('radiogroup', { name: 'Booking site' });
     expect(screen.getAllByRole('radio').map((radio) => radio.getAttribute('value'))).toEqual([
       'parkstay',
       'browseonly',
@@ -74,7 +74,7 @@ describe('ProviderPicker', () => {
 
   it('says so when no provider offers the capability', async () => {
     renderWithProviders(<Picker />, { api: providers([BROWSE_ONLY_MANIFEST]) });
-    expect(await screen.findByText('No provider supports watches yet')).toBeInTheDocument();
+    expect(await screen.findByText('No booking site supports watches yet')).toBeInTheDocument();
     expect(screen.queryByRole('radiogroup')).toBeNull();
   });
 
@@ -86,7 +86,7 @@ describe('ProviderPicker', () => {
       .mockResolvedValue(ok([PARKSTAY_MANIFEST]));
     const { user } = renderWithProviders(<Picker />, { api: { providers: { list } } });
     const retry = await screen.findByRole('button', { name: 'Try again' }, { timeout: 4000 });
-    expect(screen.getByText("Providers couldn't be loaded")).toBeInTheDocument();
+    expect(screen.getByText("Booking sites couldn't be loaded")).toBeInTheDocument();
     await user.click(retry);
     expect(await screen.findByRole('radio', { name: 'ParkStay WA' })).toBeInTheDocument();
   });

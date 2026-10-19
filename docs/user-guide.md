@@ -1,9 +1,10 @@
 # User guide
 
 WA Stay helps you find places to stay across Western Australia and get them when they are
-hard to book. It works with **providers**, the booking systems that own the places. Two are
-built in: **ParkStay WA**, DBCA's booking system for national-park campgrounds, and **RAC Parks &
-Resorts**, RAC's holiday parks and resorts, from Esperance to Broome.
+hard to book. It brings together **booking sites**, the websites where the places are booked.
+Three are built in: **ParkStay WA**, DBCA's booking system for national-park campgrounds, **RAC
+Parks & Resorts**, RAC's holiday parks and resorts, from Esperance to Broome, and **Stay
+Rottnest**, the Rottnest Island Authority's villas, cottages, cabins, hostel and campground.
 
 New to WA Stay? Install it first ([installation](installation.md)). Upgrading from the old 1.x
 app? Your data moves over by itself ([upgrading](installation.md#upgrading-from-wa-parkstay-bookings)).
@@ -27,8 +28,8 @@ There is no login: WA Stay opens on **Explore**. The top navigation has **Explor
 are still being finished, but you can use them. On the right are the **notifications bell** and
 the **account menu**, which opens **Settings**.
 
-Everything shows which provider it belongs to: a small coloured badge with the provider's
-monogram (ParkStay's is "PS" on green, RAC's "RAC" on dark grey).
+Everything shows which booking site it belongs to: a small coloured badge with the booking
+site's monogram (ParkStay's is "PS" on green, RAC's "RAC" on dark grey).
 
 ## Explore
 
@@ -36,7 +37,7 @@ monogram (ParkStay's is "PS" on green, RAC's "RAC" on dark grey).
 
 - **Search.** The pill at the top takes **Where** (a place, park or region), **When** (your
   dates) and **Who** (guests). Results update as you type.
-- **Filters.** **Provider**, **Stay type** (Camping, Cabins & villas, Rooms, Dorms, Glamping:
+- **Filters.** **Booking site**, **Stay type** (Camping, Cabins & villas, Rooms, Dorms, Glamping:
   places with any you tick), **Region**, **Facilities**, **Book online** and, once you have
   dates, **Available only**.
 - **Availability.** With dates, every card and map pin shows how many sites are free for your
@@ -45,15 +46,15 @@ monogram (ParkStay's is "PS" on green, RAC's "RAC" on dark grey).
   how many are free ("27 spots free", "1 cabin free"), as RAC gives no total, or "Not open"
   when nothing can be booked for those dates yet. With a stay type ticked, a place that also
   has other kinds counts only the ones you chose, or says "Check dates on the place page" when
-  its provider doesn't count them separately.
-- **The map** shows every place from every provider. With **Search as I move the map** on, the
+  its booking site doesn't count them separately.
+- **The map** shows every place from every booking site. With **Search as I move the map** on, the
   list narrows to the area you are looking at. Pins cluster when zoomed out; the key explains
   the colours. If WA Stay was built without a map token, Explore shows the list only and says
   so.
 - The list is ordered by distance from the middle of the map. Your search, filters, dates and
   map position are in the page address, so Back takes you where you were.
 
-Places and photos come live from the provider. The catalogue is refreshed once a day and works
+Places and photos come live from the booking sites. The catalogue is refreshed once a day and works
 offline in between; availability needs a connection.
 
 ### Why do RAC's counts take a minute?
@@ -73,27 +74,27 @@ request.
 
 Click a place to open its page:
 
-- the provider, the type of place, the park and region, photos and the provider's description,
+- the booking site, the type of place, the park and region, photos and the booking site's description,
   and under **Booking rules** when new dates open (at an RAC park: "New dates open daily at
   midnight AWST, 364 days ahead. School holidays open on RAC's release days at 8 am AWST, 48
   hours earlier for members.");
 - **Check your dates**: pick dates and guests and **Check availability** to see every site
   (or cabin, room…) night by night, with prices ("3 of 5 sites free for all 2 nights"; **Fully
   available only** narrows the table), and under each one's name how many people and vehicles
-  it takes and the provider's description of it. At an RAC park each row is a kind of site or
+  it takes and the booking site's description of it. At an RAC park each row is a kind of site or
   cabin, and the count is the same as on Explore: how many are free for your whole stay, with
   no total ("51 spots free for all 2 nights"). The park's **Spots** section lists those kinds
   ("Bookable as 6 spot types"), not a count of spots. A price from a special rate says so under the
   name: with your RAC member number saved, RAC's members' rates count, marked "Rate: RAC member
-  rate". A night the provider refuses for your stay (a minimum stay, a day with no arrivals) is
+  rate". A night the booking site refuses for your stay (a minimum stay, a day with no arrivals) is
   marked, with the reason;
-- **Book on {provider}** opens the provider's booking page in your browser with this place and
+- **Book on {booking site}** opens its booking page in your browser with this place and
   your dates chosen: ParkStay's search page, whose **See availability** takes you on to book,
   or the RAC park's booking page. With an RAC member number saved, **Copy RAC member number**
   sits beside it, for RAC's checkout;
 - **Watch for availability** starts a watch for this place and these dates;
 - **Snipe a site** (or a cabin, a room…: the place's own word) starts a Site Sniper snipe;
-- **View on {provider}** and **More information** open the provider's pages in your browser.
+- **View on {booking site}** and **More information** open its pages in your browser.
 
 ## Watches
 
@@ -102,13 +103,13 @@ Click a place to open its page:
 A watch checks a place for your dates on a schedule and tells you when sites free up.
 
 1. **New watch** (or **Watch for availability** on a place's page).
-2. Choose the provider, the place and your stay: dates, guests, the provider's own fields
+2. Choose the booking site, the place and your stay: dates, guests, the booking site's own fields
    (ParkStay's **Camping with**, RAC's **Pets**, up to 2), the stay type at a place with more
    than one (camping, cabins…), the sites you prefer (or any) and an optional maximum price per
    night. A warning says when your stay is shorter than the place usually takes: WA Stay alerts
-   only on stays the provider accepts.
+   only on stays the booking site accepts.
 3. Choose the alerts: how often to check (every 15 minutes to daily; 1 hour by default; a
-   provider may set a longer minimum), whether to tell you about partial availability (only
+   booking site may set a longer minimum), whether to tell you about partial availability (only
    some nights free), whether to stop after the first alert, and, for ParkStay (and RAC with
    its experimental auto-cart turned on), **Hold a site automatically when found**.
 4. Review and **Create watch**.
@@ -117,26 +118,26 @@ Each watch shows its last result, when it last checked and next checks, and how 
 has found something. Its count of what is free, in the alert too, is the one Explore shows:
 at an RAC park, how many sites (or cabins…) are free for your whole stay, not how many kinds
 ("Found 51 sites free"). **Check now** checks at once. The menu lets you edit, pause or resume, and
-delete it. Filter the list by provider and by status (active or paused).
+delete it. Filter the list by booking site and by status (active or paused).
 
 A watch that holds a site shows **Pay now**: see [Site Sniper](#when-a-site-is-held). More
 detail: [Watches and notifications](watches-and-notifications.md).
 
 ### What happens when I click an alert?
 
-For every provider, clicking a desktop alert that a watch found something opens the watch in WA
-Stay and the provider's booking page in your browser, filled in with the place and the dates it
+For every booking site, clicking a desktop alert that a watch found something opens the watch in
+WA Stay and the booking page in your browser, filled in with the place and the dates it
 found (for some nights free, the longest run of them). Book there before someone else does: an
-alert reserves nothing. The watch's page has the same **Book on {provider}** link under its
+alert reserves nothing. The watch's page has the same **Book on {booking site}** link under its
 last result while the stay is still ahead. An alert that a site is **held** opens only the
 watch, where you pay.
 
 ### Can I book from my phone?
 
 Yes, from the email. With email alerts on ([Settings](#settings)), each alert that a watch found
-something has a **Book on {provider}** link to the provider's public booking page for those
-dates, so you can book from your phone or any other computer. The link is always a page on the
-provider's own site, never a cart or a checkout. An email about a held site says the hold is in
+something has a **Book on {booking site}** link to its public booking page for those dates, so
+you can book from your phone or any other computer. The link is always a page on the booking
+site itself, never a cart or a checkout. An email about a held site says the hold is in
 WA Stay on the computer that placed it (pay there), and gives the same public link.
 
 ## Site Sniper (coming soon)
@@ -144,13 +145,14 @@ WA Stay on the computer that placed it (pay there), and gives the same public li
 Site Sniper catches a hard-to-get site the moment it is released, checks rapidly across the
 release, and then does what you chose under **When the dates are free**:
 
-- **Alert me** sends a desktop alert and an email with a link to book on the provider's site,
+- **Alert me** sends a desktop alert and an email with a link to book on the booking site,
   and holds nothing, so book it before someone else does. Clicking the alert opens the snipe and
-  the provider's booking page, filled in with your stay.
-- **Hold it for me** places a hold that you then pay for, where the provider places holds
-  (ParkStay's 30-minute hold, its default). A provider that places no holds offers alerts only.
+  the booking page, filled in with your stay.
+- **Hold it for me** places a hold that you then pay for, where the booking site places holds
+  (ParkStay's 30-minute hold, its default). A booking site that places no holds offers alerts
+  only.
 
-When the dates are released depends on the provider:
+When the dates are released depends on the booking site:
 
 - **ParkStay WA:** when a new date opens (180 days ahead, at the campground's release time), at
   a scheduled block release, or when someone cancels. Site Sniper joins the DBCA queue when the
@@ -163,8 +165,12 @@ When the dates are released depends on the provider:
   season). An RAC snipe checks every 10 seconds at most, for at most 30 minutes. When WA Stay
   can't work out the release (school holidays RAC hasn't announced, dates already open), it
   says why and suggests a watch or a time you set.
+- **Stay Rottnest:** each month goes on sale at 8:30 am Perth time on its Open Day. Stay
+  Rottnest's terms rule out checking for you then, so a Stay Rottnest snipe is an **Open Day
+  plan**: it reminds you at 6 pm the day before, at 6 am and at 8:15 am, with what to have
+  ready, and never checks or books. You book on Stay Rottnest yourself.
 
-**New snipe** walks through the provider, the place, your stay (with ParkStay's vehicles and
+**New snipe** walks through the booking site, the place, your stay (with ParkStay's vehicles and
 postcode, RAC's pets, and the stay type at a place with more than one), when the sites are
 released, and a review. Snipe only what you will use. Full guide:
 [Site Sniper](site-sniper.md).
@@ -191,21 +197,21 @@ email.
 
 ## Bookings (coming soon)
 
-Bookings keeps your trips from every provider in one place, in **Upcoming**, **Past** and
-**Cancelled** tabs, with search and a provider filter.
+Bookings keeps your trips from every booking site in one place, in **Upcoming**, **Past** and
+**Cancelled** tabs, with search and a booking site filter.
 
 - Bookings paid through WA Stay's payment window are added for you.
-- **Add booking** records one you made elsewhere: the provider, the place, check-in and
+- **Add booking** records one you made elsewhere: the booking site, the place, check-in and
   check-out, the unit, guests, the reference and the cost.
 - A booking's page shows its details, copies the reference, and links to **Manage on
   ParkStay** to change or cancel it on ParkStay's own site.
-- Importing bookings straight from a provider appears only for providers that support it;
-  neither ParkStay nor RAC does yet.
+- Importing bookings straight from a booking site appears only for booking sites that support
+  it; none does yet.
 
 ## Notifications
 
 The bell shows every notification, newest first, with an unread count; click one to open what
-it is about. WA Stay also shows desktop notifications (titled with the provider, e.g.
+it is about. WA Stay also shows desktop notifications (titled with the booking site, e.g.
 "ParkStay · Sites available at Bungarra") and can email you. Notifications older than 30 days
 are deleted automatically.
 
@@ -216,7 +222,7 @@ app updates when one is ready.
 
 Open Settings from the account menu (top right).
 
-- **Accounts.** One row per provider. **Connect** signs you in to ParkStay in an in-app
+- **Accounts.** One row per booking site. **Connect** signs you in to ParkStay in an in-app
   window, on ParkStay's own pages: ParkStay emails you a code to type in. It is optional: holds
   work without it, and you can sign in on the payment page instead. Connecting before a release
   just makes checkout quicker. Got a sign-in link by email instead? Paste it under **Have a
@@ -255,6 +261,11 @@ Open Settings from the account menu (top right).
   for it or let it go first. Once it is off, no new stay goes in the cart, even before the
   restart.
 
+  Stay Rottnest has no account in WA Stay. Its row has a **Notice** group instead: WA Stay
+  checks Stay Rottnest only once you have read and accepted its notice about Stay Rottnest's
+  rule on automated software ("Notice accepted on {date}"), and **Withdraw** stops checking at
+  once.
+
 - **Notifications.** **Desktop notifications** and **Play a sound**, and **Email**: your SMTP
   settings (Gmail, Outlook or your own server), where to send alerts, and **Send test email**.
   [Email setup](watches-and-notifications.md#email).
@@ -269,8 +280,9 @@ Open Settings from the account menu (top right).
   awake). Closing the window quits it; turn on **Start WA Stay when you sign in** to keep it
   going.
 - **Your data stays on your computer**, in `%APPDATA%\WA Stay` on Windows. Your RAC member
-  number is kept there encrypted, and WA Stay never sends it. WA Stay talks to the providers
-  (ParkStay, the DBCA queue, RAC) and the sites that host their photos (RAC's come from NewBook,
+  number is kept there encrypted, and WA Stay never sends it. WA Stay talks to the booking
+  sites (ParkStay, the DBCA queue, RAC, and Stay Rottnest once you accept its notice) and the
+  websites that host their photos (RAC's come from NewBook,
   its booking system), Mapbox for the map (the Mapbox map library also sends Mapbox its standard
   usage events), GitHub for updates, and your own email server if you set one up. WA Stay
   itself has no account, no cloud service and no analytics.
@@ -285,7 +297,7 @@ Open Settings from the account menu (top right).
   sent.
   If RAC turns a request away, WA Stay stops asking RAC for 30 minutes (longer if it happens
   again) and says when it will try again. [What WA Stay sends RAC](providers/rac/README.md#pacing).
-- **Payment is always yours to make**, on the provider's own site.
+- **Payment is always yours to make**, on the booking site itself.
 - **Book responsibly with ParkStay.** One account per person, one booking per night, and only
   stays you will take. [DBCA's terms](providers/parkstay/README.md#dbcas-terms).
 - **Book responsibly with RAC.** Use only your own member number, for a stay you will take,

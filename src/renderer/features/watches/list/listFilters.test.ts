@@ -65,7 +65,7 @@ describe('watch list filters', () => {
       'All',
       'ParkStay',
       'Fake Stay',
-      'Unknown provider (rac)',
+      'Unknown booking site (rac)',
       'Browse Only',
     ]);
   });

@@ -26,7 +26,7 @@ export function RemoveBookingDialog({
 }: RemoveBookingDialogProps) {
   const remove = useDeleteBooking();
   const toast = useToast();
-  const provider = manifest?.shortName ?? 'the provider';
+  const provider = manifest?.shortName ?? 'the booking site';
   const name = booking.location.name;
 
   const confirm = async () => {

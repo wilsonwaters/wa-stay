@@ -26,7 +26,7 @@ export interface AddBookingDialogProps {
 }
 
 const STEPS = [
-  { id: 'provider', title: 'Provider' },
+  { id: 'provider', title: 'Booking site' },
   { id: 'details', title: 'Details' },
 ];
 
@@ -126,13 +126,13 @@ function AddBookingFlow({ onClose, bookings, onAdded }: Omit<AddBookingDialogPro
       {step === 'provider' && (
         <>
           <ProviderPicker
-            label="Provider"
+            label="Booking site"
             hint="Where you made the booking."
             value={values.providerId || undefined}
             onChange={chooseProvider}
-            emptyMessage="No providers are installed"
+            emptyMessage="No booking sites are installed"
           />
-          {providerMissing && <Notice tone="warning">Choose a provider to continue.</Notice>}
+          {providerMissing && <Notice tone="warning">Choose a booking site to continue.</Notice>}
         </>
       )}
       {step === 'details' && manifest && (
@@ -167,7 +167,7 @@ export function AddBookingDialog({ open, onClose, bookings, onAdded }: AddBookin
       open={open}
       onClose={onClose}
       title="Add booking"
-      description="Keep a booking you made on a provider's website with the rest of your trips."
+      description="Keep a booking you made on a booking site with the rest of your trips."
       size="lg"
       closeOnOverlayClick={false}
     >

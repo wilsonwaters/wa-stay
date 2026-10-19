@@ -41,7 +41,7 @@ export function FilterRow({
   return (
     <div role="group" aria-label="Filters" className="flex flex-wrap items-center gap-2">
       <FilterChip
-        label="Provider"
+        label="Booking site"
         options={facets.providers}
         selected={params.providers}
         onChange={(providers) => onChange({ providers })}

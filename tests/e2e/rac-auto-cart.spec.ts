@@ -72,7 +72,7 @@ async function waitForCatalogues(window: Page): Promise<void> {
 async function racRow(window: Page) {
   await chooseAccountMenuItem(window, 'Settings');
   return window
-    .getByRole('list', { name: 'Provider accounts' })
+    .getByRole('list', { name: 'Booking site accounts' })
     .getByRole('listitem')
     .filter({ has: window.getByRole('heading', { level: 3, name: 'RAC Parks & Resorts' }) });
 }

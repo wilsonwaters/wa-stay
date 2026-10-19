@@ -49,7 +49,7 @@ describe('NotificationList', () => {
     expect(within(appWide).queryByText('Unread')).toBeNull();
 
     expect(
-      within(item('From a removed provider')).getByRole('img', { name: 'Unknown provider' })
+      within(item('From a removed provider')).getByRole('img', { name: 'Unknown booking site' })
     ).toBeInTheDocument();
   });
 

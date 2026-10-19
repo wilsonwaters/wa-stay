@@ -30,7 +30,7 @@ export interface SnipeOutcomeProps {
  * optional, §12.32). An alert needs no account.
  */
 export function SnipeOutcome({ snipe, manifest, actions, units, today, now }: SnipeOutcomeProps) {
-  const provider = manifest?.shortName ?? 'the provider';
+  const provider = manifest?.shortName ?? 'the booking site';
   const terminal = timelineSteps(snipe).find((step) => step.terminal);
   return (
     <>

@@ -94,6 +94,6 @@ describe('FilterRow: Stay type', () => {
       within(filters())
         .getAllByRole('button')
         .map((button) => button.textContent)
-    ).toEqual(['Provider', 'Region', 'Facilities', 'Book online', 'Available only']);
+    ).toEqual(['Booking site', 'Region', 'Facilities', 'Book online', 'Available only']);
   });
 });

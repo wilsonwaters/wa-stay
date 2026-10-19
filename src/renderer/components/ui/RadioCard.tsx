@@ -11,7 +11,7 @@ interface RadioCardGroupContextValue {
 const RadioCardGroupContext = createContext<RadioCardGroupContextValue | null>(null);
 
 export interface RadioCardGroupProps {
-  /** Visible label for the group, e.g. "Provider". */
+  /** Visible label for the group, e.g. "Booking site". */
   label: ReactNode;
   value?: string;
   defaultValue?: string;

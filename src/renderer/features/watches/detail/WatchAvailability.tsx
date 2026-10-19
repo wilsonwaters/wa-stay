@@ -48,7 +48,7 @@ export function WatchAvailability({ watch, manifest, now }: WatchAvailabilityPro
   const book = link && (
     <p className="flex flex-wrap items-center gap-x-3 gap-y-2">
       <ExternalLink href={link.url} variant="primary">
-        Book on {manifest?.shortName ?? "the provider's website"}
+        Book on {manifest?.shortName ?? 'the booking site'}
       </ExternalLink>
       <CopyCredentialButton providerId={manifest?.id} />
       {partialStay && (

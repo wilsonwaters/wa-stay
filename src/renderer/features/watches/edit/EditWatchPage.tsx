@@ -115,10 +115,10 @@ function EditWatchForm({ watch, manifest }: { watch: Watch; manifest: ProviderMa
     <FormProvider {...form}>
       <form ref={formRef} noValidate onSubmit={save} className={PAGE}>
         <PageHeader title={`Edit ${watch.name}`} back={{ label: watch.name, href: `#${detail}` }} />
-        <Section title="Provider">
+        <Section title="Booking site">
           <div className="flex items-center gap-3">
             <ProviderBadge providerId={manifest.id} />
-            <p className="text-sm text-fg-secondary">A watch stays with its provider.</p>
+            <p className="text-sm text-fg-secondary">A watch stays with its booking site.</p>
           </div>
         </Section>
         <Section title="Location">
@@ -220,7 +220,7 @@ export function EditWatchPage() {
     return (
       <div className={PAGE}>
         <PageHeader title={`Edit ${query.data.name}`} back={back} />
-        <Notice tone="warning" title="This watch's provider isn't available">
+        <Notice tone="warning" title="This watch's booking site isn't available">
           {"Its details can't be changed. You can still delete it from the watch's page."}
         </Notice>
       </div>

@@ -256,7 +256,7 @@ export function ResultsList({
           icon={<LoaderCircle size={24} className="animate-spin" />}
           accent="sun"
           title="Getting places ready"
-          description="WA Stay is loading places from your providers. This takes a few seconds the first time."
+          description="WA Stay is loading places from the booking sites. This takes a few seconds the first time."
         />
       );
       break;
@@ -290,8 +290,8 @@ export function ResultsList({
         <EmptyState
           size="md"
           icon={<Store size={24} />}
-          title="No providers with places are installed"
-          description="Places appear here once a provider that lists them is added to WA Stay."
+          title="No booking sites with places are installed"
+          description="Places appear here once a booking site that lists them is added to WA Stay."
         />
       );
       break;

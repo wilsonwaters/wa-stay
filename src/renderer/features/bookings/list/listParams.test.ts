@@ -61,7 +61,7 @@ describe('provider filter options', () => {
       { value: 'all', label: 'All' },
       { value: 'parkstay', label: 'ParkStay' },
       { value: 'fakestay', label: 'Fake Stay' },
-      { value: 'gone', label: 'Other provider (gone)' },
+      { value: 'gone', label: 'Other booking site (gone)' },
     ]);
   });
 

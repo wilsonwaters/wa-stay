@@ -13,7 +13,7 @@ describe('ProviderStep', () => {
       route: '/site-sniper/new',
       api: api({}, [PARKSTAY_MANIFEST, ALERT_ONLY_MANIFEST, FAKE_MANIFEST]),
     });
-    const group = await screen.findByRole('radiogroup', { name: 'Which provider' });
+    const group = await screen.findByRole('radiogroup', { name: 'Which booking site' });
     const alertStay = within(group).getByRole('radio', { name: 'Alert Stay Parks' });
     // The full stop is for screen readers only (jsdom spaces it from the words)
     expect(alertStay).toHaveAccessibleDescription(

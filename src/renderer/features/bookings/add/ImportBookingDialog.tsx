@@ -87,13 +87,13 @@ function ImportForm({ onClose, bookings, onImported, importBooking }: ImportForm
     >
       <ProviderPicker
         capability="bookingImport"
-        label="Provider"
-        hint="Only providers that can look a booking up are listed."
+        label="Booking site"
+        hint="Only booking sites that can look a booking up are listed."
         value={providerId}
         onChange={choose}
-        emptyMessage="No provider can import bookings yet"
+        emptyMessage="No booking site can import bookings yet"
       />
-      {providerMissing && <Notice tone="warning">Choose a provider to continue.</Notice>}
+      {providerMissing && <Notice tone="warning">Choose a booking site to continue.</Notice>}
       {manifest && (
         <Field
           label="Booking reference"
@@ -152,7 +152,7 @@ export function ImportBookingDialog({
       open={open}
       onClose={onClose}
       title="Import booking"
-      description="WA Stay looks the booking up on the provider's website and adds it here."
+      description="WA Stay looks the booking up on the booking site and adds it here."
       closeOnOverlayClick={false}
       footer={
         <>

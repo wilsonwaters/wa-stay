@@ -37,7 +37,7 @@ import { releaseSummaryFor, useReleaseRefusal } from './useReleaseRefusal';
 import { useSnipeHolds } from './useSnipeHolds';
 
 const STEPS: (FlowStep & { id: SnipeStepId })[] = [
-  { id: 'provider', title: 'Provider' },
+  { id: 'provider', title: 'Booking site' },
   { id: 'location', title: 'Location' },
   { id: 'stay', title: 'Your stay' },
   { id: 'release', title: 'Release and timing' },
@@ -209,7 +209,7 @@ export function SnipeFlow({ manifests, initialValues, initialStep, notices = [] 
         >
           {step === 'provider' && <ProviderStep onProviderChange={changeProvider} />}
           {step !== 'provider' && !manifest && (
-            <Notice tone="warning">Choose a provider first.</Notice>
+            <Notice tone="warning">Choose a booking site first.</Notice>
           )}
           {step === 'location' && manifest && (
             <LocationStep manifest={manifest} place={detail.data} placeLoading={detail.isLoading} />

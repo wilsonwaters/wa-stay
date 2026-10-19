@@ -7,6 +7,7 @@
  * renderer's components, the features that show units and Settings (whose notification copy
  * names what a watch finds), and fails on "site" or "sites" in any case, except:
  * - "Site Sniper", the feature's name, and `site-sniper`, its route;
+ * - "booking site", what copy calls a provider (architecture-notes §12.39), never a unit;
  * - a line marked `unit-noun-ok` with a reason (`// unit-noun-ok: …`).
  *
  * Test files are skipped: their mocks may quote old messages. Provider folders are outside it:
@@ -19,8 +20,8 @@ import { stripComments } from '../../utils/strip-comments';
 
 const ROOT = path.resolve(__dirname, '../../..');
 const SITE = /\bsites?\b/i;
-/** The feature's name and its route, which are not unit nouns. */
-const ALLOWED = [/Site Sniper/g, /site-sniper/g];
+/** The feature's name, its route and what copy calls a provider, which are not unit nouns. */
+const ALLOWED = [/Site Sniper/g, /site-sniper/g, /\bbooking sites?\b/gi];
 /** The marker, followed by its reason. */
 const MARKER = /unit-noun-ok\b[\s:(—–-]+\S/;
 
@@ -60,7 +61,7 @@ function isCopy(node: ts.Node): boolean {
   );
 }
 
-/** Whether a line of copy says "site" once the feature's name and route are left out. */
+/** Whether a line of copy says "site" once the feature's name, route and booking sites are left out. */
 function namesSite(text: string): boolean {
   return SITE.test(ALLOWED.reduce((rest, allowed) => rest.replace(allowed, ''), text));
 }
@@ -134,7 +135,7 @@ describe('unit noun guard', () => {
     ]);
   });
 
-  it('accepts a marked line, the feature’s name and route, comments and identifiers', () => {
+  it('accepts a marked line, the feature’s name and route, booking sites, comments and identifiers', () => {
     const file = path.join(ROOT, 'src/main/core/x.ts');
     const content = [
       "const a = 'Book on the site'; // unit-noun-ok: the provider's website",
@@ -143,8 +144,17 @@ describe('unit noun guard', () => {
       '// Sites available at Osprey Bay',
       '/* a site */ const site = siteSnipe.matchedSiteId;',
       "const d = 'site_snipes';",
+      "const e = 'Booking site details couldn’t be loaded';",
+      'const f = <p>Only booking sites that can look a booking up are listed.</p>;',
     ].join('\n');
     expect(unmarkedSiteCopy(file, content)).toEqual([]);
+  });
+
+  it('still fails on a site beside a booking site', () => {
+    const file = path.join(ROOT, 'src/main/core/x.ts');
+    expect(unmarkedSiteCopy(file, "const a = 'A site on the booking site';")).toEqual([
+      "src/main/core/x.ts:1: const a = 'A site on the booking site';",
+    ]);
   });
 
   it('wants a reason after the marker', () => {

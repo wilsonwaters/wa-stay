@@ -23,7 +23,7 @@ export function heldMessage(
   const unit = capitalise(heldUnitNoun(snipe, manifest, units).one);
   const place = snipe.location.name || snipe.name;
   if (!snipe.holdExpiresAt) {
-    return `${unit} held at ${place}. Pay on ${manifest?.shortName ?? 'the provider'} before the hold runs out.`;
+    return `${unit} held at ${place}. Pay on ${manifest?.shortName ?? 'the booking site'} before the hold runs out.`;
   }
   const minutes = Math.max(1, Math.ceil((new Date(snipe.holdExpiresAt).getTime() - now) / 60_000));
   // A guessed expiry is "about" (R18)

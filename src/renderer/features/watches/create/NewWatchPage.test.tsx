@@ -230,7 +230,7 @@ describe('NewWatchPage', () => {
   it('says so when no provider supports watches', async () => {
     renderWithApp({ route: '/watches/new', api: api({}, [BROWSE_ONLY_MANIFEST]) });
     expect(
-      await screen.findByRole('heading', { name: 'No provider supports watches yet' })
+      await screen.findByRole('heading', { name: 'No booking site supports watches yet' })
     ).toBeInTheDocument();
   });
 });

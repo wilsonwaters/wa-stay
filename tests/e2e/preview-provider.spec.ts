@@ -132,7 +132,7 @@ test.describe('preview a provider', () => {
     if (notice) {
       await chooseAccountMenuItem(window, 'Settings');
       const row = window
-        .getByRole('list', { name: 'Provider accounts' })
+        .getByRole('list', { name: 'Booking site accounts' })
         .getByRole('listitem')
         .filter({ has: window.getByRole('heading', { level: 3, name: manifest.name }) });
       await row.getByRole('button', { name: 'Read the notice' }).click();
