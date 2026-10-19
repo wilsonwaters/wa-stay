@@ -94,7 +94,7 @@ export function WatchesPage() {
         New watch
       </Button>
       <p id="no-watch-provider" className="text-sm text-fg-muted">
-        No provider supports watches yet
+        No booking site supports watches yet
       </p>
     </div>
   );
@@ -110,14 +110,14 @@ export function WatchesPage() {
       {providers.isError && (
         <Notice
           tone="warning"
-          title="Provider details couldn't be loaded"
+          title="Booking site details couldn't be loaded"
           actions={
             <Button variant="secondary" size="sm" onClick={() => void providers.refetch()}>
               Try again
             </Button>
           }
         >
-          Your watches are below; their providers show as unknown until this works.
+          Your watches are below; their booking sites show as unknown until this works.
         </Notice>
       )}
 
@@ -170,7 +170,7 @@ export function WatchesPage() {
             <EmptyState
               size="md"
               title="No watches match these filters"
-              description="Try another provider or status."
+              description="Try another booking site or status."
               actions={
                 <Button variant="secondary" onClick={() => setFilters({ status: 'all' })}>
                   Clear filters

@@ -86,7 +86,7 @@ test('an alert snipe: the app alerts on a free site, its notification opens "Boo
   await window.getByRole('link', { name: 'New snipe' }).click();
   await expectRoute(window, '/site-sniper/new');
   const steps = window.getByRole('navigation', { name: 'New snipe steps' });
-  await expectCurrentStep(steps, 'Provider');
+  await expectCurrentStep(steps, 'Booking site');
   await expect(window.getByRole('radio', { name: 'ParkStay WA' })).toBeChecked();
   await window.getByRole('button', { name: 'Continue' }).click();
 

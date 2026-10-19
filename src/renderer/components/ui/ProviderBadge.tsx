@@ -55,7 +55,7 @@ const MONOGRAM_SIZE = {
 /**
  * Whose system a watch, snipe, booking, notification or location belongs to: a coloured
  * monogram (never a third-party logo) and the short name. Its accessible name is the
- * provider's name; an unknown provider shows its id and is named "Unknown provider".
+ * provider's name; an unknown provider shows its id and is named "Unknown booking site".
  */
 export function ProviderBadge({
   providerId,
@@ -72,8 +72,8 @@ export function ProviderBadge({
     return (
       <span
         role="img"
-        aria-label="Unknown provider"
-        title={`Unknown provider: ${providerId}`}
+        aria-label="Unknown booking site"
+        title={`Unknown booking site: ${providerId}`}
         className={cx(
           'inline-flex items-center gap-1 whitespace-nowrap rounded-md border border-dashed border-border-strong px-1.5 font-medium text-fg-secondary',
           size === 'sm' ? 'h-5 text-xs' : 'h-6 text-sm',

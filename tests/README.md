@@ -237,7 +237,7 @@ npm run test:electron -- http-transport
 
 ## Electron smoke tests (E2E)
 
-`tests/e2e/` holds the Electron smoke suite: 29 journeys in 17 specs through the **built** app
+`tests/e2e/` holds the Electron smoke suite: 31 journeys in 19 specs through the **built** app
 (main, preload and renderer together), driven by Playwright's `_electron` launcher. It
 catches what Jest cannot: startup crashes, preload or sandbox breakage, CSP violations,
 broken routing and focus, and a quit that hangs.
@@ -309,7 +309,8 @@ The `launchWaStay()` fixture starts the app with:
   journey that counts or expects a pre-selection passes its list explicitly
   (`rac-catalogue.spec.ts`, `rac-watch.spec.ts`, `rac-explore.spec.ts`,
   `rac-member-number.spec.ts` and `rac-auto-cart.spec.ts` pass `['parkstay', 'rac']`: RAC's
-  eight parks beside ParkStay's 11 campgrounds). An id that is not a built-in provider stops the app at start-up, with the reason
+  eight parks beside ParkStay's 11 campgrounds; `rottnest-notice.spec.ts` and
+  `rottnest-plan.spec.ts` pass `['rottnest']`: Stay Rottnest's nine precincts alone). An id that is not a built-in provider stops the app at start-up, with the reason
   in the main process's output.
 - **A production renderer**: `NODE_ENV=production`, no `ELECTRON_RENDERER_URL`, no Mapbox
   token, `TZ=Australia/Perth`, `LANG=en_AU.UTF-8`.

@@ -38,7 +38,7 @@ export function snipeNoun(
  * Site Sniper's pages when no provider offers it: no units to name, so it speaks of dates.
  */
 export const NO_SNIPE_PROVIDER_DESCRIPTION =
-  'When a provider that releases its dates on a schedule is added, you can create a snipe here.';
+  'When a booking site that releases its dates on a schedule is added, you can create a snipe here.';
 
 /**
  * What the units of every provider with Site Sniper are called together, for the pages that

@@ -19,8 +19,9 @@ The app keeps these secrets on disk:
 | Provider secrets (`ProviderContext.secrets`)                                           | the provider's own state (`provider_state`), under `secret:<key>`                      |
 | Account details a provider asks for (a `credentials` sign-in, such as a member number) | the provider's secrets, as `account.<key>`: `secret:account.<key>` in `provider_state` |
 
-ParkStay stores no secret of its own; RAC's only one is the person's member number, an account
-detail (below). The email password is write-only over IPC: the window gets the notifier
+ParkStay and Stay Rottnest store no secret of their own (Stay Rottnest has no account, and its
+session is never signed in); RAC's only one is the person's member number, an account detail
+(below). The email password is write-only over IPC: the window gets the notifier
 settings without it (`hasPassword` instead), and saving without a password keeps the stored one
 only for the same server, port and account.
 

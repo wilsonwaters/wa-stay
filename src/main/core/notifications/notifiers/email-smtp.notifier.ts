@@ -303,7 +303,7 @@ export class SmtpEmailNotifier extends BaseNotifier {
     const logo = this.logoPath && fs.existsSync(this.logoPath) ? this.logoPath : undefined;
     const bookingUrl = httpsLink(message.bookingUrl);
     const booking: BookingAction | undefined = bookingUrl
-      ? { url: bookingUrl, label: `Book on ${provider ?? "the provider's website"}` }
+      ? { url: bookingUrl, label: `Book on ${provider ?? 'the booking site'}` }
       : undefined;
     const holdNote = message.heldInApp ? heldInAppNote(provider, booking !== undefined) : undefined;
 
@@ -350,7 +350,7 @@ export class SmtpEmailNotifier extends BaseNotifier {
 
     const details = [
       message.locationName ? ['Location', message.locationName] : null,
-      provider ? ['Provider', provider] : null,
+      provider ? ['Booking site', provider] : null,
     ]
       .filter((row): row is string[] => row !== null)
       .map(
@@ -459,7 +459,7 @@ export class SmtpEmailNotifier extends BaseNotifier {
     text += `${message.title}\n\n`;
 
     if (message.locationName) text += `Location: ${message.locationName}\n`;
-    if (provider) text += `Provider: ${provider}\n`;
+    if (provider) text += `Booking site: ${provider}\n`;
     if (message.locationName || provider) text += '\n';
 
     text += `${message.message}\n`;
@@ -524,7 +524,7 @@ function heldInAppNote(provider: string | undefined, hasBookingLink: boolean): s
     `Open ${APP_NAME} there to pay before it expires.`;
   if (!hasBookingLink) return inApp;
   return (
-    `${inApp} Away from that computer? You can book on ${provider ?? "the provider's website"} instead. ` +
+    `${inApp} Away from that computer? You can book on ${provider ?? 'the booking site'} instead. ` +
     `What ${APP_NAME} held may show as taken there until the hold ends.`
   );
 }

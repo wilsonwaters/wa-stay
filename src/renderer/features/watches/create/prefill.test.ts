@@ -34,12 +34,12 @@ describe('parseWatchPrefill', () => {
   it('drops an unknown provider or one without watches, and the location with it', () => {
     expect(parse('provider=rac&location=9')).toEqual({
       notices: [
-        "The link's provider isn't available, so choose a provider.",
+        "The link's booking site isn't available, so choose one.",
         "The link's place couldn't be used, so choose a location.",
       ],
     });
     expect(parse('provider=browseonly').notices).toEqual([
-      "Browse Only can't be watched, so choose a provider.",
+      "Browse Only can't be watched, so choose a booking site.",
     ]);
     expect(parse('location=parkstay:123').locationId).toBeUndefined();
   });

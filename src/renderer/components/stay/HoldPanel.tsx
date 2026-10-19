@@ -82,7 +82,7 @@ export function HoldPanel({
   const toAnnounce = useRef<string | null>(null);
   const endedRef = useRef(ended);
   endedRef.current = ended;
-  const provider = manifest?.shortName ?? 'the provider';
+  const provider = manifest?.shortName ?? 'the booking site';
   const page = variant === 'page';
   // `holdRelease` may stand alone with holds off (an experiment not on, or turned off before a
   // restart): then nothing can be let go, and main would answer CAPABILITY

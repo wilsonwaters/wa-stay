@@ -196,7 +196,7 @@ describe('WatchCard', () => {
 
   it('a watch of an unknown provider keeps only Delete enabled', async () => {
     const { user } = renderCard(makeWatch({ providerId: 'rac' }), {}, false);
-    expect(within(card()).getByRole('img', { name: 'Unknown provider' })).toBeInTheDocument();
+    expect(within(card()).getByRole('img', { name: 'Unknown booking site' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Check now' })).toBeDisabled();
     await user.click(screen.getByRole('button', { name: /More actions for/ }));
     const menu = screen.getByRole('menu');

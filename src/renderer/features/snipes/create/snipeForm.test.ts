@@ -11,9 +11,9 @@ import {
   emptySnipeForm,
   snipeFormSchema,
   snipeStayFields,
-  stepFields,
   type SnipeFormValues,
 } from './snipeForm';
+import { stepFields } from './snipeSteps';
 
 const NOW = new Date('2099-12-01T02:00:00Z');
 const valid = (overrides: Partial<SnipeFormValues> = {}): SnipeFormValues => ({

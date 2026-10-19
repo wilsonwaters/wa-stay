@@ -22,7 +22,7 @@ export interface HoldNoticeProps {
  * which says why it ended (`lastError`: main writes one on a held watch only then).
  */
 export function HoldNotice({ watch, state, manifest, actions }: HoldNoticeProps) {
-  const provider = manifest?.shortName ?? 'the provider';
+  const provider = manifest?.shortName ?? 'the booking site';
   const unit = unitNameOf(watch, watch.hold?.unitId, heldNoun(watch, manifest));
   const at = watch.hold
     ? timeInZone(new Date(watch.hold.expiresAt), manifest?.timezone ?? 'Australia/Perth')

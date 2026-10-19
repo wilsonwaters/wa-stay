@@ -76,7 +76,10 @@ export function providerFilterOptions(
   for (const booking of bookings) {
     if (seen.has(booking.providerId)) continue;
     seen.add(booking.providerId);
-    options.push({ value: booking.providerId, label: `Other provider (${booking.providerId})` });
+    options.push({
+      value: booking.providerId,
+      label: `Other booking site (${booking.providerId})`,
+    });
   }
   return options;
 }

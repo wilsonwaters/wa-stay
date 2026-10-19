@@ -5,12 +5,14 @@ import type { LocationRef, Stay, StayInput } from './stay.types';
 /**
  * What a snipe does when the dates are free (architecture-notes §12.35):
  * - `hold`: places the provider's temporary hold (needs `capabilities.holds`); the person pays;
- * - `alert`: a desktop alert and email with the provider's booking page; nothing is held.
+ * - `alert`: a desktop alert and email with the provider's booking page; nothing is held;
+ * - `remind` (§12.38): an Open Day plan, in a release mode that only reminds (`remindOnly`):
+ *   the mode's reminders before the release, and nothing checked, held or reserved.
  */
-export type SnipeAction = 'alert' | 'hold';
+export type SnipeAction = 'alert' | 'hold' | 'remind';
 
 /** Every `SnipeAction`, for validation. */
-export const SNIPE_ACTIONS = ['alert', 'hold'] as const satisfies readonly SnipeAction[];
+export const SNIPE_ACTIONS = ['alert', 'hold', 'remind'] as const satisfies readonly SnipeAction[];
 
 /**
  * What an ALERTED snipe found: what was free, when, and where to book it. Stored with the
@@ -87,6 +89,11 @@ export interface SiteSnipe {
   bookedReference?: string;
   /** What an ALERTED snipe found (cleared when it is armed again). */
   alert?: SnipeAlert;
+  /**
+   * An Open Day plan's reminders sent (or passed while WA Stay was closed), by when each was
+   * due (cleared when it is armed again).
+   */
+  remindersSent?: Date[];
   notes?: string;
   createdAt: Date;
   updatedAt: Date;

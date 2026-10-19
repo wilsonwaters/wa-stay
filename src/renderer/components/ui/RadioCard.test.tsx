@@ -6,7 +6,7 @@ import { RadioCard, RadioCardGroup } from './RadioCard';
 function Providers({ onValueChange = jest.fn() }) {
   return (
     <RadioCardGroup
-      label="Provider"
+      label="Booking site"
       hint="Where to watch"
       defaultValue="parkstay"
       onValueChange={onValueChange}
@@ -26,7 +26,7 @@ function Providers({ onValueChange = jest.fn() }) {
 describe('RadioCardGroup and RadioCard', () => {
   it('names each card by its title and describes it by its description', () => {
     render(<Providers />);
-    expect(screen.getByRole('radiogroup', { name: 'Provider' })).toHaveAccessibleDescription(
+    expect(screen.getByRole('radiogroup', { name: 'Booking site' })).toHaveAccessibleDescription(
       'Where to watch'
     );
     const rac = screen.getByRole('radio', { name: 'RAC Parks & Resorts' });
@@ -48,7 +48,7 @@ describe('RadioCardGroup and RadioCard', () => {
 
   it('selects on click and skips disabled cards', async () => {
     render(
-      <RadioCardGroup label="Provider">
+      <RadioCardGroup label="Booking site">
         <RadioCard value="parkstay" title="ParkStay WA" />
         <RadioCard value="rac" title="RAC Parks & Resorts" disabled />
       </RadioCardGroup>

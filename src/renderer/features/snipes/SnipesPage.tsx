@@ -15,7 +15,7 @@ import {
 import { useNow } from '../../hooks/useNow';
 import { SnipeCard } from './list/SnipeCard';
 import { NO_SNIPE_PROVIDER_DESCRIPTION, sniperNoun } from './shared/snipeNouns';
-import { sortSnipes } from './shared/snipeState';
+import { sortSnipes } from './shared/snipeOrder';
 import { HoldAlert, useStatusAnnouncements } from './shared/useStatusAnnouncements';
 
 /**
@@ -57,7 +57,7 @@ export function SnipesPage() {
         New snipe
       </Button>
       <p id="no-snipe-provider" className="text-sm text-fg-muted">
-        No provider supports Site Sniper yet
+        No booking site supports Site Sniper yet
       </p>
     </div>
   );
@@ -66,7 +66,7 @@ export function SnipesPage() {
     <div className="mx-auto flex w-full max-w-5xl flex-col gap-8 px-6 py-8 lg:px-8">
       <PageHeader
         title="Site Sniper"
-        description={`Catch a hard-to-get ${noun.one} the moment it is released: Site Sniper alerts you or, where the provider allows it, tries to hold it for you to pay for.`}
+        description={`Catch a hard-to-get ${noun.one} the moment it is released: Site Sniper alerts you or, where the booking site allows it, tries to hold it for you to pay for.`}
         actions={newSnipe}
       />
       <ComingSoonBanner featureName="Site Sniper" />
@@ -75,14 +75,14 @@ export function SnipesPage() {
       {providers.isError && (
         <Notice
           tone="warning"
-          title="Provider details couldn't be loaded"
+          title="Booking site details couldn't be loaded"
           actions={
             <Button variant="secondary" size="sm" onClick={() => void providers.refetch()}>
               Try again
             </Button>
           }
         >
-          Your snipes are below; their providers show as unknown until this works.
+          Your snipes are below; their booking sites show as unknown until this works.
         </Notice>
       )}
 
@@ -116,10 +116,10 @@ export function SnipesPage() {
           size="md"
           icon={<Crosshair size={24} />}
           accent="sun"
-          title={canSnipe ? 'No snipes yet' : 'No provider supports Site Sniper yet'}
+          title={canSnipe ? 'No snipes yet' : 'No booking site supports Site Sniper yet'}
           description={
             canSnipe
-              ? `A snipe waits for a place’s ${noun.many} to be released, then alerts you the moment they open or, where the provider allows it, tries to hold one for you.`
+              ? `A snipe waits for a place’s ${noun.many} to be released, then alerts you the moment they open or, where the booking site allows it, tries to hold one for you.`
               : NO_SNIPE_PROVIDER_DESCRIPTION
           }
           actions={

@@ -31,7 +31,7 @@ export function runResultMessage(
   units?: PlaceUnits
 ): string {
   const place = snipe.location.name || snipe.name;
-  const provider = manifest?.shortName ?? 'the provider';
+  const provider = manifest?.shortName ?? 'the booking site';
   if (result.held) {
     const noun = heldUnitNoun(snipe, manifest, units?.units, result.matchedSiteId);
     const unit = unitLabel(result.matchedSiteId, noun, units?.names);

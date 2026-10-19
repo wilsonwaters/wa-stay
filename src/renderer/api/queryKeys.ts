@@ -25,6 +25,8 @@ export const queryKeys = {
     access: (providerId: string) => [...providers, 'access', providerId] as const,
     /** A provider's experiments: the stored choices and this run's state. */
     experiments: (providerId: string) => [...providers, 'experiments', providerId] as const,
+    /** Whether a provider's notice is accepted (`providers.notice`). */
+    notice: (providerId: string) => [...providers, 'notice', providerId] as const,
   },
   catalog: {
     all: catalog,
@@ -33,6 +35,9 @@ export const queryKeys = {
     area: (areaKey: string, providerIds: readonly string[]) =>
       [...catalog, 'area', areaKey, providerIds] as const,
     detail: (key: string) => [...catalog, 'detail', key] as const,
+    /** What a place's provider's rules say about a stay (`catalog.stayRules`). */
+    stayRules: (key: string, stay: unknown, options: unknown = {}) =>
+      [...catalog, 'stay-rules', key, stay, options] as const,
     /** One location's availability for one stay (`catalog.checkLocation`). */
     check: (key: string, stay: unknown) => [...catalog, 'check', key, stay] as const,
     /** One provider's bulk availability for one stay (`catalog.availability`), by stay key. */

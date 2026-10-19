@@ -41,7 +41,7 @@ test('Explore shows the search pill, the filters and, with no token, the list in
   await expect(search.getByRole('combobox', { name: 'Where' })).toBeVisible();
   await expect(search.getByRole('button', { name: 'Search' })).toBeVisible();
   const filters = window.getByRole('group', { name: 'Filters' });
-  for (const chip of ['Provider', 'Region', 'Facilities', 'Book online', 'Available only']) {
+  for (const chip of ['Booking site', 'Region', 'Facilities', 'Book online', 'Available only']) {
     await expect(filters.getByRole('button', { name: chip, exact: true })).toBeVisible();
   }
 

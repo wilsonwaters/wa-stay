@@ -47,7 +47,7 @@ export interface SnipeSummaryProps {
 
 /**
  * The snipe's stay, and its release, what it does when the dates are free ("When free") and
- * its timing, side by side. How long it keeps trying is the window it runs with: cut to the
+ * its timing, side by side (an Open Day plan only reminds: no timing). How long it keeps trying is the window it runs with: cut to the
  * release mode's limit (`maxWindowMinutes`), as main cuts an older row's.
  */
 export function SnipeSummary({ snipe, manifest, today, now, units }: SnipeSummaryProps) {
@@ -60,6 +60,8 @@ export function SnipeSummary({ snipe, manifest, today, now, units }: SnipeSummar
   const showStayType = snipe.unitKinds.length > 0 || isMixedPlace(units && placeUnitKinds(units));
   const cap = windowCapMinutes(manifest, snipe.releaseMode);
   const windowMinutes = Math.min(msToMinutes(snipe.windowDurationMs), cap ?? Infinity);
+
+  const plan = snipe.action === 'remind';
 
   return (
     <div className="grid gap-8 sm:grid-cols-2">
@@ -83,14 +85,25 @@ export function SnipeSummary({ snipe, manifest, today, now, units }: SnipeSummar
       </Group>
       <Group title="Release">
         <Item label="When">{releaseText(manifest, snipe.releaseMode, releaseAt, now)}</Item>
-        <Item label="When free">
-          {snipe.action === 'alert' ? 'Alert me' : `Hold a ${noun.one}`}
-        </Item>
-        {!continuous && <Item label="Starts early">{snipe.leadTimeSeconds} seconds before</Item>}
-        <Item label="Checks">Every {msToSeconds(snipe.pollIntervalMs)} seconds</Item>
-        {!continuous && <Item label="Keeps trying">For {windowMinutes} minutes</Item>}
-        <Item label="Most attempts">{snipe.maxAttempts > 0 ? snipe.maxAttempts : 'No limit'}</Item>
-        {manifest?.capabilities.accessGate && (
+        {plan ? (
+          // An Open Day plan checks nothing: it has no timing
+          <Item label="What it does">Reminds you before the release</Item>
+        ) : (
+          <>
+            <Item label="When free">
+              {snipe.action === 'alert' ? 'Alert me' : `Hold a ${noun.one}`}
+            </Item>
+            {!continuous && (
+              <Item label="Starts early">{snipe.leadTimeSeconds} seconds before</Item>
+            )}
+            <Item label="Checks">Every {msToSeconds(snipe.pollIntervalMs)} seconds</Item>
+            {!continuous && <Item label="Keeps trying">For {windowMinutes} minutes</Item>}
+            <Item label="Most attempts">
+              {snipe.maxAttempts > 0 ? snipe.maxAttempts : 'No limit'}
+            </Item>
+          </>
+        )}
+        {!plan && manifest?.capabilities.accessGate && (
           <Item label="Queue">
             {snipe.accessGateEnabled ? `Uses the ${manifest.shortName} queue` : 'Not used'}
           </Item>
@@ -102,9 +115,13 @@ export function SnipeSummary({ snipe, manifest, today, now, units }: SnipeSummar
 
 export default SnipeSummary;
 
-/** The snipe's record so far, under its progress: attempts, the last try, and re-arming. */
+/**
+ * The snipe's record so far, under its progress: attempts, the last try, and re-arming. An Open
+ * Day plan makes no attempts: its reminders say how far it has come.
+ */
 export function SnipeRecord({ snipe, manifest, now, units }: Omit<SnipeSummaryProps, 'today'>) {
   const noun = heldUnitNoun(snipe, manifest, units);
+  if (snipe.action === 'remind') return null;
   const finished = snipe.status === SnipeStatus.HELD || snipe.status === SnipeStatus.BOOKED;
   return (
     <dl className="flex flex-col gap-2 text-sm">

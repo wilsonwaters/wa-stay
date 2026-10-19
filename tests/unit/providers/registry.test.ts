@@ -228,6 +228,19 @@ describe('ProviderRegistry.register', () => {
           /release mode daily_rollover, scheduled uses the access gate but capability accessGate is off/,
         ],
         [
+          'notice needs no account and no access gate',
+          {
+            notice: {
+              version: 1,
+              title: 'Before WA Stay checks Fake',
+              body: 'Read this.',
+              points: [],
+              confirmLabel: 'I understand',
+            },
+          },
+          /a notice gates every request, but account optional and accessGate would ask outside it/,
+        ],
+        [
           'minRequestIntervalMs needs maxConcurrentRequests 1',
           {},
           /limits\.minRequestIntervalMs needs limits\.maxConcurrentRequests 1, not 4/,
@@ -418,6 +431,12 @@ describe('ProviderRegistry.register', () => {
             'http://queue.fake.example',
           ]),
         /access\.waitingRoomOrigins must be https origins or https:\/\/\*\.<domain> patterns/,
+      ],
+      [
+        'stayRules',
+        {},
+        (p) => ((p as { stayRules?: object }).stayRules = {}),
+        /stayRules needs stayRules\.check/,
       ],
       ['snipes', {}, (p) => delete p.release, /snipes needs availability and release/],
       [

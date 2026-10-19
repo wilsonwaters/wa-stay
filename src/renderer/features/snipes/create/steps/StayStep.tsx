@@ -3,12 +3,14 @@ import { useFormContext } from 'react-hook-form';
 import type { UnitSummary } from '../../../../../shared/types/catalog.types';
 import type { ProviderManifest } from '../../../../../shared/types/provider.types';
 import { MinStayNotice } from '../../../../components/stay/MinStayNotice';
+import { StayRulesPanel } from '../../../../components/stay/StayRulesPanel';
 import { ProviderStayFields } from '../../../../components/stay/ProviderStayFields';
 import { StayTypeChips } from '../../../../components/stay/StayTypeChips';
 import { placeUnitKinds, stayTypeOptions } from '../../../../components/stay/stayTypes';
 import { choosesUnit, UnitPicker, type UnitNoun } from '../../../../components/stay/UnitPicker';
 import { DateRangeField, GuestsField, Notice } from '../../../../components/ui';
 import { snipeStayFields, type SnipeFormValues } from '../snipeForm';
+import { useSnipeStayRules } from '../usePlanRelease';
 import { useSetSnipeField, useSetSnipeFields } from '../useSetSnipeField';
 
 /**
@@ -39,7 +41,9 @@ export interface StayStepProps {
  * preferred units: none chosen means any unit. A snipe that holds needs a stay type or a unit
  * at such a place, which the Release step asks for where "Hold it for me" is chosen; changing
  * either here checks that rule again once its message shows. Warnings say when the stay is
- * shorter than the units take (`MinStayNotice`), or the party more than they hold.
+ * shorter than the units take (`MinStayNotice`), or the party more than they hold. Where the
+ * provider publishes booking rules, they say what they make of the stay (`StayRulesPanel`,
+ * asking the provider nothing), with dates they would take as buttons that set them.
  */
 export function StayStep({ manifest, today, units, noun }: StayStepProps) {
   const { watch, formState, getFieldState, trigger } = useFormContext<SnipeFormValues>();
@@ -70,6 +74,18 @@ export function StayStep({ manifest, today, units, noun }: StayStepProps) {
     'action',
   ]);
   const holds = action === 'hold';
+  const plan = action === 'remind';
+  const rules = useSnipeStayRules(manifest, {
+    location,
+    arrival,
+    departure,
+    adults,
+    children,
+    infants,
+    stayParams,
+    unitIds,
+    unitKinds,
+  });
   // A unit or a stay type meets the hold rule: check it again once its message shows.
   const recheckHoldRule = () => {
     if (getFieldState('action').error) void trigger('action');
@@ -89,7 +105,11 @@ export function StayStep({ manifest, today, units, noun }: StayStepProps) {
           setFields(['arrival', range.arrival ?? ''], ['departure', range.departure ?? ''])
         }
         minDate={today}
-        hint={`The nights you want${holds ? ' to hold' : ''}, even if they aren't released yet.`}
+        hint={
+          plan
+            ? 'The nights you want, before they go on sale.'
+            : `The nights you want${holds ? ' to hold' : ''}, even if they aren't released yet.`
+        }
         error={errors.arrival?.message ?? errors.departure?.message}
       />
       <GuestsField
@@ -104,6 +124,15 @@ export function StayStep({ manifest, today, units, noun }: StayStepProps) {
         }
         error={errors.adults?.message}
       />
+      {rules.data && (
+        <StayRulesPanel
+          verdict={rules.data}
+          shortName={manifest.shortName}
+          onSuggest={(dates) =>
+            setFields(['arrival', dates.arrival], ['departure', dates.departure])
+          }
+        />
+      )}
       <ProviderStayFields
         fields={fields}
         values={stayParams}
@@ -132,9 +161,11 @@ export function StayStep({ manifest, today, units, noun }: StayStepProps) {
           }}
           noun={noun}
           hint={
-            holds
-              ? `Leave all unticked and Site Sniper holds the first ${noun.one} that comes free.`
-              : `Leave all unticked and Site Sniper alerts you to the first ${noun.one} that comes free.`
+            plan
+              ? `Leave all unticked for any ${noun.one}. Site Sniper only reminds you, so this is for your own plan.`
+              : holds
+                ? `Leave all unticked and Site Sniper holds the first ${noun.one} that comes free.`
+                : `Leave all unticked and Site Sniper alerts you to the first ${noun.one} that comes free.`
           }
           kinds={stayTypes.length > 0 ? unitKinds : undefined}
         />

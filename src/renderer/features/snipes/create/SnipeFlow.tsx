@@ -19,23 +19,25 @@ import { useNow } from '../../../hooks/useNow';
 import {
   emptySnipeForm,
   snipeFormSchema,
-  stepFields,
   type SnipeFieldName,
   type SnipeFormValues,
   type SnipeStepId,
 } from './snipeForm';
+import { stepFields } from './snipeSteps';
 import { issueField, suggestedName, toSnipeInput } from './snipeFormMapping';
 import { LocationStep } from './steps/LocationStep';
 import { ProviderStep } from './steps/ProviderStep';
 import { ReleaseStep } from './steps/ReleaseStep';
 import { ReviewStep } from './steps/ReviewStep';
 import { StayStep } from './steps/StayStep';
+import { remindsOnly } from './snipeAction';
+import { usePlanRelease } from './usePlanRelease';
 import { useReleasePreview } from './useReleasePreview';
 import { releaseSummaryFor, useReleaseRefusal } from './useReleaseRefusal';
 import { useSnipeHolds } from './useSnipeHolds';
 
 const STEPS: (FlowStep & { id: SnipeStepId })[] = [
-  { id: 'provider', title: 'Provider' },
+  { id: 'provider', title: 'Booking site' },
   { id: 'location', title: 'Location' },
   { id: 'stay', title: 'Your stay' },
   { id: 'release', title: 'Release and timing' },
@@ -105,6 +107,9 @@ export function SnipeFlow({ manifests, initialValues, initialStep, notices = [] 
     now,
     step === 'review' && Boolean(manifest)
   );
+  // An Open Day plan (a mode that only reminds): its Open Day from the booking rules
+  const isPlan = remindsOnly(manifest, values.releaseMode);
+  const plan = usePlanRelease(manifest, values, step === 'review');
 
   // Suggest a name from the place and dates until the person writes their own: any name but
   // the last suggestion, or none. Not `dirtyFields.name`: react-hook-form counts any value that
@@ -146,7 +151,7 @@ export function SnipeFlow({ manifests, initialValues, initialStep, notices = [] 
     setSubmitError(undefined);
     try {
       const created = await create.mutateAsync(toSnipeInput(getValues(), manifest));
-      toast.success('Snipe created');
+      toast.success(isPlan ? 'Plan created' : 'Snipe created');
       navigate(ROUTES.snipeDetail(created.id));
       return true;
     } catch (error) {
@@ -172,7 +177,14 @@ export function SnipeFlow({ manifests, initialValues, initialStep, notices = [] 
     step === 'review' ? submit() : trigger(stepFields(step, manifest));
   const linkNotices = [...notices, ...placeNotices];
 
-  const releaseSummary = releaseSummaryFor(manifest, values, refused ?? preview);
+  const releaseSummary = releaseSummaryFor(
+    manifest,
+    values,
+    refused ??
+      (isPlan
+        ? (plan.refused ?? plan.text ?? 'Working out the Open Day for these dates…')
+        : preview)
+  );
 
   return (
     <FormProvider {...form}>
@@ -192,12 +204,12 @@ export function SnipeFlow({ manifests, initialValues, initialStep, notices = [] 
           current={step}
           onStepChange={(id) => setStep(id as SnipeStepId)}
           onContinue={onContinue}
-          finalLabel="Create snipe"
+          finalLabel={isPlan ? 'Create plan' : 'Create snipe'}
           finishing={create.isPending}
         >
           {step === 'provider' && <ProviderStep onProviderChange={changeProvider} />}
           {step !== 'provider' && !manifest && (
-            <Notice tone="warning">Choose a provider first.</Notice>
+            <Notice tone="warning">Choose a booking site first.</Notice>
           )}
           {step === 'location' && manifest && (
             <LocationStep manifest={manifest} place={detail.data} placeLoading={detail.isLoading} />

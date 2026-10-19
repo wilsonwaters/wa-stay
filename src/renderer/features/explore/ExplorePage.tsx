@@ -31,11 +31,13 @@ import {
   useCatalogUpdates,
   useProviders,
   useProvidersWith,
+  type ProviderManifest,
 } from '../../api';
 import type { PlaceLinkQuery, PlaceLinkState } from '../../app/routes';
 import { parseStayTypes } from '../../app/stayParams';
 import type { CardAvailability } from '../../components/LocationCard';
 import { hasMapLocation, placesLabel } from '../../components/locationFormat';
+import { ProviderNoticeDialog } from '../../components/providers/ProviderNoticeDialog';
 import { stayRangeLabel } from '../../components/nightGridModel';
 import { Button, Notice, Spinner, useAnnounce, type Guests } from '../../components/ui';
 import { cx } from '../../components/ui/cx';
@@ -86,7 +88,7 @@ export const SLOW_AVAILABILITY_MS = 10_000;
 export const AREA_SEARCH_DEBOUNCE_MS = 500;
 const ALL_PLACES: PlaceAvailability = { state: 'no-dates' };
 /** The states in which a place's units were counted for the stay. */
-const COUNTED = new Set<AvailabilityState>(['available', 'full', 'none-open']);
+const COUNTED = new Set<AvailabilityState>(['available', 'full', 'none-open', 'opens', 'refused']);
 const HEADER_HEIGHT = 64;
 
 const unique = (values: Iterable<string | undefined>) =>
@@ -297,7 +299,7 @@ export default function ExplorePage() {
   const availableOnlyUnavailable = !stay
     ? 'Add dates to filter by availability'
     : manifestsQuery.isSuccess && bulkProviders.length === 0
-      ? "Availability filtering isn't supported by these providers"
+      ? "Availability filtering isn't supported by these booking sites"
       : undefined;
   const availableOnly = params.avail && !availableOnlyUnavailable;
 
@@ -329,7 +331,13 @@ export default function ExplorePage() {
     for (const item of results) {
       const availability = placeAvailability.get(item.key) ?? ALL_PLACES;
       const shortName = manifests.get(item.providerId)?.shortName ?? item.providerId;
-      const label = availabilityLabel(availability, countedKinds(item, stayTypes), shortName);
+      const manifest = manifests.get(item.providerId);
+      const label = availabilityLabel(
+        availability,
+        countedKinds(item, stayTypes),
+        shortName,
+        manifest?.timezone
+      );
       if (!label) continue;
       pins.set(item.key, { state: availability.state, pill: label.pill });
       if (label.card === null) continue;
@@ -661,9 +669,27 @@ export default function ExplorePage() {
 
   // ---- Notices -----------------------------------------------------------------------------
   // One notice per provider that failed or is slow, never one per card.
+  /** The provider whose notice is open (§12.36): it was not asked for availability. */
+  const [noticeFor, setNoticeFor] = useState<ProviderManifest | null>(null);
   const availabilityNotices = stay
     ? bulkProviders.map((manifest) => {
         const { id, shortName } = manifest;
+        // Not asked: its notice comes first. Accepting asks again by itself.
+        if (statuses[id] === 'error' && bulk.errors[id]?.code === 'NOTICE_REQUIRED') {
+          return (
+            <Notice
+              key={id}
+              tone="info"
+              actions={
+                <Button variant="secondary" size="sm" onClick={() => setNoticeFor(manifest)}>
+                  Read {shortName}&apos;s notice
+                </Button>
+              }
+            >
+              {shortName} checks dates once you&apos;ve read and accepted its notice.
+            </Notice>
+          );
+        }
         if (statuses[id] === 'error') {
           const queue = bulk.errors[id]?.code === 'ACCESS_GATE' && manifest.capabilities.accessGate;
           return (
@@ -904,6 +930,13 @@ export default function ExplorePage() {
           </Button>
         )}
       </div>
+      {noticeFor && (
+        <ProviderNoticeDialog
+          manifest={noticeFor}
+          onAccepted={() => setNoticeFor(null)}
+          onClose={() => setNoticeFor(null)}
+        />
+      )}
     </HighlightContext.Provider>
   );
 }

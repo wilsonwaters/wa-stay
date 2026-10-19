@@ -262,3 +262,95 @@ export const RAC_AUTO_CART_MANIFEST: ProviderManifest = {
   capabilities: { ...RAC_MANIFEST.capabilities, holds: true },
   experiments: RAC_MANIFEST.experiments!.map((experiment) => ({ ...experiment, applied: true })),
 };
+
+/**
+ * Stay Rottnest as main registers it (tests/unit/renderer/mock-manifests.test.ts pins it to the
+ * real manifest): Explore's free counts and watches, nothing held or booked, its terms' limits,
+ * and its notice, which the person accepts before WA Stay checks anything there (§12.36).
+ */
+export const ROTTNEST_MANIFEST: ProviderManifest = {
+  id: 'rottnest',
+  name: 'Stay Rottnest',
+  shortName: 'Stay Rottnest',
+  description:
+    "Villas, cottages, cabins, the hostel and camping on Rottnest Island, from the Rottnest Island Authority's Stay Rottnest.",
+  website: 'https://www.stayrottnest.com',
+  integration: 'api',
+  brand: { color: '#9E3819', monogram: 'SR' }, // token-guard-ignore: provider brand data
+  locationKinds: ['cabin', 'campground', 'other'],
+  timezone: 'Australia/Perth',
+  currency: 'AUD',
+  capabilities: {
+    catalog: true,
+    catalogMode: 'full',
+    availability: true,
+    bulkAvailability: true,
+    watches: true,
+    snipes: true,
+    holds: false,
+    bookingImport: false,
+    accessGate: false,
+    account: 'none',
+  },
+  limits: {
+    minWatchIntervalMinutes: 30,
+    maxConcurrentRequests: 1,
+    minRequestIntervalMs: 60_000,
+    catalogTtlHours: 24,
+  },
+  releaseModes: [
+    {
+      id: 'open_day',
+      label: 'On its Open Day',
+      description:
+        "Stay Rottnest opens a whole month of stays at once, at 8:30 am on its Open Day. Site Sniper reminds you before then, so you're in the waiting room in time: you book on Stay Rottnest yourself.",
+      usesAccessGate: false,
+      remindOnly: true,
+      reminders: [
+        {
+          daysBefore: 1,
+          at: '18:00',
+          title: 'Open Day tomorrow',
+          body: "Stay Rottnest's waiting room opens at 6 am and bookings at 8:30 am, Perth time. Have your mobile for the passcode, your card and your plan ready.",
+        },
+        {
+          daysBefore: 0,
+          at: '06:00',
+          title: 'The waiting room is open',
+          body: "Everyone in Stay Rottnest's waiting room before 8:30 am gets a random place in the queue, so join when it suits you before then.",
+        },
+        {
+          daysBefore: 0,
+          at: '08:15',
+          title: '15 minutes to Open Day',
+          body: "Bookings open at 8:30 am. Join Stay Rottnest's waiting room now if you haven't: after 8:30 you join the back of the queue.",
+        },
+      ],
+      checklist: [
+        "Your choices in order: the room types and precincts you'd take, best first.",
+        'Dates that can move a little, in case your first choice goes.',
+        'Everyone in your party, within what the room type sleeps.',
+        'Your Stay Rottnest profile, with your details up to date.',
+        "Your own mobile, for the waiting room's passcode. Temporary or virtual numbers aren't accepted.",
+        'A Visa or Mastercard.',
+        'For a second unit in your name, a keyholder to nominate.',
+        'Only what you need: everyone else in the queue is hoping too.',
+      ],
+    },
+  ],
+  notice: {
+    version: 1,
+    title: 'Before WA Stay checks Stay Rottnest',
+    body:
+      "Stay Rottnest's booking terms (clause 4, Use of Automated Software) say bookings may not be made or assisted by automated software, including programs used for web scraping or rate shopping.\n\n" +
+      'WA Stay checks Stay Rottnest automatically, so a booking you make after one of its checks or alerts could count as assisted.',
+    points: [
+      'If the Rottnest Island Authority reasonably suspects a booking was made with the help of automated software, it may cancel the booking without a refund, and block your internet connection from its website.',
+      'WA Stay only looks: it checks from your computer and your internet connection, a watch at most every 30 minutes, and it never holds, books or signs in for you. You book on Stay Rottnest yourself.',
+      'It does not check on Open Day mornings, and stops for at least 12 hours if Stay Rottnest turns a check away.',
+      "The risk is yours to take. If you'd rather not, book on Stay Rottnest's own website: WA Stay still shows its places and links to them.",
+      'You can withdraw this in Settings, under Accounts, at any time, and WA Stay stops checking at once.',
+    ],
+    confirmLabel: 'I understand, and I want WA Stay to check Stay Rottnest for me',
+  },
+};

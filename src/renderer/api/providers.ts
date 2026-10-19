@@ -1,19 +1,26 @@
 import { useCallback } from 'react';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { unwrap } from './client';
 import { useApiEvent } from './events';
 import { queryKeys } from './queryKeys';
 
-import type { ProviderExperimentState } from '../../shared/contracts';
+import type { ProviderExperimentState, ProviderNoticeStatus } from '../../shared/contracts';
 import type {
   AccessStatus,
   BooleanCapability,
   ProviderCapabilities,
   ProviderId,
   ProviderManifest,
+  ProviderNotice,
 } from '../../shared/types/provider.types';
 
-export type { ProviderCapabilities, ProviderExperimentState, ProviderManifest };
+export type {
+  ProviderCapabilities,
+  ProviderExperimentState,
+  ProviderManifest,
+  ProviderNotice,
+  ProviderNoticeStatus,
+};
 
 /** The on/off capabilities a flow can filter providers by (`account`/`catalogMode` are not). */
 export type ProviderCapability = BooleanCapability;
@@ -82,6 +89,79 @@ export function useSetExperiment() {
     }) => unwrap((api) => api.providers.setExperiment(providerId, experimentId, enabled)),
     onSuccess: (states, { providerId }) =>
       queryClient.setQueryData(queryKeys.providers.experiments(providerId), states),
+  });
+}
+
+/**
+ * Whether the person has accepted a provider's notice (`providers.notice`, §12.36): until
+ * then WA Stay checks nothing there. Ask only for a provider whose manifest has a notice
+ * (`enabled` false asks nothing); a provider without one is always `accepted`.
+ */
+export function useProviderNotice(providerId: ProviderId | undefined, enabled = true) {
+  return useQuery<ProviderNoticeStatus>({
+    queryKey: queryKeys.providers.notice(providerId ?? ''),
+    queryFn: () => unwrap((api) => api.providers.notice(providerId as ProviderId)),
+    enabled: enabled && Boolean(providerId),
+  });
+}
+
+/** The provider's availability answers: its place checks and Explore's counts. */
+function availabilityOf(providerId: ProviderId) {
+  const checkPrefix = `${providerId}:`;
+  return ({ queryKey }: { queryKey: readonly unknown[] }) =>
+    queryKey[0] === queryKeys.catalog.all[0] &&
+    ((queryKey[1] === 'availability' && queryKey[3] === providerId) ||
+      (queryKey[1] === 'check' &&
+        typeof queryKey[2] === 'string' &&
+        queryKey[2].startsWith(checkPrefix)));
+}
+
+/**
+ * The provider's availability answers go, as the notice that let them be asked has: each
+ * query on screen asks again (and is refused), and none shows an answer from before, even one
+ * not on screen now.
+ */
+function forgetProviderAvailability(queryClient: QueryClient, providerId: ProviderId): void {
+  void queryClient.resetQueries({ predicate: availabilityOf(providerId) });
+}
+
+/** The provider's availability answers are asked again (each query on screen refetches). */
+function askProviderAvailabilityAgain(queryClient: QueryClient, providerId: ProviderId): void {
+  void queryClient.invalidateQueries({ predicate: availabilityOf(providerId) });
+}
+
+/**
+ * Accepts a provider's notice at the version the person read (`providers.acceptNotice`): its
+ * status is main's answer, and its checks and counts are asked again. Rejects with
+ * `VALIDATION` when the notice changed meanwhile.
+ */
+export function useAcceptNotice() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ providerId, version }: { providerId: ProviderId; version: number }) =>
+      unwrap((api) => api.providers.acceptNotice(providerId, version)),
+    onSuccess: (status, { providerId }) => {
+      queryClient.setQueryData(queryKeys.providers.notice(providerId), status);
+      askProviderAvailabilityAgain(queryClient, providerId);
+    },
+  });
+}
+
+/**
+ * Withdraws the person's acceptance (`providers.withdrawNotice`): WA Stay stops checking the
+ * provider at once. Its status is main's answer; its availability answers are dropped (main
+ * drops its own too), and its watches are read again.
+ */
+export function useWithdrawNotice() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (providerId: ProviderId) =>
+      unwrap((api) => api.providers.withdrawNotice(providerId)),
+    onSuccess: (status, providerId) => {
+      queryClient.setQueryData(queryKeys.providers.notice(providerId), status);
+      forgetProviderAvailability(queryClient, providerId);
+      void queryClient.invalidateQueries({ queryKey: queryKeys.watches.all });
+    },
   });
 }
 

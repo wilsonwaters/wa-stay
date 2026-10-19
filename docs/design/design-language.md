@@ -394,6 +394,7 @@ One hand-drawn gesture, used sparingly, is what makes the app feel WA without be
 - **Errors say what happened and what to do next:** "ParkStay didn't respond. Try again in a minute." Never blame the user.
 - **Never claim what the app can't guarantee** (ui-review #9): "Checks every 5 minutes", not "never miss a site"; "Stored encrypted on this computer", not "never leaves your device".
 - "ParkStay" appears only when naming the provider. The app is "WA Stay".
+- **A provider is a "booking site"** in copy: "Booking site" (the filter and the create flows' first step), "Which booking site", "Unknown booking site", "where the booking site allows it". "Provider" is the code's word, never the person's. Prefer the provider's short name where it is known ("Book on RAC"), and no noun at all where the sentence needs none ("the booking page"). "Booking site" is never a unit: a campsite is still a site.
 
 ## Do and don't
 

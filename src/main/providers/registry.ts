@@ -84,14 +84,20 @@ export interface ConsistencyRule {
 
 const fn = (value: unknown): boolean => typeof value === 'function';
 const hasCheck = (p: AccommodationProvider): boolean => fn(p.availability?.check);
+/** Every release mode only reminds (§12.38): its snipes are plans, which never check. */
+const onlyReminds = (m: Readonly<ProviderManifest>): boolean =>
+  Boolean(m.releaseModes?.length) && m.releaseModes!.every((mode) => mode.remindOnly === true);
 
 /** The manifest-flag rules on the manifest as it is. */
 const FLAG_RULES: readonly ManifestRule[] = [
   {
-    // Holds are optional: a snipe without them alerts (§12.35, amends §12.30)
+    // Holds are optional: a snipe without them alerts (§12.35, amends §12.30); a provider whose
+    // every release mode only reminds checks nothing for its snipes (§12.38)
     rule: 'snipes needs availability',
-    violation: ({ capabilities: c }) =>
-      c.snipes && !c.availability ? 'capability snipes needs capability availability' : undefined,
+    violation: (m) =>
+      m.capabilities.snipes && !m.capabilities.availability && !onlyReminds(m)
+        ? 'capability snipes needs capability availability'
+        : undefined,
   },
   {
     rule: 'snipes needs release modes',
@@ -106,6 +112,21 @@ const FLAG_RULES: readonly ManifestRule[] = [
       const gated = (m.releaseModes ?? []).filter((mode) => mode.usesAccessGate);
       return gated.length && !m.capabilities.accessGate
         ? `release mode ${gated.map((mode) => mode.id).join(', ')} uses the access gate but capability accessGate is off`
+        : undefined;
+    },
+  },
+  {
+    rule: 'notice needs no account and no access gate',
+    // The notice gates availability, watches and snipes (§12.36); an account's signed-in check
+    // and a queue would ask the provider outside it.
+    violation: ({ notice, capabilities: c }) => {
+      if (!notice) return undefined;
+      const outside = [
+        c.account !== 'none' ? `account ${c.account}` : '',
+        c.accessGate ? 'accessGate' : '',
+      ].filter(Boolean);
+      return outside.length
+        ? `a notice gates every request, but ${outside.join(' and ')} would ask outside it`
         : undefined;
     },
   },
@@ -264,9 +285,15 @@ export const CONSISTENCY_RULES: readonly ConsistencyRule[] = [
         : undefined,
   },
   {
+    rule: 'stayRules',
+    violation: (p) =>
+      p.stayRules && !fn(p.stayRules.check) ? 'stayRules needs stayRules.check' : undefined,
+  },
+  {
     rule: 'snipes',
     violation: (p) =>
-      p.manifest.capabilities.snipes && !(hasCheck(p) && fn(p.release?.computeReleaseAt))
+      p.manifest.capabilities.snipes &&
+      !((hasCheck(p) || onlyReminds(p.manifest)) && fn(p.release?.computeReleaseAt))
         ? 'capability snipes needs availability and release'
         : undefined,
   },

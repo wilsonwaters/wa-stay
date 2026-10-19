@@ -57,6 +57,7 @@ import { compareDates, isCalendarDate, todayIn } from '@shared/utils/calendar-da
 import { cleanUnitKinds, isUnitKind } from '@shared/utils/unit-kinds';
 import { DEFAULT_SNIPE_POLL_INTERVAL_MS, DEFAULT_SNIPE_WINDOW_MS } from '@shared/constants';
 import type { SiteSniperRepository } from '../../database/repositories';
+import { noticeRequiredMessage } from '../../providers/notices';
 import type { ProviderRegistry, ProviderWith } from '../../providers/registry';
 import {
   AccessGateError,
@@ -70,7 +71,13 @@ import type { AccessGate, HoldsModule } from '../../providers/sdk/provider';
 import { AppError } from '../../utils/app-error';
 import { logger } from '../../utils/logger';
 import type { AccountGate } from '../accounts/ports';
+import {
+  reminderSteps,
+  REMINDER_LATE_MS,
+  type ReminderStep,
+} from '@shared/utils/release-reminders';
 import { firstBookingLink } from '../booking-link';
+import { checkStayRules, STAY_RULE_ISSUES } from '../stay-rules';
 import type { NightGuard } from '../holds/night-guard';
 import type { NotificationService } from '../notifications/notification.service';
 import { resolveStayParams } from '../stay-params';
@@ -93,6 +100,7 @@ export const TERMINAL_SNIPE_STATUSES: ReadonlySet<SnipeStatus> = new Set([
   SnipeStatus.HELD,
   SnipeStatus.BOOKED,
   SnipeStatus.ALERTED,
+  SnipeStatus.REMINDED,
   SnipeStatus.FAILED,
   SnipeStatus.EXPIRED,
   SnipeStatus.DISABLED,
@@ -133,7 +141,10 @@ export interface SnipePlan {
   timeZone: string;
 }
 
-export type SnipeNotifications = Pick<NotificationService, 'notifySnipeHeld' | 'notifySnipeAlert'>;
+export type SnipeNotifications = Pick<
+  NotificationService,
+  'notifySnipeHeld' | 'notifySnipeAlert' | 'notifySnipeReminders'
+>;
 
 export interface SnipeServiceDeps {
   snipes: SiteSniperRepository;
@@ -150,6 +161,12 @@ export interface SnipeServiceDeps {
    * it alerts, and a new one is an alert snipe (default: never).
    */
   holdsTurningOff?: (providerId: string) => boolean;
+  /**
+   * Throws `NOTICE_REQUIRED` while the provider's notice is not accepted (`ProviderNotices`,
+   * §12.36): a snipe is then neither created nor armed, uses no queue, and a poll ends it
+   * FAILED having asked nothing (default: never throws).
+   */
+  assertNotice?: (providerId: string) => void;
   clock?: () => Date;
 }
 
@@ -169,6 +186,16 @@ function maxWindowMs(provider: SnipeProvider, mode: string): number | undefined 
 }
 
 /** `windowMs` within the release mode's limit. */
+/** The provider's release mode `mode`, as its manifest declares it. */
+function modeOf(provider: Pick<SnipeProvider, 'manifest'>, mode: string) {
+  return provider.manifest.releaseModes?.find((m) => m.id === mode);
+}
+
+/** Whether `mode` only reminds (§12.38): its snipes are Open Day plans. */
+export function remindsOnly(provider: Pick<SnipeProvider, 'manifest'>, mode: string): boolean {
+  return modeOf(provider, mode)?.remindOnly === true;
+}
+
 function clampWindow(provider: SnipeProvider, mode: string, windowMs: number): number {
   const max = maxWindowMs(provider, mode);
   return max === undefined ? windowMs : Math.min(windowMs, max);
@@ -202,6 +229,7 @@ export class SiteSniperService {
   private readonly events?: EventSink;
   private readonly accounts?: AccountGate;
   private readonly holdsTurningOff: (providerId: string) => boolean;
+  private readonly assertNotice: (providerId: string) => void;
   private readonly clock: () => Date;
 
   constructor(deps: SnipeServiceDeps) {
@@ -212,6 +240,7 @@ export class SiteSniperService {
     this.events = deps.events;
     this.accounts = deps.accounts;
     this.holdsTurningOff = deps.holdsTurningOff ?? (() => false);
+    this.assertNotice = deps.assertNotice ?? (() => undefined);
     this.clock = deps.clock ?? (() => new Date());
   }
 
@@ -219,13 +248,17 @@ export class SiteSniperService {
    * Creates a snipe. Throws `CAPABILITY` for a provider without snipes and `VALIDATION`
    * (with the field) for a release mode the provider does not support, bad dates, bad stay
    * fields, a release time the provider cannot work out (a scheduled release needs one,
-   * before check-in), or `hold` on a provider without holds. The action defaults to `hold`
-   * when the provider has holds, else `alert`; the window is clamped to the mode's limit.
+   * before check-in), or `hold` on a provider without holds, and `NOTICE_REQUIRED` while the
+   * provider's notice is not accepted. The action defaults to `hold` when the provider has
+   * holds, else `alert`; the window is clamped to the mode's limit.
    */
   async create(userId: number, input: SiteSnipeInput): Promise<SiteSnipe> {
     const provider = this.providers.require(input.providerId, 'snipes');
-    const action = input.action ?? (this.holdsOf(provider) ? 'hold' : 'alert');
-    this.assertAction(provider, action);
+    const reminds = remindsOnly(provider, input.releaseMode);
+    const action = input.action ?? (reminds ? 'remind' : this.holdsOf(provider) ? 'hold' : 'alert');
+    this.assertAction(provider, action, input.releaseMode);
+    // A plan sends the provider nothing, so it needs no notice (§12.36)
+    if (action !== 'remind') this.assertNotice(input.providerId);
     const unitKinds = cleanUnitKinds(input.unitKinds);
     const prepared = {
       action,
@@ -286,6 +319,14 @@ export class SiteSniperService {
         signIn = await this.signInNeeded(provider);
       }
     }
+    if (updates.action !== undefined || updates.releaseMode !== undefined) {
+      const provider = this.providers.require(snipe.providerId, 'snipes');
+      this.assertAction(
+        provider,
+        updates.action ?? snipe.action,
+        updates.releaseMode ?? snipe.releaseMode
+      );
+    }
     const affectsPlan =
       updates.releaseMode !== undefined ||
       updates.location !== undefined ||
@@ -339,7 +380,8 @@ export class SiteSniperService {
 
   /**
    * Arms a snipe again. A HELD or BOOKED snipe is refused: it would hold the same nights a
-   * second time. An ALERTED one may be, as it holds nothing: its alert is cleared.
+   * second time. An ALERTED one may be, as it holds nothing: its alert is cleared. So is one
+   * whose provider's notice is not accepted (`NOTICE_REQUIRED`).
    */
   async activate(id: number): Promise<void> {
     const snipe = this.requireSnipe(id);
@@ -354,6 +396,14 @@ export class SiteSniperService {
     // A hold snipe on a provider whose holds need an account: AUTH_REQUIRED, and nothing is
     // armed. An alert never waits for a sign-in.
     const provider = this.providers.tryGet(snipe.providerId);
+    if (provider && snipe.action !== 'remind') this.assertNotice(snipe.providerId);
+    // A plan whose release has passed has nothing left to remind
+    if (snipe.action === 'remind' && snipe.releaseAt && snipe.releaseAt <= this.clock()) {
+      throw new AppError(
+        'VALIDATION',
+        'This release has passed: there is nothing to remind you of'
+      );
+    }
     if (snipe.action === 'hold' && provider && needsAccountForHolds(provider) && this.accounts) {
       await this.accounts.ensureForHolds(snipe.providerId);
       // Signed in now: the sign-in hint no longer applies
@@ -406,7 +456,7 @@ export class SiteSniperService {
     this.repo.setResult(
       id,
       SnipeResult.ERROR,
-      `UNKNOWN_PROVIDER: Unknown provider "${providerId}"`
+      `UNKNOWN_PROVIDER: Unknown booking site "${providerId}"`
     );
     this.changed(id);
   }
@@ -415,6 +465,80 @@ export class SiteSniperService {
   recordGateFailure(id: number, message: string): void {
     this.repo.setResult(id, SnipeResult.QUEUE_FULL, message);
     this.changed(id);
+  }
+
+  /**
+   * An Open Day plan's reminders for its release (`ReleaseModeDescriptor.reminders`, in the
+   * provider's time zone), in order; none for a snipe that is not a plan, has no release
+   * instant, or whose provider is not registered.
+   */
+  reminderStepsOf(snipe: SiteSnipe): ReminderStep[] {
+    if (snipe.action !== 'remind' || !snipe.releaseAt) return [];
+    const provider = this.providers.tryGet(snipe.providerId);
+    const reminders = provider && modeOf(provider, snipe.releaseMode)?.reminders;
+    if (!provider || !reminders) return [];
+    return reminderSteps(snipe.releaseAt, reminders, provider.manifest.timezone);
+  }
+
+  /**
+   * When the plan's next reminder is due: the first not sent yet. One already due (WA Stay was
+   * closed at its time) is due now while the release is less than `REMINDER_LATE_MS` past;
+   * undefined when none is left.
+   */
+  nextReminderAt(snipe: SiteSnipe, now: Date = this.clock()): Date | undefined {
+    const sent = new Set((snipe.remindersSent ?? []).map((at) => at.getTime()));
+    const left = this.reminderStepsOf(snipe).filter((step) => !sent.has(step.at.getTime()));
+    if (!left.length || !snipe.releaseAt) return undefined;
+    if (now.getTime() >= snipe.releaseAt.getTime() + REMINDER_LATE_MS) return undefined;
+    return left[0].at;
+  }
+
+  /**
+   * Sends the plans' reminders that are due at `now`, and records them. Of the reminders a
+   * plan missed (WA Stay was closed), only the latest is sent, and only while its release is
+   * less than `REMINDER_LATE_MS` past; the earlier ones are recorded as passed. Reminders of
+   * one provider with the same title go as one notification. A plan with nothing left is
+   * REMINDED and inactive. Never checks, holds or reserves anything.
+   */
+  async sendReminders(ids: readonly number[], now: Date = this.clock()): Promise<void> {
+    const out: { snipe: SiteSnipe; step: ReminderStep; bookingUrl?: string }[] = [];
+    for (const id of ids) {
+      const snipe = this.repo.findById(id);
+      if (!snipe || snipe.action !== 'remind' || !snipe.isActive || !snipe.releaseAt) continue;
+      if (TERMINAL_SNIPE_STATUSES.has(snipe.status)) continue;
+      const steps = this.reminderStepsOf(snipe);
+      const sent = [...(snipe.remindersSent ?? [])];
+      const known = new Set(sent.map((at) => at.getTime()));
+      const due = steps.filter((step) => !known.has(step.at.getTime()) && step.at <= now);
+      const late = now.getTime() >= snipe.releaseAt.getTime() + REMINDER_LATE_MS;
+      const latest = due[due.length - 1];
+      if (latest && !late) {
+        const provider = this.providers.tryGet(snipe.providerId);
+        const stay = toStayQuery(snipe.stay, snipe.stayParams);
+        const link = provider?.links.booking(snipe.location.externalId, stay) ?? undefined;
+        out.push({ snipe, step: latest, ...(link ? { bookingUrl: link } : {}) });
+      }
+      sent.push(...due.map((step) => step.at));
+      const next = steps.find((step) => !sent.some((at) => at.getTime() === step.at.getTime()));
+      if (next && !late) this.repo.recordReminders(id, sent, now, next.at);
+      else this.repo.markReminded(id, sent, now);
+      this.changed(id);
+    }
+    // One notification per provider and reminder: two plans for one Open Day get one
+    const groups = new Map<string, typeof out>();
+    for (const item of out) {
+      const key = `${item.snipe.providerId}|${item.step.title}`;
+      groups.set(key, [...(groups.get(key) ?? []), item]);
+    }
+    for (const group of groups.values()) {
+      try {
+        await this.notifications.notifySnipeReminders(group);
+      } catch (error) {
+        log.error(
+          `Plan reminder could not be sent: ${error instanceof Error ? error.name : 'error'}`
+        );
+      }
+    }
   }
 
   /**
@@ -431,15 +555,23 @@ export class SiteSniperService {
       ? snipes.release.pollFloorMs.continuous
       : snipes.release.pollFloorMs.window;
     const releaseAt = continuous ? undefined : snipe.releaseAt;
-    const windowMs = clampWindow(snipes, snipe.releaseMode, snipe.windowDurationMs);
+    // A plan's window: its reminders, up to a short while after the release (late ones)
+    const windowMs =
+      snipe.action === 'remind'
+        ? REMINDER_LATE_MS
+        : clampWindow(snipes, snipe.releaseMode, snipe.windowDurationMs);
     return {
       provider: snipes,
       releaseAt,
       warmupAt: releaseAt && new Date(releaseAt.getTime() - snipe.leadTimeSeconds * 1000),
       windowEnd: releaseAt && new Date(releaseAt.getTime() + windowMs),
-      gate: this.usesGate(snipes, snipe.releaseMode, snipe.accessGateEnabled)
-        ? snipes.access
-        : undefined,
+      // No queue for a provider whose notice is not accepted: its poll ends the snipe instead
+      gate:
+        snipe.action !== 'remind' &&
+        this.usesGate(snipes, snipe.releaseMode, snipe.accessGateEnabled) &&
+        this.noticeAccepted(snipe.providerId)
+          ? snipes.access
+          : undefined,
       pollIntervalMs: Math.max(snipe.pollIntervalMs, floor),
       timeZone: provider.manifest.timezone,
     };
@@ -459,7 +591,10 @@ export class SiteSniperService {
    * still carry the old midnight instant). Keeps the stored one when the provider cannot answer.
    */
   async refreshReleaseAt(snipe: SiteSnipe, signal?: AbortSignal): Promise<Date | undefined> {
-    if (snipe.releaseMode !== SnipeReleaseMode.DAILY_ROLLOVER) return snipe.releaseAt;
+    // A daily rollover's instant moves each day; a plan's when its Open Day moves (§12.38)
+    if (snipe.releaseMode !== SnipeReleaseMode.DAILY_ROLLOVER && snipe.action !== 'remind') {
+      return snipe.releaseAt;
+    }
     const provider = this.providers.tryGet(snipe.providerId) as SnipeProvider | undefined;
     if (!provider?.release) return snipe.releaseAt;
     try {
@@ -520,6 +655,12 @@ export class SiteSniperService {
     if (!snipe.isActive || TERMINAL_SNIPE_STATUSES.has(snipe.status)) {
       return outcome('done', SnipeResult.EXPIRED, { error: 'Snipe is not active' });
     }
+    // A plan reminds; it never checks, holds or reserves a night
+    if (snipe.action === 'remind') {
+      return outcome('done', SnipeResult.PENDING, {
+        error: 'An Open Day plan only reminds you: it never checks',
+      });
+    }
     if (!manual && snipe.status !== SnipeStatus.SNIPING) {
       return outcome('done', SnipeResult.PENDING, { error: 'Snipe is not sniping' });
     }
@@ -534,6 +675,16 @@ export class SiteSniperService {
     }
     const { provider } = plan;
     const nextCheck = new Date(checkedAt.getTime() + plan.pollIntervalMs);
+
+    // The person has not accepted the provider's notice (or withdrew it): nothing is asked, and
+    // the snipe ends, to be armed again once it is accepted
+    if (!this.noticeAccepted(snipe.providerId)) {
+      const error = noticeRequiredMessage(provider.manifest);
+      log.info(`Snipe ${snipeId}: ended, the notice of ${snipe.providerId} is not accepted`);
+      this.repo.finish(snipeId, SnipeStatus.FAILED, SnipeResult.ERROR, error);
+      this.changed(snipeId);
+      return outcome('done', SnipeResult.ERROR, { error });
+    }
 
     try {
       if (this.repo.hasReachedMaxAttempts(snipeId)) {
@@ -917,13 +1068,32 @@ export class SiteSniperService {
   }
 
   /** `VALIDATION` on `action` for `hold` on a provider that places no holds. */
-  private assertAction(provider: SnipeProvider, action: SnipeAction): void {
+  private assertAction(provider: SnipeProvider, action: SnipeAction, mode?: string): void {
+    // A reminder-only mode's snipes are plans, and plans are only made in those modes
+    if (mode !== undefined && remindsOnly(provider, mode) !== (action === 'remind')) {
+      throw new AppError(
+        'VALIDATION',
+        action === 'remind'
+          ? 'Only a release you go to yourself takes a plan of reminders'
+          : `${provider.manifest.shortName} releases these dates on a day you go to yourself, so Site Sniper can only remind you`,
+        { issues: ['action'] }
+      );
+    }
     if (action === 'hold' && !this.holdsOf(provider)) {
       throw new AppError(
         'VALIDATION',
         `${provider.manifest.shortName} can't hold automatically, so choose an alert`,
         { issues: ['action'] }
       );
+    }
+  }
+
+  private noticeAccepted(providerId: string): boolean {
+    try {
+      this.assertNotice(providerId);
+      return true;
+    } catch {
+      return false;
     }
   }
 
@@ -1002,20 +1172,35 @@ export class SiteSniperService {
       input.windowDurationMs ?? DEFAULT_SNIPE_WINDOW_MS
     );
 
+    const stay = toStayQuery(
+      {
+        ...input.stay,
+        children: input.stay.children ?? 0,
+        infants: input.stay.infants ?? 0,
+        concessions: input.stay.concessions ?? 0,
+      },
+      stayParams
+    );
+    // A stay the provider's published rules refuse: VALIDATION on the field to change
+    const verdict = checkStayRules(provider, {
+      externalId: input.location.externalId,
+      stay,
+      ...(input.unitIds?.length ? { unitIds: [...input.unitIds] } : {}),
+      ...(input.unitKinds?.length ? { unitKinds: [...input.unitKinds] } : {}),
+      now: this.clock(),
+    });
+    if (verdict && !verdict.ok) {
+      throw new AppError('VALIDATION', verdict.reason, {
+        issues: [STAY_RULE_ISSUES[verdict.field]],
+      });
+    }
+
     let releaseAt: Date | undefined;
     try {
       const at = await release.computeReleaseAt({
         mode: input.releaseMode,
         externalId: input.location.externalId,
-        stay: toStayQuery(
-          {
-            ...input.stay,
-            children: input.stay.children ?? 0,
-            infants: input.stay.infants ?? 0,
-            concessions: input.stay.concessions ?? 0,
-          },
-          stayParams
-        ),
+        stay,
         params: stayParams,
         requestedAt,
         unitIds: [...(input.unitIds ?? [])],
@@ -1029,6 +1214,14 @@ export class SiteSniperService {
         throw new AppError('VALIDATION', error.message, { issues: ['releaseAt'] });
       }
       throw error;
+    }
+    // A plan reminds before a release still to come
+    if (remindsOnly(provider, input.releaseMode) && (!releaseAt || releaseAt <= this.clock())) {
+      throw new AppError(
+        'VALIDATION',
+        'These dates are already on sale: book them now, or set a watch',
+        { issues: ['releaseAt'] }
+      );
     }
     // A scheduled release is the person's own time: it must come before check-in day starts
     // where the provider is (the form's rule, checked here too)

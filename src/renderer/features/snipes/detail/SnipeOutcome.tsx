@@ -3,6 +3,7 @@ import { SnipeStatus } from '../../../../shared/types/common.types';
 import type { ProviderManifest } from '../../../../shared/types/provider.types';
 import type { SiteSnipe } from '../../../../shared/types/site-sniper.types';
 import { ConnectAccountPrompt } from '../../../components/accounts/ConnectAccountPrompt';
+import { ROUTES } from '../../../app/routes';
 import { Notice } from '../../../components/ui';
 import { AlertedPanel } from '../shared/AlertedPanel';
 import { HeldPanel } from '../shared/HeldPanel';
@@ -23,13 +24,13 @@ export interface SnipeOutcomeProps {
 
 /**
  * What a snipe has come to, under its page's header: the hold to pay for (or, let go here, how it
- * ended), the alert sent (what was free and "Book on {shortName}"), the booking, or why it
- * stopped; and, while a snipe that
- * holds runs, the provider's account (a hint where it is optional, §12.32). An alert needs no
- * account.
+ * ended), the alert sent (what was free and "Book on {shortName}"), the booking, an Open Day
+ * plan's reminders sent (with "Watch for cancellations" for a stay it didn't get, §12.38), or
+ * why it stopped; and, while a snipe that holds runs, the provider's account (a hint where it is
+ * optional, §12.32). An alert needs no account.
  */
 export function SnipeOutcome({ snipe, manifest, actions, units, today, now }: SnipeOutcomeProps) {
-  const provider = manifest?.shortName ?? 'the provider';
+  const provider = manifest?.shortName ?? 'the booking site';
   const terminal = timelineSteps(snipe).find((step) => step.terminal);
   return (
     <>
@@ -53,6 +54,32 @@ export function SnipeOutcome({ snipe, manifest, actions, units, today, now }: Sn
           <Link to={bookingHref(snipe.bookedReference)} className="font-semibold underline">
             See it in Bookings
           </Link>
+        </Notice>
+      )}
+      {snipe.status === SnipeStatus.REMINDED && (
+        <Notice tone="success" title="Reminders sent">
+          The Open Day has come. Didn&apos;t get it?{' '}
+          {manifest?.capabilities.watches ? (
+            <>
+              <Link
+                to={ROUTES.watchNew({
+                  provider: snipe.providerId,
+                  location: snipe.location.externalId,
+                  arrival: snipe.stay.arrival,
+                  departure: snipe.stay.departure,
+                  adults: snipe.stay.adults,
+                  ...(snipe.stay.children ? { children: snipe.stay.children } : {}),
+                  ...(snipe.unitKinds.length ? { stay: snipe.unitKinds } : {}),
+                })}
+                className="font-semibold underline"
+              >
+                Watch for cancellations
+              </Link>
+              : a watch checks {provider} and alerts you when the dates come free.
+            </>
+          ) : (
+            <>Look again on {provider} for cancellations.</>
+          )}
         </Notice>
       )}
       {terminal && !actions.letGo && (

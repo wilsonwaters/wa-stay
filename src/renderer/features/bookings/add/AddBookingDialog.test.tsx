@@ -82,7 +82,7 @@ describe('AddBookingDialog', () => {
     const dialog = await open(user);
     expect(dialog).toHaveAttribute('aria-modal', 'true');
     expect(
-      within(dialog).getByRole('heading', { level: 2, name: /Provider$/ })
+      within(dialog).getByRole('heading', { level: 2, name: /Booking site$/ })
     ).toBeInTheDocument();
     expect(await within(dialog).findAllByRole('radio')).toHaveLength(2);
 

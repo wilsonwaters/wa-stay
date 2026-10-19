@@ -5,6 +5,7 @@
 
 import { parkstayFactory } from './parkstay';
 import { racFactory } from './rac';
+import { rottnestFactory } from './rottnest';
 import { withExperiments, type ProviderExperiments } from './experiments';
 import type { ProviderContextFactory, ProviderRegistry } from './registry';
 import type { ProviderLogger } from './sdk/context';
@@ -12,7 +13,11 @@ import { ProviderRegistrationError } from './sdk/errors';
 import type { ProviderFactory } from './sdk/provider';
 import type { ProviderId } from '@shared/types/provider.types';
 
-export const BUILT_IN_PROVIDERS: readonly ProviderFactory[] = [parkstayFactory, racFactory];
+export const BUILT_IN_PROVIDERS: readonly ProviderFactory[] = [
+  parkstayFactory,
+  racFactory,
+  rottnestFactory,
+];
 
 export interface BuiltInRegistration {
   registered: ProviderId[];

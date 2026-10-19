@@ -17,11 +17,11 @@ export interface ProviderPickerProps {
    * list every provider, for a flow that needs no capability (adding a booking by hand).
    */
   capability?: ProviderCapability;
-  /** The group's visible label, e.g. "Provider". */
+  /** The group's visible label, e.g. "Booking site". */
   label: string;
   value: string | undefined;
   onChange: (providerId: string) => void;
-  /** Shown when no provider offers the capability, e.g. "No provider supports watches yet". */
+  /** Shown when no provider offers the capability, e.g. "No booking site supports watches yet". */
   emptyMessage: string;
   hint?: string;
   /**
@@ -57,7 +57,7 @@ export function ProviderPicker({
     return (
       <div aria-busy="true" className="flex flex-col gap-3">
         <p role="status">
-          <VisuallyHidden>Loading providers</VisuallyHidden>
+          <VisuallyHidden>Loading booking sites</VisuallyHidden>
         </p>
         <Skeleton className="h-20 w-full" />
         <Skeleton className="h-20 w-full" />
@@ -68,7 +68,7 @@ export function ProviderPicker({
     return (
       <Notice
         tone="danger"
-        title="Providers couldn't be loaded"
+        title="Booking sites couldn't be loaded"
         actions={
           <Button variant="secondary" size="sm" onClick={() => void providers.refetch()}>
             Try again

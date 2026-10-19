@@ -44,11 +44,14 @@ const log = logger.child({ module: 'scheduler' });
 export const MAX_TIMER_MS = 2_000_000_000;
 /** How often a far-off release is re-armed. */
 export const REARM_INTERVAL_MS = 24 * 60 * 60 * 1000;
+/** How long a due reminder waits for other plans' reminders due with it (§12.38). */
+export const REMINDER_BATCH_MS = 1000;
 
 /** Why a snipe's window closed, by what it does when the dates are free. */
 export const WINDOW_CLOSED_MESSAGE = {
   hold: 'The snipe window closed without a hold',
   alert: 'The window closed before the dates were free',
+  remind: 'The release passed before the plan could remind you',
 } as const;
 
 interface SnipeRun {
@@ -102,6 +105,11 @@ export class SnipeRunner {
   /** Controllers of manual attempts for snipes with no run. */
   private readonly manualControllers = new Set<AbortController>();
   private readonly holdTimers = new Map<number, ReturnType<typeof setTimeout>>();
+  /** Plans whose reminders are due in one minute, by provider: sent as one notification. */
+  private readonly reminderBatches = new Map<
+    string,
+    { ids: Set<number>; sending: Promise<void> }
+  >();
   private generation = 0;
   /** Set by `stop()`: nothing is armed afterwards, not even a hold's expiry. */
   private stopped = false;
@@ -331,6 +339,7 @@ export class SnipeRunner {
   private async prepare(id: number, run: SnipeRun): Promise<void> {
     let snipe = this.live(id);
     if (!snipe) return this.finish(id, run);
+    if (snipe.action === 'remind') return this.prepareReminders(id, run, snipe);
 
     // V3 stored the release instant at save time: a daily rollover asks the provider again
     // (a v8-migrated row still carries the old midnight instant). A snipe that is over whatever
@@ -367,6 +376,59 @@ export class SnipeRunner {
       `Snipe ${id} armed (gen ${run.gen}): warm-up in ${Math.max(0, delay)} ms, release ${plan.releaseAt.toISOString()}`
     );
     this.setTimer(id, run, delay, () => this.warmUp(id, run));
+  }
+
+  /**
+   * An Open Day plan's chain (§12.38): its release asked again (a moved Open Day moves the
+   * reminders left), then one timer for its next reminder. A plan with none left (its release
+   * long past) records the rest as passed and is REMINDED. It never checks.
+   */
+  private async prepareReminders(id: number, run: SnipeRun, snipe: SiteSnipe): Promise<void> {
+    if (!this.planFor(id, run, snipe, { window: false })) return;
+    await this.snipes.refreshReleaseAt(snipe, run.controller.signal);
+    if (!this.isCurrent(id, run)) return;
+    const current = this.live(id);
+    if (!current) return this.finish(id, run);
+    const now = this.clock();
+    const next = this.snipes.nextReminderAt(current, now);
+    if (!next) {
+      await this.snipes.sendReminders([id], now);
+      return this.finish(id, run);
+    }
+    this.setStatus(current, SnipeStatus.ARMED);
+    const delay = next.getTime() - now.getTime();
+    if (delay > MAX_TIMER_MS) {
+      this.setTimer(id, run, REARM_INTERVAL_MS, () => this.arm(id));
+      return;
+    }
+    log.info(`Plan ${id} armed (gen ${run.gen}): next reminder ${next.toISOString()}`);
+    this.setTimer(id, run, delay, () => this.track(id, run, this.remind(id, run, current)));
+  }
+
+  /**
+   * A plan's reminder is due: it goes with every plan of the provider due in the same minute
+   * (`REMINDER_BATCH_MS` later, as one notification), then the plan's next one is armed.
+   */
+  private async remind(id: number, run: SnipeRun, snipe: SiteSnipe): Promise<void> {
+    const key = `${snipe.providerId}|${Math.floor(this.clock().getTime() / 60_000)}`;
+    let batch = this.reminderBatches.get(key);
+    if (!batch) {
+      const ids = new Set<number>();
+      const sending = new Promise<void>((resolve) => setTimeout(resolve, REMINDER_BATCH_MS)).then(
+        () => {
+          this.reminderBatches.delete(key);
+          return this.snipes.sendReminders([...ids], this.clock());
+        }
+      );
+      batch = { ids, sending };
+      this.reminderBatches.set(key, batch);
+    }
+    batch.ids.add(id);
+    await batch.sending;
+    if (!this.isCurrent(id, run)) return;
+    const current = this.live(id);
+    if (!current) return this.finish(id, run);
+    await this.prepareReminders(id, run, current);
   }
 
   private warmUp(id: number, run: SnipeRun): void {

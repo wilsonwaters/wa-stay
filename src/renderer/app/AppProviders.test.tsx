@@ -26,7 +26,7 @@ describe('AppProviders', () => {
     window.api = createMockApi({ providers: { list: jest.fn().mockResolvedValue(ok([])) } }).api;
     renderBadge();
     await waitFor(() => expect(window.api.providers.list).toHaveBeenCalled());
-    expect(await screen.findByRole('img', { name: 'Unknown provider' })).toHaveTextContent(
+    expect(await screen.findByRole('img', { name: 'Unknown booking site' })).toHaveTextContent(
       'parkstay'
     );
     expect(screen.queryByRole('alert')).toBeNull();
@@ -38,9 +38,9 @@ describe('AppProviders', () => {
     }).api;
     renderBadge();
     expect(await screen.findByRole('alert')).toHaveTextContent(
-      "Provider details couldn't be loaded. Registry offline"
+      "Booking site details couldn't be loaded. Registry offline"
     );
-    expect(screen.getByRole('img', { name: 'Unknown provider' })).toBeInTheDocument();
+    expect(screen.getByRole('img', { name: 'Unknown booking site' })).toBeInTheDocument();
     expect(screen.getAllByRole('alert')).toHaveLength(1);
   });
 });

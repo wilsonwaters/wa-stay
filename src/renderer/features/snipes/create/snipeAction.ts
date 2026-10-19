@@ -1,8 +1,9 @@
 /**
  * What a snipe does when the dates are free (`SiteSnipe.action`, §12.35) and how long it keeps
  * trying, as the new-snipe flow and the snipe's page decide them from the provider's manifest:
- * a hold where the provider places holds (its default there, RS9), else an alert; and a release
- * mode's limit on the window (`maxWindowMinutes`). Pure.
+ * a hold where the provider places holds (its default there, RS9), else an alert, and in a mode
+ * that only reminds (`remindOnly`, §12.38) an Open Day plan; and a release mode's limit on the
+ * window (`maxWindowMinutes`). Pure.
  */
 import type { ProviderExperimentState } from '../../../../shared/contracts/providers';
 import type { ProviderManifest } from '../../../../shared/types/provider.types';
@@ -24,8 +25,25 @@ export function holdsTurningOff(
   return !holds.some((e) => state(e.id)?.enabled);
 }
 
-/** What a new snipe does by default: hold where the provider places holds, else alert. */
-export function defaultSnipeAction(manifest: ProviderManifest | undefined): SnipeAction {
+/** The release mode `modeId` of the provider, when it declares it. */
+export function releaseModeOf(manifest: ProviderManifest | undefined, modeId: string) {
+  return manifest?.releaseModes?.find((mode) => mode.id === modeId);
+}
+
+/** Whether the mode only reminds (an Open Day plan, §12.38): it never checks, alerts or holds. */
+export function remindsOnly(manifest: ProviderManifest | undefined, modeId: string): boolean {
+  return releaseModeOf(manifest, modeId)?.remindOnly === true;
+}
+
+/**
+ * What a new snipe does by default in `modeId` (the provider's first mode unless given): a plan
+ * in a mode that only reminds, else hold where the provider places holds, else alert.
+ */
+export function defaultSnipeAction(
+  manifest: ProviderManifest | undefined,
+  modeId = manifest?.releaseModes?.[0]?.id ?? ''
+): SnipeAction {
+  if (remindsOnly(manifest, modeId)) return 'remind';
   return manifest?.capabilities.holds === true ? 'hold' : 'alert';
 }
 
@@ -37,7 +55,7 @@ export function windowCapMinutes(
   manifest: ProviderManifest | undefined,
   releaseMode: string
 ): number | undefined {
-  return manifest?.releaseModes?.find((mode) => mode.id === releaseMode)?.maxWindowMinutes;
+  return releaseModeOf(manifest, releaseMode)?.maxWindowMinutes;
 }
 
 /**

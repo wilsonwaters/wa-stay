@@ -113,7 +113,7 @@ export function BookingsPage() {
     <div className={PAGE}>
       <PageHeader
         title="Bookings"
-        description="Your trips across every provider."
+        description="Your trips across every booking site."
         actions={
           <>
             {importButton}
@@ -131,8 +131,8 @@ export function BookingsPage() {
       <ComingSoonBanner featureName="Bookings" />
 
       {providers.isError && (
-        <Notice tone="warning" title="Provider details couldn't be loaded">
-          Your bookings are below; their providers show as unknown until this works.
+        <Notice tone="warning" title="Booking site details couldn't be loaded">
+          Your bookings are below; their booking sites show as unknown until this works.
         </Notice>
       )}
 
@@ -167,7 +167,7 @@ export function BookingsPage() {
           icon={<Luggage size={24} />}
           accent="sun"
           title="No trips yet"
-          description="Add a booking you made on a provider's website to keep all your trips in one place."
+          description="Add a booking you made on a booking site to keep all your trips in one place."
           actions={
             <>
               <Button variant="secondary" onClick={() => setAdding(true)}>

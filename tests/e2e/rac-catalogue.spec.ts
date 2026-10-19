@@ -1,5 +1,5 @@
 /**
- * RAC Parks & Resorts on Explore, network-free: with ParkStay and RAC registered, the Provider
+ * RAC Parks & Resorts on Explore, network-free: with ParkStay and RAC registered, the Booking site
  * chip's "RAC Parks & Resorts" leaves RAC's eight open parks (its seed, with each card's photo
  * from RAC's parks page: the catalogue sync's one request), each card with RAC's badge. RAC
  * Margaret River Nature Park's page lists its categories (its dorms and its safari tent) from
@@ -18,7 +18,7 @@ const CATALOGUE_TIMEOUT_MS = 30_000;
 const ALL_PLACES = 19;
 const RAC_PARKS = 8;
 
-test('the Provider chip shows RAC’s eight parks, and a park’s page lists its categories', async ({
+test('the Booking site chip shows RAC’s eight parks, and a park’s page lists its categories', async ({
   launchWaStay,
 }) => {
   test.setTimeout(60_000);
@@ -29,15 +29,15 @@ test('the Provider chip shows RAC’s eight parks, and a park’s page lists its
     results.getByRole('heading', { level: 2, name: `${ALL_PLACES} places` })
   ).toBeVisible({ timeout: CATALOGUE_TIMEOUT_MS });
 
-  // Provider → RAC Parks & Resorts: its 8 parks, each with RAC's badge
+  // Booking site → RAC Parks & Resorts: its 8 parks, each with RAC's badge
   const filters = window.getByRole('group', { name: 'Filters' });
-  await filters.getByRole('button', { name: 'Provider' }).click();
-  const providers = window.getByRole('dialog', { name: 'Provider' });
+  await filters.getByRole('button', { name: 'Booking site' }).click();
+  const providers = window.getByRole('dialog', { name: 'Booking site' });
   await providers
     .getByRole('checkbox', { name: `RAC Parks & Resorts, ${RAC_PARKS} places` })
     .click();
   await providers.getByRole('button', { name: 'Done' }).click();
-  await expect(filters.getByRole('button', { name: 'Provider, 1 selected' })).toBeFocused();
+  await expect(filters.getByRole('button', { name: 'Booking site, 1 selected' })).toBeFocused();
   await expect(
     results.getByRole('heading', { level: 2, name: `${RAC_PARKS} places` })
   ).toBeVisible();
