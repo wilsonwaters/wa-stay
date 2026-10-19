@@ -3,15 +3,20 @@
  *
  * - **Rule 7, the fixtures.** Every file in `tests/fixtures/providers/rac/` and
  *   `tests/e2e/fixtures/http/rac/` is trimmed to facts: no image URL but the placeholder
- *   pattern (and the widget's 1×1 lazy-load gif), no NewBook instance key but the placeholder
- *   one (anywhere, not only in a photo's address), photo alt text only as "Photo <n>", only
- *   placeholder category descriptions (in whatever element), no description, inclusions,
- *   deposits, fees or membership copy in an availability answer, `<redacted>` for every
- *   `api_key`, `rest_api_data_id` and `online_cart_url`, and no email address, phone number,
- *   IP address, Cloudflare cookie or `cf-ray` value, or script. Each availability answer says
- *   where it was trimmed from and when (`_fixture`). The auto-cart's fixtures (`cart/`, R19)
- *   are synthetic and say so: their cart addresses are RAC's booking page with the made-up
- *   token of 32 zeros (`rest_api_data_id` is that token or `<redacted>` everywhere).
+ *   patterns (NewBook's with the zero instance key, and a park's own on RAC's host with a
+ *   made-up `0000/00/placeholder-<n>.jpg` upload) and the widget's 1×1 lazy-load gif, no
+ *   NewBook instance key but the placeholder one (anywhere, not only in a photo's address),
+ *   photo alt text only as "Photo <n>", only placeholder descriptions (in whatever element, and
+ *   in a page's description meta tags), a park's intro paragraphs (`wp-block-paragraph`) in
+ *   made-up words only ("Made-up …"), no description, inclusions, deposits, fees or membership
+ *   copy in an availability answer, `<redacted>` for every `api_key`, `rest_api_data_id` and
+ *   `online_cart_url`, and no email address, phone number, IP address, Cloudflare cookie or
+ *   `cf-ray` value, or script. Each availability answer says where it was trimmed from and
+ *   when (`_fixture`). The auto-cart's fixtures (`cart/`, R19) are synthetic and say so: their
+ *   cart addresses are RAC's booking page with the made-up token of 32 zeros
+ *   (`rest_api_data_id` is that token or `<redacted>` everywhere). So are the park pages (RAC's
+ *   parks page and a park's home page), with made-up words and photo addresses: every paragraph
+ *   in them, whatever its class, starts "Made-up".
  * - **Rule 1, the source.** Every URL in `src/main/providers/rac/` is on RAC's host; NewBook's
  *   image host is named only where photos are checked; and nothing names a cart address
  *   (`online_cart_url`, `/booking/?cart`), except that the auto-cart (`holds.ts`) reads a
@@ -28,9 +33,22 @@ const ROOT = path.join(__dirname, '../../..');
 const FIXTURE_DIRS = ['tests/fixtures/providers/rac', 'tests/e2e/fixtures/http/rac'];
 const SOURCE_DIR = 'src/main/providers/rac';
 
-/** The only photo address a fixture may hold. */
+/** The only photo address a fixture may hold: NewBook's, with the zero instance key… */
 const PLACEHOLDER_IMAGE =
   /^https:\/\/driveau\.newbook\.cloud\/crop_800_450\/instances_0{32}_\d+\.jpg$/;
+/**
+ * …or a park's own on RAC's host, as WordPress serves its uploads, made up: no upload is from
+ * month `0000/00`.
+ */
+const PLACEHOLDER_PARK_PHOTO =
+  /^https:\/\/parksandresorts\.rac\.com\.au\/(?:[a-z-]+\/)?wp-content\/uploads\/sites\/\d+\/0000\/00\/placeholder-\d+\.jpg$/;
+const isPlaceholderPhoto = (url: string): boolean =>
+  PLACEHOLDER_IMAGE.test(url) || PLACEHOLDER_PARK_PHOTO.test(url);
+/** How a park's intro paragraph in a fixture starts: its words are made up. */
+const MADE_UP_WORDS = /^Made-up\b/;
+/** The synthetic park pages, and the label each starts with. */
+const PARK_PAGES = ['parks-page.html', 'park-home.html'];
+const PARK_PAGE_LABEL = /^<!-- Synthetic: made-up words and photo addresses, not recorded\./;
 /** The widget's lazy-load placeholder: a 1×1 transparent gif, not a photo. */
 const LAZY_GIF = 'data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==';
 const PLACEHOLDER_DESCRIPTION = 'Placeholder description.';
@@ -106,10 +124,10 @@ function fixtureViolations(raw: string, { synthetic = false } = {}): string[] {
     }
     const photo =
       /\.(?:jpe?g|png|gif|webp|avif)(?:[?#]|$)/i.test(url) || (/newbook/i.test(url) && !racProxy);
-    if (photo && !PLACEHOLDER_IMAGE.test(url)) found.push(`image URL ${url}`);
+    if (photo && !isPlaceholderPhoto(url)) found.push(`image URL ${url}`);
   }
-  for (const [, src] of text.matchAll(/\b(?:data-)?src(?:set)?\s*=\s*"([^"]*)"/gi)) {
-    if (src !== LAZY_GIF && !PLACEHOLDER_IMAGE.test(src)) found.push(`image source ${src}`);
+  for (const [, src] of text.matchAll(/\b(?:data-)?(?:src(?:set)?|back)\s*=\s*"([^"]*)"/gi)) {
+    if (src !== LAZY_GIF && !isPlaceholderPhoto(src)) found.push(`image source ${src}`);
   }
   for (const [, tag, classes, description] of text.matchAll(
     /<([a-z][a-z0-9]*)\b[^>]*\bclass="([^"]*description[^"]*)"[^>]*>([\s\S]*?)<\/\1>/gi
@@ -119,6 +137,21 @@ function fixtureViolations(raw: string, { synthetic = false } = {}): string[] {
     if (plain !== PLACEHOLDER_DESCRIPTION && plain !== '') {
       found.push(`description in a <${tag}> "${plain.slice(0, 40)}"`);
     }
+  }
+  // A page's own description, in its meta tags
+  for (const [meta] of text.matchAll(/<meta\b[^>]*>/gi)) {
+    if (!/\b(?:name|property)\s*=\s*"(?:[a-z]+:)?description"/i.test(meta)) continue;
+    const content = /\bcontent\s*=\s*"([^"]*)"/i.exec(meta)?.[1] ?? '';
+    if (content !== PLACEHOLDER_DESCRIPTION && content !== '') {
+      found.push(`description in a <meta> "${content.slice(0, 40)}"`);
+    }
+  }
+  // A park's intro (RAC's own words): made-up words only
+  for (const [, paragraph] of text.matchAll(
+    /<p\b[^>]*\bclass="[^"]*\bwp-block-paragraph\b[^"]*"[^>]*>([\s\S]*?)<\/p>/gi
+  )) {
+    const plain = paragraph.replace(/<[^>]*>/g, '').trim();
+    if (!MADE_UP_WORDS.test(plain)) found.push(`an intro paragraph "${plain.slice(0, 40)}"`);
   }
   for (const [key, value] of text.matchAll(/"([a-z_]*description)"\s*:\s*"((?:[^"\\]|\\.)*)"/gi)) {
     if (value !== '' && value !== PLACEHOLDER_DESCRIPTION) found.push(`description ${key}`);
@@ -167,6 +200,19 @@ function fixtureViolations(raw: string, { synthetic = false } = {}): string[] {
     for (const [phone] of text.matchAll(pattern)) found.push(`phone number ${phone}`);
   }
   if (/<script\b/i.test(text)) found.push('a <script>');
+  return found;
+}
+
+/**
+ * What in a synthetic park page (RAC's parks page, a park's home page) is not made up, as
+ * messages ([] when nothing): every paragraph, whatever its class, holds made-up words only.
+ */
+function parkPageViolations(text: string): string[] {
+  const found: string[] = [];
+  for (const [, paragraph] of text.matchAll(/<p\b[^>]*>([\s\S]*?)<\/p>/gi)) {
+    const plain = paragraph.replace(/<[^>]*>/g, '').trim();
+    if (!MADE_UP_WORDS.test(plain)) found.push(`a paragraph "${plain.slice(0, 40)}"`);
+  }
   return found;
 }
 
@@ -220,6 +266,10 @@ describe('RAC fixtures (terms rule 7)', () => {
         'tests/e2e/fixtures/http/rac/book-now-busselton.html',
         'tests/e2e/fixtures/http/rac/book-now-margaret-river.html',
         'tests/e2e/fixtures/http/rac/availability-busselton-2026-11-06-2n.json',
+        ...PARK_PAGES.flatMap((name) => [
+          `tests/fixtures/providers/rac/${name}`,
+          `tests/e2e/fixtures/http/rac/${name}`,
+        ]),
         ...BULK_PARKS.flatMap((slug) => [
           `tests/fixtures/providers/rac/availability-${slug}-2026-11-06-2n.json`,
           `tests/e2e/fixtures/http/rac/availability-${slug}-2026-11-06-2n.json`,
@@ -230,6 +280,30 @@ describe('RAC fixtures (terms rule 7)', () => {
 
   it.each(files.map((file) => [file]))('%s is trimmed to facts', (file) => {
     expect(fixtureViolations(read(file), { synthetic: file.startsWith(CART_DIR) })).toEqual([]);
+  });
+
+  it.each(files.filter((f) => PARK_PAGES.includes(path.basename(f))).map((file) => [file]))(
+    '%s holds made-up words in every paragraph',
+    (file) => {
+      expect(parkPageViolations(read(file))).toEqual([]);
+    }
+  );
+
+  it('catches a paragraph of a park page that is not made up, whatever its class', () => {
+    for (const sample of [
+      '<p>Nestled by the bay, our park…</p>',
+      '<p class="intro">Wake up to birdsong.</p>',
+      '<p class="has-text-align-center"><a href="contact-us/">Our park</a> is close to town.</p>',
+      '<p>Made up without the hyphen.</p>',
+    ]) {
+      expect([sample, parkPageViolations(sample).length]).not.toEqual([sample, 0]);
+    }
+    expect(
+      parkPageViolations(
+        '<p>Made-up introduction.</p><p class="x">Made-up <strong>emphasis</strong>.</p>' +
+          '<div>Not a paragraph.</div>'
+      )
+    ).toEqual([]);
   });
 
   it('labels every auto-cart fixture as synthetic, and finds them (R19)', () => {
@@ -261,6 +335,10 @@ describe('RAC fixtures (terms rule 7)', () => {
       expect(read(`tests/fixtures/providers/rac/${file}`)).toMatch(
         /^<!-- Synthetic, written by hand/
       );
+    }
+    // The park pages are made up, and say so
+    for (const file of files.filter((f) => PARK_PAGES.includes(path.basename(f)))) {
+      expect([file, PARK_PAGE_LABEL.test(read(file))]).toEqual([file, true]);
     }
     const recorded = files.filter((f) => !f.startsWith(CART_DIR));
     for (const file of recorded.filter((f) => /\/availability-[^/]+\.json$/.test(f))) {
@@ -304,6 +382,17 @@ describe('RAC fixtures (terms rule 7)', () => {
       '{"membership_icon":"<redacted>"}',
       '{"deposits":[]}',
       '{"tariff_inclusions":[]}',
+      // A park's own photo on RAC's host, in an address, a data-src or a hero's data-back
+      '{"photo":"https://parksandresorts.rac.com.au/busselton/wp-content/uploads/sites/6/2022/05/a-photo.jpg"}',
+      '<img data-src="https://parksandresorts.rac.com.au/wp-content/uploads/sites/6/2022/05/x-414x229.jpg">',
+      '<div data-back="https://parksandresorts.rac.com.au/wp-content/uploads/sites/6/2022/05/a.png">',
+      // The made-up upload month on another host, or with another name
+      '<img src="https://example.com/wp-content/uploads/sites/6/0000/00/placeholder-1.jpg">',
+      '<img src="https://parksandresorts.rac.com.au/wp-content/uploads/sites/6/0000/00/beach-1.jpg">',
+      // A park's words: its intro, and a page's description meta tags
+      '<p class="has-text-align-center wp-block-paragraph">Nestled by the bay, our park…</p>',
+      '<meta name="description" content="Planning a holiday? Book online today.">',
+      '<meta property="og:description" content="Planning a holiday? Book online today.">',
       // An IP address, Cloudflare's cookies and a cf-ray value
       'REMOTE_ADDR: 203.0.113.42',
       '"client_ip":"2001:db8:85a3:0:0:8a2e:370:7334"',
@@ -319,6 +408,11 @@ describe('RAC fixtures (terms rule 7)', () => {
           '{"api_key":"<redacted>","online_cart_url":"<redacted>"} data-date-from="20270924"' +
           '<div class="booking-notification__description"><p>Arrivals on Fridays only.</p></div>' +
           '<p class="accommodation-item__description">Placeholder description.</p>' +
+          // A park's own photo, made up, on RAC's host, and its intro in made-up words
+          '<div data-back="https://parksandresorts.rac.com.au/wp-content/uploads/sites/0/0000/00/placeholder-1.jpg"></div>' +
+          '<img data-src="https://parksandresorts.rac.com.au/wp-content/uploads/sites/6/0000/00/placeholder-6.jpg" alt="">' +
+          '<p class="has-text-align-center wp-block-paragraph">Made-up introduction, with a <a href="contact-us/">link</a>.</p>' +
+          '<meta name="description" content="Placeholder description."><meta property="og:image" content="">' +
           '{"timestamp":"2026-10-16 23:35:15","newbook_version":"2025.03.12-6acd5eef54202"}' +
           `rest_api_data_id=${ZERO_TOKEN}&rand=1 ` +
           // RAC's own NewBook proxy, on RAC's host, is no photo

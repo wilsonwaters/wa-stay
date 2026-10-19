@@ -18,6 +18,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - The app and the website call the places WA Stay brings together **booking sites** rather than "providers": Explore's **Booking site** filter, "Which booking site" when you make a snipe, **Booking site** as the first step of a new watch, snipe or booking, the filters on Watches and Bookings, and the messages that named a provider. The email alert's "Provider" line is now "Booking site".
 
+### Fixed
+
+- RAC Parks & Resorts' parks now show their photos and RAC's own description. Explore's cards showed "No photo yet" for every RAC park, and a park's page had no description ("No description yet.") and, at Exmouth, Karri Valley and Monkey Mia, no photos at all. Each card now shows the park's photo from RAC's parks page, read once a day with the catalogue; a park's page shows RAC's introduction to the park under About and its photo first, then its cabins' and sites' photos. They come live from RAC's site, as RAC publishes them, and are shown only in WA Stay.
+
 ## [2.1.0] - 2026-10-18
 
 ### Added
