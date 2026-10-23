@@ -387,12 +387,48 @@ describe('splitStaysOf: reported split stays', () => {
         ],
       }),
     ],
+    [
+      'more units than parts',
+      category('bad', 'Bad', {
+        booking: 'separate',
+        units: 5,
+        parts: [
+          { arrival: '2099-12-01', departure: '2099-12-03' },
+          { arrival: '2099-12-03', departure: '2099-12-06' },
+        ],
+      }),
+    ],
+    ...(['booked', 'closed', 'not-released'] as const).map((state): [string, UnitAvailability] => {
+      const bad = category('bad', 'Bad', { booking: 'contact' });
+      return [
+        `a ${state} night marked split`,
+        { ...bad, nights: bad.nights.map((n, i) => (i === 2 ? { ...n, state } : n)) },
+      ];
+    }),
   ])('ignores a report with %s, in one debug line naming the provider and unit', (_why, bad) => {
     expect(splitStaysOf([bad], ARRIVAL, DEPARTURE, { providerId: 'test' })).toEqual([]);
     expect(mockLog.debug).toHaveBeenCalledTimes(1);
     expect(mockLog.debug.mock.calls[0][0]).toMatch(
       /^test: ignored the split stay reported on unit bad: /
     );
+  });
+
+  it('takes a split night with room, unknown or available, and as many units as parts', () => {
+    const report = category('cat:1', 'Powered Site', { booking: 'contact' });
+    const available: UnitAvailability = {
+      ...report,
+      nights: report.nights.map((n, i) => (i === 0 ? { ...n, state: 'available' as const } : n)),
+    };
+    expect(splitStaysOf([available], ARRIVAL, DEPARTURE)).toHaveLength(1);
+
+    const parts = [
+      { arrival: '2099-12-01', departure: '2099-12-03' },
+      { arrival: '2099-12-03', departure: '2099-12-06' },
+    ];
+    const asMany = category('cat:2', 'Ensuite Site', { booking: 'separate', units: 2, parts });
+    expect(splitStaysOf([asMany], ARRIVAL, DEPARTURE)).toEqual([
+      expect.objectContaining({ unitId: 'cat:2', units: 2 }),
+    ]);
   });
 
   it('logs nothing for an ignored report when quiet (the watch reads)', () => {
@@ -529,6 +565,30 @@ describe('withSplitStayLinks', () => {
     mockLog.warn.mockClear();
     withSplitStayLinks(throwing, 'p1', STAY, [...contact(), ...derived()], { quiet: true });
     expect(mockLog.warn).not.toHaveBeenCalled();
+  });
+
+  it('asks for the place’s page only when the contact page is missing or refused', () => {
+    const location = jest.fn((id: string) => `https://www.test.example/places/${id}/`);
+    const contactUrlWith = (contactLink: () => string | null) =>
+      withSplitStayLinks(provider({ contact: contactLink, location }), 'p1', STAY, contact())[0]
+        .contactUrl;
+
+    expect(contactUrlWith(() => 'https://www.test.example/contact')).toBe(
+      'https://www.test.example/contact'
+    );
+    expect(location).not.toHaveBeenCalled();
+
+    expect(contactUrlWith(() => null)).toBe('https://www.test.example/places/p1/');
+    expect(location).toHaveBeenCalledTimes(1);
+    expect(contactUrlWith(() => 'https://elsewhere.example/contact')).toBe(
+      'https://www.test.example/places/p1/'
+    );
+    expect(location).toHaveBeenCalledTimes(2);
+    // A provider with no contact page at all
+    expect(withSplitStayLinks(provider({ location }), 'p1', STAY, contact())[0].contactUrl).toBe(
+      'https://www.test.example/places/p1/'
+    );
+    expect(location).toHaveBeenCalledTimes(3);
   });
 
   it('asks for the contact page once per call, and leaves its input as it was', () => {

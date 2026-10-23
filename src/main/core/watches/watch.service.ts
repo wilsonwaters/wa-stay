@@ -26,7 +26,9 @@
  * partly found. Its alert says how to book it (the place's contact page, or each part's booking
  * page), never with a booking link to open, and a notify-only watch pauses after it as after a
  * partial alert. Auto-hold never acts on one. Every read derives `splitStays` from the stored
- * units, as `bookingLink`; they are never stored.
+ * units, as `bookingLink`; they are never stored. Turning the option on or off is an edit of
+ * what a check answers: a check in flight then keeps nothing, and turning it off forgets a
+ * split-found check.
  *
  * `execute` never throws for a failed check (only `NOT_FOUND`); after its `signal` aborts it
  * writes nothing, except a hold the provider already placed.
@@ -249,6 +251,11 @@ export class WatchService {
     if (updates.location && updates.location.externalId !== watch.location.externalId) {
       this.repo.forgetLastCheck(id);
     }
+    // Split stays turned off: a split-found check answered what the watch no longer asks, and
+    // would keep showing it (a notify-only watch is paused after its alert)
+    if (updates.allowSplitStay === false && watch.lastResult === WatchResult.SPLIT_FOUND) {
+      this.repo.forgetLastCheck(id);
+    }
     const reschedule =
       updates.location !== undefined ||
       updates.stay !== undefined ||
@@ -381,8 +388,9 @@ export class WatchService {
       );
       if (signal?.aborted) return result({ error: 'The check was stopped' });
       // Edited while the provider answered (another place, stay, units, stay types or stay
-      // fields): the answer is about what the watch was, so nothing of it is kept or sent.
-      // The edit made the watch due at once, so the next check asks about what it is now.
+      // fields, or split stays turned on or off): the answer is about what the watch was, so
+      // nothing of it is kept or sent. The edit made the watch due at once, so the next check
+      // asks about what it is now.
       if (this.editedSince(watch, manifest)) return result({ error: WATCH_EDITED_DURING_CHECK });
 
       const units = wantedUnits(watch, availability.units);
@@ -497,12 +505,17 @@ export class WatchService {
   // ---- internal helpers -------------------------------------------------------
 
   /**
-   * Whether what a check asks about (`checkedKey`) has changed since `before` was read, or the
+   * Whether what a check asks about (`checkedKey`), or whether split stays count (which decides
+   * what its answer is: a split alert, or none), has changed since `before` was read, or the
    * watch is gone.
    */
   private editedSince(before: Watch, manifest: Pick<ProviderManifest, 'stayFields'>): boolean {
     const now = this.repo.findById(before.id);
-    return !now || checkedKey(now, manifest) !== checkedKey(before, manifest);
+    return (
+      !now ||
+      checkedKey(now, manifest) !== checkedKey(before, manifest) ||
+      now.allowSplitStay !== before.allowSplitStay
+    );
   }
 
   private require(id: number): Watch {
@@ -555,12 +568,13 @@ export class WatchService {
 
   /**
    * The split stays the last check found, from its stored units, as the alert had them: only
-   * for a split-found watch whose stored nights are the stay's, with their links while the
-   * provider is registered (quietly: this runs on every read). None for any other result.
+   * for a split-found watch that still asks for them and whose stored nights are the stay's,
+   * with their links while the provider is registered (quietly: this runs on every read). None
+   * for any other result.
    */
   private splitStaysOf(watch: Watch): SplitStay[] | undefined {
     const { lastResult, lastAvailability } = watch;
-    if (lastResult !== WatchResult.SPLIT_FOUND) return undefined;
+    if (lastResult !== WatchResult.SPLIT_FOUND || !watch.allowSplitStay) return undefined;
     if (!lastAvailability || !coversStayNights(lastAvailability, watch.stay)) return undefined;
     const units = wantedUnits(watch, lastAvailability);
     const found = splitStaysOf(units, watch.stay.arrival, watch.stay.departure, {

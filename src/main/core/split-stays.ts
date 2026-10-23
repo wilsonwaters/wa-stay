@@ -118,10 +118,18 @@ function partsCoverStay(parts: unknown, arrival: string, departure: string): boo
 }
 
 /**
+ * A night free only on another unit: `split`, and room that night (`unknown`, as the SDK has
+ * it, or `available`), never a booked, closed or unreleased night with the reason.
+ */
+function isSplitNight(night: NightStatus): boolean {
+  return night.reason === 'split' && (night.state === 'unknown' || night.state === 'available');
+}
+
+/**
  * Why a unit's reported split stay is not valid for this stay, or undefined when it is: it is
  * not fully available, counts no free unit, has every night of the stay free or `split` with
  * at least one `split`, a known way to book, a count of at least 2 and parts that cover the
- * stay exactly, when it gives them.
+ * stay exactly, when it gives them, and no more units than parts when it gives both.
  */
 function reportProblem(
   unit: UnitAvailability,
@@ -137,15 +145,19 @@ function reportProblem(
   if (unit.freeCount !== undefined && unit.freeCount !== 0) return 'the unit counts free units';
   if (nights.some((night) => night === undefined)) return 'a night of the stay is missing';
   const present = nights as NightStatus[];
-  if (present.some((night) => !isFreeNight(night) && night.reason !== 'split')) {
+  if (present.some((night) => !isFreeNight(night) && !isSplitNight(night))) {
     return 'a night is neither free nor split';
   }
-  if (!present.some((night) => night.reason === 'split')) return 'no night is split';
+  if (!present.some(isSplitNight)) return 'no night is split';
   if (report.units !== undefined && !isUnitCount(report.units)) {
     return 'its count is not a whole number of at least 2';
   }
   if (report.parts !== undefined && !partsCoverStay(report.parts, arrival, departure)) {
     return 'its parts do not cover the stay';
+  }
+  // Each part is on one place, so a stay of N parts moves across N places at most
+  if (report.units !== undefined && report.parts !== undefined) {
+    if (report.units > report.parts.length) return 'its count is more than its parts';
   }
   return undefined;
 }
@@ -330,19 +342,22 @@ export function withSplitStayLinks(
       return undefined;
     }
   };
-  // Asked once per call, and only when a split stay is booked through the place
+  // Asked once per call, and only when a split stay is booked through the place; the place's
+  // page only when its contact page is missing or refused
   let contact: { url?: string } | undefined;
   const contactUrl = (): string | undefined => {
-    contact ??= {
-      url: firstBookingLink(
+    if (!contact) {
+      const own = firstBookingLink(
         manifest,
-        [
-          ask('contact', () => links.contact?.(externalId)),
-          ask('location', () => links.location(externalId)),
-        ],
+        [ask('contact', () => links.contact?.(externalId))],
         options
-      ),
-    };
+      );
+      contact = {
+        url:
+          own ??
+          firstBookingLink(manifest, [ask('location', () => links.location(externalId))], options),
+      };
+    }
     return contact.url;
   };
 

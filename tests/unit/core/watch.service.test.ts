@@ -1066,6 +1066,90 @@ describe('WatchService', () => {
       expect(h.watchRepo.findById(watch.id)?.nextCheckAt).toEqual(NOW);
     });
 
+    it('split stays turned off while a check runs: nothing kept, no alert, no pause, due again at once', async () => {
+      const watch = await h.watches.create(
+        h.userId,
+        h.watchInput({ allowSplitStay: true, notifyOnly: true })
+      );
+      h.fake.delayMs = 20;
+      const running = h.watches.execute(watch.id, { manual: true });
+      await new Promise((resolve) => setTimeout(resolve, 5));
+      await h.watches.update(watch.id, { allowSplitStay: false });
+
+      await expect(running).resolves.toMatchObject({
+        success: false,
+        found: false,
+        error: WATCH_EDITED_DURING_CHECK,
+      });
+      const stored = h.watchRepo.findById(watch.id)!;
+      expect(stored).toMatchObject({ isActive: true, allowSplitStay: false, foundCount: 0 });
+      expect(stored.lastResult).toBeUndefined();
+      expect(stored.lastAvailability).toBeUndefined();
+      expect(stored.nextCheckAt).toEqual(NOW);
+      expect(h.notifications.notifyWatchSplitFound).not.toHaveBeenCalled();
+      expect(h.watches.findDue(NOW, ['fake']).map((w) => w.id)).toEqual([watch.id]);
+    });
+
+    it('split stays turned on while a check runs: nothing kept, and due at once to answer it', async () => {
+      const watch = await h.watches.create(h.userId, h.watchInput({ notifyOnly: true }));
+      h.fake.delayMs = 20;
+      const running = h.watches.execute(watch.id, { manual: true });
+      await new Promise((resolve) => setTimeout(resolve, 5));
+      await h.watches.update(watch.id, { allowSplitStay: true });
+
+      await expect(running).resolves.toMatchObject({
+        success: false,
+        error: WATCH_EDITED_DURING_CHECK,
+      });
+      const stored = h.watchRepo.findById(watch.id)!;
+      expect(stored.lastResult).toBeUndefined();
+      expect(stored.lastAvailability).toBeUndefined();
+      expect(stored.nextCheckAt).toEqual(NOW);
+      expect(h.watches.findDue(NOW, ['fake']).map((w) => w.id)).toEqual([watch.id]);
+
+      // The next check answers what the watch asks now
+      h.fake.delayMs = 0;
+      await h.watches.execute(watch.id);
+      expect(h.watchRepo.findById(watch.id)?.lastResult).toBe(WatchResult.SPLIT_FOUND);
+      expect(h.notifications.notifyWatchSplitFound).toHaveBeenCalledTimes(1);
+    });
+
+    it('turning split stays off forgets a split-found check, also on a watch paused after its alert', async () => {
+      const watch = await h.watches.create(h.userId, h.watchInput({ allowSplitStay: true }));
+      await h.watches.execute(watch.id);
+      const paused = (await h.watches.get(watch.id))!;
+      expect(paused).toMatchObject({ isActive: false, lastResult: WatchResult.SPLIT_FOUND });
+      expect(paused.splitStays).toEqual(LINKED);
+
+      const off = await h.watches.update(watch.id, { allowSplitStay: false });
+      expect(off).toMatchObject({ isActive: false, allowSplitStay: false });
+      expect(off.lastResult).toBeUndefined();
+      expect(off.lastAvailability).toBeUndefined();
+      expect(off.splitStays).toBeUndefined();
+      expect(updates(watch.id).at(-1)?.splitStays).toBeUndefined();
+    });
+
+    it('turning split stays off keeps any other result', async () => {
+      h.fake.setAvailability('1', { ...SPLIT, u3: 'available' });
+      const watch = await h.watches.create(
+        h.userId,
+        h.watchInput({ allowSplitStay: true, notifyOnly: false })
+      );
+      await h.watches.execute(watch.id);
+      const off = await h.watches.update(watch.id, { allowSplitStay: false });
+      expect(off.lastResult).toBe(WatchResult.FOUND);
+      expect(off.bookingLink).toBeDefined();
+    });
+
+    it('a split-found row whose option is off reads no split stays', async () => {
+      const watch = await h.watches.create(h.userId, h.watchInput({ allowSplitStay: true }));
+      await h.watches.execute(watch.id);
+      h.db.prepare('UPDATE watches SET allow_split_stay = 0 WHERE id = ?').run(watch.id);
+      const read = (await h.watches.get(watch.id))!;
+      expect(read.lastResult).toBe(WatchResult.SPLIT_FOUND);
+      expect(read.splitStays).toBeUndefined();
+    });
+
     it('a check in flight when the dates change keeps nothing of a split stay and alerts on nothing', async () => {
       const watch = await h.watches.create(h.userId, h.watchInput({ allowSplitStay: true }));
       h.fake.delayMs = 20;

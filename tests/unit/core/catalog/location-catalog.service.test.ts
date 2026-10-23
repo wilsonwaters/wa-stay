@@ -3,7 +3,8 @@
  * freshness and TTLs (a future timestamp is stale), empty-result protection, single-flight,
  * automatic sync timing, the release guard and the empty-cache retries, stop, detail
  * fallbacks and sanitising, summary derivation, the key and bbox filtering of bulk
- * availability, and the 60 s cache of queue and timeout errors.
+ * availability, the 60 s cache of queue and timeout errors, and a location check's split
+ * stays (on a cached answer too).
  */
 
 import type Database from 'better-sqlite3';
@@ -1061,5 +1062,49 @@ describe('the 60 s cache of queue and timeout errors', () => {
     expect(retried.errors).toEqual([]);
     expect(retried.entries).toHaveLength(3);
     expect(callsTo(s.fake, 'search')).toBe(2);
+  });
+});
+
+describe('split stays on a location check', () => {
+  /** Place 1 is free both nights, but on u1 the first and on u2 the second. */
+  const SPLIT = {
+    '1': {
+      u1: [{ state: 'available' as const }, { state: 'booked' as const }],
+      u2: [{ state: 'booked' as const }, { state: 'available' as const }],
+    },
+  };
+
+  it('every answer carries its split stays, the cached one too, from one provider call', async () => {
+    const s = setup({}, { availability: SPLIT });
+    const first = await s.catalog.checkLocation('fake:1', STAY);
+    advance(s, 60_000 - 1);
+    const cached = await s.catalog.checkLocation('fake:1', STAY);
+
+    expect(callsTo(s.fake, 'check')).toBe(1);
+    expect(first.splitStays).toEqual([
+      expect.objectContaining({
+        booking: 'separate',
+        units: 2,
+        parts: [
+          expect.objectContaining({
+            unitId: 'u1',
+            bookingUrl: 'https://fake.example/book/1?arrival=2026-11-10&departure=2026-11-11',
+          }),
+          expect.objectContaining({
+            unitId: 'u2',
+            bookingUrl: 'https://fake.example/book/1?arrival=2026-11-11&departure=2026-11-12',
+          }),
+        ],
+      }),
+    ]);
+    expect(cached.splitStays).toEqual(first.splitStays);
+    expect(cached.units).toEqual(first.units);
+  });
+
+  it('a place with a unit free for the whole stay has none', async () => {
+    const s = setup();
+    await expect(s.catalog.checkLocation('fake:1', STAY)).resolves.toMatchObject({
+      splitStays: [],
+    });
   });
 });
