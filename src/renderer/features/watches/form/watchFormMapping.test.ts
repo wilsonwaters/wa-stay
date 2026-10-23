@@ -1,6 +1,7 @@
 import { contract } from '../../../../shared/contracts';
 import { PARKSTAY_MANIFEST, FAKE_MANIFEST } from '@tests/utils/renderer/manifests';
 import { makeWatch } from '@tests/fixtures/renderer/watches';
+import type { Watch } from '../../../../shared/types/watch.types';
 import type { WatchFormValues } from './watchFormSchema';
 import {
   emptyWatchForm,
@@ -161,6 +162,43 @@ describe('stay types', () => {
         PARKSTAY_MANIFEST
       )
     ).toEqual({});
+  });
+});
+
+describe('stays that move between units (allowSplitStay, §12.36)', () => {
+  it('starts off, and is sent on create only when ticked', () => {
+    expect(emptyWatchForm(PARKSTAY_MANIFEST).allowSplitStay).toBe(false);
+    expect(toWatchInput(form(), PARKSTAY_MANIFEST)).not.toHaveProperty('allowSplitStay');
+    const input = toWatchInput(form({ allowSplitStay: true }), PARKSTAY_MANIFEST);
+    expect(input).toMatchObject({ allowSplitStay: true });
+    expect(contract.watches.create.request.parse(input)).toEqual(input);
+  });
+
+  it('pre-fills the stored setting, and an edit of it sends only allowSplitStay, both ways', () => {
+    const off = makeWatch();
+    const { values: offValues } = fromWatch(off, PARKSTAY_MANIFEST);
+    expect(offValues.allowSplitStay).toBe(false);
+    const on = toWatchUpdate(
+      { ...offValues, allowSplitStay: true },
+      offValues,
+      off,
+      PARKSTAY_MANIFEST
+    );
+    expect(on).toEqual({ allowSplitStay: true });
+    expect(contract.watches.update.request.parse({ id: 1, updates: on }).updates).toEqual(on);
+
+    const stored = makeWatch({ allowSplitStay: true });
+    const { values } = fromWatch(stored, PARKSTAY_MANIFEST);
+    expect(values.allowSplitStay).toBe(true);
+    expect(toWatchUpdate(values, values, stored, PARKSTAY_MANIFEST)).toEqual({});
+    expect(
+      toWatchUpdate({ ...values, allowSplitStay: false }, values, stored, PARKSTAY_MANIFEST)
+    ).toEqual({ allowSplitStay: false });
+  });
+
+  it('reads a watch from before the setting as off', () => {
+    const old = { ...makeWatch(), allowSplitStay: undefined } as unknown as Watch;
+    expect(fromWatch(old, PARKSTAY_MANIFEST).values.allowSplitStay).toBe(false);
   });
 });
 

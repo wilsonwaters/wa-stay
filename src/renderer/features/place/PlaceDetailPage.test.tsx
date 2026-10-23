@@ -14,7 +14,7 @@ import {
 import { placeApi } from '../../../../tests/utils/renderer/catalog';
 import { fail, ok, PARKSTAY_MANIFEST } from '../../../../tests/utils/renderer/createMockApi';
 import { currentRoute, renderWithApp } from '../../../../tests/utils/renderer/renderWithApp';
-import type { StayQuery } from '../../../shared/types/provider.types';
+import type { SplitStay, StayQuery } from '../../../shared/types/provider.types';
 import { SLOW_CHECK_MS } from './PlaceDetailPage';
 
 configure({ asyncUtilTimeout: 4000 });
@@ -856,5 +856,84 @@ describe('Place detail page', () => {
       syncedAt: '2026-10-09T02:00:00Z',
     });
     expect(mock?.api.catalog.get).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe('Place detail page: split stays (free every night, by moving: §12.36)', () => {
+  /** Site 01 free on the 6th, Site 02 on the 7th: two bookings on ParkStay. */
+  const SPLIT: SplitStay = {
+    unitKind: 'campsite',
+    booking: 'separate',
+    units: 2,
+    total: 60,
+    parts: [
+      {
+        unitId: '1',
+        unitName: 'Site 01',
+        arrival: '2099-11-06',
+        departure: '2099-11-07',
+        total: 30,
+        bookingUrl: `${SEARCH_PAGE}&arrival=2099/11/06&departure=2099/11/07`,
+      },
+      {
+        unitId: '2',
+        unitName: 'Site 02',
+        arrival: '2099-11-07',
+        departure: '2099-11-08',
+        total: 30,
+        bookingUrl: `${SEARCH_PAGE}&arrival=2099/11/07&departure=2099/11/08`,
+      },
+    ],
+  };
+  /** None free for the whole stay (Sites 01–04 free on the first night only). */
+  const answering = (splitStays: SplitStay[]) =>
+    placeApi({
+      catalog: {
+        checkLocation: jest.fn(async (_key: string, stay: StayQuery) =>
+          ok({ ...availabilityFor(stay, { fully: 0, partly: 4 }), splitStays })
+        ),
+      },
+    });
+  const splitBlock = () => screen.queryByRole('region', { name: 'Free if you move sites' });
+
+  it('shows the block under the grid, says so after the summary, and never says "available"', async () => {
+    const { user } = await renderPlace(`/places/parkstay/20${STAY}`, answering([SPLIT]));
+    await user.click(checkButton());
+    const summary = await findSummary('0 of 24 sites free for all 2 nights');
+    await waitFor(() => expect(summary).toHaveFocus());
+    expect(politeRegion()?.textContent?.trim()).toBe(
+      '0 of 24 sites free for all 2 nights. Free if you move sites'
+    );
+
+    const availability = screen.getByRole('region', { name: 'Availability' });
+    const block = within(availability).getByRole('region', { name: 'Free if you move sites' });
+    expect(
+      within(block).getByRole('heading', { level: 3, name: 'Free if you move sites' })
+    ).toBeInTheDocument();
+    // Under the night grid: after its summary, its switch and its message
+    const fullyOnly = within(availability).getByRole('switch', { name: 'Fully available only' });
+    for (const above of [summary, fullyOnly]) {
+      expect(above.compareDocumentPosition(block) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    }
+    expect(
+      within(block).getByRole('heading', { level: 4, name: 'Across 2 sites' })
+    ).toBeInTheDocument();
+    expect(
+      within(block).getByRole('link', { name: 'Book 6–7 Nov on ParkStay (opens in your browser)' })
+    ).toHaveAttribute('href', `${SEARCH_PAGE}&arrival=2099/11/06&departure=2099/11/07`);
+    expect(
+      within(block).getByRole('link', { name: 'Book 7–8 Nov on ParkStay (opens in your browser)' })
+    ).toHaveAttribute('href', `${SEARCH_PAGE}&arrival=2099/11/07&departure=2099/11/08`);
+    expect(block).not.toHaveTextContent(/available/i);
+  });
+
+  it('shows no block, and announces the summary alone, without a split stay', async () => {
+    const { user } = await renderPlace(`/places/parkstay/20${STAY}`, answering([]));
+    await user.click(checkButton());
+    const summary = await findSummary('0 of 24 sites free for all 2 nights');
+    await waitFor(() => expect(summary).toHaveFocus());
+    expect(politeRegion()?.textContent?.trim()).toBe('0 of 24 sites free for all 2 nights');
+    expect(splitBlock()).toBeNull();
+    expect(screen.queryByRole('heading', { level: 3, name: /Free if you move/ })).toBeNull();
   });
 });

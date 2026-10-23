@@ -50,6 +50,7 @@ export function emptyWatchForm(manifest: ProviderManifest | undefined): WatchFor
     maxPrice: '',
     checkIntervalMinutes: defaultInterval(manifest),
     allowPartialMatch: false,
+    allowSplitStay: false,
     notifyOnly: true,
     autoHold: false,
     name: '',
@@ -103,6 +104,8 @@ export function toWatchInput(
     ...(manifest?.capabilities.holds && values.autoHold ? { autoHold: true } : {}),
     notifyOnly: values.notifyOnly,
     allowPartialMatch: values.allowPartialMatch,
+    // Off is main's default: sent only when asked for
+    ...(values.allowSplitStay ? { allowSplitStay: true } : {}),
     ...(maxPrice !== undefined ? { maxPrice } : {}),
     ...(notes ? { notes } : {}),
   };
@@ -136,6 +139,7 @@ export function fromWatch(
       maxPrice: watch.maxPrice ? String(watch.maxPrice) : '',
       checkIntervalMinutes: watch.checkIntervalMinutes,
       allowPartialMatch: watch.allowPartialMatch,
+      allowSplitStay: watch.allowSplitStay === true,
       notifyOnly: watch.notifyOnly,
       autoHold: watch.autoHold,
       name: watch.name,
@@ -190,6 +194,9 @@ export function toWatchUpdate(
   if (values.notifyOnly !== initial.notifyOnly) update.notifyOnly = values.notifyOnly;
   if (values.allowPartialMatch !== initial.allowPartialMatch) {
     update.allowPartialMatch = values.allowPartialMatch;
+  }
+  if (values.allowSplitStay !== initial.allowSplitStay) {
+    update.allowSplitStay = values.allowSplitStay;
   }
   if (values.maxPrice.trim() !== initial.maxPrice.trim()) {
     update.maxPrice = parsePrice(values.maxPrice) ?? 0;
