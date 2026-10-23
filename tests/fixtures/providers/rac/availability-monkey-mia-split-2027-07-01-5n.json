@@ -1,0 +1,1786 @@
+{
+  "_fixture": "Trimmed from RAC Parks & Resorts' availability answer for RAC Monkey Mia Dolphin Resort (blog 2), 1-6 Jul 2027, 2 adults, fetched anonymously; only the fields WA Stay reads, the NewBook key and cart addresses redacted. The stakeholder's split stay: the Powered Site free every night, on no one site. (Fetched 24 Oct 2026, 02:32 Perth.)",
+  "success": "true",
+  "message": "",
+  "timestamp": "2026-10-24 02:32:23",
+  "timezone": "Australia/Perth",
+  "api_key": "<redacted>",
+  "data": {
+    "44": {
+      "category_id": 44,
+      "category_type_id": "1",
+      "category_name": "Accessible Two Bedroom Beachfront Villa",
+      "sort": 0,
+      "sites_available": {
+        "2027-07-01": 1,
+        "2027-07-02": 0,
+        "2027-07-03": 0,
+        "2027-07-04": 0,
+        "2027-07-05": 0
+      },
+      "sites_code": {
+        "2027-07-01": 0,
+        "2027-07-02": 3,
+        "2027-07-03": 3,
+        "2027-07-04": 3,
+        "2027-07-05": 3
+      },
+      "sites_message": {
+        "2027-07-01": "",
+        "2027-07-02": "There is no availability for this date",
+        "2027-07-03": "There is no availability for this date",
+        "2027-07-04": "There is no availability for this date",
+        "2027-07-05": "There is no availability for this date"
+      },
+      "stay_through_sites_available": 0,
+      "stay_through_sites_code": 3,
+      "stay_through_sites_message": "There is no longer availability for the dates given (<strong>1 Jul 2027 14:00</strong> to <strong>6 Jul 2027 10:00</strong>)",
+      "online_booking_url": "https://parksandresorts.rac.com.au/monkey-mia/booking/?available_from=2027-07-01&available_to=2027-07-06&force_category_id=44&adults=2&children=0&infants=0&animals=0",
+      "tariffs_available": [
+        {
+          "tariff_label": "Standard Rate",
+          "tariff_success": "true",
+          "tariff_code": 0,
+          "tariff_message": "",
+          "tariff_total": 3850,
+          "tariffs_quoted": {
+            "2027-07-01": {
+              "amount": 722,
+              "minimum_periods": "2",
+              "close_arrival": 0,
+              "close_departure": 0
+            },
+            "2027-07-02": {
+              "amount": 743,
+              "minimum_periods": "2",
+              "close_arrival": 0,
+              "close_departure": 0
+            },
+            "2027-07-03": {
+              "amount": 795,
+              "minimum_periods": "2",
+              "close_arrival": 0,
+              "close_departure": 0
+            },
+            "2027-07-04": {
+              "amount": 795,
+              "minimum_periods": "2",
+              "close_arrival": 0,
+              "close_departure": 0
+            },
+            "2027-07-05": {
+              "amount": 795,
+              "minimum_periods": "2",
+              "close_arrival": 0,
+              "close_departure": 0
+            }
+          }
+        },
+        {
+          "tariff_label": "RAC Member Rate",
+          "tariff_success": "true",
+          "tariff_code": 0,
+          "tariff_message": "",
+          "tariff_total": 3642,
+          "tariffs_quoted": {
+            "2027-07-01": {
+              "amount": 677,
+              "minimum_periods": "2",
+              "close_arrival": 0,
+              "close_departure": 0
+            },
+            "2027-07-02": {
+              "amount": 704,
+              "minimum_periods": "2",
+              "close_arrival": 0,
+              "close_departure": 0
+            },
+            "2027-07-03": {
+              "amount": 755,
+              "minimum_periods": "2",
+              "close_arrival": 0,
+              "close_departure": 0
+            },
+            "2027-07-04": {
+              "amount": 751,
+              "minimum_periods": "2",
+              "close_arrival": 0,
+              "close_departure": 0
+            },
+            "2027-07-05": {
+              "amount": 755,
+              "minimum_periods": "2",
+              "close_arrival": 0,
+              "close_departure": 0
+            }
+          }
+        }
+      ]
+    },
+    "2": {
+      "category_id": 2,
+      "category_type_id": "1",
+      "category_name": "Garden View Room",
+      "sort": 1,
+      "sites_available": {
+        "2027-07-01": 18,
+        "2027-07-02": 15,
+        "2027-07-03": 15,
+        "2027-07-04": 8,
+        "2027-07-05": 8
+      },
+      "sites_code": {
+        "2027-07-01": 0,
+        "2027-07-02": 0,
+        "2027-07-03": 0,
+        "2027-07-04": 0,
+        "2027-07-05": 0
+      },
+      "sites_message": {
+        "2027-07-01": "",
+        "2027-07-02": "",
+        "2027-07-03": "",
+        "2027-07-04": "",
+        "2027-07-05": ""
+      },
+      "stay_through_sites_available": 4,
+      "stay_through_sites_code": 0,
+      "stay_through_sites_message": "",
+      "online_booking_url": "https://parksandresorts.rac.com.au/monkey-mia/booking/?available_from=2027-07-01&available_to=2027-07-06&force_category_id=2&adults=2&children=0&infants=0&animals=0",
+      "tariffs_available": [
+        {
+          "tariff_label": "Standard Rate",
+          "tariff_success": "true",
+          "tariff_code": 0,
+          "tariff_message": "",
+          "tariff_total": 2051,
+          "tariffs_quoted": {
+            "2027-07-01": {
+              "amount": 325,
+              "minimum_periods": "1",
+              "close_arrival": 0,
+              "close_departure": 0
+            },
+            "2027-07-02": {
+              "amount": 338,
+              "minimum_periods": "1",
+              "close_arrival": 0,
+              "close_departure": 0
+            },
+            "2027-07-03": {
+              "amount": 459,
+              "minimum_periods": "1",
+              "close_arrival": 0,
+              "close_departure": 0
+            },
+            "2027-07-04": {
+              "amount": 464,
+              "minimum_periods": "1",
+              "close_arrival": 0,
+              "close_departure": 0
+            },
+            "2027-07-05": {
+              "amount": 465,
+              "minimum_periods": "1",
+              "close_arrival": 0,
+              "close_departure": 0
+            }
+          }
+        },
+        {
+          "tariff_label": "RAC Member Rate",
+          "tariff_success": "true",
+          "tariff_code": 0,
+          "tariff_message": "",
+          "tariff_total": 1917,
+          "tariffs_quoted": {
+            "2027-07-01": {
+              "amount": 300,
+              "minimum_periods": "1",
+              "close_arrival": 0,
+              "close_departure": 0
+            },
+            "2027-07-02": {
+              "amount": 311,
+              "minimum_periods": "1",
+              "close_arrival": 0,
+              "close_departure": 0
+            },
+            "2027-07-03": {
+              "amount": 436,
+              "minimum_periods": "1",
+              "close_arrival": 0,
+              "close_departure": 0
+            },
+            "2027-07-04": {
+              "amount": 428,
+              "minimum_periods": "1",
+              "close_arrival": 0,
+              "close_departure": 0
+            },
+            "2027-07-05": {
+              "amount": 442,
+              "minimum_periods": "1",
+              "close_arrival": 0,
+              "close_departure": 0
+            }
+          }
+        }
+      ]
+    },
+    "41": {
+      "category_id": 41,
+      "category_type_id": "1",
+      "category_name": "Pool View Room",
+      "sort": 2,
+      "sites_available": {
+        "2027-07-01": 3,
+        "2027-07-02": 3,
+        "2027-07-03": 2,
+        "2027-07-04": 3,
+        "2027-07-05": 2
+      },
+      "sites_code": {
+        "2027-07-01": 0,
+        "2027-07-02": 0,
+        "2027-07-03": 0,
+        "2027-07-04": 0,
+        "2027-07-05": 0
+      },
+      "sites_message": {
+        "2027-07-01": "",
+        "2027-07-02": "",
+        "2027-07-03": "",
+        "2027-07-04": "",
+        "2027-07-05": ""
+      },
+      "stay_through_sites_available": 1,
+      "stay_through_sites_code": 0,
+      "stay_through_sites_message": "",
+      "online_booking_url": "https://parksandresorts.rac.com.au/monkey-mia/booking/?available_from=2027-07-01&available_to=2027-07-06&force_category_id=41&adults=2&children=0&infants=0&animals=0",
+      "tariffs_available": [
+        {
+          "tariff_label": "Standard Rate",
+          "tariff_success": "true",
+          "tariff_code": 0,
+          "tariff_message": "",
+          "tariff_total": 2126,
+          "tariffs_quoted": {
+            "2027-07-01": {
+              "amount": 340,
+              "minimum_periods": "1",
+              "close_arrival": 0,
+              "close_departure": 0
+            },
+            "2027-07-02": {
+              "amount": 353,
+              "minimum_periods": "1",
+              "close_arrival": 0,
+              "close_departure": 0
+            },
+            "2027-07-03": {
+              "amount": 474,
+              "minimum_periods": "1",
+              "close_arrival": 0,
+              "close_departure": 0
+            },
+            "2027-07-04": {
+              "amount": 479,
+              "minimum_periods": "1",
+              "close_arrival": 0,
+              "close_departure": 0
+            },
+            "2027-07-05": {
+              "amount": 480,
+              "minimum_periods": "1",
+              "close_arrival": 0,
+              "close_departure": 0
+            }
+          }
+        },
+        {
+          "tariff_label": "RAC Member Rate",
+          "tariff_success": "true",
+          "tariff_code": 0,
+          "tariff_message": "",
+          "tariff_total": 1986,
+          "tariffs_quoted": {
+            "2027-07-01": {
+              "amount": 314,
+              "minimum_periods": "1",
+              "close_arrival": 0,
+              "close_departure": 0
+            },
+            "2027-07-02": {
+              "amount": 325,
+              "minimum_periods": "1",
+              "close_arrival": 0,
+              "close_departure": 0
+            },
+            "2027-07-03": {
+              "amount": 450,
+              "minimum_periods": "1",
+              "close_arrival": 0,
+              "close_departure": 0
+            },
+            "2027-07-04": {
+              "amount": 441,
+              "minimum_periods": "1",
+              "close_arrival": 0,
+              "close_departure": 0
+            },
+            "2027-07-05": {
+              "amount": 456,
+              "minimum_periods": "1",
+              "close_arrival": 0,
+              "close_departure": 0
+            }
+          }
+        }
+      ]
+    },
+    "3": {
+      "category_id": 3,
+      "category_type_id": "1",
+      "category_name": "Beach View Room",
+      "sort": 3,
+      "sites_available": {
+        "2027-07-01": 17,
+        "2027-07-02": 4,
+        "2027-07-03": 0,
+        "2027-07-04": 18,
+        "2027-07-05": 6
+      },
+      "sites_code": {
+        "2027-07-01": 0,
+        "2027-07-02": 0,
+        "2027-07-03": 3,
+        "2027-07-04": 0,
+        "2027-07-05": 0
+      },
+      "sites_message": {
+        "2027-07-01": "",
+        "2027-07-02": "",
+        "2027-07-03": "There is no availability for this date",
+        "2027-07-04": "",
+        "2027-07-05": ""
+      },
+      "stay_through_sites_available": 0,
+      "stay_through_sites_code": 3,
+      "stay_through_sites_message": "There is no longer availability for the dates given (<strong>1 Jul 2027 14:00</strong> to <strong>6 Jul 2027 10:00</strong>)",
+      "online_booking_url": "https://parksandresorts.rac.com.au/monkey-mia/booking/?available_from=2027-07-01&available_to=2027-07-06&force_category_id=3&adults=2&children=0&infants=0&animals=0",
+      "tariffs_available": [
+        {
+          "tariff_label": "Standard Rate",
+          "tariff_success": "true",
+          "tariff_code": 0,
+          "tariff_message": "",
+          "tariff_total": 2051,
+          "tariffs_quoted": {
+            "2027-07-01": {
+              "amount": 325,
+              "minimum_periods": "1",
+              "close_arrival": 0,
+              "close_departure": 0
+            },
+            "2027-07-02": {
+              "amount": 338,
+              "minimum_periods": "1",
+              "close_arrival": 0,
+              "close_departure": 0
+            },
+            "2027-07-03": {
+              "amount": 459,
+              "minimum_periods": "1",
+              "close_arrival": 0,
+              "close_departure": 0
+            },
+            "2027-07-04": {
+              "amount": 464,
+              "minimum_periods": "1",
+              "close_arrival": 0,
+              "close_departure": 0
+            },
+            "2027-07-05": {
+              "amount": 465,
+              "minimum_periods": "1",
+              "close_arrival": 0,
+              "close_departure": 0
+            }
+          }
+        },
+        {
+          "tariff_label": "RAC Member Rate",
+          "tariff_success": "true",
+          "tariff_code": 0,
+          "tariff_message": "",
+          "tariff_total": 1917,
+          "tariffs_quoted": {
+            "2027-07-01": {
+              "amount": 300,
+              "minimum_periods": "1",
+              "close_arrival": 0,
+              "close_departure": 0
+            },
+            "2027-07-02": {
+              "amount": 311,
+              "minimum_periods": "1",
+              "close_arrival": 0,
+              "close_departure": 0
+            },
+            "2027-07-03": {
+              "amount": 436,
+              "minimum_periods": "1",
+              "close_arrival": 0,
+              "close_departure": 0
+            },
+            "2027-07-04": {
+              "amount": 428,
+              "minimum_periods": "1",
+              "close_arrival": 0,
+              "close_departure": 0
+            },
+            "2027-07-05": {
+              "amount": 442,
+              "minimum_periods": "1",
+              "close_arrival": 0,
+              "close_departure": 0
+            }
+          }
+        }
+      ]
+    },
+    "23": {
+      "category_id": 23,
+      "category_type_id": "1",
+      "category_name": "Family Studio",
+      "sort": 4,
+      "sites_available": {
+        "2027-07-01": 1,
+        "2027-07-02": 3,
+        "2027-07-03": 2,
+        "2027-07-04": 0,
+        "2027-07-05": 1
+      },
+      "sites_code": {
+        "2027-07-01": 0,
+        "2027-07-02": 0,
+        "2027-07-03": 0,
+        "2027-07-04": 3,
+        "2027-07-05": 0
+      },
+      "sites_message": {
+        "2027-07-01": "",
+        "2027-07-02": "",
+        "2027-07-03": "",
+        "2027-07-04": "There is no availability for this date",
+        "2027-07-05": ""
+      },
+      "stay_through_sites_available": 0,
+      "stay_through_sites_code": 3,
+      "stay_through_sites_message": "There is no longer availability for the dates given (<strong>1 Jul 2027 14:00</strong> to <strong>6 Jul 2027 10:00</strong>)",
+      "online_booking_url": "https://parksandresorts.rac.com.au/monkey-mia/booking/?available_from=2027-07-01&available_to=2027-07-06&force_category_id=23&adults=2&children=0&infants=0&animals=0",
+      "tariffs_available": [
+        {
+          "tariff_label": "Standard Rate",
+          "tariff_success": "true",
+          "tariff_code": 0,
+          "tariff_message": "",
+          "tariff_total": 2101,
+          "tariffs_quoted": {
+            "2027-07-01": {
+              "amount": 335,
+              "minimum_periods": "1",
+              "close_arrival": 0,
+              "close_departure": 0
+            },
+            "2027-07-02": {
+              "amount": 348,
+              "minimum_periods": "1",
+              "close_arrival": 0,
+              "close_departure": 0
+            },
+            "2027-07-03": {
+              "amount": 469,
+              "minimum_periods": "1",
+              "close_arrival": 0,
+              "close_departure": 0
+            },
+            "2027-07-04": {
+              "amount": 474,
+              "minimum_periods": "1",
+              "close_arrival": 0,
+              "close_departure": 0
+            },
+            "2027-07-05": {
+              "amount": 475,
+              "minimum_periods": "1",
+              "close_arrival": 0,
+              "close_departure": 0
+            }
+          }
+        },
+        {
+          "tariff_label": "RAC Member Rate",
+          "tariff_success": "true",
+          "tariff_code": 0,
+          "tariff_message": "",
+          "tariff_total": 1986,
+          "tariffs_quoted": {
+            "2027-07-01": {
+              "amount": 314,
+              "minimum_periods": "1",
+              "close_arrival": 0,
+              "close_departure": 0
+            },
+            "2027-07-02": {
+              "amount": 325,
+              "minimum_periods": "1",
+              "close_arrival": 0,
+              "close_departure": 0
+            },
+            "2027-07-03": {
+              "amount": 450,
+              "minimum_periods": "1",
+              "close_arrival": 0,
+              "close_departure": 0
+            },
+            "2027-07-04": {
+              "amount": 441,
+              "minimum_periods": "1",
+              "close_arrival": 0,
+              "close_departure": 0
+            },
+            "2027-07-05": {
+              "amount": 456,
+              "minimum_periods": "1",
+              "close_arrival": 0,
+              "close_departure": 0
+            }
+          }
+        }
+      ]
+    },
+    "10": {
+      "category_id": 10,
+      "category_type_id": "1",
+      "category_name": "Superior Beach View Room",
+      "sort": 5,
+      "sites_available": {
+        "2027-07-01": 2,
+        "2027-07-02": 1,
+        "2027-07-03": 1,
+        "2027-07-04": 3,
+        "2027-07-05": 1
+      },
+      "sites_code": {
+        "2027-07-01": 0,
+        "2027-07-02": 0,
+        "2027-07-03": 0,
+        "2027-07-04": 0,
+        "2027-07-05": 0
+      },
+      "sites_message": {
+        "2027-07-01": "",
+        "2027-07-02": "",
+        "2027-07-03": "",
+        "2027-07-04": "",
+        "2027-07-05": ""
+      },
+      "stay_through_sites_available": 0,
+      "stay_through_sites_code": 3,
+      "stay_through_sites_message": "There is no longer availability for the dates given (<strong>1 Jul 2027 14:00</strong> to <strong>6 Jul 2027 10:00</strong>)",
+      "online_booking_url": "https://parksandresorts.rac.com.au/monkey-mia/booking/?available_from=2027-07-01&available_to=2027-07-06&force_category_id=10&adults=2&children=0&infants=0&animals=0",
+      "tariffs_available": [
+        {
+          "tariff_label": "Standard Rate",
+          "tariff_success": "true",
+          "tariff_code": 0,
+          "tariff_message": "",
+          "tariff_total": 2541,
+          "tariffs_quoted": {
+            "2027-07-01": {
+              "amount": 469,
+              "minimum_periods": "1",
+              "close_arrival": 0,
+              "close_departure": 0
+            },
+            "2027-07-02": {
+              "amount": 444,
+              "minimum_periods": "2",
+              "close_arrival": 0,
+              "close_departure": 0
+            },
+            "2027-07-03": {
+              "amount": 532,
+              "minimum_periods": "2",
+              "close_arrival": 0,
+              "close_departure": 0
+            },
+            "2027-07-04": {
+              "amount": 545,
+              "minimum_periods": "2",
+              "close_arrival": 0,
+              "close_departure": 0
+            },
+            "2027-07-05": {
+              "amount": 551,
+              "minimum_periods": "2",
+              "close_arrival": 0,
+              "close_departure": 0
+            }
+          }
+        },
+        {
+          "tariff_label": "RAC Member Rate",
+          "tariff_success": "true",
+          "tariff_code": 0,
+          "tariff_message": "",
+          "tariff_total": 2385,
+          "tariffs_quoted": {
+            "2027-07-01": {
+              "amount": 443,
+              "minimum_periods": "1",
+              "close_arrival": 0,
+              "close_departure": 0
+            },
+            "2027-07-02": {
+              "amount": 412,
+              "minimum_periods": "2",
+              "close_arrival": 0,
+              "close_departure": 0
+            },
+            "2027-07-03": {
+              "amount": 505,
+              "minimum_periods": "2",
+              "close_arrival": 0,
+              "close_departure": 0
+            },
+            "2027-07-04": {
+              "amount": 502,
+              "minimum_periods": "2",
+              "close_arrival": 0,
+              "close_departure": 0
+            },
+            "2027-07-05": {
+              "amount": 523,
+              "minimum_periods": "2",
+              "close_arrival": 0,
+              "close_departure": 0
+            }
+          }
+        }
+      ]
+    },
+    "30": {
+      "category_id": 30,
+      "category_type_id": "1",
+      "category_name": "Family Garden View Room",
+      "sort": 6,
+      "sites_available": {
+        "2027-07-01": 7,
+        "2027-07-02": 6,
+        "2027-07-03": 5,
+        "2027-07-04": 2,
+        "2027-07-05": 1
+      },
+      "sites_code": {
+        "2027-07-01": 0,
+        "2027-07-02": 0,
+        "2027-07-03": 0,
+        "2027-07-04": 0,
+        "2027-07-05": 0
+      },
+      "sites_message": {
+        "2027-07-01": "",
+        "2027-07-02": "",
+        "2027-07-03": "",
+        "2027-07-04": "",
+        "2027-07-05": ""
+      },
+      "stay_through_sites_available": 0,
+      "stay_through_sites_code": 0,
+      "stay_through_sites_message": "",
+      "online_booking_url": "https://parksandresorts.rac.com.au/monkey-mia/booking/?available_from=2027-07-01&available_to=2027-07-06&force_category_id=30&adults=2&children=0&infants=0&animals=0",
+      "tariffs_available": [
+        {
+          "tariff_label": "Standard Rate",
+          "tariff_success": "true",
+          "tariff_code": 0,
+          "tariff_message": "",
+          "tariff_total": 3557,
+          "tariffs_quoted": {
+            "2027-07-01": {
+              "amount": 536,
+              "minimum_periods": "1",
+              "close_arrival": 0,
+              "close_departure": 0
+            },
+            "2027-07-02": {
+              "amount": 592,
+              "minimum_periods": "1",
+              "close_arrival": 0,
+              "close_departure": 0
+            },
+            "2027-07-03": {
+              "amount": 803,
+              "minimum_periods": "1",
+              "close_arrival": 0,
+              "close_departure": 0
+            },
+            "2027-07-04": {
+              "amount": 812,
+              "minimum_periods": "1",
+              "close_arrival": 0,
+              "close_departure": 0
+            },
+            "2027-07-05": {
+              "amount": 814,
+              "minimum_periods": "1",
+              "close_arrival": 0,
+              "close_departure": 0
+            }
+          }
+        },
+        {
+          "tariff_label": "RAC Member Rate",
+          "tariff_success": "true",
+          "tariff_code": 0,
+          "tariff_message": "",
+          "tariff_total": 3406,
+          "tariffs_quoted": {
+            "2027-07-01": {
+              "amount": 495,
+              "minimum_periods": "1",
+              "close_arrival": 0,
+              "close_departure": 0
+            },
+            "2027-07-02": {
+              "amount": 560,
+              "minimum_periods": "1",
+              "close_arrival": 0,
+              "close_departure": 0
+            },
+            "2027-07-03": {
+              "amount": 785,
+              "minimum_periods": "1",
+              "close_arrival": 0,
+              "close_departure": 0
+            },
+            "2027-07-04": {
+              "amount": 770,
+              "minimum_periods": "1",
+              "close_arrival": 0,
+              "close_departure": 0
+            },
+            "2027-07-05": {
+              "amount": 796,
+              "minimum_periods": "1",
+              "close_arrival": 0,
+              "close_departure": 0
+            }
+          }
+        }
+      ]
+    },
+    "36": {
+      "category_id": 36,
+      "category_type_id": "1",
+      "category_name": "2 Bedroom Beachfront Villa",
+      "sort": 7,
+      "sites_available": {
+        "2027-07-01": 0,
+        "2027-07-02": 2,
+        "2027-07-03": 1,
+        "2027-07-04": 0,
+        "2027-07-05": 0
+      },
+      "sites_code": {
+        "2027-07-01": 3,
+        "2027-07-02": 0,
+        "2027-07-03": 0,
+        "2027-07-04": 3,
+        "2027-07-05": 3
+      },
+      "sites_message": {
+        "2027-07-01": "There is no availability for this date",
+        "2027-07-02": "",
+        "2027-07-03": "",
+        "2027-07-04": "There is no availability for this date",
+        "2027-07-05": "There is no availability for this date"
+      },
+      "stay_through_sites_available": 0,
+      "stay_through_sites_code": 3,
+      "stay_through_sites_message": "There is no longer availability for the dates given (<strong>1 Jul 2027 14:00</strong> to <strong>6 Jul 2027 10:00</strong>)",
+      "online_booking_url": "https://parksandresorts.rac.com.au/monkey-mia/booking/?available_from=2027-07-01&available_to=2027-07-06&force_category_id=36&adults=2&children=0&infants=0&animals=0",
+      "tariffs_available": [
+        {
+          "tariff_label": "Standard Rate",
+          "tariff_success": "true",
+          "tariff_code": 0,
+          "tariff_message": "",
+          "tariff_total": 3850,
+          "tariffs_quoted": {
+            "2027-07-01": {
+              "amount": 722,
+              "minimum_periods": "2",
+              "close_arrival": 0,
+              "close_departure": 0
+            },
+            "2027-07-02": {
+              "amount": 743,
+              "minimum_periods": "2",
+              "close_arrival": 0,
+              "close_departure": 0
+            },
+            "2027-07-03": {
+              "amount": 795,
+              "minimum_periods": "2",
+              "close_arrival": 0,
+              "close_departure": 0
+            },
+            "2027-07-04": {
+              "amount": 795,
+              "minimum_periods": "2",
+              "close_arrival": 0,
+              "close_departure": 0
+            },
+            "2027-07-05": {
+              "amount": 795,
+              "minimum_periods": "2",
+              "close_arrival": 0,
+              "close_departure": 0
+            }
+          }
+        },
+        {
+          "tariff_label": "RAC Member Rate",
+          "tariff_success": "true",
+          "tariff_code": 0,
+          "tariff_message": "",
+          "tariff_total": 3642,
+          "tariffs_quoted": {
+            "2027-07-01": {
+              "amount": 677,
+              "minimum_periods": "2",
+              "close_arrival": 0,
+              "close_departure": 0
+            },
+            "2027-07-02": {
+              "amount": 704,
+              "minimum_periods": "2",
+              "close_arrival": 0,
+              "close_departure": 0
+            },
+            "2027-07-03": {
+              "amount": 755,
+              "minimum_periods": "2",
+              "close_arrival": 0,
+              "close_departure": 0
+            },
+            "2027-07-04": {
+              "amount": 751,
+              "minimum_periods": "2",
+              "close_arrival": 0,
+              "close_departure": 0
+            },
+            "2027-07-05": {
+              "amount": 755,
+              "minimum_periods": "2",
+              "close_arrival": 0,
+              "close_departure": 0
+            }
+          }
+        }
+      ]
+    },
+    "37": {
+      "category_id": 37,
+      "category_type_id": "1",
+      "category_name": "3 Bedroom Beachfront Villa",
+      "sort": 8,
+      "sites_available": {
+        "2027-07-01": 1,
+        "2027-07-02": 0,
+        "2027-07-03": 0,
+        "2027-07-04": 0,
+        "2027-07-05": 0
+      },
+      "sites_code": {
+        "2027-07-01": 0,
+        "2027-07-02": 3,
+        "2027-07-03": 3,
+        "2027-07-04": 3,
+        "2027-07-05": 3
+      },
+      "sites_message": {
+        "2027-07-01": "",
+        "2027-07-02": "There is no availability for this date",
+        "2027-07-03": "There is no availability for this date",
+        "2027-07-04": "There is no availability for this date",
+        "2027-07-05": "There is no availability for this date"
+      },
+      "stay_through_sites_available": 0,
+      "stay_through_sites_code": 3,
+      "stay_through_sites_message": "There is no longer availability for the dates given (<strong>1 Jul 2027 14:00</strong> to <strong>6 Jul 2027 10:00</strong>)",
+      "online_booking_url": "https://parksandresorts.rac.com.au/monkey-mia/booking/?available_from=2027-07-01&available_to=2027-07-06&force_category_id=37&adults=2&children=0&infants=0&animals=0",
+      "tariffs_available": [
+        {
+          "tariff_label": "Standard Rate",
+          "tariff_success": "true",
+          "tariff_code": 0,
+          "tariff_message": "",
+          "tariff_total": 4445,
+          "tariffs_quoted": {
+            "2027-07-01": {
+              "amount": 815,
+              "minimum_periods": "2",
+              "close_arrival": 0,
+              "close_departure": 0
+            },
+            "2027-07-02": {
+              "amount": 825,
+              "minimum_periods": "2",
+              "close_arrival": 0,
+              "close_departure": 0
+            },
+            "2027-07-03": {
+              "amount": 935,
+              "minimum_periods": "2",
+              "close_arrival": 0,
+              "close_departure": 0
+            },
+            "2027-07-04": {
+              "amount": 935,
+              "minimum_periods": "2",
+              "close_arrival": 0,
+              "close_departure": 0
+            },
+            "2027-07-05": {
+              "amount": 935,
+              "minimum_periods": "2",
+              "close_arrival": 0,
+              "close_departure": 0
+            }
+          }
+        },
+        {
+          "tariff_label": "RAC Member Rate",
+          "tariff_success": "true",
+          "tariff_code": 0,
+          "tariff_message": "",
+          "tariff_total": 4207,
+          "tariffs_quoted": {
+            "2027-07-01": {
+              "amount": 764,
+              "minimum_periods": "2",
+              "close_arrival": 0,
+              "close_departure": 0
+            },
+            "2027-07-02": {
+              "amount": 779,
+              "minimum_periods": "2",
+              "close_arrival": 0,
+              "close_departure": 0
+            },
+            "2027-07-03": {
+              "amount": 888,
+              "minimum_periods": "2",
+              "close_arrival": 0,
+              "close_departure": 0
+            },
+            "2027-07-04": {
+              "amount": 888,
+              "minimum_periods": "2",
+              "close_arrival": 0,
+              "close_departure": 0
+            },
+            "2027-07-05": {
+              "amount": 888,
+              "minimum_periods": "2",
+              "close_arrival": 0,
+              "close_departure": 0
+            }
+          }
+        }
+      ]
+    },
+    "12": {
+      "category_id": 12,
+      "category_type_id": "1",
+      "category_name": "Budget Room Shared Bathroom",
+      "sort": 9,
+      "sites_available": {
+        "2027-07-01": 7,
+        "2027-07-02": 10,
+        "2027-07-03": 5,
+        "2027-07-04": 7,
+        "2027-07-05": 1
+      },
+      "sites_code": {
+        "2027-07-01": 0,
+        "2027-07-02": 0,
+        "2027-07-03": 0,
+        "2027-07-04": 0,
+        "2027-07-05": 0
+      },
+      "sites_message": {
+        "2027-07-01": "",
+        "2027-07-02": "",
+        "2027-07-03": "",
+        "2027-07-04": "",
+        "2027-07-05": ""
+      },
+      "stay_through_sites_available": 0,
+      "stay_through_sites_code": 3,
+      "stay_through_sites_message": "There is no longer availability for the dates given (<strong>1 Jul 2027 14:00</strong> to <strong>6 Jul 2027 10:00</strong>)",
+      "online_booking_url": "https://parksandresorts.rac.com.au/monkey-mia/booking/?available_from=2027-07-01&available_to=2027-07-06&force_category_id=12&adults=2&children=0&infants=0&animals=0",
+      "tariffs_available": [
+        {
+          "tariff_label": "Standard Rate",
+          "tariff_success": "true",
+          "tariff_code": 0,
+          "tariff_message": "",
+          "tariff_total": 1233,
+          "tariffs_quoted": {
+            "2027-07-01": {
+              "amount": 199,
+              "minimum_periods": "1",
+              "close_arrival": 0,
+              "close_departure": 0
+            },
+            "2027-07-02": {
+              "amount": 203,
+              "minimum_periods": "1",
+              "close_arrival": 0,
+              "close_departure": 0
+            },
+            "2027-07-03": {
+              "amount": 277,
+              "minimum_periods": "1",
+              "close_arrival": 0,
+              "close_departure": 0
+            },
+            "2027-07-04": {
+              "amount": 277,
+              "minimum_periods": "1",
+              "close_arrival": 0,
+              "close_departure": 0
+            },
+            "2027-07-05": {
+              "amount": 277,
+              "minimum_periods": "1",
+              "close_arrival": 0,
+              "close_departure": 0
+            }
+          }
+        },
+        {
+          "tariff_label": "RAC Member Rate",
+          "tariff_success": "true",
+          "tariff_code": 0,
+          "tariff_message": "",
+          "tariff_total": 1152,
+          "tariffs_quoted": {
+            "2027-07-01": {
+              "amount": 184,
+              "minimum_periods": "1",
+              "close_arrival": 0,
+              "close_departure": 0
+            },
+            "2027-07-02": {
+              "amount": 187,
+              "minimum_periods": "1",
+              "close_arrival": 0,
+              "close_departure": 0
+            },
+            "2027-07-03": {
+              "amount": 263,
+              "minimum_periods": "1",
+              "close_arrival": 0,
+              "close_departure": 0
+            },
+            "2027-07-04": {
+              "amount": 255,
+              "minimum_periods": "1",
+              "close_arrival": 0,
+              "close_departure": 0
+            },
+            "2027-07-05": {
+              "amount": 263,
+              "minimum_periods": "1",
+              "close_arrival": 0,
+              "close_departure": 0
+            }
+          }
+        }
+      ]
+    },
+    "40": {
+      "category_id": 40,
+      "category_type_id": "2",
+      "category_name": "Powered Ensuite Site",
+      "sort": 10,
+      "sites_available": {
+        "2027-07-01": 1,
+        "2027-07-02": 5,
+        "2027-07-03": 0,
+        "2027-07-04": 2,
+        "2027-07-05": 0
+      },
+      "sites_code": {
+        "2027-07-01": 0,
+        "2027-07-02": 0,
+        "2027-07-03": 3,
+        "2027-07-04": 0,
+        "2027-07-05": 3
+      },
+      "sites_message": {
+        "2027-07-01": "",
+        "2027-07-02": "",
+        "2027-07-03": "There is no availability for this date",
+        "2027-07-04": "",
+        "2027-07-05": "There is no availability for this date"
+      },
+      "stay_through_sites_available": 0,
+      "stay_through_sites_code": 3,
+      "stay_through_sites_message": "There is no longer availability for the dates given (<strong>1 Jul 2027 14:00</strong> to <strong>6 Jul 2027 10:00</strong>)",
+      "online_booking_url": "https://parksandresorts.rac.com.au/monkey-mia/booking/?available_from=2027-07-01&available_to=2027-07-06&force_category_id=40&adults=2&children=0&infants=0&animals=0",
+      "tariffs_available": [
+        {
+          "tariff_label": "Standard Rate",
+          "tariff_success": "true",
+          "tariff_code": 0,
+          "tariff_message": "",
+          "tariff_total": 679,
+          "tariffs_quoted": {
+            "2027-07-01": {
+              "amount": 122,
+              "minimum_periods": "2",
+              "close_arrival": 0,
+              "close_departure": 0
+            },
+            "2027-07-02": {
+              "amount": 122,
+              "minimum_periods": "2",
+              "close_arrival": 0,
+              "close_departure": 0
+            },
+            "2027-07-03": {
+              "amount": 145,
+              "minimum_periods": "2",
+              "close_arrival": 0,
+              "close_departure": 0
+            },
+            "2027-07-04": {
+              "amount": 145,
+              "minimum_periods": "2",
+              "close_arrival": 0,
+              "close_departure": 0
+            },
+            "2027-07-05": {
+              "amount": 145,
+              "minimum_periods": "2",
+              "close_arrival": 0,
+              "close_departure": 0
+            }
+          }
+        },
+        {
+          "tariff_label": "RAC Member Rate",
+          "tariff_success": "true",
+          "tariff_code": 0,
+          "tariff_message": "",
+          "tariff_total": 631,
+          "tariffs_quoted": {
+            "2027-07-01": {
+              "amount": 114,
+              "minimum_periods": "2",
+              "close_arrival": 0,
+              "close_departure": 0
+            },
+            "2027-07-02": {
+              "amount": 113,
+              "minimum_periods": "2",
+              "close_arrival": 0,
+              "close_departure": 0
+            },
+            "2027-07-03": {
+              "amount": 135,
+              "minimum_periods": "2",
+              "close_arrival": 0,
+              "close_departure": 0
+            },
+            "2027-07-04": {
+              "amount": 134,
+              "minimum_periods": "2",
+              "close_arrival": 0,
+              "close_departure": 0
+            },
+            "2027-07-05": {
+              "amount": 135,
+              "minimum_periods": "2",
+              "close_arrival": 0,
+              "close_departure": 0
+            }
+          }
+        }
+      ]
+    },
+    "13": {
+      "category_id": 13,
+      "category_type_id": "2",
+      "category_name": "Powered Beach Site",
+      "sort": 11,
+      "sites_available": {
+        "2027-07-01": 0,
+        "2027-07-02": 1,
+        "2027-07-03": 2,
+        "2027-07-04": 0,
+        "2027-07-05": 0
+      },
+      "sites_code": {
+        "2027-07-01": 3,
+        "2027-07-02": 0,
+        "2027-07-03": 0,
+        "2027-07-04": 3,
+        "2027-07-05": 3
+      },
+      "sites_message": {
+        "2027-07-01": "There is no availability for this date",
+        "2027-07-02": "",
+        "2027-07-03": "",
+        "2027-07-04": "There is no availability for this date",
+        "2027-07-05": "There is no availability for this date"
+      },
+      "stay_through_sites_available": 0,
+      "stay_through_sites_code": 2,
+      "stay_through_sites_message": "This Site is closed as of 8 Jan 2018",
+      "online_booking_url": "https://parksandresorts.rac.com.au/monkey-mia/booking/?available_from=2027-07-01&available_to=2027-07-06&force_category_id=13&adults=2&children=0&infants=0&animals=0",
+      "tariffs_available": [
+        {
+          "tariff_label": "Standard Rate",
+          "tariff_success": "true",
+          "tariff_code": 0,
+          "tariff_message": "",
+          "tariff_total": 679,
+          "tariffs_quoted": {
+            "2027-07-01": {
+              "amount": 122,
+              "minimum_periods": "2",
+              "close_arrival": 0,
+              "close_departure": 0
+            },
+            "2027-07-02": {
+              "amount": 122,
+              "minimum_periods": "2",
+              "close_arrival": 0,
+              "close_departure": 0
+            },
+            "2027-07-03": {
+              "amount": 145,
+              "minimum_periods": "2",
+              "close_arrival": 0,
+              "close_departure": 0
+            },
+            "2027-07-04": {
+              "amount": 145,
+              "minimum_periods": "2",
+              "close_arrival": 0,
+              "close_departure": 0
+            },
+            "2027-07-05": {
+              "amount": 145,
+              "minimum_periods": "2",
+              "close_arrival": 0,
+              "close_departure": 0
+            }
+          }
+        },
+        {
+          "tariff_label": "RAC Member Rate",
+          "tariff_success": "true",
+          "tariff_code": 0,
+          "tariff_message": "",
+          "tariff_total": 631,
+          "tariffs_quoted": {
+            "2027-07-01": {
+              "amount": 114,
+              "minimum_periods": "2",
+              "close_arrival": 0,
+              "close_departure": 0
+            },
+            "2027-07-02": {
+              "amount": 113,
+              "minimum_periods": "2",
+              "close_arrival": 0,
+              "close_departure": 0
+            },
+            "2027-07-03": {
+              "amount": 135,
+              "minimum_periods": "2",
+              "close_arrival": 0,
+              "close_departure": 0
+            },
+            "2027-07-04": {
+              "amount": 134,
+              "minimum_periods": "2",
+              "close_arrival": 0,
+              "close_departure": 0
+            },
+            "2027-07-05": {
+              "amount": 135,
+              "minimum_periods": "2",
+              "close_arrival": 0,
+              "close_departure": 0
+            }
+          }
+        }
+      ]
+    },
+    "7": {
+      "category_id": 7,
+      "category_type_id": "2",
+      "category_name": "Powered Site",
+      "sort": 12,
+      "sites_available": {
+        "2027-07-01": 20,
+        "2027-07-02": 22,
+        "2027-07-03": 16,
+        "2027-07-04": 1,
+        "2027-07-05": 2
+      },
+      "sites_code": {
+        "2027-07-01": 0,
+        "2027-07-02": 0,
+        "2027-07-03": 0,
+        "2027-07-04": 0,
+        "2027-07-05": 0
+      },
+      "sites_message": {
+        "2027-07-01": "",
+        "2027-07-02": "",
+        "2027-07-03": "",
+        "2027-07-04": "",
+        "2027-07-05": ""
+      },
+      "stay_through_sites_available": 0,
+      "stay_through_sites_code": 3,
+      "stay_through_sites_message": "There is no longer availability for the dates given (<strong>1 Jul 2027 14:00</strong> to <strong>6 Jul 2027 10:00</strong>)",
+      "online_booking_url": "https://parksandresorts.rac.com.au/monkey-mia/booking/?available_from=2027-07-01&available_to=2027-07-06&force_category_id=7&adults=2&children=0&infants=0&animals=0",
+      "tariffs_available": [
+        {
+          "tariff_label": "Standard Rate",
+          "tariff_success": "true",
+          "tariff_code": 0,
+          "tariff_message": "",
+          "tariff_total": 450,
+          "tariffs_quoted": {
+            "2027-07-01": {
+              "amount": 75,
+              "minimum_periods": "1",
+              "close_arrival": 0,
+              "close_departure": 0
+            },
+            "2027-07-02": {
+              "amount": 75,
+              "minimum_periods": "1",
+              "close_arrival": 0,
+              "close_departure": 0
+            },
+            "2027-07-03": {
+              "amount": 100,
+              "minimum_periods": "1",
+              "close_arrival": 0,
+              "close_departure": 0
+            },
+            "2027-07-04": {
+              "amount": 100,
+              "minimum_periods": "1",
+              "close_arrival": 0,
+              "close_departure": 0
+            },
+            "2027-07-05": {
+              "amount": 100,
+              "minimum_periods": "1",
+              "close_arrival": 0,
+              "close_departure": 0
+            }
+          }
+        },
+        {
+          "tariff_label": "RAC Member Rate",
+          "tariff_success": "true",
+          "tariff_code": 0,
+          "tariff_message": "",
+          "tariff_total": 414,
+          "tariffs_quoted": {
+            "2027-07-01": {
+              "amount": 69,
+              "minimum_periods": "1",
+              "close_arrival": 0,
+              "close_departure": 0
+            },
+            "2027-07-02": {
+              "amount": 69,
+              "minimum_periods": "1",
+              "close_arrival": 0,
+              "close_departure": 0
+            },
+            "2027-07-03": {
+              "amount": 92,
+              "minimum_periods": "1",
+              "close_arrival": 0,
+              "close_departure": 0
+            },
+            "2027-07-04": {
+              "amount": 92,
+              "minimum_periods": "1",
+              "close_arrival": 0,
+              "close_departure": 0
+            },
+            "2027-07-05": {
+              "amount": 92,
+              "minimum_periods": "1",
+              "close_arrival": 0,
+              "close_departure": 0
+            }
+          }
+        }
+      ]
+    },
+    "38": {
+      "category_id": 38,
+      "category_type_id": "2",
+      "category_name": "Unpowered Camping",
+      "sort": 13,
+      "sites_available": {
+        "2027-07-01": 64,
+        "2027-07-02": 63,
+        "2027-07-03": 60,
+        "2027-07-04": 61,
+        "2027-07-05": 60
+      },
+      "sites_code": {
+        "2027-07-01": 0,
+        "2027-07-02": 0,
+        "2027-07-03": 0,
+        "2027-07-04": 0,
+        "2027-07-05": 0
+      },
+      "sites_message": {
+        "2027-07-01": "",
+        "2027-07-02": "",
+        "2027-07-03": "",
+        "2027-07-04": "",
+        "2027-07-05": ""
+      },
+      "stay_through_sites_available": 59,
+      "stay_through_sites_code": 0,
+      "stay_through_sites_message": "",
+      "online_booking_url": "https://parksandresorts.rac.com.au/monkey-mia/booking/?available_from=2027-07-01&available_to=2027-07-06&force_category_id=38&adults=2&children=0&infants=0&animals=0",
+      "tariffs_available": [
+        {
+          "tariff_label": "Standard Rate",
+          "tariff_success": "true",
+          "tariff_code": 0,
+          "tariff_message": "",
+          "tariff_total": 286,
+          "tariffs_quoted": {
+            "2027-07-01": {
+              "amount": 50,
+              "minimum_periods": "1",
+              "close_arrival": 0,
+              "close_departure": 0
+            },
+            "2027-07-02": {
+              "amount": 50,
+              "minimum_periods": "1",
+              "close_arrival": 0,
+              "close_departure": 0
+            },
+            "2027-07-03": {
+              "amount": 62,
+              "minimum_periods": "1",
+              "close_arrival": 0,
+              "close_departure": 0
+            },
+            "2027-07-04": {
+              "amount": 62,
+              "minimum_periods": "1",
+              "close_arrival": 0,
+              "close_departure": 0
+            },
+            "2027-07-05": {
+              "amount": 62,
+              "minimum_periods": "1",
+              "close_arrival": 0,
+              "close_departure": 0
+            }
+          }
+        },
+        {
+          "tariff_label": "RAC Member Rate",
+          "tariff_success": "true",
+          "tariff_code": 0,
+          "tariff_message": "",
+          "tariff_total": 246,
+          "tariffs_quoted": {
+            "2027-07-01": {
+              "amount": 44,
+              "minimum_periods": "1",
+              "close_arrival": 0,
+              "close_departure": 0
+            },
+            "2027-07-02": {
+              "amount": 43,
+              "minimum_periods": "1",
+              "close_arrival": 0,
+              "close_departure": 0
+            },
+            "2027-07-03": {
+              "amount": 54,
+              "minimum_periods": "1",
+              "close_arrival": 0,
+              "close_departure": 0
+            },
+            "2027-07-04": {
+              "amount": 53,
+              "minimum_periods": "1",
+              "close_arrival": 0,
+              "close_departure": 0
+            },
+            "2027-07-05": {
+              "amount": 52,
+              "minimum_periods": "1",
+              "close_arrival": 0,
+              "close_departure": 0
+            }
+          }
+        }
+      ]
+    },
+    "31": {
+      "category_id": 31,
+      "category_type_id": "7",
+      "category_name": "Exclusive Use 4 Bed Dorms",
+      "sort": 14,
+      "sites_available": {
+        "2027-07-01": 5,
+        "2027-07-02": 5,
+        "2027-07-03": 2,
+        "2027-07-04": 4,
+        "2027-07-05": 5
+      },
+      "sites_code": {
+        "2027-07-01": 0,
+        "2027-07-02": 0,
+        "2027-07-03": 0,
+        "2027-07-04": 0,
+        "2027-07-05": 0
+      },
+      "sites_message": {
+        "2027-07-01": "",
+        "2027-07-02": "",
+        "2027-07-03": "",
+        "2027-07-04": "",
+        "2027-07-05": ""
+      },
+      "stay_through_sites_available": 1,
+      "stay_through_sites_code": 0,
+      "stay_through_sites_message": "",
+      "online_booking_url": "https://parksandresorts.rac.com.au/monkey-mia/booking/?available_from=2027-07-01&available_to=2027-07-06&force_category_id=31&adults=2&children=0&infants=0&animals=0",
+      "tariffs_available": [
+        {
+          "tariff_label": "Standard Rate",
+          "tariff_success": "true",
+          "tariff_code": 0,
+          "tariff_message": "",
+          "tariff_total": 600,
+          "tariffs_quoted": {
+            "2027-07-01": {
+              "amount": 120,
+              "minimum_periods": "1",
+              "close_arrival": 0,
+              "close_departure": 0
+            },
+            "2027-07-02": {
+              "amount": 120,
+              "minimum_periods": "1",
+              "close_arrival": 0,
+              "close_departure": 0
+            },
+            "2027-07-03": {
+              "amount": 120,
+              "minimum_periods": "1",
+              "close_arrival": 0,
+              "close_departure": 0
+            },
+            "2027-07-04": {
+              "amount": 120,
+              "minimum_periods": "1",
+              "close_arrival": 0,
+              "close_departure": 0
+            },
+            "2027-07-05": {
+              "amount": 120,
+              "minimum_periods": "1",
+              "close_arrival": 0,
+              "close_departure": 0
+            }
+          }
+        },
+        {
+          "tariff_label": "RAC Member Rate",
+          "tariff_success": "true",
+          "tariff_code": 0,
+          "tariff_message": "",
+          "tariff_total": 525,
+          "tariffs_quoted": {
+            "2027-07-01": {
+              "amount": 105,
+              "minimum_periods": "1",
+              "close_arrival": 0,
+              "close_departure": 0
+            },
+            "2027-07-02": {
+              "amount": 105,
+              "minimum_periods": "1",
+              "close_arrival": 0,
+              "close_departure": 0
+            },
+            "2027-07-03": {
+              "amount": 105,
+              "minimum_periods": "1",
+              "close_arrival": 0,
+              "close_departure": 0
+            },
+            "2027-07-04": {
+              "amount": 105,
+              "minimum_periods": "1",
+              "close_arrival": 0,
+              "close_departure": 0
+            },
+            "2027-07-05": {
+              "amount": 105,
+              "minimum_periods": "1",
+              "close_arrival": 0,
+              "close_departure": 0
+            }
+          }
+        }
+      ]
+    },
+    "32": {
+      "category_id": 32,
+      "category_type_id": "7",
+      "category_name": "Exclusive Use 8 Bed Dorms",
+      "sort": 15,
+      "sites_available": {
+        "2027-07-01": 6,
+        "2027-07-02": 6,
+        "2027-07-03": 3,
+        "2027-07-04": 2,
+        "2027-07-05": 4
+      },
+      "sites_code": {
+        "2027-07-01": 0,
+        "2027-07-02": 0,
+        "2027-07-03": 0,
+        "2027-07-04": 0,
+        "2027-07-05": 0
+      },
+      "sites_message": {
+        "2027-07-01": "",
+        "2027-07-02": "",
+        "2027-07-03": "",
+        "2027-07-04": "",
+        "2027-07-05": ""
+      },
+      "stay_through_sites_available": 2,
+      "stay_through_sites_code": 0,
+      "stay_through_sites_message": "",
+      "online_booking_url": "https://parksandresorts.rac.com.au/monkey-mia/booking/?available_from=2027-07-01&available_to=2027-07-06&force_category_id=32&adults=2&children=0&infants=0&animals=0",
+      "tariffs_available": [
+        {
+          "tariff_label": "Standard Rate",
+          "tariff_success": "true",
+          "tariff_code": 0,
+          "tariff_message": "",
+          "tariff_total": 1200,
+          "tariffs_quoted": {
+            "2027-07-01": {
+              "amount": 240,
+              "minimum_periods": "1",
+              "close_arrival": 0,
+              "close_departure": 0
+            },
+            "2027-07-02": {
+              "amount": 240,
+              "minimum_periods": "1",
+              "close_arrival": 0,
+              "close_departure": 0
+            },
+            "2027-07-03": {
+              "amount": 240,
+              "minimum_periods": "1",
+              "close_arrival": 0,
+              "close_departure": 0
+            },
+            "2027-07-04": {
+              "amount": 240,
+              "minimum_periods": "1",
+              "close_arrival": 0,
+              "close_departure": 0
+            },
+            "2027-07-05": {
+              "amount": 240,
+              "minimum_periods": "1",
+              "close_arrival": 0,
+              "close_departure": 0
+            }
+          }
+        },
+        {
+          "tariff_label": "RAC Member Rate",
+          "tariff_success": "true",
+          "tariff_code": 0,
+          "tariff_message": "",
+          "tariff_total": 995,
+          "tariffs_quoted": {
+            "2027-07-01": {
+              "amount": 199,
+              "minimum_periods": "1",
+              "close_arrival": 0,
+              "close_departure": 0
+            },
+            "2027-07-02": {
+              "amount": 199,
+              "minimum_periods": "1",
+              "close_arrival": 0,
+              "close_departure": 0
+            },
+            "2027-07-03": {
+              "amount": 199,
+              "minimum_periods": "1",
+              "close_arrival": 0,
+              "close_departure": 0
+            },
+            "2027-07-04": {
+              "amount": 199,
+              "minimum_periods": "1",
+              "close_arrival": 0,
+              "close_departure": 0
+            },
+            "2027-07-05": {
+              "amount": 199,
+              "minimum_periods": "1",
+              "close_arrival": 0,
+              "close_departure": 0
+            }
+          }
+        }
+      ]
+    }
+  }
+}

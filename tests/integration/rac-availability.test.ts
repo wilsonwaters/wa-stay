@@ -1040,6 +1040,57 @@ describe('RAC availability: never a cart address', () => {
   });
 });
 
+describe('RAC availability: a split stay recorded live (Monkey Mia, 1–6 Jul 2027)', () => {
+  /** The stay RAC's staff book as three stays: a site for nights 1–3, another for 4, another for 5. */
+  const SPLIT_STAY: StayQuery = { arrival: '2027-07-01', departure: '2027-07-06', adults: 2 };
+
+  it('the Powered Site, free every night on no one site, is a split stay booked through the park, at $450', async () => {
+    const provider = fixtureProvider();
+    const result = await provider.availability!.check('monkey-mia', SPLIT_STAY);
+    const powered = unit(result, 'cat:7');
+    expect(powered.unitName).toBe('Powered Site');
+    // RAC: 20, 22, 16, 1 and 2 sites free; none for the whole stay (stay-through 0, code 3)
+    expect(powered.nights.map((n) => [n.date, n.state, n.reason, n.price])).toEqual([
+      ['2027-07-01', 'unknown', 'split', 75],
+      ['2027-07-02', 'unknown', 'split', 75],
+      ['2027-07-03', 'unknown', 'split', 100],
+      ['2027-07-04', 'unknown', 'split', 100],
+      ['2027-07-05', 'unknown', 'split', 100],
+    ]);
+    expect(powered).toMatchObject({
+      fullyAvailable: false,
+      freeCount: 0,
+      splitStay: { booking: 'contact' },
+    });
+    expect(powered).not.toHaveProperty('total');
+    // The Standard Rate's $450 for the 5 nights, as RAC's page showed it
+    expect(powered.nights.reduce((sum, n) => sum + (n.price ?? 0), 0)).toBe(450);
+    // Three of its rooms are split stays too; what is free for the stay stays free
+    expect(result.units.filter((u) => u.splitStay).map((u) => [u.unitId, u.unitName])).toEqual([
+      ['cat:10', 'Superior Beach View Room'],
+      ['cat:30', 'Family Garden View Room'],
+      ['cat:12', 'Budget Room Shared Bathroom'],
+      ['cat:7', 'Powered Site'],
+    ]);
+    expect(unit(result, 'cat:38')).toMatchObject({ fullyAvailable: true, freeCount: 59 });
+    expect(splitStayViolations(racManifest, provider, SPLIT_STAY, result)).toEqual([]);
+    expect(stayRuleViolations(SPLIT_STAY, result)).toEqual([]);
+  });
+
+  it("with a member number, at the RAC Member Rate's $414", async () => {
+    const body = answer('monkey-mia-split-2027-07-01-5n');
+    const http = new RecordingHttpClient({ providerId: 'rac', respond: () => ({ body }) });
+    const factory = defineProvider(racManifest, (ctx) =>
+      createRacModules(ctx, { isMember: async () => true })
+    );
+    const provider = factory(createTestProviderContext(racManifest, { http, clock: () => NOW }));
+    const powered = unit(await provider.availability!.check('monkey-mia', SPLIT_STAY), 'cat:7');
+    expect(powered.splitStay).toEqual({ booking: 'contact' });
+    expect(powered.nights.map((n) => n.price)).toEqual([69, 69, 92, 92, 92]);
+    expect(powered.priceNote).toBe('RAC member rate');
+  });
+});
+
 describe('RAC availability: releases (release.opensAt)', () => {
   /** 23:36 AWST on 16 Oct 2026, when the window-edge answer was recorded. */
   const EDGE_CHECKED = new Date('2026-10-16T15:36:00.000Z');
