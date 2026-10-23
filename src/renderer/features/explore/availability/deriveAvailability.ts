@@ -13,6 +13,10 @@
  * With stay types chosen, a place that has other kinds too counts only the chosen kinds'
  * units (`byKind`), or says "check dates" when its provider does not count them apart: a
  * figure about cabins is never one that may include sites.
+ *
+ * A place with no unit free for the whole stay, but free every night by moving between units
+ * (the provider's `splitStay`, §12.36), reads "Free if you move": muted, never counted as
+ * available, after the places with a unit free and before "None free".
  */
 
 import type { LocationSummary } from '../../../../shared/types/catalog.types';
@@ -33,6 +37,7 @@ export type AvailabilityState =
   | 'error'
   | 'loading'
   | 'available'
+  | 'split'
   | 'full'
   | 'none-open'
   | 'unknown';
@@ -53,10 +58,15 @@ export type ProviderAvailabilityStatus = 'idle' | 'loading' | 'success' | 'error
  */
 export type PlaceAvailability =
   | { state: 'available'; availableUnits: number; bookableUnits?: number }
+  /**
+   * No unit free for the whole stay, but every night free by moving between units (a split
+   * stay). `kinds`: the counted kinds with a split, else the counted kinds, for its noun.
+   */
+  | { state: 'split'; kinds: UnitKind[] }
   | { state: 'full'; bookableUnits?: number }
   /** `queue`: the provider's waiting queue is up (its access gate), not a fault. */
   | { state: 'error'; queue: boolean }
-  | { state: Exclude<AvailabilityState, 'available' | 'full' | 'error'> };
+  | { state: Exclude<AvailabilityState, 'available' | 'split' | 'full' | 'error'> };
 
 export interface AvailabilityInput {
   /** Both dates are chosen and valid (`exploreStay`). */
@@ -106,6 +116,29 @@ export function countedKinds(
 }
 
 /**
+ * One kind's counts in the entry's `byKind`. Passed through as the provider gives it: anything
+ * but an object counts as no entry.
+ */
+function kindCounts(entry: BulkAvailabilityEntry, kind: UnitKind) {
+  const { byKind } = entry;
+  const counts = byKind && typeof byKind === 'object' ? byKind[kind] : undefined;
+  return counts && typeof counts === 'object' ? counts : undefined;
+}
+
+/**
+ * Whether the entry's totals answer for the stay types chosen: none is chosen, or the place has
+ * no kind that is not chosen.
+ */
+function totalsAnswer(
+  location: Pick<LocationSummary, 'kind' | 'unitKinds'>,
+  stayTypes: readonly UnitKind[]
+): boolean {
+  if (stayTypes.length === 0) return true;
+  const kinds = unitKindsOf(location);
+  return kinds.every((kind) => stayTypes.includes(kind));
+}
+
+/**
  * The counts that answer for the stay types chosen: the entry's totals when none is chosen or
  * the place has no kind that is not chosen; else the chosen kinds' counts from `byKind`
  * summed (a chosen kind it leaves out counts none), or null when it counts none of them. The
@@ -117,16 +150,9 @@ function chosenCounts(
   stayTypes: readonly UnitKind[]
 ): UnitCounts | null {
   const totals = { available: units(entry.availableUnits), bookable: totalOf(entry.bookableUnits) };
-  if (stayTypes.length === 0) return totals;
-  const kinds = unitKindsOf(location);
-  const chosen = kinds.filter((kind) => stayTypes.includes(kind));
-  if (chosen.length === kinds.length) return totals;
-  // Passed through as the provider gives it: anything but an object counts as no entry.
-  const { byKind } = entry;
-  const countsOf = (kind: UnitKind) => {
-    const counts = byKind && typeof byKind === 'object' ? byKind[kind] : undefined;
-    return counts && typeof counts === 'object' ? counts : undefined;
-  };
+  if (totalsAnswer(location, stayTypes)) return totals;
+  const chosen = unitKindsOf(location).filter((kind) => stayTypes.includes(kind));
+  const countsOf = (kind: UnitKind) => kindCounts(entry, kind);
   if (!chosen.some((kind) => countsOf(kind))) return null;
   return chosen.reduce<UnitCounts>(
     (sum, kind) => {
@@ -146,12 +172,34 @@ function chosenCounts(
 }
 
 /**
+ * With none of the counted units free, whether the place is free every night by moving
+ * between units (a split stay) for the stay types chosen, and of which kinds: the entry's own
+ * `splitStay` (or a counted kind's) when its totals answer, else a chosen kind's in `byKind`.
+ * The kinds are the counted kinds with a split, else the counted kinds; null when there is no
+ * split. Only `true` counts: the entry is passed through as the provider gives it.
+ */
+function splitKinds(
+  location: Pick<LocationSummary, 'kind' | 'unitKinds'>,
+  entry: BulkAvailabilityEntry,
+  stayTypes: readonly UnitKind[]
+): UnitKind[] | null {
+  const counted = countedKinds(location, stayTypes);
+  const withSplit = counted.filter((kind) => kindCounts(entry, kind)?.splitStay === true);
+  const split =
+    withSplit.length > 0 || (totalsAnswer(location, stayTypes) && entry.splitStay === true);
+  if (!split) return null;
+  return withSplit.length > 0 ? withSplit : counted;
+}
+
+/**
  * The place's availability state. Precedence, first match wins: `no-dates` (no stay),
  * `offline-booking` (not bookable online), `check-dates` (the provider checks one place at a
  * time but not in bulk), `not-supported` (no availability at all), `error`, `loading`, then
- * from the provider's entry `available` (a unit free every night), `full` (no unit free every
- * night, some bookable or no total given) or `none-open` (a total of 0: not released, closed or
- * too far ahead), and `unknown` when the provider answered without this place.
+ * from the provider's entry `available` (a unit free every night), `split` (no unit free every
+ * night, but every night free by moving between units, where the provider can tell), `full`
+ * (no unit free every night, some bookable or no total given) or `none-open` (a total of 0:
+ * not released, closed or too far ahead), and `unknown` when the provider answered without
+ * this place.
  *
  * With `stayTypes` chosen and the place having a kind not chosen, the entry's counts for the
  * chosen kinds it has (`byKind`) decide instead of its totals, and without any it is
@@ -190,6 +238,8 @@ export function deriveAvailability(
   const { available, bookable } = counts;
   const withTotal = bookable === undefined ? {} : { bookableUnits: bookable };
   if (available > 0) return { state: 'available', availableUnits: available, ...withTotal };
+  const split = splitKinds(location, entry, input.stayTypes ?? []);
+  if (split) return { state: 'split', kinds: split };
   if (bookable === undefined || bookable > 0) return { state: 'full', ...withTotal };
   return { state: 'none-open' };
 }
@@ -219,7 +269,9 @@ export const LOADING_PILL = '···';
  * How a state reads on a map pill and a card, with the noun of the unit kinds it counts
  * (`countedKinds`: "8 of 24 sites available", "2 of 6 cabins available", "27 of 40 spots
  * available" at a place of several kinds). Without a provider total: "27 free" on the pill and
- * "27 spots free" or "1 cabin free" on the card. Null with no dates: nothing shows.
+ * "27 spots free" or "1 cabin free" on the card. A split stay reads "Free if you move" on the
+ * pill and "Free if you move sites" on the card, in the noun of its own kinds. Null with no
+ * dates: nothing shows.
  */
 export function availabilityLabel(
   availability: PlaceAvailability,
@@ -255,6 +307,12 @@ export function availabilityLabel(
         tone: 'available',
       };
     }
+    case 'split': {
+      // Never "available": every night is free, but only by moving between units. Named by
+      // the kinds with the split.
+      const own = availability.kinds.length > 0 ? nounForKinds(availability.kinds) : noun;
+      return { pill: 'Free if you move', card: `Free if you move ${own.many}`, tone: 'neutral' };
+    }
     case 'full':
       // Not "Fully booked": a provider's "none free for the stay" also covers nights free on
       // different units, closed nights and nights not released yet.
@@ -289,21 +347,22 @@ export function availabilityLabel(
 /** The list's groups with dates set, first to last. */
 const RANK: Record<AvailabilityState, number> = {
   available: 0,
-  full: 1,
-  'none-open': 2,
-  'check-dates': 3,
-  'offline-booking': 4,
-  'not-supported': 5,
-  unknown: 6,
-  loading: 6,
-  error: 7,
-  'no-dates': 8,
+  split: 1,
+  full: 2,
+  'none-open': 3,
+  'check-dates': 4,
+  'offline-booking': 5,
+  'not-supported': 6,
+  unknown: 7,
+  loading: 7,
+  error: 8,
+  'no-dates': 9,
 };
 
 /**
- * The list with dates set: available places first, most free units first, then full, not
- * open, "check dates", info only, not shared, unknown and failed. Within a group the given
- * order is kept (Explore's own order). Returns a new array.
+ * The list with dates set: available places first, most free units first, then those free
+ * only if you move, full, not open, "check dates", info only, not shared, unknown and failed.
+ * Within a group the given order is kept (Explore's own order). Returns a new array.
  */
 export function sortByAvailability<T>(
   items: readonly T[],

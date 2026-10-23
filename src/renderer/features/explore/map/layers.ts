@@ -19,14 +19,15 @@
  * available", "None free", "Check dates", "–") at every unclustered zoom, so the text, not the
  * colour, carries the state:
  * - available: eucalypt fill, white text (`fg-inverse` on `available`, 5.68:1);
- * - none free or not open: sand-100 fill, muted text (`fg-muted` on `surface-subtle`, 5.19:1);
+ * - none free, not open, or free only if you move (a split stay): sand-100 fill, muted text
+ *   (`fg-muted` on `surface-subtle`, 5.19:1);
  * - not bookable online ("Info only"): quiet, only from zoom 8 (as names): white fill, muted
  *   text (`fg-muted` on `surface`, 5.99:1), a sand-500 outline (`border-strong`, 3.67:1 on
  *   the land);
  * - anything else: white fill, ink text, as without dates;
  * - hovered or selected: ink, as without dates.
- * Pins are filled eucalypt, or muted (`fg-muted` on the sand land, 5.60:1) for none free and
- * not open, with a white ring; not bookable online is hollow with a muted ring, the rest
+ * Pins are filled eucalypt, or muted (`fg-muted` on the sand land, 5.60:1) for none free, not
+ * open and free only if you move, with a white ring; not bookable online is hollow with a muted ring, the rest
  * hollow with an ink ring. Clusters holding an available place turn eucalypt and say how
  * many are available ("12 available", the cards' word); available pills win collisions. Only checking pills ("···")
  * pulse.
@@ -66,8 +67,11 @@ export const MAP_FONT_BOLD = ['DIN Pro Bold', 'Arial Unicode MS Bold'];
 
 /** The feature property with a place's availability state, with dates (geo.ts). */
 const AVAIL: ExpressionSpecification = ['get', 'avail'];
-/** States whose pills and pins are muted. */
-const MUTED_STATES = ['full', 'none-open'];
+/**
+ * States whose pills and pins are muted: none free, not open, and free only if you move (a
+ * split stay, never counted as available). The pill's text says which.
+ */
+const MUTED_STATES = ['full', 'none-open', 'split'];
 /** A cluster holds at least one available place (with dates). */
 const HAS_FREE: ExpressionSpecification = ['>', ['get', 'availableCount'], 0];
 

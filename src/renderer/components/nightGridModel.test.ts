@@ -1,6 +1,7 @@
 import type { NightState, UnitAvailability } from '../../shared/types/provider.types';
 import {
   formatPrice,
+  isFreeEveryNightIfYouMove,
   isFullyAvailable,
   isMinStayNight,
   minStayRules,
@@ -487,5 +488,78 @@ describe('min-stay nights (free, but refused for this stay by the stay rules)', 
       label: 'Available, $20',
       short: '$20',
     });
+  });
+});
+
+describe('a split stay the provider reported (free every night, by moving: §12.36)', () => {
+  // RAC's Powered Site: a free site every night, but no one site for the whole stay
+  const powered: UnitAvailability = {
+    unitId: 'cat:4',
+    unitName: 'Powered Site',
+    nights: [
+      { date: '2026-11-06', state: 'unknown', reason: 'split', price: 90 },
+      { date: '2026-11-07', state: 'unknown', reason: 'split', price: 90 },
+    ],
+    fullyAvailable: false,
+    freeCount: 0,
+    splitStay: { booking: 'contact' },
+  };
+  // A class with a free site on the 6th, then free only on another one on the 7th
+  const classSplit: UnitAvailability = {
+    unitId: 'class:117',
+    unitName: 'One site - select on arrival',
+    nights: [
+      { date: '2026-11-06', state: 'available', price: 20 },
+      { date: '2026-11-07', state: 'unknown', reason: 'split', price: 20 },
+    ],
+    fullyAvailable: false,
+  };
+
+  it('says "Free every night" for a unit with a split stay, and keeps the other note for the rest', () => {
+    expect(isFreeEveryNightIfYouMove(powered, NIGHTS)).toBe(true);
+    const alone = summariseAvailability([powered], NIGHTS);
+    expect(alone).toMatchObject({ known: 1, fully: 0, split: 1, splitStays: 1 });
+    expect(summaryNotes(alone, SITE, 'RAC')).toEqual([
+      'Free every night, but not on one site for the whole stay.',
+    ]);
+
+    const both = summariseAvailability([powered, { ...classSplit, freeCount: 0 }], NIGHTS);
+    expect(summaryNotes(both, SITE, 'RAC')).toEqual([
+      'Free every night, but not on one site for the whole stay.',
+      'Free on some nights, but not on one site for the whole stay.',
+    ]);
+  });
+
+  it('claims "every night" only when every night shows it: free or split, at least one split', () => {
+    // No split stay reported: the old note
+    expect(isFreeEveryNightIfYouMove(classSplit, NIGHTS)).toBe(false);
+    expect(summaryNotes(summariseAvailability([classSplit], NIGHTS), SITE, 'ParkStay')).toEqual([
+      'Free on some nights, but not on one site for the whole stay.',
+    ]);
+    // A night it did not report, or one refused by the stay rules, is not free
+    const missing = { ...powered, nights: powered.nights.slice(0, 1) };
+    expect(isFreeEveryNightIfYouMove(missing, NIGHTS)).toBe(false);
+    const refused = {
+      ...powered,
+      nights: [
+        powered.nights[0],
+        { date: NIGHTS[1], state: 'unknown' as const, reason: 'min-stay' as const },
+      ],
+    };
+    expect(isFreeEveryNightIfYouMove(refused, NIGHTS)).toBe(false);
+    // Every night free with no split is no split stay
+    const free = {
+      ...powered,
+      nights: NIGHTS.map((date) => ({ date, state: 'available' as const })),
+    };
+    expect(isFreeEveryNightIfYouMove(free, NIGHTS)).toBe(false);
+    expect(isFreeEveryNightIfYouMove(powered, [])).toBe(false);
+  });
+
+  it('names the unit by its kind', () => {
+    const summary = summariseAvailability([powered], NIGHTS);
+    expect(summaryNotes(summary, { one: 'cabin', many: 'cabins' }, 'RAC')).toEqual([
+      'Free every night, but not on one cabin for the whole stay.',
+    ]);
   });
 });

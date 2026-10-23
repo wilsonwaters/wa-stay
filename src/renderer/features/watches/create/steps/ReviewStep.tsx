@@ -177,8 +177,11 @@ export function ReviewStep({
             <Item label="Alert me">
               {v.allowPartialMatch
                 ? 'Also when only some nights are free'
-                : 'Only when the whole stay is free'}
-              , {v.notifyOnly ? 'stops after the first alert' : 'keeps checking after alerts'}
+                : v.allowSplitStay
+                  ? 'When the whole stay is free'
+                  : 'Only when the whole stay is free'}
+              {v.allowSplitStay && `; also when it's free only if you move ${noun.many}`},{' '}
+              {v.notifyOnly ? 'stops after the first alert' : 'keeps checking after alerts'}
             </Item>
             {manifest.capabilities.holds && (
               <Item label="Automatic hold">
