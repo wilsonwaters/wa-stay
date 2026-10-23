@@ -45,7 +45,10 @@ monogram (ParkStay's is "PS" on green, RAC's "RAC" on dark grey).
   how many are free ("27 spots free", "1 cabin free"), as RAC gives no total, or "Not open"
   when nothing can be booked for those dates yet. With a stay type ticked, a place that also
   has other kinds counts only the ones you chose, or says "Check dates on the place page" when
-  its provider doesn't count them separately.
+  its provider doesn't count them separately. An RAC park whose only option is a stay free
+  every night, but only by moving between sites, reads "Free if you move sites", after the
+  places with something free; it is never counted as available, and **Available only** hides
+  it.
 - **The map** shows every place from every provider. With **Search as I move the map** on, the
   list narrows to the area you are looking at. Pins cluster when zoomed out; the key explains
   the colours. If WA Stay was built without a map token, Explore shows the list only and says
@@ -87,6 +90,11 @@ Click a place to open its page:
   name: with your RAC member number saved, RAC's members' rates count, marked "Rate: RAC member
   rate". A night the provider refuses for your stay (a minimum stay, a day with no arrivals) is
   marked, with the reason;
+- **Free if you move sites**, under the table, when no site is free for your whole stay but
+  every night is, by moving between sites. It says how to book it: at an RAC park, **Contact
+  {park}** opens the park's contact page (its staff book it as separate stays); at ParkStay,
+  each part in order (a site and its nights) with **Book {dates} on ParkStay** for each, the
+  fewest bookings that cover your stay. A price reads "about";
 - **Book on {provider}** opens the provider's booking page in your browser with this place and
   your dates chosen: ParkStay's search page, whose **See availability** takes you on to book,
   or the RAC park's booking page. With an RAC member number saved, **Copy RAC member number**
@@ -109,7 +117,9 @@ A watch checks a place for your dates on a schedule and tells you when sites fre
    only on stays the provider accepts.
 3. Choose the alerts: how often to check (every 15 minutes to daily; 1 hour by default; a
    provider may set a longer minimum), whether to tell you about partial availability (only
-   some nights free), whether to stop after the first alert, and, for ParkStay (and RAC with
+   some nights free), whether to tell you about stays that move between sites (every night
+   free, but not on one site; off by default, and never held automatically), whether to stop
+   after the first alert, and, for ParkStay (and RAC with
    its experimental auto-cart turned on), **Hold a site automatically when found**.
 4. Review and **Create watch**.
 
@@ -129,7 +139,8 @@ Stay and the provider's booking page in your browser, filled in with the place a
 found (for some nights free, the longest run of them). Book there before someone else does: an
 alert reserves nothing. The watch's page has the same **Book on {provider}** link under its
 last result while the stay is still ahead. An alert that a site is **held** opens only the
-watch, where you pay.
+watch, where you pay, and an alert that a stay is free only if you move between sites opens
+only the watch, which shows how to book it.
 
 ### Can I book from my phone?
 
@@ -137,7 +148,9 @@ Yes, from the email. With email alerts on ([Settings](#settings)), each alert th
 something has a **Book on {provider}** link to the provider's public booking page for those
 dates, so you can book from your phone or any other computer. The link is always a page on the
 provider's own site, never a cart or a checkout. An email about a held site says the hold is in
-WA Stay on the computer that placed it (pay there), and gives the same public link.
+WA Stay on the computer that placed it (pay there), and gives the same public link. An email
+about a stay free only if you move says how to book it: **Contact {park}**, or each part with
+its own **Book on {provider}** link.
 
 ## Site Sniper (coming soon)
 

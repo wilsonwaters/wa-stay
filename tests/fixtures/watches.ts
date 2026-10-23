@@ -63,6 +63,7 @@ export const mockWatch: Watch = {
   autoHold: false,
   notifyOnly: true,
   allowPartialMatch: false,
+  allowSplitStay: false,
   maxPrice: 50.0,
   notes: 'Looking for unpowered sites',
   createdAt: new Date('2024-01-01T00:00:00Z'),

@@ -614,3 +614,120 @@ describe('sortByAvailability', () => {
     expect(items[0].name).toBe('Zebra full');
   });
 });
+
+describe('free only if you move: a split stay (§12.36)', () => {
+  /** An RAC park: sites and cabins, its free units counted with no total. */
+  const PARK = {
+    bookingMode: 'online' as const,
+    kind: 'holiday-park' as const,
+    unitKinds: ['campsite', 'cabin'] as UnitKind[],
+  };
+  /** None free for the whole stay; the powered sites free every night by moving. */
+  const split = (patch: Partial<BulkAvailabilityEntry> = {}): BulkAvailabilityEntry => ({
+    key: 'rac:busselton',
+    availableUnits: 0,
+    splitStay: true,
+    byKind: { campsite: { availableUnits: 0, splitStay: true }, cabin: { availableUnits: 0 } },
+    ...patch,
+  });
+  const derive = (
+    entry: BulkAvailabilityEntry,
+    stayTypes: UnitKind[] = [],
+    location: Parameters<typeof deriveAvailability>[0] = PARK
+  ) =>
+    deriveAvailability(location, {
+      staySet: true,
+      capabilities: BULK,
+      status: 'success',
+      entry,
+      stayTypes,
+    });
+  const label = (entry: BulkAvailabilityEntry, stayTypes: UnitKind[] = []) =>
+    availabilityLabel(derive(entry, stayTypes), countedKinds(PARK, stayTypes), 'RAC');
+
+  it('reads the entry’s split stay, named by the kinds with one', () => {
+    expect(derive(split())).toEqual({ state: 'split', kinds: ['campsite'] });
+    expect(label(split())).toEqual({
+      pill: 'Free if you move',
+      card: 'Free if you move sites',
+      tone: 'neutral',
+    });
+  });
+
+  it('names it by the counted kinds when no kind says which has it', () => {
+    const entry = split({ byKind: undefined });
+    expect(derive(entry)).toEqual({ state: 'split', kinds: ['campsite', 'cabin'] });
+    expect(label(entry)?.card).toBe('Free if you move spots');
+    // A campground's sites
+    expect(derive(split({ byKind: undefined }), [], ONLINE)).toEqual({
+      state: 'split',
+      kinds: ['campsite'],
+    });
+  });
+
+  it('never hides availability: a place with any unit free stays available', () => {
+    expect(derive(split({ availableUnits: 3 }))).toEqual({
+      state: 'available',
+      availableUnits: 3,
+    });
+  });
+
+  it('comes before "None free" and "Not open", and only `true` counts', () => {
+    expect(derive(split({ splitStay: undefined, byKind: undefined }))).toEqual({ state: 'full' });
+    expect(derive(split({ bookableUnits: 0 }))).toEqual({ state: 'split', kinds: ['campsite'] });
+    const junk = {
+      splitStay: 'yes',
+      byKind: { campsite: { availableUnits: 0, splitStay: 1 } },
+    } as unknown as Partial<BulkAvailabilityEntry>;
+    expect(derive(split(junk))).toEqual({ state: 'full' });
+  });
+
+  it('with stay types chosen, asks the chosen kinds in byKind', () => {
+    // Camping: the powered sites' split
+    expect(derive(split(), ['campsite'])).toEqual({ state: 'split', kinds: ['campsite'] });
+    expect(label(split(), ['campsite'])?.card).toBe('Free if you move sites');
+    // Cabins & villas: no split among the cabins, so none free
+    expect(derive(split(), ['cabin'])).toEqual({ state: 'full' });
+    expect(label(split(), ['cabin'])?.card).toBe('No cabin free every night');
+    // The top-level split alone never speaks for a chosen kind
+    expect(
+      derive(split({ byKind: { campsite: { availableUnits: 0 }, cabin: { availableUnits: 0 } } }), [
+        'cabin',
+      ])
+    ).toEqual({ state: 'full' });
+    // Every kind chosen: the totals answer, the entry's split with them
+    expect(derive(split(), ['campsite', 'cabin'])).toEqual({
+      state: 'split',
+      kinds: ['campsite'],
+    });
+  });
+
+  it('sorts after the available places and before full, not open and the rest', () => {
+    const places = [
+      {
+        name: 'Not open',
+        availability: derive(split({ splitStay: undefined, byKind: undefined, bookableUnits: 0 })),
+      },
+      { name: 'Full', availability: { state: 'full' } as PlaceAvailability },
+      { name: 'Move B', availability: derive(split()) },
+      { name: 'Unknown', availability: { state: 'unknown' } as PlaceAvailability },
+      { name: 'Free', availability: derive(split({ availableUnits: 2 })) },
+      { name: 'Move A', availability: derive(split({ byKind: undefined })) },
+    ];
+    expect(sortByAvailability(places, (place) => place.availability).map((p) => p.name)).toEqual([
+      'Free',
+      'Move B',
+      'Move A',
+      'Full',
+      'Not open',
+      'Unknown',
+    ]);
+  });
+
+  it('lets "Available only" hide it: it is never "available"', () => {
+    const availability = derive(split());
+    expect(availability.state === 'available').toBe(false);
+    const words = label(split());
+    expect(`${words?.pill} ${words?.card}`).not.toMatch(/available/i);
+  });
+});

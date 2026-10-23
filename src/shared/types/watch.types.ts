@@ -1,6 +1,12 @@
 import type { ApiErrorCode } from './api.types';
 import { WatchResult } from './common.types';
-import type { ProviderId, StayParams, UnitAvailability, UnitKind } from './provider.types';
+import type {
+  ProviderId,
+  SplitStay,
+  StayParams,
+  UnitAvailability,
+  UnitKind,
+} from './provider.types';
 import type { LocationRef, Stay, StayInput } from './stay.types';
 
 /**
@@ -38,6 +44,8 @@ export interface Watch {
   autoHold: boolean;
   notifyOnly: boolean;
   allowPartialMatch: boolean;
+  /** Also alert on a split stay: every night free, but only by moving between units. Off by default. */
+  allowSplitStay: boolean;
   maxPrice?: number;
   notes?: string;
   /** The hold its auto-hold placed (`lastResult` held, or booked once paid for). */
@@ -50,6 +58,12 @@ export interface Watch {
    * Main derives it from `lastAvailability` on every read; it is never stored.
    */
   bookingLink?: WatchBookingLink;
+  /**
+   * The split stays the last check found, best first, with how to book them: set only while
+   * `lastResult` is split-found and the stored nights are the stay's. Main derives it from
+   * `lastAvailability` on every read (as `bookingLink`); it is never stored.
+   */
+  splitStays?: SplitStay[];
   createdAt: Date;
   updatedAt: Date;
 }
@@ -89,6 +103,8 @@ export interface WatchInput {
   autoHold?: boolean;
   notifyOnly?: boolean;
   allowPartialMatch?: boolean;
+  /** `Watch.allowSplitStay`; off when left out. */
+  allowSplitStay?: boolean;
   maxPrice?: number;
   notes?: string;
 }
@@ -122,6 +138,11 @@ export interface WatchExecutionResult {
   matches: WatchMatch[];
   /** Present when an auto-hold was placed. */
   hold?: WatchHold;
+  /**
+   * The split stays the check found (`SPLIT_FOUND`: nothing free on one unit, and the watch
+   * allows them), best first, with their links; `matches` is then empty.
+   */
+  splitStays?: SplitStay[];
   error?: string;
   errorCode?: ApiErrorCode;
   /** True when the watch's arrival date has passed and it was deactivated. */

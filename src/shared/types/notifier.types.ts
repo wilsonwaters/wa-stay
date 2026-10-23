@@ -142,6 +142,20 @@ export interface NotificationMessage {
   bookingUrl?: string;
   /** The alert is about a hold WA Stay placed: the email says the hold is in the app. */
   heldInApp?: boolean;
+  /**
+   * How to book a split stay an alert found (never stored): the place's contact page, or each
+   * part's booking page. Every URL is https on the provider's own site, checked again by
+   * `notify`; one that isn't is dropped.
+   */
+  splitStay?: NotificationSplitStay;
+}
+
+/** The email's "How to book" for a split stay (`NotificationMessage.splitStay`). */
+export interface NotificationSplitStay {
+  /** `contact`: "Contact {place}" and the place's contact page. */
+  contact?: { label: string; url: string };
+  /** `separate`: one line per part ("CAMPSITE 03, 10/11/2026, 1 night") and its booking page. */
+  parts?: Array<{ label: string; url?: string }>;
 }
 
 /**

@@ -2,9 +2,11 @@ import {
   Notification,
   NotificationInput,
   Watch,
+  type NotificationSplitStay,
   type ProviderId,
   SiteSnipe,
   type Booking,
+  type SplitStay,
   type UnitKind,
   type WatchHold,
   type WatchMatch,
@@ -57,6 +59,32 @@ interface DispatchMeta {
    * person pays there), and the email says where the hold is. Never stored.
    */
   heldInApp?: boolean;
+  /**
+   * How to book a split stay the alert found, for the email: the place's contact page, or each
+   * part's booking page. `notify` checks every URL against the provider's manifest, as
+   * `bookingUrl`, and drops any other. A desktop click never opens them. Never stored.
+   */
+  splitStay?: NotificationSplitStay;
+}
+
+/** The most parts a split alert's message names; the rest are "and N more". */
+const SPLIT_PARTS_NAMED = 4;
+
+/** The most reporting units a split alert's message names in brackets. */
+const SPLIT_UNITS_NAMED = 3;
+
+/** "1 night", "3 nights". */
+function nightsLabel(nights: number): string {
+  return nights === 1 ? '1 night' : `${nights} nights`;
+}
+
+/** "A", "A and B", "A, B and C"; past `most`, "A, B, C and 2 more". */
+function listOf(names: readonly string[], most: number): string {
+  const named = names.slice(0, most);
+  const more = names.length - named.length;
+  const items = more > 0 ? [...named, `${more} more`] : named;
+  if (items.length <= 1) return items.join('');
+  return `${items.slice(0, -1).join(', ')} and ${items[items.length - 1]}`;
 }
 
 /** What a general notification (`notifyWarning`) is about: a watch, snipe or booking. */
@@ -193,6 +221,7 @@ export class NotificationService {
     const notification = this.notificationRepo.create(input);
     const bookingUrl = this.checkedBookingLink(input, dispatchMeta?.bookingUrl);
     const heldInApp = dispatchMeta?.heldInApp === true;
+    const splitStay = this.checkedSplitStay(input, dispatchMeta?.splitStay);
 
     // The OS notification, if the person wants them; its sound is the OS's own (`silent`). A
     // click on an alert about a hold opens only the app, where the person pays.
@@ -219,6 +248,7 @@ export class NotificationService {
           locationName: dispatchMeta?.locationName,
           ...(bookingUrl ? { bookingUrl } : {}),
           ...(heldInApp ? { heldInApp } : {}),
+          ...(splitStay ? { splitStay } : {}),
         });
       } catch (error) {
         log.error('Error dispatching notification to providers:', error);
@@ -241,6 +271,29 @@ export class NotificationService {
     if (!bookingUrl || !input.providerId) return undefined;
     const manifest = this.providerManifest(input.providerId);
     return manifest ? firstBookingLink(manifest, [bookingUrl]) : undefined;
+  }
+
+  /**
+   * A split alert's "How to book", each URL checked as a booking link (`checkedBookingLink`):
+   * the contact link kept only when it is one, each part kept with its label and its link only
+   * when it is one. None when nothing is left to show.
+   */
+  private checkedSplitStay(
+    input: NotificationInput,
+    splitStay: NotificationSplitStay | undefined
+  ): NotificationSplitStay | undefined {
+    if (!splitStay) return undefined;
+    const contactUrl = splitStay.contact
+      ? this.checkedBookingLink(input, splitStay.contact.url)
+      : undefined;
+    const parts = splitStay.parts?.map(({ label, url }) => {
+      const checked = this.checkedBookingLink(input, url);
+      return checked ? { label, url: checked } : { label };
+    });
+    const contact =
+      splitStay.contact && contactUrl ? { label: splitStay.contact.label, url: contactUrl } : null;
+    if (!contact && !parts?.length) return undefined;
+    return { ...(contact ? { contact } : {}), ...(parts?.length ? { parts } : {}) };
   }
 
   /**
@@ -321,6 +374,89 @@ export class NotificationService {
         actionUrl: relatedPath(RelatedType.WATCH, watch.id),
       },
       { locationName: watch.location.name, bookingUrl }
+    );
+  }
+
+  /**
+   * Notify when a watch finds a split stay (`SPLIT_FOUND`): every night free, but only by
+   * moving between units. `splitStays` are best first, with their links
+   * (`withSplitStayLinks`); the alert names the best. "Free if you move sites at …", in the noun
+   * of the units it uses (else the watch's stay types, else the provider's). A `contact` one
+   * names the units that reported it and says to contact the place; a `separate` one lists its
+   * parts (the first four) and says to book each. `note` is a sentence added to the message,
+   * such as that WA Stay holds none of these. A desktop click opens only the watch, where the
+   * person reads the parts first; the email gets "How to book": the contact page, or each part
+   * with its booking page.
+   */
+  async notifyWatchSplitFound(
+    watch: Watch,
+    splitStays: readonly SplitStay[],
+    note?: string
+  ): Promise<void> {
+    const best = splitStays[0];
+    if (!best) return;
+
+    const place = watch.location.name;
+    const noun = this.nounFor(watch, best.unitKind ? [{ unitKind: best.unitKind }] : []);
+    const shortName = this.providerName(watch.providerId) ?? "the provider's website";
+    const arrival = formatCalendarDate(watch.stay.arrival);
+    const departure = formatCalendarDate(watch.stay.departure);
+
+    let message: string;
+    let splitStay: NotificationSplitStay | undefined;
+    if (best.booking === 'contact') {
+      const names = splitStays
+        .filter((split) => split.booking === 'contact' && split.unitName)
+        .map((split) => split.unitName as string);
+      const which = names.length > 0 ? ` (${listOf(names, SPLIT_UNITS_NAMED)})` : '';
+      message =
+        `Every night from ${arrival} - ${departure} is free at ${place}${which}, but not on one ${noun.one}. ` +
+        `Contact ${place} to book it as separate stays.`;
+      splitStay = best.contactUrl
+        ? { contact: { label: `Contact ${place}`, url: best.contactUrl } }
+        : undefined;
+    } else {
+      const parts = best.parts ?? [];
+      const free =
+        best.units !== undefined
+          ? `Free across ${unitCountLabel(best.units, noun)}`
+          : `Free if you move ${noun.many}`;
+      const named = parts
+        .slice(0, SPLIT_PARTS_NAMED)
+        .map(
+          (part) =>
+            `${part.unitName} for ${nightsLabel(nightsBetween(part.arrival, part.departure))}`
+        )
+        .join(', then ');
+      const more =
+        parts.length > SPLIT_PARTS_NAMED ? `, and ${parts.length - SPLIT_PARTS_NAMED} more` : '';
+      message =
+        `${free} at ${place} for ${arrival} - ${departure}` +
+        (named ? `: ${named}${more}.` : '.') +
+        ` Book each part on ${shortName}.`;
+      splitStay = parts.length
+        ? {
+            parts: parts.map((part) => ({
+              label: `${part.unitName}, ${formatCalendarDate(part.arrival)}, ${nightsLabel(nightsBetween(part.arrival, part.departure))}`,
+              ...(part.bookingUrl ? { url: part.bookingUrl } : {}),
+            })),
+          }
+        : undefined;
+    }
+
+    await this.notify(
+      {
+        userId: watch.userId,
+        providerId: watch.providerId,
+        type: NotificationType.WATCH_FOUND,
+        title: `Free if you move ${noun.many} at ${place}`,
+        message: note ? `${message} ${note}` : message,
+        relatedId: watch.id,
+        relatedType: RelatedType.WATCH,
+        actionUrl: relatedPath(RelatedType.WATCH, watch.id),
+      },
+      // No booking link: a click opens the watch, where the parts are
+      { locationName: place, ...(splitStay ? { splitStay } : {}) }
     );
   }
 

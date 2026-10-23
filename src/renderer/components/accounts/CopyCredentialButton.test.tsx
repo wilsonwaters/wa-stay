@@ -151,6 +151,29 @@ describe('beside "Book on RAC" and "Pay now"', () => {
         now={NOW}
       />
     ),
+    "a watch's stay free only if you move (SplitStays)": () => (
+      <WatchAvailability
+        watch={makeWatch({
+          providerId: 'rac',
+          location: { externalId: 'busselton', name: 'RAC Busselton Holiday Park' },
+          stay: { ...makeWatch().stay, arrival: '2099-12-11', departure: '2099-12-13' },
+          lastResult: WatchResult.SPLIT_FOUND,
+          lastCheckedAt: new Date(NOW.getTime() - 60_000),
+          lastAvailability: [makeUnit('cat:4', ['2099-12-11', '2099-12-12'])],
+          splitStays: [
+            {
+              unitKind: 'campsite',
+              booking: 'contact',
+              unitId: 'cat:4',
+              unitName: 'Powered Site',
+              contactUrl: 'https://parksandresorts.rac.com.au/busselton/contact-us/',
+            },
+          ],
+        })}
+        manifest={RAC_MANIFEST}
+        now={NOW}
+      />
+    ),
     'an alerted snipe (AlertedPanel)': () => (
       <AlertedPanel
         snipe={makeAlertedSnipe({
@@ -177,6 +200,7 @@ describe('beside "Book on RAC" and "Pay now"', () => {
   const anchors: Record<keyof typeof places, RegExp> = {
     'the place page (StayCard)': /^Book on RAC/,
     "a watch's page (WatchAvailability)": /^Book on RAC/,
+    "a watch's stay free only if you move (SplitStays)": /^Contact RAC Busselton Holiday Park/,
     'an alerted snipe (AlertedPanel)': /^Book on RAC/,
     'a hold (HoldPanel)': /^Pay now$/,
   };

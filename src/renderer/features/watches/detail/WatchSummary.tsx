@@ -107,6 +107,7 @@ export function WatchSummary({ watch, state, manifest, today, now, units }: Watc
           {watch.allowPartialMatch
             ? 'Also when only some nights are free'
             : 'When the whole stay is free'}
+          {watch.allowSplitStay && `; also when it's free only if you move ${noun.many}`}
           {watch.notifyOnly ? '; stops after the first alert' : '; keeps checking after alerts'}
         </Item>
         {(manifest?.capabilities.holds || watch.hold || watch.autoHold) && (

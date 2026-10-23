@@ -8,7 +8,7 @@
  * The key reads over IPC (`providers.list`, `catalog.search`, `accounts.list`) answer for both
  * providers, and filtered to ParkStay they equal what a container with ParkStay alone answers.
  * Each provider's watch carries its own booking link (R7), and a provider's stay rules (R8)
- * touch only its own watches.
+ * and split stays touch only its own watches.
  */
 
 import fs from 'fs';
@@ -326,5 +326,77 @@ describe('a container with ParkStay and a second provider', () => {
     const outcome = (w: Watch) => [w.lastResult, w.foundCount, w.bookingLink, w.lastAvailability];
     expect(outcome(withBoth)).toEqual(outcome(alone));
     expect(withBoth.lastResult).not.toBe('not_found');
+  });
+
+  it("a provider's split stay gives its watch SPLIT_FOUND with the place's contact page, and ParkStay's watch is unaffected", async () => {
+    fakeDateOnly(FIXED_NOW);
+    // A category free both nights, but on no one site for both: its provider says to contact
+    const split = { state: 'unknown', reason: 'split', price: 45 } as const;
+    second = createFakeProvider({
+      id: 'bush-camps',
+      name: 'Bush Camps WA',
+      shortName: 'Bush Camps',
+      account: 'signed-out',
+      contactLinks: true,
+      availability: { '1': { cat: [split, split] } },
+      unitKinds: { cat: 'campsite' },
+      splitStays: { cat: { booking: 'contact' } },
+    });
+    const stay = { arrival: '2026-11-10', departure: '2026-11-12', adults: 1 };
+    const bungarra: WatchInput = {
+      providerId: 'parkstay',
+      name: 'Bungarra',
+      location: { externalId: '20', name: 'Bungarra' },
+      stay,
+      stayParams: { gearType: 'all' },
+      allowSplitStay: true,
+    };
+    const watchIn = async (w: World, input: WatchInput): Promise<Watch> => {
+      const watch = await w.read<Watch>('watches:create', input);
+      await w.read('watches:run-now', { id: watch.id });
+      return w.read<Watch>('watches:get', { id: watch.id });
+    };
+
+    const both = await world([parkstayFactory, second.factory]);
+    const bush = await watchIn(both, {
+      providerId: 'bush-camps',
+      name: 'Banksia',
+      location: { externalId: '1', name: 'Banksia Camp' },
+      stay,
+      allowSplitStay: true,
+    });
+    expect(bush).toMatchObject({ lastResult: 'split_found', foundCount: 1, isActive: false });
+    expect(bush.bookingLink).toBeUndefined();
+    expect(bush.splitStays).toEqual([
+      {
+        unitKind: 'campsite',
+        booking: 'contact',
+        unitId: 'cat',
+        unitName: 'Site cat',
+        total: 90,
+        contactUrl: 'https://bush-camps.example/locations/1/contact',
+      },
+    ]);
+    const [alert] = await both.read<Notification[]>('notifications:list', {});
+    expect(alert).toMatchObject({
+      providerId: 'bush-camps',
+      title: 'Free if you move sites at Banksia Camp',
+      message: expect.stringMatching(/^Every night from .* is free at Banksia Camp \(Site cat\)/),
+    });
+    // The contact page goes to the email only, never into the stored alert
+    expect(JSON.stringify(alert)).not.toContain('/contact');
+
+    const withBoth = await watchIn(both, bungarra);
+    const alone = await watchIn(await world([parkstayFactory]), bungarra);
+    const outcome = (w: Watch) => [
+      w.lastResult,
+      w.foundCount,
+      w.bookingLink,
+      w.splitStays,
+      w.lastAvailability,
+    ];
+    expect(outcome(withBoth)).toEqual(outcome(alone));
+    expect(withBoth.lastResult).toBe('found');
+    expect(withBoth.splitStays).toBeUndefined();
   });
 });

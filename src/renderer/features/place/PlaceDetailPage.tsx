@@ -28,6 +28,7 @@ import {
   type Guests,
 } from '../../components/ui';
 import { buttonClassName } from '../../components/ui/Button';
+import { splitStaysTitle } from '../../components/SplitStays';
 import { AvailabilitySection } from './AvailabilitySection';
 import { Gallery, GALLERY_SIZE } from './Gallery';
 import {
@@ -251,9 +252,25 @@ export default function PlaceDetailPage() {
     if (check.data && summaryRef.current) {
       awaiting.current = false;
       summaryRef.current.focus();
-      announce(summaryRef.current.textContent?.trim() ?? '');
+      const summary = summaryRef.current.textContent?.trim() ?? '';
+      // A split stay is said too: the block under the grid is not where focus lands
+      const splitStays = check.data.splitStays ?? [];
+      announce(
+        splitStays.length > 0
+          ? `${summary}. ${splitStaysTitle(splitStays, placeNoun(detail, manifest))}`
+          : summary
+      );
     }
-  }, [check.isFetching, check.isError, check.error, check.data, manifest, shortName, announce]);
+  }, [
+    check.isFetching,
+    check.isError,
+    check.error,
+    check.data,
+    detail,
+    manifest,
+    shortName,
+    announce,
+  ]);
 
   // Opened before anything about the place was known, the page said "Loading place"; say its
   // name once the detail arrives (with a cached summary the name was there from the start).
@@ -419,6 +436,9 @@ export default function PlaceDetailPage() {
           {requested && check.data && (
             <AvailabilitySection
               availability={check.data}
+              splitStays={check.data.splitStays}
+              place={detail?.name ?? shortName}
+              providerId={providerId}
               arrival={requested.arrival}
               departure={requested.departure}
               current={current}

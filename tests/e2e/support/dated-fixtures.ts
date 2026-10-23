@@ -17,6 +17,9 @@
  *
  *   const fixtures = writeDatedFixtures(tempDir('dated'));
  *   const wa = await launchWaStay({ env: { WA_STAY_E2E_FIXTURES_DIR: fixtures.dir }, … });
+ *
+ * A journey that needs an answer the recordings don't have edits its copy before the launch
+ * (`editDatedFixture(fixtures, 'parkstay/campsite_availablity_view_20.json', (view) => …)`).
  */
 
 import fs from 'fs';
@@ -105,6 +108,23 @@ export function writeDatedFixtures(
   fs.writeFileSync(manifestFile, `${JSON.stringify(manifest, null, 2)}\n`);
   moveParkStayViews(path.join(dir, 'parkstay'), arrival);
   return { dir, arrival };
+}
+
+/**
+ * Edits one JSON answer in the copy, after its dates were moved: `file` is its path in the copy
+ * (`rac/availability-busselton-2026-11-06-2n.json`), and `edit` changes the parsed answer in
+ * place. For a journey that needs an answer the recordings don't have, such as a split stay
+ * (`split-stays.spec.ts`); the recorded fixtures are never changed.
+ */
+export function editDatedFixture<T>(
+  fixtures: DatedFixtures,
+  file: string,
+  edit: (answer: T) => void
+): void {
+  const target = path.join(fixtures.dir, file);
+  const answer = JSON.parse(fs.readFileSync(target, 'utf8')) as T;
+  edit(answer);
+  fs.writeFileSync(target, `${JSON.stringify(answer, null, 2)}\n`);
 }
 
 /** Each ParkStay campground availability view in `parkstayDir`, moved to arrive on `arrival`. */

@@ -1,7 +1,8 @@
 /**
  * The `watches`, `snipes` and `bookings` namespaces through P3's harness, against a real
  * container (built-in ParkStay plus FakeProviders added to its registry): capability errors,
- * field-level validation, stay types (`unitKinds`) on watches and snipes, list filters,
+ * field-level validation, stay types (`unitKinds`) on watches and snipes, split stays
+ * (`allowSplitStay`, `splitStays`, and `catalog.checkLocation`'s answer), list filters,
  * booking import and `manageUrl`, the removed `bookings:sync*` channels, and `*:updated`
  * events reaching the trusted renderer.
  */
@@ -13,7 +14,14 @@ import { createAppUrlMatcher } from '@main/app/renderer-entry';
 import { registerIpcHandlers } from '@main/ipc';
 import { createSenderGuard } from '@main/ipc/sender-guard';
 import { SnipeReleaseMode } from '@shared/types/common.types';
-import type { APIResponse, Booking, SiteSnipe, Watch } from '@shared/types';
+import type {
+  APIResponse,
+  Booking,
+  LocationCheck,
+  SiteSnipe,
+  Watch,
+  WatchExecutionResult,
+} from '@shared/types';
 import {
   APP_INDEX_PATH,
   FakeIpcMain,
@@ -231,6 +239,139 @@ describe('watches / snipes / bookings over IPC', () => {
       await expect(call(`${namespace}:get`, { id })).resolves.toMatchObject({
         data: { unitKinds: [] },
       });
+    });
+  });
+
+  describe('split stays (allowSplitStay, splitStays)', () => {
+    const SPLIT_STAY = { arrival: '2099-12-01', departure: '2099-12-03', adults: 2 };
+    /** Registers `split`: place 1 is free both nights, but u1 the first and u2 the second. */
+    const registerSplit = (): void => {
+      const split = createFakeProvider({
+        id: 'split',
+        availability: {
+          '1': {
+            u1: [{ state: 'available' }, { state: 'booked' }],
+            u2: [{ state: 'booked' }, { state: 'available' }],
+          },
+        },
+      });
+      container.providers.register(split.factory, createTestProviderContext(split.manifest));
+    };
+    const partUrl = (arrival: string, departure: string) =>
+      `https://split.example/book/1?arrival=${arrival}&departure=${departure}`;
+
+    it('watches.create and watches.update take allowSplitStay, and refuse one that is not a boolean', async () => {
+      const created = await call<Watch>('watches:create', {
+        ...watchInput('fake'),
+        allowSplitStay: true,
+      });
+      expect(created).toMatchObject({ success: true, data: { allowSplitStay: true } });
+      const id = created.data!.id;
+      await expect(call('watches:get', { id })).resolves.toMatchObject({
+        data: { allowSplitStay: true },
+      });
+      await expect(
+        call('watches:update', { id, updates: { allowSplitStay: false } })
+      ).resolves.toMatchObject({ success: true, data: { allowSplitStay: false } });
+
+      // Off when left out
+      await expect(call('watches:create', watchInput('fake'))).resolves.toMatchObject({
+        success: true,
+        data: { allowSplitStay: false },
+      });
+
+      await expect(
+        call('watches:create', { ...watchInput('fake'), allowSplitStay: 'yes' })
+      ).resolves.toMatchObject({ success: false, code: 'VALIDATION', issues: ['allowSplitStay'] });
+      await expect(
+        call('watches:update', { id, updates: { allowSplitStay: 1 } })
+      ).resolves.toMatchObject({
+        success: false,
+        code: 'VALIDATION',
+        issues: ['updates.allowSplitStay'],
+      });
+      expect((await call<Watch>('watches:get', { id })).data?.allowSplitStay).toBe(false);
+    });
+
+    it('watches.runNow answers the split stays it found, and watches.get carries them', async () => {
+      registerSplit();
+      const created = await call<Watch>('watches:create', {
+        ...watchInput('split'),
+        stay: SPLIT_STAY,
+        allowSplitStay: true,
+      });
+      const id = created.data!.id;
+      const linked = [
+        {
+          booking: 'separate',
+          units: 2,
+          parts: [
+            {
+              unitId: 'u1',
+              unitName: 'Site u1',
+              arrival: '2099-12-01',
+              departure: '2099-12-02',
+              total: 30,
+              bookingUrl: partUrl('2099-12-01', '2099-12-02'),
+            },
+            {
+              unitId: 'u2',
+              unitName: 'Site u2',
+              arrival: '2099-12-02',
+              departure: '2099-12-03',
+              total: 30,
+              bookingUrl: partUrl('2099-12-02', '2099-12-03'),
+            },
+          ],
+          total: 60,
+        },
+      ];
+
+      const run = await call<WatchExecutionResult>('watches:run-now', { id });
+      expect(run).toMatchObject({
+        success: true,
+        data: { found: true, matches: [], splitStays: linked },
+      });
+      const watch = await call<Watch>('watches:get', { id });
+      expect(watch.data).toMatchObject({ lastResult: 'split_found', splitStays: linked });
+      expect(watch.data?.bookingLink).toBeUndefined();
+      expect(structuredClone(watch)).toEqual(watch);
+    });
+
+    it('catalog.checkLocation answers splitStays: none where a unit is free, the split with links where none is', async () => {
+      registerSplit();
+      const free = await call<LocationCheck>('catalog:check-location', {
+        key: 'fake:1',
+        stay: SPLIT_STAY,
+      });
+      expect(free).toMatchObject({ success: true, data: { key: 'fake:1', splitStays: [] } });
+
+      const split = await call<LocationCheck>('catalog:check-location', {
+        key: 'split:1',
+        stay: SPLIT_STAY,
+      });
+      expect(split.success).toBe(true);
+      expect(split.data?.units.map((u) => [u.unitId, u.fullyAvailable])).toEqual([
+        ['u1', false],
+        ['u2', false],
+      ]);
+      expect(split.data?.splitStays).toEqual([
+        expect.objectContaining({
+          booking: 'separate',
+          units: 2,
+          parts: [
+            expect.objectContaining({
+              unitId: 'u1',
+              bookingUrl: partUrl('2099-12-01', '2099-12-02'),
+            }),
+            expect.objectContaining({
+              unitId: 'u2',
+              bookingUrl: partUrl('2099-12-02', '2099-12-03'),
+            }),
+          ],
+        }),
+      ]);
+      expect(structuredClone(split)).toEqual(split);
     });
   });
 

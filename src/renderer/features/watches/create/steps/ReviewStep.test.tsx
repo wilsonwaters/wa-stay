@@ -74,3 +74,35 @@ describe('ReviewStep', () => {
     expect(within(alerts).getByText('Every 5 minutes (checks run every 15)')).toBeInTheDocument();
   });
 });
+
+describe('ReviewStep: stays that move between units (§12.36)', () => {
+  const alertMe = () =>
+    within(screen.getByRole('region', { name: 'Alerts' })).getByText(/when the whole stay|nights/i);
+
+  it('says it alerts on them too, only when asked', () => {
+    const { unmount } = renderWithProviders(<Harness values={VALUES} onChangeStep={jest.fn()} />);
+    expect(alertMe()).toHaveTextContent(
+      /^Only when the whole stay is free, stops after the first alert$/
+    );
+    unmount();
+
+    renderWithProviders(
+      <Harness values={{ ...VALUES, allowSplitStay: true }} onChangeStep={jest.fn()} />
+    );
+    expect(alertMe()).toHaveTextContent(
+      /^When the whole stay is free; also when it's free only if you move sites, stops after the first alert$/
+    );
+  });
+
+  it('keeps partial availability beside it', () => {
+    renderWithProviders(
+      <Harness
+        values={{ ...VALUES, allowSplitStay: true, allowPartialMatch: true, notifyOnly: false }}
+        onChangeStep={jest.fn()}
+      />
+    );
+    expect(alertMe()).toHaveTextContent(
+      /^Also when only some nights are free; also when it's free only if you move sites, keeps checking after alerts$/
+    );
+  });
+});

@@ -237,7 +237,7 @@ npm run test:electron -- http-transport
 
 ## Electron smoke tests (E2E)
 
-`tests/e2e/` holds the Electron smoke suite: 29 journeys in 17 specs through the **built** app
+`tests/e2e/` holds the Electron smoke suite: 31 journeys in 18 specs through the **built** app
 (main, preload and renderer together), driven by Playwright's `_electron` launcher. It
 catches what Jest cannot: startup crashes, preload or sandbox breakage, CSP violations,
 broken routing and focus, and a quit that hangs.
@@ -308,7 +308,8 @@ The `launchWaStay()` fixture starts the app with:
   (ParkStay's 11 places, ParkStay chosen for you) hold however many providers are built in. A
   journey that counts or expects a pre-selection passes its list explicitly
   (`rac-catalogue.spec.ts`, `rac-watch.spec.ts`, `rac-explore.spec.ts`,
-  `rac-member-number.spec.ts` and `rac-auto-cart.spec.ts` pass `['parkstay', 'rac']`: RAC's
+  `rac-member-number.spec.ts`, `rac-auto-cart.spec.ts` and `split-stays.spec.ts`'s RAC journey
+  pass `['parkstay', 'rac']`: RAC's
   eight parks beside ParkStay's 11 campgrounds). An id that is not a built-in provider stops the app at start-up, with the reason
   in the main process's output.
 - **A production renderer**: `NODE_ENV=production`, no `ELECTRON_RENDERER_URL`, no Mapbox
@@ -370,8 +371,14 @@ availability answer (its night keys, the dates in `online_booking_url`, and its 
 and each ParkStay campground availability view (its nights and release date, from its own
 `arrival`) to a stay arriving 7 days after today in Perth (`arrivalInDays` for another); the
 launch passes `env: { WA_STAY_E2E_FIXTURES_DIR: fixtures.dir }`. `rac-watch.spec.ts`,
-`rac-explore.spec.ts` (tomorrow, `arrivalInDays: 1`), `rac-member-number.spec.ts` and
-`alert-snipe.spec.ts` use it. `rac-member-number.spec.ts` also reads the clipboard from the
+`rac-explore.spec.ts` (tomorrow, `arrivalInDays: 1`), `rac-member-number.spec.ts`,
+`alert-snipe.spec.ts` and `split-stays.spec.ts` use it. A journey that needs an answer the
+recordings don't have edits its own copy before the launch, with
+`editDatedFixture(fixtures, '<provider>/<file>.json', (answer) => …)`: `split-stays.spec.ts`
+takes away Busselton's powered site for the whole stay (stay-through 0, code 3), so RAC's park
+is free only if you move, and leaves Bungarra's CAMPSITE 03 free on the first night only and
+CAMPSITE 04 on the second only, so ParkStay's stay is two parts. The recorded fixtures have no
+split stay, so no other journey sees one. `rac-member-number.spec.ts` also reads the clipboard from the
 main process (`app.evaluate(({ clipboard }) => clipboard.readText())`) for a made-up member
 number, and attaches a screenshot of each step.
 

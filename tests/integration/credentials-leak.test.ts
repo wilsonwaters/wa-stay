@@ -16,6 +16,9 @@
  * plain text (while the values are stored, and after they are removed). The clipboard
  * (Electron's `clipboard`, mocked) receives the normalised member number exactly once, on copy.
  *
+ * A split stay found with the values saved (the place page's `splitStays`, a watch's split
+ * alert and its links) carries neither either.
+ *
  * RAC's own member number sign-in (R16) goes through the same channels: typed with hyphens, it
  * is stored and copied as its digits, and is in no answer, event, log line, request or plain
  * row either (its sign-in sends no request at all).
@@ -48,7 +51,7 @@ import {
 } from '@main/providers/sdk';
 import { FixtureHttpClient } from '@main/testing/fixture-http-client';
 import { logger } from '@main/utils/logger';
-import type { APIResponse, Watch } from '@shared/types';
+import type { APIResponse, LocationCheck, Watch } from '@shared/types';
 import type { ProviderAccount } from '@shared/types/provider.types';
 import { RecordingHttpClient } from '@tests/utils/fake-paced-provider';
 import { fakeDateOnly } from '@tests/utils/core-harness';
@@ -288,6 +291,73 @@ describe('credentials values never leak', () => {
       expect(JSON.stringify(http.requests)).not.toContain(sentinel);
       expect(savedDatabase).not.toContain(sentinel);
       expect(removedDatabase).not.toContain(sentinel);
+    }
+  });
+
+  it('a split-stay alert carries no value: not the split stays, their links, the alert or any answer', async () => {
+    fakeDateOnly(new Date('2026-10-17T02:00:00.000Z'));
+    try {
+      const responses: Array<APIResponse<unknown>> = [];
+      const record = async <T>(pending: Promise<APIResponse<T>>) => {
+        const response = await pending;
+        responses.push(response);
+        return response;
+      };
+      await expect(
+        record(
+          call('accounts:save-credentials', {
+            providerId: 'keystay',
+            values: { memberNumber: TYPED, password: PASSWORD },
+            confirmed: ['own'],
+          })
+        )
+      ).resolves.toMatchObject({ success: true });
+      // Free both nights, but u1 the first and u2 the second: booked a part at a time
+      keystay.setAvailability('1', {
+        u1: [{ state: 'available' }, { state: 'booked' }],
+        u2: [{ state: 'booked' }, { state: 'available' }],
+      });
+      const stay = { arrival: '2026-11-06', departure: '2026-11-08', adults: 2 };
+
+      const checked = await record(
+        call<LocationCheck>('catalog:check-location', { key: 'keystay:1', stay })
+      );
+      expect(checked).toMatchObject({ success: true, data: { splitStays: [{ units: 2 }] } });
+      const created = await record(
+        call<Watch>('watches:create', {
+          providerId: 'keystay',
+          name: 'Banksia',
+          location: { externalId: '1', name: 'Banksia Camp' },
+          stay,
+          allowSplitStay: true,
+        })
+      );
+      const id = (created as { data: Watch }).data.id;
+      await record(call('watches:run-now', { id }));
+      const found = await record(call<Watch>('watches:get', { id }));
+      expect(found).toMatchObject({
+        success: true,
+        data: { lastResult: 'split_found', splitStays: [{ units: 2 }] },
+      });
+
+      const notifications = JSON.stringify(
+        container.db.prepare('SELECT * FROM notifications').all()
+      );
+      expect(notifications).toContain('Free if you move');
+      const logs = logLines.join('\n');
+      for (const sentinel of SENTINELS) {
+        for (const text of [
+          JSON.stringify(responses),
+          JSON.stringify(renderer.sent),
+          JSON.stringify(http.requests),
+          notifications,
+          logs,
+        ]) {
+          expect(text).not.toContain(sentinel);
+        }
+      }
+    } finally {
+      jest.useRealTimers();
     }
   });
 

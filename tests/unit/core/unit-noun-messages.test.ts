@@ -1,7 +1,8 @@
 /**
  * The core names no unit it does not know (R9): a provider without holds "cannot hold
  * automatically", a held snipe "already has a hold", a missing snipe is "Snipe not found" (it
- * names the record), and the held unit's kind reaches its alert, so a cabin reads "Cabin held".
+ * names the record), and the held unit's kind reaches its alert, so a cabin reads "Cabin held";
+ * a split stay's kind reaches its alert too ("Free if you move cabins").
  */
 import { SnipeStatus } from '@shared/types/common.types';
 import type { SiteSnipeInput } from '@shared/types';
@@ -75,6 +76,39 @@ describe('core messages without a unit noun', () => {
       'cabin',
       // The public booking page, for the email (R12)
       expect.stringMatching(/^https:\/\/fake\.example\/book\/1\?/)
+    );
+  });
+
+  it('a split stay across cabins hands its kind to the alert, and never takes a campsite', async () => {
+    setUp({
+      availability: {
+        '1': {
+          s1: [{ state: 'booked' }, { state: 'available' }, { state: 'available' }],
+          c1: [{ state: 'available' }, { state: 'booked' }, { state: 'booked' }],
+          c2: [{ state: 'booked' }, { state: 'available' }, { state: 'available' }],
+        },
+      },
+      unitKinds: { s1: 'campsite', c1: 'cabin', c2: 'cabin' },
+    });
+    const watch = await h.watches.create(
+      h.userId,
+      h.watchInput({ allowSplitStay: true, unitKinds: ['cabin'] })
+    );
+    await h.watches.execute(watch.id);
+
+    expect(h.notifications.notifyWatchSplitFound).toHaveBeenCalledWith(
+      expect.objectContaining({ id: watch.id }),
+      [
+        expect.objectContaining({
+          unitKind: 'cabin',
+          booking: 'separate',
+          parts: [
+            expect.objectContaining({ unitId: 'c1' }),
+            expect.objectContaining({ unitId: 'c2' }),
+          ],
+        }),
+      ],
+      undefined
     );
   });
 

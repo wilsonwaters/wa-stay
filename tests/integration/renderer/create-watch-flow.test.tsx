@@ -94,6 +94,9 @@ describe('create a watch, end to end', () => {
     await screen.findByRole('heading', { level: 2, name: /Alerts$/ });
     expect(screen.queryByRole('checkbox', { name: /automatically when found/ })).toBeNull();
     await user.click(screen.getByRole('checkbox', { name: 'Alert on partial availability' }));
+    await user.click(
+      screen.getByRole('checkbox', { name: 'Alert on stays that move between spots' })
+    );
     await user.click(screen.getByRole('button', { name: 'Continue' }));
 
     // 5. Review, then create.
@@ -109,6 +112,7 @@ describe('create a watch, end to end', () => {
       providerId: 'fakestay',
       location: { externalId: 'lb', name: 'Lucky Bay Holiday Park', areaName: 'Esperance' },
       allowPartialMatch: true,
+      allowSplitStay: true,
       notifyOnly: true,
       checkIntervalMinutes: 60,
     });
