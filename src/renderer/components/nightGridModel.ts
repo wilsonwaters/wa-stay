@@ -69,8 +69,10 @@ export function isFreeEveryNightIfYouMove(
   let split = false;
   for (const date of nights) {
     const night = nightOf(unit, date);
-    if (isSplitNight(night)) split = true;
-    else if (night.state !== 'available' || night.reason !== undefined) return false;
+    // A split night counts only with room, as the core takes one: never a booked or closed one
+    if (isSplitNight(night) && (night.state === 'unknown' || night.state === 'available')) {
+      split = true;
+    } else if (night.state !== 'available' || night.reason !== undefined) return false;
   }
   return split;
 }

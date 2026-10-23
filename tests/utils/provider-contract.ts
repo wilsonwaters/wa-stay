@@ -44,6 +44,7 @@ import {
   SPLIT_STAY_BOOKINGS,
   type BulkAvailabilityEntry,
   type LocationAvailability,
+  type NightStatus,
   type ProviderManifest,
   type StayQuery,
 } from '@shared/types/provider.types';
@@ -342,13 +343,18 @@ function partsProblem(parts: unknown, arrival: string, departure: string): strin
   return at === departure ? undefined : `end on ${at}, not the stay's departure ${departure}`;
 }
 
+/** A `split` night with room (`unknown` or `available`), as the core takes one. */
+const isSplitWithRoom = (night: NightStatus): boolean =>
+  night.reason === 'split' && (night.state === 'unknown' || night.state === 'available');
+
 /**
  * What is wrong with the split stays a check's answer reports (`UnitAvailability.splitStay`),
  * as messages ([] when nothing). A unit that reports one stands for several places and is not
  * free for the stay: it is not `fullyAvailable`, counts no free unit (`freeCount` 0 or none),
- * and has every night of the stay, each free (`available` with no reason) or `split`, at least
- * one `split`. Its `booking` is `contact` or `separate`; its `units`, if any, a whole number of
- * at least 2; its `parts`, if any, at least 2 that cover the stay exactly, in order. One booked
+ * and has every night of the stay, each free (`available` with no reason) or `split` with room
+ * (`unknown` or `available`), at least one `split`. Its `booking` is `contact` or `separate`;
+ * its `units`, if any, a whole number of at least 2; its `parts`, if any, at least 2 that cover
+ * the stay exactly, in order; and no more units than parts when it gives both. One booked
  * through the place (`contact`) needs `links.contact`, giving the place's contact page as a link
  * the core keeps (`isProviderBookingLink`: https on the provider's own site).
  */
@@ -374,14 +380,15 @@ export function splitStayViolations(
     const missing = dates.filter((_, i) => nights[i] === undefined);
     if (missing.length > 0) violations.push(`${owner}: no night for ${missing.join(', ')}`);
     for (const night of nights) {
-      if (night && !isFreeNight(night) && night.reason !== 'split') {
-        const reason = night.reason ? ` (${night.reason})` : '';
-        violations.push(
-          `${owner}: ${night.date} is ${night.state}${reason}, neither free nor split`
-        );
+      if (!night || isFreeNight(night) || isSplitWithRoom(night)) continue;
+      if (night.reason === 'split') {
+        violations.push(`${owner}: ${night.date} is split but ${night.state}, with no room`);
+        continue;
       }
+      const reason = night.reason ? ` (${night.reason})` : '';
+      violations.push(`${owner}: ${night.date} is ${night.state}${reason}, neither free nor split`);
     }
-    if (!nights.some((night) => night?.reason === 'split')) {
+    if (!nights.some((night) => night !== undefined && isSplitWithRoom(night))) {
       violations.push(`${owner}: no night is split`);
     }
     if (!(SPLIT_STAY_BOOKINGS as readonly unknown[]).includes(report.booking)) {
@@ -399,6 +406,12 @@ export function splitStayViolations(
     if (report.parts !== undefined) {
       const problem = partsProblem(report.parts, stay.arrival, stay.departure);
       if (problem) violations.push(`${owner}: its parts ${problem}`);
+    }
+    // Each part is on one place, so a stay of N parts moves across N places at most
+    if (typeof units === 'number' && Array.isArray(report.parts) && units > report.parts.length) {
+      violations.push(
+        `${owner}: units ${String(units)} is more than its ${String(report.parts.length)} parts`
+      );
     }
     if (report.booking === 'contact') {
       if (!contactAsked) {

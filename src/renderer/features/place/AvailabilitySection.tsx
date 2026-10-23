@@ -101,6 +101,8 @@ export function AvailabilitySection({
           departure={departure}
           noun={unitNoun}
           currency={currency}
+          // The stay card already copies it, beside "Book on {shortName}"
+          showCopy={false}
         />
       </div>
     </PlaceSection>

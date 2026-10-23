@@ -312,6 +312,18 @@ describe('ParkStay campgrounds listed by class (Lucky Bay, 43)', () => {
       expect((await check()).units[0]).not.toHaveProperty('splitStay');
     });
 
+    it('reports no split stay when the view covers fewer nights than the stay', async () => {
+      // ParkStay answers 6 and 7 Nov only: a split of those two nights is not the stay's
+      const view = luckyBayView();
+      const entry = view.sites[0];
+      entry.availability.pop();
+      for (const row of entry.breakdown!) row.availability.pop();
+      server.views.set('43', view);
+      const [unit] = (await check()).units;
+      expect(unit.nights.map((n) => n.date)).toEqual(['2026-11-06', '2026-11-07']);
+      expect(unit).not.toHaveProperty('splitStay');
+    });
+
     it('covers a longer stay in the fewest bookings: two sites that hand over make two parts', async () => {
       const view = luckyBayView();
       const entry = view.sites[0];

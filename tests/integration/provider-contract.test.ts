@@ -512,6 +512,11 @@ describe('the split-stay checks of the contract suite', () => {
       "unit c1's split stay: 2026-11-11 is unknown (min-stay), neither free nor split",
     ],
     [
+      'a booked night marked split',
+      { nights: [night('2026-11-10'), night('2026-11-11', { state: 'booked' })] },
+      "unit c1's split stay: 2026-11-11 is split but booked, with no room",
+    ],
+    [
       'no split night',
       {
         nights: [
@@ -535,6 +540,17 @@ describe('the split-stay checks of the contract suite', () => {
       'a count that is a fraction',
       { splitStay: { booking: 'contact', units: 2.5 } },
       "unit c1's split stay: units 2.5 is not a whole number of at least 2",
+    ],
+    [
+      'more units than parts',
+      {
+        splitStay: {
+          booking: 'separate',
+          units: 3,
+          parts: parts(['2026-11-10', '2026-11-11'], ['2026-11-11', '2026-11-12']),
+        },
+      },
+      "unit c1's split stay: units 3 is more than its 2 parts",
     ],
     [
       'one part',

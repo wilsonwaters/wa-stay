@@ -164,6 +164,13 @@ describe('SplitStays: booked through the place (contact)', () => {
     await settle();
     expect(screen.queryByRole('button', { name: /^Copy/ })).toBeNull();
   });
+
+  it('leaves "Copy {label}" to the view when it already has one (showCopy false)', async () => {
+    renderBlock({ showCopy: false }, [RAC_SAVED]);
+    await settle();
+    expect(within(block()).getByRole('link', { name: /^Contact/ })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^Copy/ })).toBeNull();
+  });
 });
 
 describe('SplitStays: booked part by part (separate)', () => {

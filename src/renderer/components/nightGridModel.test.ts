@@ -547,6 +547,15 @@ describe('a split stay the provider reported (free every night, by moving: §12.
       ],
     };
     expect(isFreeEveryNightIfYouMove(refused, NIGHTS)).toBe(false);
+    // A split night with no room (booked or closed) is not free, as the core takes it
+    const taken = {
+      ...powered,
+      nights: [
+        powered.nights[0],
+        { date: NIGHTS[1], state: 'booked' as const, reason: 'split' as const },
+      ],
+    };
+    expect(isFreeEveryNightIfYouMove(taken, NIGHTS)).toBe(false);
     // Every night free with no split is no split stay
     const free = {
       ...powered,
