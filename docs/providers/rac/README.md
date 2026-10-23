@@ -164,7 +164,9 @@ answer to a unit, night by night (the codes are in [endpoints](endpoints.md#racs
   take a request per part, and the park's staff book it anyway. When no rate counts, or RAC's
   stay rules refuse the stay, nothing is reported, and a night held back for a school-holiday
   release still to come ends it too. WA Stay copies nothing from the contact page: no phone
-  number, and no promise of a reply.
+  number, and no promise of a reply. A recorded answer shows one: Monkey Mia's Powered Site for
+  1 to 6 July 2027, free every night but on no one site, at $450 for the five nights
+  (`availability-monkey-mia-split-2027-07-01-5n.json`).
 - **Pets.** Up to two, sent with the stay; a category that takes none refuses a stay with pets.
   A stay with more than two (or a fraction) is refused before anything is sent.
 - **364 days.** RAC takes bookings 364 days ahead. A night beyond that, or one held back for a

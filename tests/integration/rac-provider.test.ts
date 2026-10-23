@@ -1337,6 +1337,41 @@ describe('RAC bulk availability', () => {
       expect(bulkSplitViolations([entry])).toEqual([]);
     });
 
+    describe('Monkey Mia, 1–6 Jul 2027 (recorded live): its Powered Site on no one site', () => {
+      const SPLIT_FILE = 'availability-monkey-mia-split-2027-07-01-5n.json';
+      const SPLIT_STAY: StayQuery = { arrival: '2027-07-01', departure: '2027-07-06', adults: 2 };
+
+      it('flags nothing while other camping and rooms are free for the whole stay', async () => {
+        const entry = await entryFor('monkey-mia', page(SPLIT_FILE), SPLIT_STAY);
+        expect(entry).toMatchObject({ key: 'rac:monkey-mia', availableUnits: 67 });
+        // Unpowered Camping's 59 sites are free for the stay, so camping is not "if you move"
+        expect(entry.byKind?.campsite).toStrictEqual({ availableUnits: 59 });
+        expect(JSON.stringify(entry)).not.toContain('splitStay');
+        expect(bulkSplitViolations([entry])).toEqual([]);
+      });
+
+      it('flags the park, its camping and its rooms when nothing else is free for the stay', async () => {
+        const raw = JSON.parse(page(SPLIT_FILE)) as {
+          data: Record<string, { stay_through_sites_available: number }>;
+        };
+        // Without the categories free for the whole stay
+        for (const [id, category] of Object.entries(raw.data)) {
+          if (category.stay_through_sites_available > 0) delete raw.data[id];
+        }
+        const entry = await entryFor('monkey-mia', JSON.stringify(raw), SPLIT_STAY);
+        expect(entry).toMatchObject({
+          key: 'rac:monkey-mia',
+          availableUnits: 0,
+          splitStay: true,
+          byKind: {
+            campsite: { availableUnits: 0, splitStay: true },
+            room: { availableUnits: 0, splitStay: true },
+          },
+        });
+        expect(bulkSplitViolations([entry])).toEqual([]);
+      });
+    });
+
     it("Exmouth's closed category (stay-through code 2, stop sold) adds nothing and makes nothing bookable", async () => {
       const entry = await entryFor(
         'exmouth',
