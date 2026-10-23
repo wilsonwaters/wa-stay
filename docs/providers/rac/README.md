@@ -418,15 +418,15 @@ there is no RAC logo.
 - `tests/unit/providers/rac/`: the manifest, the client (one host, redirects by hand, blocks and
   their pause), book-now pages, the park pages (`park-pages.test.ts`: the parks page's photos, a
   home page's photos, intro and accommodation photos), stay types, the member number's form,
-  members' tariffs, free counts (`free-count.test.ts`), the release calendar and the release
-  policy (on a fake clock).
+  members' tariffs, free counts and split stays on Explore (`free-count.test.ts`), the release
+  calendar and the release policy (on a fake clock).
 - `tests/integration/rac-provider.test.ts`: the provider contract suite and the catalogue (the
   cards' photos, a park's intro and photos, and what stands in when their pages fail);
-  `rac-availability.test.ts` (every code and refusal), `rac-watch.test.ts`, `rac-snipes.test.ts`,
-  `rac-member-rates.test.ts` and `rac-member-number.test.ts` (the number is in no request, log
-  line, IPC answer, alert or email); `rac-explore-ipc.test.ts` and `rac-snipes-ipc.test.ts`
-  through IPC; `rac-free-counts.test.ts` (for every recorded answer, Explore, the place page, a
-  watch, its alert and its email count the same, through IPC).
+  `rac-availability.test.ts` (every code and refusal, split stays included), `rac-watch.test.ts`,
+  `rac-snipes.test.ts`, `rac-member-rates.test.ts` and `rac-member-number.test.ts` (the number
+  is in no request, log line, IPC answer, alert or email); `rac-explore-ipc.test.ts` and
+  `rac-snipes-ipc.test.ts` through IPC; `rac-free-counts.test.ts` (for every recorded answer,
+  Explore, the place page, a watch, its alert and its email count the same, through IPC).
 - `tests/unit/providers/rac-fixtures.test.ts`: the fixtures hold facts only, and the module's
   code asks only RAC's host and names no cart address outside the auto-cart.
 - The auto-cart: `tests/unit/providers/rac/holds.test.ts`, `cart-page.test.ts` and
@@ -441,8 +441,10 @@ there is no RAC logo.
   status, and every path the module requests is documented.
 - The Electron smoke tests: RAC's parks on Explore and a park's categories and About
   (`rac-catalogue.spec.ts`), its free counts on Explore and the park's page
-  (`rac-explore.spec.ts`), a watch and its count (`rac-watch.spec.ts`) and the member number
-  (`rac-member-number.spec.ts`), from the recorded answers in `tests/e2e/fixtures/http/rac/`
+  (`rac-explore.spec.ts`), a watch and its count (`rac-watch.spec.ts`), the member number
+  (`rac-member-number.spec.ts`) and a split stay booked through the park on Explore, its page
+  and a watch (`split-stays.spec.ts`, on a copy of Busselton's answer edited so its powered site
+  has no site for the whole stay), from the recorded answers in `tests/e2e/fixtures/http/rac/`
   (every park's, for 6–8 Nov 2026).
 - The preview: `npm run build:e2e`, then
   `npx cross-env PREVIEW_PROVIDER=rac PREVIEW_ARRIVAL=2026-11-06 playwright test preview-provider`

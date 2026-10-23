@@ -131,7 +131,11 @@ redistributed.
 - `tests/unit/providers/parkstay-manifest.test.ts`: the manifest.
 - `npm run test:electron`: the module on the production transport (`ElectronSessionHttpClient`),
   still against the loopback server.
+- `tests/unit/providers/parkstay/site-classes.test.ts`: a class's nights and its split stay
+  (Lucky Bay's recording: three one-night parts).
 - The Electron smoke tests (`tests/e2e`) use recorded responses in `tests/e2e/fixtures/http/parkstay/`.
+  `split-stays.spec.ts` edits a copy of Bungarra's so two sites are each free on one night of
+  the stay, and checks the place page's two parts and their ParkStay links.
 
 No test or agent run ever places a real hold, booking or payment on ParkStay; live checks
 are anonymous, read-only and a handful of requests.
