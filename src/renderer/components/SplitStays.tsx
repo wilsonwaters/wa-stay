@@ -131,6 +131,11 @@ export interface SplitStaysProps {
   currency?: string;
   /** "Contact {place}" is the view's one call to action (a watch's page): coral. */
   primary?: boolean;
+  /**
+   * "Copy {label}" beside "Contact {place}" (default true). False where the view already has
+   * one (the place page's, beside "Book on {shortName}"), so no two buttons share a name.
+   */
+  showCopy?: boolean;
 }
 
 /**
@@ -153,6 +158,7 @@ export function SplitStays({
   noun,
   currency,
   primary = false,
+  showCopy = true,
 }: SplitStaysProps) {
   const headingId = useId();
   if (splitStays.length === 0) return null;
@@ -238,7 +244,7 @@ export function SplitStays({
                 Contact {place}
               </ExternalLink>
             )}
-            <CopyCredentialButton providerId={providerId} />
+            {showCopy && <CopyCredentialButton providerId={providerId} />}
           </div>
         </div>
       )}
