@@ -10,6 +10,11 @@ export enum WatchResult {
   FOUND = 'found',
   NOT_FOUND = 'not_found',
   PARTIAL_FOUND = 'partial_found',
+  /**
+   * No unit is free for the whole stay, but it is free every night by moving between units
+   * (`allowSplitStay`). Below found, above partly found.
+   */
+  SPLIT_FOUND = 'split_found',
   /** An auto-hold placed a hold; the night guard counts it until `hold_expires_at`. */
   HELD = 'held',
   /** The hold was paid for in the payment window: a confirmed booking. */

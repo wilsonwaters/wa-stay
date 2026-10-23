@@ -18,7 +18,7 @@ import {
 import {
   ProviderIdSchema,
   StayQuerySchema,
-  type LocationAvailability,
+  type LocationCheck,
   type ProviderId,
   type StayQuery,
 } from '../types/provider.types';
@@ -110,11 +110,12 @@ export const catalog = {
     args: {} as [stay: StayQuery, options?: CatalogAvailabilityOptions],
     response: {} as CatalogAvailabilityResult,
   },
+  /** One place's units and nights for a stay, and the split stays in them (`LocationCheck`). */
   checkLocation: {
     channel: C.checkLocation,
     request: checkLocationRequest,
     args: {} as [key: string, stay: StayQuery],
-    response: {} as LocationAvailability,
+    response: {} as LocationCheck,
   },
   /** Re-syncs one provider's catalogue (or all), then returns the status. */
   refresh: {

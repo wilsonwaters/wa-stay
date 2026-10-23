@@ -875,6 +875,7 @@ it has an answer for:
 | `key` | The place's location key, `makeLocationKey(ctx.id, externalId)`. Main keeps only entries for places of this provider that are in the stored catalogue (and in the area Explore shows). |
 | `availableUnits` | How many units are free on **every** night of the stay. A unit free on some nights only does not count. |
 | `bookableUnits` | Optional: how many units can be booked online for these dates at all, free or not: the place's total, or 0 when none can be booked (not released yet, closed, or past the provider's booking window). Leave it out when the provider gives no unit total (RAC counts free units only); 0 still means none can be booked. |
+| `splitStay` | Optional: `true` when no unit is free for the whole stay (`availableUnits` 0) but the stay is free every night by moving between units, a split stay. Set it only with `availableUnits` 0, and only when you can tell; it is never counted. Each kind in `byKind` may carry it likewise. |
 | `byKind` | Optional: the same two counts for each unit kind the place has, e.g. `{ campsite: { availableUnits: 2, bookableUnits: 5 }, cabin: { availableUnits: 0, bookableUnits: 3 } }`, so a filter on cabins counts only the cabins. Set it for a place with more than one kind. Each kind's `bookableUnits` is optional too, by the same rule; a sum of kinds has no total when any kind in it has none. Main passes it on as you give it. |
 
 The names invite a swap: `availableUnits` is the smaller number, the free ones, and

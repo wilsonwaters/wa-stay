@@ -52,6 +52,8 @@ interface WatchRow extends StayRow {
   unit_kinds: string | null;
   // Migration v12 (R18)
   hold_expires_estimated: number | null;
+  // Migration v13 (split stays)
+  allow_split_stay: number | null;
   created_at: string;
   updated_at: string;
 }
@@ -68,8 +70,8 @@ export class WatchRepository extends BaseRepository<Watch> {
         user_id, provider_id, name, location_external_id, location_name, area_name,
         arrival_date, departure_date, num_adults, num_children, num_infants, num_concessions,
         unit_ids, unit_kinds, stay_params, check_interval_minutes, auto_book, notify_only,
-        allow_partial_match, max_price, notes
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        allow_partial_match, allow_split_stay, max_price, notes
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
     const result = stmt.run(
@@ -87,6 +89,7 @@ export class WatchRepository extends BaseRepository<Watch> {
       input.autoHold ? 1 : 0,
       input.notifyOnly !== false ? 1 : 0,
       input.allowPartialMatch ? 1 : 0,
+      input.allowSplitStay ? 1 : 0,
       input.maxPrice || null,
       input.notes || null
     );
@@ -134,6 +137,9 @@ export class WatchRepository extends BaseRepository<Watch> {
     if (updates.notifyOnly !== undefined) push('notify_only', updates.notifyOnly ? 1 : 0);
     if (updates.allowPartialMatch !== undefined) {
       push('allow_partial_match', updates.allowPartialMatch ? 1 : 0);
+    }
+    if (updates.allowSplitStay !== undefined) {
+      push('allow_split_stay', updates.allowSplitStay ? 1 : 0);
     }
     // 0 is "no max price" (the renderer clears one with it), stored as NULL as on create.
     if (updates.maxPrice !== undefined) push('max_price', updates.maxPrice || null);
@@ -444,6 +450,7 @@ export class WatchRepository extends BaseRepository<Watch> {
       autoHold: Boolean(row.auto_book),
       notifyOnly: Boolean(row.notify_only),
       allowPartialMatch: Boolean(row.allow_partial_match),
+      allowSplitStay: Boolean(row.allow_split_stay),
       maxPrice: row.max_price ?? undefined,
       notes: row.notes ?? undefined,
       ...this.readHold(row),

@@ -98,6 +98,7 @@ import type {
   StayFieldDescriptor,
   StayQuery,
   UnitKind,
+  UnitSplitStay,
 } from '@shared/types/provider.types';
 import { minimumNights } from '@main/core/watches/matching';
 import type { LocationDetail, LocationSummary } from '@shared/types/catalog.types';
@@ -164,6 +165,14 @@ export interface FakeProviderOptions {
    * the fake's website. Units have none by default.
    */
   unitBookingUrls?: boolean;
+  /**
+   * What each unit reports as a split stay (`UnitAvailability.splitStay`), by unit id, at every
+   * location, passed through as given (a test may give an invalid one). Units left out report
+   * none.
+   */
+  splitStays?: Record<string, UnitSplitStay>;
+  /** `links.contact`: `https://<id>.example/locations/<externalId>/contact`. None by default. */
+  contactLinks?: boolean;
   /** The signed-in state `auth.isSignedIn` reports (`setAccount` changes it). */
   account?: AccountStatus['state'];
   /** Replaces parts of the `browser-session` auth (sign-in URL, origins, completion pages). */
@@ -575,6 +584,7 @@ export function createFakeProvider(options: FakeProviderOptions = {}): FakeProvi
         const fullyAvailable = freeForStay(nights);
         const priced = nights.every((night) => night.price !== undefined);
         const unitKind = options.unitKinds?.[unitId];
+        const splitStay = options.splitStays?.[unitId];
         return {
           unitId,
           unitName: `Site ${unitId}`,
@@ -594,6 +604,7 @@ export function createFakeProvider(options: FakeProviderOptions = {}): FakeProvi
                   `${encodeURIComponent(unitId)}?arrival=${stay.arrival}&departure=${stay.departure}`,
               }
             : {}),
+          ...(splitStay ? { splitStay } : {}),
         };
       });
     return {
@@ -615,6 +626,12 @@ export function createFakeProvider(options: FakeProviderOptions = {}): FakeProvi
       (stay ? `?arrival=${stay.arrival}&departure=${stay.departure}` : ''),
     manageBooking: (reference: string) =>
       `https://${id}.example/bookings/${encodeURIComponent(reference)}`,
+    ...(options.contactLinks
+      ? {
+          contact: (externalId: string) =>
+            `https://${id}.example/locations/${encodeURIComponent(externalId)}/contact`,
+        }
+      : {}),
   };
 
   // ---- access gate: steps through `accessStates` on ensure(), one step per tick ----

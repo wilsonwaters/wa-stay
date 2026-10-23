@@ -41,6 +41,7 @@ export function makeWatch(overrides: Partial<Watch> = {}): Watch {
     autoHold: false,
     notifyOnly: true,
     allowPartialMatch: false,
+    allowSplitStay: false,
     createdAt: new Date('2099-01-01T00:00:00Z'),
     updatedAt: new Date('2099-01-01T00:00:00Z'),
     ...overrides,

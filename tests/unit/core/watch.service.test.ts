@@ -11,11 +11,14 @@ import {
   ProviderHttpError,
   UnknownProviderError,
 } from '@main/providers/sdk';
-import { WATCH_EDITED_DURING_CHECK } from '@main/core/watches/watch.service';
+import {
+  SPLIT_STAY_NO_HOLD_NOTE,
+  WATCH_EDITED_DURING_CHECK,
+} from '@main/core/watches/watch.service';
 import type { WatchUpdate } from '@shared/types';
 import { WatchResult } from '@shared/types/common.types';
 import { createCoreHarness, fakeDateOnly, type CoreHarness } from '@tests/utils/core-harness';
-import { createFakeProvider, FAKE_PRICE } from '@tests/utils/fake-provider';
+import { createFakeProvider, FAKE_PRICE, type FakeUnitNights } from '@tests/utils/fake-provider';
 
 // 4 Oct 2026, 10:00 in Perth
 const NOW = new Date('2026-10-04T02:00:00.000Z');
@@ -745,6 +748,341 @@ describe('WatchService', () => {
       expect((await h.watches.list(h.userId, { status: 'inactive' })).map((w) => w.id)).toEqual([
         b.id,
       ]);
+    });
+  });
+
+  describe('split stays', () => {
+    /** Site u1 free the first two nights, u2 the third: every night free, none on one unit. */
+    const SPLIT: Record<string, FakeUnitNights> = {
+      u1: [{ state: 'available' }, { state: 'available' }, { state: 'booked' }],
+      u2: [{ state: 'booked' }, { state: 'booked' }, { state: 'available' }],
+    };
+    /** The fake's booking page for location 1 and these dates (it ignores the unit). */
+    const partUrl = (arrival: string, departure: string) =>
+      `https://fake.example/book/1?arrival=${arrival}&departure=${departure}`;
+    const UNLINKED = [
+      {
+        booking: 'separate',
+        units: 2,
+        parts: [
+          {
+            unitId: 'u1',
+            unitName: 'Site u1',
+            arrival: '2026-12-01',
+            departure: '2026-12-03',
+            total: 2 * FAKE_PRICE,
+          },
+          {
+            unitId: 'u2',
+            unitName: 'Site u2',
+            arrival: '2026-12-03',
+            departure: '2026-12-04',
+            total: FAKE_PRICE,
+          },
+        ],
+        total: 3 * FAKE_PRICE,
+      },
+    ];
+    const LINKED = [
+      {
+        ...UNLINKED[0],
+        parts: [
+          { ...UNLINKED[0].parts[0], bookingUrl: partUrl('2026-12-01', '2026-12-03') },
+          { ...UNLINKED[0].parts[1], bookingUrl: partUrl('2026-12-03', '2026-12-04') },
+        ],
+      },
+    ];
+    /** The `watch:updated` payloads for `id`, oldest first. */
+    const updates = (id: number) =>
+      h.events.emit.mock.calls
+        .filter(([name, watch]) => name === 'watch:updated' && watch.id === id)
+        .map(([, watch]) => watch);
+
+    beforeEach(() => h.fake.setAvailability('1', SPLIT));
+
+    it('off (the default): nothing changes, NOT_FOUND or PARTIAL_FOUND as before', async () => {
+      const plain = await h.watches.create(h.userId, h.watchInput());
+      expect(plain.allowSplitStay).toBe(false);
+      await expect(h.watches.execute(plain.id)).resolves.toMatchObject({
+        success: true,
+        found: false,
+        matches: [],
+      });
+      expect(h.watchRepo.findById(plain.id)?.lastResult).toBe(WatchResult.NOT_FOUND);
+
+      const partly = await h.watches.create(h.userId, h.watchInput({ allowPartialMatch: true }));
+      const result = await h.watches.execute(partly.id);
+      expect(result.splitStays).toBeUndefined();
+      expect(h.watchRepo.findById(partly.id)?.lastResult).toBe(WatchResult.PARTIAL_FOUND);
+      expect(h.notifications.notifyWatchPartialFound).toHaveBeenCalledTimes(1);
+      expect(h.notifications.notifyWatchSplitFound).not.toHaveBeenCalled();
+    });
+
+    it('on: SPLIT_FOUND, counted as found, above some nights, from the one check', async () => {
+      const watch = await h.watches.create(
+        h.userId,
+        h.watchInput({ allowSplitStay: true, allowPartialMatch: true })
+      );
+      expect(watch.allowSplitStay).toBe(true);
+      const result = await h.watches.execute(watch.id);
+
+      expect(h.fake.calls.filter((c) => c.module === 'availability')).toHaveLength(1);
+      expect(result).toMatchObject({ success: true, found: true, matches: [] });
+      expect(result.splitStays).toEqual(LINKED);
+      const stored = h.watchRepo.findById(watch.id)!;
+      expect(stored).toMatchObject({ lastResult: WatchResult.SPLIT_FOUND, foundCount: 1 });
+      expect(stored.lastAvailability?.map((u) => u.unitId)).toEqual(['u1', 'u2']);
+      expect(stored.lastError).toBeUndefined();
+      expect(h.notifications.notifyWatchPartialFound).not.toHaveBeenCalled();
+      expect(h.notifications.notifyWatchFound).not.toHaveBeenCalled();
+    });
+
+    it('the alert gets the split stays with each part’s booking page, and no note', async () => {
+      const watch = await h.watches.create(h.userId, h.watchInput({ allowSplitStay: true }));
+      await h.watches.execute(watch.id);
+
+      expect(h.notifications.notifyWatchSplitFound).toHaveBeenCalledTimes(1);
+      expect(h.notifications.notifyWatchSplitFound).toHaveBeenCalledWith(
+        expect.objectContaining({ id: watch.id }),
+        LINKED,
+        undefined
+      );
+    });
+
+    it('found beats a split stay', async () => {
+      h.fake.setAvailability('1', { ...SPLIT, u3: 'available' });
+      const watch = await h.watches.create(h.userId, h.watchInput({ allowSplitStay: true }));
+      const result = await h.watches.execute(watch.id);
+
+      expect(result.matches).toEqual([expect.objectContaining({ unitId: 'u3', partial: false })]);
+      expect(result.splitStays).toBeUndefined();
+      expect(h.watchRepo.findById(watch.id)?.lastResult).toBe(WatchResult.FOUND);
+      expect(h.notifications.notifyWatchFound).toHaveBeenCalledTimes(1);
+      expect(h.notifications.notifyWatchSplitFound).not.toHaveBeenCalled();
+    });
+
+    it('never holds a split stay, even with autoHold: no night reserved, no hold; the alert says so', async () => {
+      const create = jest.spyOn(h.registry.get('fake').holds!, 'create');
+      const reserve = jest.spyOn(h.nightGuard, 'tryReserve');
+      const watch = await h.watches.create(
+        h.userId,
+        h.watchInput({ allowSplitStay: true, autoHold: true })
+      );
+      const result = await h.watches.execute(watch.id);
+
+      expect(create).not.toHaveBeenCalled();
+      expect(reserve).not.toHaveBeenCalled();
+      expect(result.hold).toBeUndefined();
+      expect(h.notifications.notifyWatchHeld).not.toHaveBeenCalled();
+      expect(h.notifications.notifyWatchSplitFound).toHaveBeenCalledWith(
+        expect.objectContaining({ id: watch.id }),
+        LINKED,
+        SPLIT_STAY_NO_HOLD_NOTE
+      );
+      expect(SPLIT_STAY_NO_HOLD_NOTE).toBe("WA Stay doesn't hold these automatically.");
+      expect(h.watchRepo.findById(watch.id)?.lastResult).toBe(WatchResult.SPLIT_FOUND);
+    });
+
+    it('a notify-only watch pauses after a split alert; one that is not keeps watching', async () => {
+      const once = await h.watches.create(
+        h.userId,
+        h.watchInput({ allowSplitStay: true, notifyOnly: true })
+      );
+      await h.watches.execute(once.id);
+      expect(h.watchRepo.findById(once.id)?.isActive).toBe(false);
+
+      const always = await h.watches.create(
+        h.userId,
+        h.watchInput({ allowSplitStay: true, notifyOnly: false })
+      );
+      await h.watches.execute(always.id);
+      expect(h.watchRepo.findById(always.id)?.isActive).toBe(true);
+    });
+
+    it('a reported split stay booked through the place carries its contact page', async () => {
+      await h.close();
+      h = createCoreHarness({
+        providers: [
+          createFakeProvider({
+            contactLinks: true,
+            splitStays: { cat: { booking: 'contact' } },
+            availability: {
+              '1': {
+                cat: [
+                  { state: 'unknown', reason: 'split', price: 40 },
+                  { state: 'unknown', reason: 'split', price: 40 },
+                  { state: 'unknown', reason: 'split', price: 40 },
+                ],
+              },
+            },
+          }),
+        ],
+      });
+      const watch = await h.watches.create(h.userId, h.watchInput({ allowSplitStay: true }));
+      const result = await h.watches.execute(watch.id);
+
+      const contact = [
+        {
+          booking: 'contact',
+          unitId: 'cat',
+          unitName: 'Site cat',
+          total: 120,
+          contactUrl: 'https://fake.example/locations/1/contact',
+        },
+      ];
+      expect(result.splitStays).toEqual(contact);
+      expect(h.notifications.notifyWatchSplitFound).toHaveBeenCalledWith(
+        expect.anything(),
+        contact,
+        undefined
+      );
+      expect((await h.watches.get(watch.id))?.splitStays).toEqual(contact);
+    });
+
+    it('at a place of several kinds finds one per kind, never across them, the best first', async () => {
+      await h.close();
+      h = createCoreHarness({
+        providers: [
+          createFakeProvider({
+            unitKinds: { s1: 'campsite', s2: 'campsite', c1: 'cabin', c2: 'cabin' },
+            availability: {
+              '1': {
+                s1: SPLIT.u1,
+                c1: [{ state: 'available' }, { state: 'booked' }, { state: 'booked' }],
+                s2: SPLIT.u2,
+                c2: [{ state: 'booked' }, { state: 'available' }, { state: 'available' }],
+              },
+            },
+          }),
+        ],
+      });
+      const watch = await h.watches.create(
+        h.userId,
+        h.watchInput({ allowSplitStay: true, autoHold: true })
+      );
+      const result = await h.watches.execute(watch.id);
+
+      expect(
+        result.splitStays?.map((split) => [split.unitKind, split.parts?.map((p) => p.unitId)])
+      ).toEqual([
+        ['campsite', ['s1', 's2']],
+        ['cabin', ['c1', 'c2']],
+      ]);
+      expect(h.fake.calls.filter((c) => c.module === 'holds')).toEqual([]);
+    });
+
+    it('get, list and watch:updated carry them while split-found for the stay’s nights; never bookingLink', async () => {
+      const watch = await h.watches.create(
+        h.userId,
+        h.watchInput({ allowSplitStay: true, notifyOnly: false })
+      );
+      expect(watch.splitStays).toBeUndefined();
+      await h.watches.execute(watch.id);
+
+      expect((await h.watches.get(watch.id))?.splitStays).toEqual(LINKED);
+      expect((await h.watches.list(h.userId)).map((w) => w.splitStays)).toEqual([LINKED]);
+      expect(updates(watch.id).at(-1)?.splitStays).toEqual(LINKED);
+      expect((await h.watches.get(watch.id))?.bookingLink).toBeUndefined();
+      // Derived, never stored
+      expect(h.watchRepo.findById(watch.id)?.splitStays).toBeUndefined();
+
+      // Another stay: the stored nights are not its nights
+      const edited = await h.watches.update(watch.id, {
+        stay: { arrival: '2026-12-01', departure: '2026-12-05', adults: 2 },
+      });
+      expect(edited.lastResult).toBe(WatchResult.SPLIT_FOUND);
+      expect(edited.splitStays).toBeUndefined();
+      expect((await h.watches.get(watch.id))?.splitStays).toBeUndefined();
+
+      // Nothing found any more
+      await h.watches.update(watch.id, {
+        stay: { arrival: '2026-12-01', departure: '2026-12-04', adults: 2 },
+      });
+      h.fake.setAvailability('1', { u1: 'booked', u2: 'booked' });
+      await h.watches.execute(watch.id);
+      expect((await h.watches.get(watch.id))?.lastResult).toBe(WatchResult.NOT_FOUND);
+      expect((await h.watches.get(watch.id))?.splitStays).toBeUndefined();
+      expect(updates(watch.id).at(-1)?.splitStays).toBeUndefined();
+    });
+
+    it('a found or partly found watch has none, and a split-found one keeps none after moving', async () => {
+      const found = await h.watches.create(h.userId, h.watchInput({ allowSplitStay: true }));
+      h.fake.setAvailability('1', { ...SPLIT, u3: 'available' });
+      await h.watches.execute(found.id);
+      expect((await h.watches.get(found.id))?.splitStays).toBeUndefined();
+      expect((await h.watches.get(found.id))?.bookingLink).toBeDefined();
+
+      h.fake.setAvailability('1', SPLIT);
+      const moved = await h.watches.create(h.userId, h.watchInput({ allowSplitStay: true }));
+      await h.watches.execute(moved.id);
+      expect((await h.watches.get(moved.id))?.splitStays).toEqual(LINKED);
+      const away = await h.watches.update(moved.id, {
+        location: { externalId: '2', name: 'Karri Grove' },
+      });
+      expect(away.lastResult).toBeUndefined();
+      expect(away.splitStays).toBeUndefined();
+    });
+
+    it('quietly: no links for a provider no longer registered; none for a check it cannot read', async () => {
+      const watch = await h.watches.create(h.userId, h.watchInput({ allowSplitStay: true }));
+      await h.watches.execute(watch.id);
+
+      h.db.prepare("UPDATE watches SET provider_id = 'gone' WHERE id = ?").run(watch.id);
+      expect((await h.watches.get(watch.id))?.splitStays).toEqual(UNLINKED);
+
+      h.db.prepare("UPDATE watches SET provider_id = 'fake' WHERE id = ?").run(watch.id);
+      h.db
+        .prepare('UPDATE watches SET last_availability = ? WHERE id = ?')
+        .run(
+          JSON.stringify([
+            { unitId: 'u1', unitName: 'Site u1', nights: [null], fullyAvailable: false },
+          ]),
+          watch.id
+        );
+      expect((await h.watches.get(watch.id))?.splitStays).toBeUndefined();
+      expect((await h.watches.list(h.userId)).map((w) => [w.id, w.splitStays])).toEqual([
+        [watch.id, undefined],
+      ]);
+    });
+
+    it('turning the option on or off makes the watch due at once; setting what it is does not', async () => {
+      h.fake.setAvailability('1', { u1: 'booked', u2: 'booked' });
+      const watch = await h.watches.create(h.userId, h.watchInput({ notifyOnly: false }));
+      await h.watches.execute(watch.id);
+      const later = new Date(NOW.getTime() + 60 * 60_000);
+      expect(h.watchRepo.findById(watch.id)?.nextCheckAt).toEqual(later);
+
+      await h.watches.update(watch.id, { allowSplitStay: false });
+      expect(h.watchRepo.findById(watch.id)?.nextCheckAt).toEqual(later);
+
+      const on = await h.watches.update(watch.id, { allowSplitStay: true });
+      expect(on.allowSplitStay).toBe(true);
+      expect(h.watchRepo.findById(watch.id)?.nextCheckAt).toEqual(NOW);
+
+      await h.watches.execute(watch.id);
+      expect(h.watchRepo.findById(watch.id)?.nextCheckAt).toEqual(later);
+      const off = await h.watches.update(watch.id, { allowSplitStay: false });
+      expect(off.allowSplitStay).toBe(false);
+      expect(h.watchRepo.findById(watch.id)?.nextCheckAt).toEqual(NOW);
+    });
+
+    it('a check in flight when the dates change keeps nothing of a split stay and alerts on nothing', async () => {
+      const watch = await h.watches.create(h.userId, h.watchInput({ allowSplitStay: true }));
+      h.fake.delayMs = 20;
+      const running = h.watches.execute(watch.id, { manual: true });
+      await new Promise((resolve) => setTimeout(resolve, 5));
+      await h.watches.update(watch.id, {
+        stay: { arrival: '2026-12-02', departure: '2026-12-04', adults: 2 },
+      });
+
+      await expect(running).resolves.toMatchObject({
+        success: false,
+        error: WATCH_EDITED_DURING_CHECK,
+      });
+      const stored = h.watchRepo.findById(watch.id)!;
+      expect(stored.lastResult).toBeUndefined();
+      expect(stored.lastAvailability).toBeUndefined();
+      expect(h.notifications.notifyWatchSplitFound).not.toHaveBeenCalled();
     });
   });
 });

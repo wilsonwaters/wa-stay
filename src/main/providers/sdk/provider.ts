@@ -413,6 +413,13 @@ export interface ProviderLinks {
   booking(externalId: string, stay?: StayQuery, unitId?: string): string | null;
   /** Where the person manages an existing booking (§12.5). */
   manageBooking?(reference: string): string | null;
+  /**
+   * The place's contact page, where a person asks its staff to book what WA Stay can't (a
+   * split stay with `booking: 'contact'`): an absolute https URL on the provider's own site,
+   * a public page that needs no sign-in. Needed by a provider that reports `contact` split
+   * stays (the contract suite checks); null when the place has none.
+   */
+  contact?(externalId: string): string | null;
 }
 
 export interface AccommodationProvider {

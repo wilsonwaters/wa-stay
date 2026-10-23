@@ -8,10 +8,12 @@
 import {
   freeForStay,
   fullMatches,
+  isFreeNight,
   kindsAmbiguous,
   longestRun,
   meetsStayRules,
   minimumNights,
+  nightAfter,
   partialMatches,
   priceCheck,
   wantedUnits,
@@ -472,5 +474,27 @@ describe('watch matching', () => {
       expect(meetsStayRules({}, [free(D1)], free(D2, { noArrival: true }))).toBe(true);
       expect(meetsStayRules({}, [])).toBe(false);
     });
+  });
+});
+
+describe('the night helpers split stays share (isFreeNight, nightAfter)', () => {
+  it('isFreeNight: available with no reason; a reason wins over the state', () => {
+    expect(isFreeNight(night(D1, 'available', 30))).toBe(true);
+    expect(isFreeNight(night(D1, 'available'))).toBe(true);
+    expect(isFreeNight({ ...night(D1, 'available'), reason: 'split' })).toBe(false);
+    expect(isFreeNight({ ...night(D1, 'available'), reason: 'min-stay' })).toBe(false);
+    expect(isFreeNight({ ...night(D1, 'unknown'), reason: 'split' })).toBe(false);
+    for (const state of ['booked', 'closed', 'not-released', 'unknown'] as const) {
+      expect(isFreeNight(night(D1, state))).toBe(false);
+    }
+  });
+
+  it('nightAfter: the unit’s night on the morning after, when it reported one', () => {
+    const nights = [night(D1, 'available'), night(D2, 'booked'), night(D3, 'available')];
+    const u = unit('u', nights);
+    expect(nightAfter(u, nights[0])).toBe(nights[1]);
+    expect(nightAfter(u, nights[1])).toBe(nights[2]);
+    expect(nightAfter(u, nights[2])).toBeUndefined();
+    expect(nightAfter(u, night(D4, 'available'))).toBeUndefined();
   });
 });

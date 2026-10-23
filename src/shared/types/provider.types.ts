@@ -367,6 +367,43 @@ export type NightState = 'available' | 'booked' | 'closed' | 'not-released' | 'u
  */
 export type NightReason = 'split' | 'min-stay';
 
+/**
+ * How a split stay is booked:
+ * - `contact`: the place's own staff book it, as separate stays; the person contacts the
+ *   place (`ProviderLinks.contact`). RAC: a category with a free site every night but no one
+ *   site free for all of them.
+ * - `separate`: the person books each part online, as a booking of its own, on the provider's
+ *   booking page for that part's dates (ParkStay).
+ */
+export type SplitStayBooking = 'contact' | 'separate';
+
+/** Every `SplitStayBooking`. */
+export const SPLIT_STAY_BOOKINGS = [
+  'contact',
+  'separate',
+] as const satisfies readonly SplitStayBooking[];
+assertTypeEquals<(typeof SPLIT_STAY_BOOKINGS)[number], SplitStayBooking>(true);
+
+/**
+ * What a provider reports on a unit that stands for several (a category or class of sites)
+ * whose stay is free every night only by moving between them. Set it only when the unit is not
+ * `fullyAvailable`, its `freeCount` (if any) is 0, and every night of the stay is free
+ * (`available`, no reason) or `split`, at least one of them `split`. Leave it out when you
+ * can't tell how it would be booked. Never counted as free.
+ */
+export interface UnitSplitStay {
+  booking: SplitStayBooking;
+  /**
+   * The parts in date order, when the provider knows where the moves fall: each a run of nights
+   * on one of the places this unit stands for. The first arrives on the stay's arrival, each
+   * departs the morning the next arrives, and the last departs on the stay's departure; at
+   * least 2. Left out when the provider can't tell (RAC counts free sites per night, not which).
+   */
+  parts?: Array<{ arrival: string; departure: string }>;
+  /** How many places it moves across, when known: a whole number of at least 2. */
+  units?: number;
+}
+
 export interface NightStatus {
   /** Calendar date `YYYY-MM-DD`. */
   date: string;
@@ -432,6 +469,8 @@ export interface UnitAvailability {
    * on a phone too; and never a URL that adds to a cart, holds or books when it is opened.
    */
   bookingUrl?: string;
+  /** A split stay on this unit, which stands for several (`UnitSplitStay`). */
+  splitStay?: UnitSplitStay;
 }
 
 export interface LocationAvailability {
@@ -452,6 +491,62 @@ export interface LocationAvailability {
    * public page that needs no sign-in, never one that adds to a cart, holds or books.
    */
   bookingUrl?: string;
+}
+
+/** One part of a split stay: consecutive nights on one unit, booked on its own. */
+export interface SplitStayPart {
+  /**
+   * The unit the part is on: one place (a derived split), or the unit standing for several
+   * that the provider reported the split on (ParkStay's class: the provider picks the site).
+   */
+  unitId: string;
+  unitName: string;
+  /** Calendar dates; `departure` is the morning after the part's last night. */
+  arrival: string;
+  departure: string;
+  /** The part's price, when every one of its nights has one. */
+  total?: number;
+  /**
+   * `separate`: this part's booking page, `links.booking(externalId, partStay, unitId)`, kept
+   * only when it is a booking link of the provider (`firstBookingLink`).
+   */
+  bookingUrl?: string;
+}
+
+/**
+ * A stay free every night only by moving between units of one kind: a split stay. Never free:
+ * not in `fullyAvailable`, `freeCount`, Explore's counts or a watch's full match. Built by the
+ * core (`splitStaysOf`, `src/main/core/split-stays.ts`) from a check's units; never sent by a
+ * provider.
+ */
+export interface SplitStay {
+  /** The kind of every unit it uses; it never crosses stay types. Absent when the units give none. */
+  unitKind?: UnitKind;
+  booking: SplitStayBooking;
+  /** The unit the provider reported it on (RAC's category), when it did; absent when derived. */
+  unitId?: string;
+  unitName?: string;
+  /** How many units it moves across, when known: the derived parts' distinct units, or the provider's count. */
+  units?: number;
+  /** The parts in date order, when known; `parts.length` is how many bookings it takes. */
+  parts?: SplitStayPart[];
+  /** The whole stay's price, the sum of its nights' prices, when every night has one. Shown as "about". */
+  total?: number;
+  /**
+   * `contact`: the place's contact page (`links.contact`, else `links.location`), kept only
+   * when https on the provider's own site; absent otherwise (the copy names the place
+   * without a link).
+   */
+  contactUrl?: string;
+}
+
+/** `catalog.checkLocation`'s answer: the provider's availability, and the split stays in it. */
+export interface LocationCheck extends LocationAvailability {
+  /**
+   * Best first: every unit's reported split stay, and per kind the derived one when no unit of
+   * that kind is free for the whole stay. Empty when there is none.
+   */
+  splitStays: SplitStay[];
 }
 
 /**
@@ -477,12 +572,20 @@ export interface BulkAvailabilityEntry {
    */
   bookableUnits?: number;
   /**
+   * No unit is free for the whole stay (`availableUnits` 0), but the stay is free every night
+   * by moving between units: a split stay. Set only with `availableUnits` 0, and only when the
+   * provider can tell. Never counted. Per kind in `byKind` likewise.
+   */
+  splitStay?: true;
+  /**
    * The same two counts for each kind of unit the place has, so a filter on what people sleep
    * in can count only those units. Set it at a place with more than one kind; a kind left out
    * has no count. Its `bookableUnits` is left out, as above, when the provider has no total.
    * Passed through as the provider gives it.
    */
-  byKind?: Partial<Record<UnitKind, { availableUnits: number; bookableUnits?: number }>>;
+  byKind?: Partial<
+    Record<UnitKind, { availableUnits: number; bookableUnits?: number; splitStay?: true }>
+  >;
 }
 
 /** The state of a provider's waiting room or queue. */
