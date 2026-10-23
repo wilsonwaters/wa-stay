@@ -1,7 +1,7 @@
 # Split stays: design spec and task plan
 
 **Stream:** split-stays · **Status:** approved 2026-10-23 (SQ1: no limit on moves; SQ2: a split alert pauses a "stop after the first alert" watch) · **Tasks:** SS1–SS4 (below)
-**Inputs:** the stakeholder's RAC finding (1–6 July 2027, RAC Busselton Holiday Park, "Powered Site") and request; the dispatch's decisions D1–D6; CLAUDE.md; architecture-notes §12 (12.4, 12.17, 12.31, 12.33, 12.35); `docs/providers/rac/README.md`; the code at this lane's head; RAC's saved contact pages (research of 16 Oct 2026).
+**Inputs:** the stakeholder's RAC finding (1–6 July 2027, RAC Monkey Mia Dolphin Resort, "Powered Site"; first assumed to be Busselton, confirmed by the stakeholder on 23 Oct 2026 and recorded live as `availability-monkey-mia-split-2027-07-01-5n.json`) and request; the dispatch's decisions D1–D6; CLAUDE.md; architecture-notes §12 (12.4, 12.17, 12.31, 12.33, 12.35); `docs/providers/rac/README.md`; the code at this lane's head; RAC's saved contact pages (research of 16 Oct 2026).
 
 ## 1. Goal
 
