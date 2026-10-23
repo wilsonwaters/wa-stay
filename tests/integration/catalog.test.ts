@@ -546,6 +546,59 @@ describe('the location catalogue on a real database', () => {
       ]);
       expect(availability.bookingUrl).toMatch(/^https:\/\/parkstay\.dbca\.wa\.gov\.au\//);
     });
+
+    it('checkLocation answers a split stay across sites (03 free the first night, 04 the second), with ParkStay’s search page for each part', async () => {
+      const view = parkStayFixture<{
+        sites: Array<{ id: number; availability: Array<[boolean, string, ...unknown[]]> }>;
+      }>('campsite_availablity_view_20.json');
+      const booked = (night: [boolean, string, ...unknown[]]) =>
+        [false, 'Booked', ...night.slice(2)] as [boolean, string, ...unknown[]];
+      for (const site of view.sites) {
+        site.availability = site.availability.map((night, i) =>
+          (site.id === 3 && i === 0) || (site.id === 4 && i === 1) ? night : booked(night)
+        );
+      }
+      server.views.set('20', view);
+      try {
+        const { catalog } = await build({ parkstay: true });
+        await catalog.sync('parkstay');
+
+        const checked = await catalog.checkLocation('parkstay:20', BUNGARRA_STAY);
+
+        expect(checked.units.some((u) => u.fullyAvailable || u.splitStay)).toBe(false);
+        const search = 'https://parkstay.dbca.wa.gov.au/search-availability/information/';
+        expect(checked.splitStays).toEqual([
+          {
+            unitKind: 'campsite',
+            booking: 'separate',
+            units: 2,
+            parts: [
+              {
+                unitId: '3',
+                unitName: 'CAMPSITE 03',
+                arrival: '2026-11-10',
+                departure: '2026-11-11',
+                total: 30,
+                bookingUrl: `${search}?campground_id=20&arrival=2026/11/10&departure=2026/11/11`,
+              },
+              {
+                unitId: '4',
+                unitName: 'CAMPSITE 04',
+                arrival: '2026-11-11',
+                departure: '2026-11-12',
+                total: 30,
+                bookingUrl: `${search}?campground_id=20&arrival=2026/11/11&departure=2026/11/12`,
+              },
+            ],
+            total: 60,
+          },
+        ]);
+        // Asked once: the split stays come from the check, at no request of their own
+        expect(server.requestsTo('/api/campsite_availablity_view/20/')).toHaveLength(1);
+      } finally {
+        server.views.delete('20');
+      }
+    });
   });
 });
 

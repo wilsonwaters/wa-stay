@@ -56,7 +56,14 @@
  * 1. `unknown` with `min-stay`: the stay rules above refuse it (a minimum above the stay's
  *    nights, or no arrivals on its first night);
  * 2. `unknown` with `split`: every night has free sites, but no site is free for the whole stay
- *    (stay-through code 3 or 5, or 0 with no site);
+ *    (stay-through code 3 or 5, or 0 with no site). With a tariff that counts, it is a split
+ *    stay RAC's staff book as separate stays: the unit reports `splitStay: { booking: 'contact' }`
+ *    (the person contacts the park, `links.contact`), and each night keeps that tariff's price
+ *    (the category's nightly rate, whichever site; never the placeholder) and its closed days.
+ *    No parts and no count: RAC counts free sites per night, not which, and finding where the
+ *    moves fall would take a POST per part. With no tariff that counts, the nights have no
+ *    price and nothing is reported: RAC refuses the stay for another reason, and so may its
+ *    staff;
  * 3. `unknown` with `min-stay`: no tariff counts and the deciding tariff (the public "Standard
  *    Rate", else the first public tariff) has code 6, 7, 9 or 10;
  * 4. `closed`, labelled with RAC's message: the deciding tariff's code 2, 3, 4, 8 or 11, or the
@@ -434,7 +441,7 @@ function minStayNight(date: string, rules: StayRules): NightStatus {
 /** What a category's answer says about a unit, before its id, name, kind and link. */
 export type CategoryAvailability = Pick<
   UnitAvailability,
-  'nights' | 'fullyAvailable' | 'freeCount' | 'total' | 'minNights' | 'priceNote'
+  'nights' | 'fullyAvailable' | 'freeCount' | 'total' | 'minNights' | 'priceNote' | 'splitStay'
 >;
 
 /**
@@ -492,18 +499,24 @@ export function categoryAvailability(
     !tooShort &&
     arrivalRules.noArrival !== true;
 
+  // A split stay RAC's staff can book as separate stays: only through a tariff that counts
+  let splitStay = false;
   if (allFree && !fullyAvailable) {
     const verdict = verdictOf(category, deciding, tooShort || arrivalRules.noArrival === true);
+    splitStay = verdict.state === 'unknown' && verdict.reason === 'split' && !!priceTariff;
     unitNights = unitNights.map((night): NightStatus => {
       if (verdict.state === 'closed') return closedNight(night.date, verdict.message);
       if (verdict.state === 'not-released') return { date: night.date, state: 'not-released' };
       if (verdict.reason === 'min-stay') {
         return minStayNight(night.date, rulesOf(rulesTariff, night.date));
       }
+      // A split stay's nights keep their price: the category's rate, whichever site
+      const price = splitStay ? nightPriceOf(priceTariff, night.date) : undefined;
       return {
         date: night.date,
         state: 'unknown',
         ...(verdict.reason ? { reason: verdict.reason } : {}),
+        ...(price !== undefined ? { price } : {}),
       };
     });
   } else if (tooShort) {
@@ -531,5 +544,7 @@ export function categoryAvailability(
   if (minimum >= 2) result.minNights = minimum;
   const note = priceTariff ? priceNoteOf(priceTariff) : undefined;
   if (note) result.priceNote = note;
+  // Where the moves fall, and across how many sites, RAC does not say: no parts, no count
+  if (splitStay) result.splitStay = { booking: 'contact' };
   return result;
 }

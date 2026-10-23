@@ -16,6 +16,10 @@
  *
  * At a campground listed by site class (Lucky Bay), each class is one unit, `class:<id>`, and
  * its nights come from the class's own nights and its per-site breakdown (`site-classes.ts`).
+ * When no site of the class is free for the whole stay but every night has one, the class
+ * reports a split stay booked part by part (`splitStay: { booking: 'separate', parts }`). At a
+ * campground listed by site, each site is one place and reports nothing: the core works out
+ * split stays across them. The bulk answer has no nights, so it cannot tell a split stay.
  */
 
 import type {
@@ -25,6 +29,7 @@ import type {
   NightStatus,
   StayQuery,
   UnitAvailability,
+  UnitSplitStay,
 } from '@shared/types/provider.types';
 import { eachNight } from '@shared/utils/calendar-date';
 import { makeLocationKey } from '@shared/utils/location-key';
@@ -37,7 +42,13 @@ import { toParkStayDate, type ParkStayClient } from './client';
 import { DEFAULT_MAX_ADVANCE_DAYS } from './constants';
 import { parkstayLinks } from './links';
 import { isReleased, type ParkStayReleasePolicy } from './release-policy';
-import { bookableClassNights, classesOfSiteId, classUnitId, isClassListing } from './site-classes';
+import {
+  bookableClassNights,
+  classesOfSiteId,
+  classSplitStay,
+  classUnitId,
+  isClassListing,
+} from './site-classes';
 import type {
   RawBulkAvailability,
   RawCampsite,
@@ -147,15 +158,37 @@ function freeSitesByNight(entry: RawCampsite, offsets: readonly number[]): boole
  * read one stay that no site can take); and a night with no free site is booked, closed or
  * not released as for a site. Without a breakdown, the class's own labels are read as a
  * site's.
+ *
+ * With a breakdown whose every night has a free site, the class also reports its split stay
+ * (`classSplitStay`): the fewest class bookings that cover the stay, one per run of nights on
+ * one site. A misaligned breakdown, or none, reports nothing.
  */
 export function classNights(
   entry: RawCampsite,
   inStay: (date: string) => boolean,
   released: (date: string) => boolean
-): NightStatus[] {
+): { nights: NightStatus[]; splitStay?: UnitSplitStay } {
   const offsets = entry.availability.flatMap((tuple, offset) => (inStay(tuple[5]) ? offset : []));
   const free = freeSitesByNight(entry, offsets);
   const chosen = free ? bookableClassNights(free, offsets.length) : undefined;
+  const nights = classNightStatuses(entry, offsets, free, chosen, released);
+  const splitStay = free
+    ? classSplitStay(
+        free,
+        offsets.map((offset) => entry.availability[offset][5])
+      )
+    : undefined;
+  return { nights, ...(splitStay ? { splitStay } : {}) };
+}
+
+/** Each of the class's nights at `offsets`, from its own tuple and which sites are free. */
+function classNightStatuses(
+  entry: RawCampsite,
+  offsets: readonly number[],
+  free: readonly (readonly boolean[])[] | undefined,
+  chosen: readonly boolean[] | undefined,
+  released: (date: string) => boolean
+): NightStatus[] {
   return offsets.map((offset, i): NightStatus => {
     const tuple = entry.availability[offset];
     const night = toNightStatus(tuple, released(tuple[5]));
@@ -268,15 +301,24 @@ export function createAvailability({
       const unitId = (byClass && classUnitId(site)) || String(site.id);
       const aliases = aliasesOf(site);
       if (wanted && !wanted.has(unitId) && !aliases.some((id) => wanted.has(id))) continue;
-      const siteNights = byClass
-        ? classNights(site, inStay, released)
-        : site.availability
-            .filter((tuple) => inStay(tuple[5]))
-            .map((tuple) => toNightStatus(tuple, released(tuple[5])));
+      const classStay = byClass ? classNights(site, inStay, released) : undefined;
+      const siteNights =
+        classStay?.nights ??
+        site.availability
+          .filter((tuple) => inStay(tuple[5]))
+          .map((tuple) => toNightStatus(tuple, released(tuple[5])));
       const byDate = new Map(siteNights.map((night) => [night.date, night]));
       const unitNights = nights.flatMap((date) => byDate.get(date) ?? []);
       const fullyAvailable =
         nights.length > 0 && nights.every((date) => byDate.get(date)?.state === 'available');
+      // A class's split stay, only over the stay's own nights, each once and in order
+      const splitStay =
+        classStay?.splitStay &&
+        !fullyAvailable &&
+        siteNights.length === nights.length &&
+        siteNights.every((night, i) => night.date === nights[i])
+          ? classStay.splitStay
+          : undefined;
       const prices = unitNights.map((night) => night.price);
       const total =
         fullyAvailable && prices.every((p) => p !== undefined)
@@ -293,6 +335,7 @@ export function createAvailability({
         nights: unitNights,
         fullyAvailable,
         ...(total !== undefined ? { total } : {}),
+        ...(splitStay ? { splitStay } : {}),
       });
     }
 

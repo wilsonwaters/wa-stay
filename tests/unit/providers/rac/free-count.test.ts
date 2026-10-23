@@ -7,12 +7,16 @@
 
 import fs from 'fs';
 import path from 'path';
+import { parkEntry } from '@main/providers/rac/bulk';
 import {
   categoryAvailability,
   readAvailability,
   wholeUnits,
   type RawCategory,
 } from '@main/providers/rac/mapping';
+import { racPark } from '@main/providers/rac/parks';
+import type { UnitAvailability, UnitKind } from '@shared/types/provider.types';
+import { bulkSplitViolations } from '@tests/utils/provider-contract';
 
 const RAC_FIXTURES = path.join(__dirname, '../../../fixtures/providers/rac');
 const NIGHTS = ['2026-11-06', '2026-11-07'];
@@ -79,5 +83,104 @@ describe('RAC free counts (freeCount)', () => {
       ['unknown', 'split'],
       ['unknown', 'split'],
     ]);
+  });
+});
+
+describe("RAC's split stays on Explore (parkEntry)", () => {
+  const BUSSELTON = racPark('busselton')!;
+  /** A category as `check` gives it, of `kind`, from Busselton's answer edited by `edit`. */
+  function category(
+    id: number,
+    kind: UnitKind,
+    edit: (category: Record<string, unknown>) => void = () => undefined
+  ): UnitAvailability {
+    const raw = byId(
+      busselton((c) => {
+        if (c.category_id === id) edit(c);
+      }),
+      id
+    );
+    return {
+      unitId: `cat:${id}`,
+      unitName: raw.category_name,
+      unitKind: kind,
+      ...categoryAvailability(raw, NIGHTS),
+    };
+  }
+  /** Free every night, on no one site. */
+  const split = (c: Record<string, unknown>) =>
+    Object.assign(c, { stay_through_sites_available: 0, stay_through_sites_code: 3 });
+  /** The sold-out ensuite site with free sites every night. */
+  const freeNights = (c: Record<string, unknown>) =>
+    Object.assign(c, {
+      sites_available: { '2026-11-06': 4, '2026-11-07': 3 },
+      sites_code: { '2026-11-06': 0, '2026-11-07': 0 },
+    });
+
+  it('flags the park and the kind when nothing is free for the whole stay, but a category reports a split stay', () => {
+    const units = [category(4, 'campsite', split), category(7, 'cabin')];
+    expect(units[0].splitStay).toEqual({ booking: 'contact' });
+    const entry = parkEntry('rac', BUSSELTON, units);
+    expect(entry).toStrictEqual({
+      key: 'rac:busselton',
+      availableUnits: 0,
+      splitStay: true,
+      byKind: {
+        campsite: { availableUnits: 0, splitStay: true },
+        cabin: { availableUnits: 0 },
+      },
+    });
+    expect(bulkSplitViolations([entry])).toEqual([]);
+  });
+
+  it('flags only its kind when a category of another kind is free for the whole stay', () => {
+    const units = [
+      category(4, 'campsite', split),
+      category(7, 'cabin', (c) => {
+        freeNights(c);
+        Object.assign(c, { stay_through_sites_available: 2, stay_through_sites_code: 0 });
+      }),
+    ];
+    const entry = parkEntry('rac', BUSSELTON, units);
+    expect(entry).toStrictEqual({
+      key: 'rac:busselton',
+      availableUnits: 2,
+      byKind: {
+        campsite: { availableUnits: 0, splitStay: true },
+        cabin: { availableUnits: 2 },
+      },
+    });
+    expect(bulkSplitViolations([entry])).toEqual([]);
+  });
+
+  it('flags nothing when another category of the same kind is free for the whole stay', () => {
+    const units = [
+      category(4, 'campsite'),
+      category(7, 'campsite', (c) => {
+        freeNights(c);
+        split(c);
+      }),
+    ];
+    expect(units[1].splitStay).toEqual({ booking: 'contact' });
+    expect(parkEntry('rac', BUSSELTON, units)).toStrictEqual({
+      key: 'rac:busselton',
+      availableUnits: 51,
+      byKind: { campsite: { availableUnits: 51 }, cabin: { availableUnits: 0, bookableUnits: 0 } },
+    });
+  });
+
+  it('flags nothing for split nights no tariff counts for: no split stay is reported', () => {
+    const units = [
+      category(4, 'campsite', (c) => {
+        split(c);
+        for (const tariff of c.tariffs_available as Array<Record<string, unknown>>) {
+          Object.assign(tariff, { tariff_success: 'false', tariff_code: 4 });
+        }
+      }),
+    ];
+    expect(units[0].nights.map((n) => n.reason)).toEqual(['split', 'split']);
+    const entry = parkEntry('rac', BUSSELTON, units);
+    expect(entry).not.toHaveProperty('splitStay');
+    expect(entry.byKind?.campsite).toStrictEqual({ availableUnits: 0 });
   });
 });

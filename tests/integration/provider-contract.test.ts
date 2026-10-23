@@ -8,14 +8,21 @@ import type { CatalogModule } from '@main/providers/sdk';
 import type { BoundingBox, LocationSummary } from '@shared/types/catalog.types';
 import { createFakeProvider, createTestProviderContext } from '@tests/utils/fake-provider';
 import { createFakeSearchProvider } from '@tests/utils/fake-search-provider';
+import type {
+  BulkAvailabilityEntry,
+  NightStatus,
+  UnitAvailability,
+} from '@shared/types/provider.types';
 import {
   abortViolation,
   bookingLinkViolations,
+  bulkSplitViolations,
   defaultSearchText,
   describeProviderContract,
   freeCountViolations,
   searchAreaViolations,
   searchTextViolations,
+  splitStayViolations,
   stayRuleViolations,
 } from '@tests/utils/provider-contract';
 
@@ -391,6 +398,259 @@ describe('the free-count checks of the contract suite', () => {
     expect(
       freeCountViolations({ units: [unit('c1', true, 51), unit('c2', false), unit('c3', true)] })
     ).toEqual(['units c2, c3 have no freeCount, but others do']);
+  });
+});
+
+/**
+ * A provider whose units stand for several places, at 10–12 Nov 2026: u1 is booked, u2 is free
+ * every night only by moving (booked through the place), u3 likewise in two parts (booked part
+ * by part).
+ */
+const SPLIT_STAY = { arrival: '2026-11-10', departure: '2026-11-12', adults: 2 };
+const withSplitStays = () =>
+  createFakeProvider({
+    availability: {
+      '1': {
+        u1: 'booked',
+        u2: [{ state: 'unknown', reason: 'split', price: 40 }, { state: 'available' }],
+        u3: [{ state: 'available' }, { state: 'unknown', reason: 'split' }],
+      },
+    },
+    splitStays: {
+      u2: { booking: 'contact' },
+      u3: {
+        booking: 'separate',
+        units: 2,
+        parts: [
+          { arrival: '2026-11-10', departure: '2026-11-11' },
+          { arrival: '2026-11-11', departure: '2026-11-12' },
+        ],
+      },
+    },
+    contactLinks: true,
+  });
+
+describeProviderContract('FakeProvider with split stays', () => ({
+  provider: withSplitStays(),
+  sample: { externalId: '1', stay: SPLIT_STAY },
+}));
+
+describe('the split-stay checks of the contract suite', () => {
+  const stay = SPLIT_STAY;
+  const fake = withSplitStays();
+  const night = (date: string, extra: Partial<NightStatus> = {}): NightStatus => ({
+    date,
+    state: 'unknown',
+    reason: 'split',
+    ...extra,
+  });
+  /** A unit that reports a valid split stay booked through the place, changed by `extra`. */
+  const unit = (extra: Partial<UnitAvailability> = {}): UnitAvailability => ({
+    unitId: 'c1',
+    unitName: 'Powered Site',
+    nights: [night('2026-11-10'), night('2026-11-11')],
+    fullyAvailable: false,
+    freeCount: 0,
+    splitStay: { booking: 'contact' },
+    ...extra,
+  });
+  const check = (units: UnitAvailability[], provider = fake) =>
+    splitStayViolations(provider.manifest, provider, stay, { key: 'fake:1', units });
+  const parts = (...dates: Array<[string, string]>) =>
+    dates.map(([arrival, departure]) => ({ arrival, departure }));
+
+  it('pass the split stays a provider reports as the SDK asks, and a check with none', async () => {
+    const result = await fake.availability!.check('1', stay);
+    expect(result.units.filter((u) => u.splitStay).map((u) => u.unitId)).toEqual(['u2', 'u3']);
+    expect(check(result.units)).toEqual([]);
+    expect(check([unit()])).toEqual([]);
+    expect(
+      check([
+        unit({
+          freeCount: undefined,
+          nights: [
+            night('2026-11-10', { state: 'available', reason: undefined }),
+            night('2026-11-11'),
+          ],
+          splitStay: {
+            booking: 'separate',
+            parts: parts(['2026-11-10', '2026-11-11'], ['2026-11-11', '2026-11-12']),
+          },
+        }),
+      ])
+    ).toEqual([]);
+    const plain = await createFakeProvider().availability!.check('1', stay);
+    expect(check(plain.units, createFakeProvider())).toEqual([]);
+  });
+
+  it.each<[string, Partial<UnitAvailability>, string]>([
+    [
+      'a unit that is fullyAvailable',
+      { fullyAvailable: true },
+      "unit c1's split stay: the unit is fullyAvailable",
+    ],
+    [
+      'a unit that counts free units',
+      { freeCount: 3 },
+      "unit c1's split stay: the unit counts 3 free",
+    ],
+    [
+      'a missing night',
+      { nights: [night('2026-11-10')] },
+      "unit c1's split stay: no night for 2026-11-11",
+    ],
+    [
+      'a booked night',
+      {
+        nights: [night('2026-11-10'), night('2026-11-11', { state: 'booked', reason: undefined })],
+      },
+      "unit c1's split stay: 2026-11-11 is booked, neither free nor split",
+    ],
+    [
+      'a min-stay night',
+      { nights: [night('2026-11-10'), night('2026-11-11', { reason: 'min-stay' })] },
+      "unit c1's split stay: 2026-11-11 is unknown (min-stay), neither free nor split",
+    ],
+    [
+      'no split night',
+      {
+        nights: [
+          night('2026-11-10', { state: 'available', reason: undefined }),
+          night('2026-11-11', { state: 'available', reason: undefined }),
+        ],
+      },
+      "unit c1's split stay: no night is split",
+    ],
+    [
+      'an unknown way to book',
+      { splitStay: { booking: 'phone' as never } },
+      'unit c1\'s split stay: booking "phone" is neither contact nor separate',
+    ],
+    [
+      'a count of 1',
+      { splitStay: { booking: 'contact', units: 1 } },
+      "unit c1's split stay: units 1 is not a whole number of at least 2",
+    ],
+    [
+      'a count that is a fraction',
+      { splitStay: { booking: 'contact', units: 2.5 } },
+      "unit c1's split stay: units 2.5 is not a whole number of at least 2",
+    ],
+    [
+      'one part',
+      { splitStay: { booking: 'separate', parts: parts(['2026-11-10', '2026-11-12']) } },
+      "unit c1's split stay: its parts are 1, not 2 or more",
+    ],
+    [
+      'parts with a gap',
+      {
+        splitStay: {
+          booking: 'separate',
+          parts: parts(['2026-11-10', '2026-11-11'], ['2026-11-12', '2026-11-13']),
+        },
+      },
+      "unit c1's split stay: its parts have part 2 arriving 2026-11-12, not 2026-11-11",
+    ],
+    [
+      'parts that overlap',
+      {
+        splitStay: {
+          booking: 'separate',
+          parts: parts(['2026-11-10', '2026-11-12'], ['2026-11-11', '2026-11-12']),
+        },
+      },
+      "unit c1's split stay: its parts have part 2 arriving 2026-11-11, not 2026-11-12",
+    ],
+    [
+      'parts that stop short of the departure',
+      {
+        splitStay: {
+          booking: 'separate',
+          parts: parts(['2026-11-10', '2026-11-11'], ['2026-11-11', '2026-11-11']),
+        },
+      },
+      "unit c1's split stay: its parts have part 2 of no night (2026-11-11 to 2026-11-11)",
+    ],
+    [
+      'parts that end after the departure',
+      {
+        splitStay: {
+          booking: 'separate',
+          parts: parts(['2026-11-10', '2026-11-11'], ['2026-11-11', '2026-11-13']),
+        },
+      },
+      "unit c1's split stay: its parts end on 2026-11-13, not the stay's departure 2026-11-12",
+    ],
+    [
+      'a part without dates',
+      {
+        splitStay: {
+          booking: 'separate',
+          parts: [
+            { arrival: '2026-11-10', departure: '11 Nov' },
+            ...parts(['2026-11-11', '2026-11-12']),
+          ],
+        },
+      },
+      "unit c1's split stay: its parts have part 1 without two calendar dates",
+    ],
+  ])('fail %s', (_name, extra, message) => {
+    expect(check([unit(extra)])).toEqual([message]);
+  });
+
+  it('fail a split stay booked through the place with no contact page on the provider’s own site', () => {
+    const without = createFakeProvider();
+    expect(check([unit()], without)).toEqual([
+      "unit c1's split stay is booked through the place, but the provider has no links.contact",
+    ]);
+    const offSite = withSplitStays();
+    offSite.links.contact = () => 'https://contact.elsewhere.test/1';
+    expect(check([unit()], offSite)).toEqual([
+      'unit c1\'s split stay is booked through the place, but links.contact("1") gives https://contact.elsewhere.test/1, not a page on https://fake.example',
+    ]);
+    const http = withSplitStays();
+    http.links.contact = () => 'http://fake.example/1/contact';
+    expect(check([unit()], http)[0]).toContain(
+      'gives http://fake.example/1/contact, not a page on'
+    );
+    const none = withSplitStays();
+    none.links.contact = () => null;
+    expect(check([unit(), unit({ unitId: 'c2' })], none)).toEqual([
+      'unit c1\'s split stay is booked through the place, but links.contact("1") gives none',
+      'unit c2\'s split stay is booked through the place, but links.contact("1") gives none',
+    ]);
+    // Booked part by part, it needs no contact page
+    expect(check([unit({ splitStay: { booking: 'separate' } })], without)).toEqual([]);
+  });
+
+  describe('bulk', () => {
+    const entry = (extra: Partial<BulkAvailabilityEntry> = {}): BulkAvailabilityEntry => ({
+      key: 'fake:1',
+      availableUnits: 0,
+      splitStay: true,
+      byKind: { campsite: { availableUnits: 0, splitStay: true }, cabin: { availableUnits: 2 } },
+      ...extra,
+    });
+
+    it('pass a split stay flagged where nothing is free, for the place or a kind', async () => {
+      expect(bulkSplitViolations([entry(), { key: 'fake:2', availableUnits: 4 }])).toEqual([]);
+      expect(bulkSplitViolations([entry({ availableUnits: 2, splitStay: undefined })])).toEqual([]);
+      expect(bulkSplitViolations(await createFakeProvider().availability!.search!(stay))).toEqual(
+        []
+      );
+    });
+
+    it('fail a split stay flagged where something is free, or flagged as anything but true', () => {
+      expect(bulkSplitViolations([entry({ availableUnits: 3 })])).toEqual([
+        'fake:1 flags a split stay with 3 available units',
+      ]);
+      expect(
+        bulkSplitViolations([entry({ byKind: { cabin: { availableUnits: 1, splitStay: true } } })])
+      ).toEqual(['fake:1 (cabin) flags a split stay with 1 available units']);
+      expect(bulkSplitViolations([entry({ splitStay: 'yes' as never })])).toEqual([
+        "fake:1's splitStay is yes, not true",
+      ]);
+    });
   });
 });
 

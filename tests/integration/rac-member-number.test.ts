@@ -100,6 +100,24 @@ function availabilityAnswer(slug: string, arrival: string): string {
     .replaceAll('2026-11-08', '2027-12-22');
 }
 
+/**
+ * Whether Busselton's ensuite sites answer free every night, but on no one site (stay-through 0,
+ * code 3): a split stay RAC's own mapping reports as booked through the park.
+ */
+let ensuiteOnNoOneSite = false;
+
+/** Busselton's answer for 6–8 Nov 2026, its ensuite sites free every night on no one site. */
+function ensuiteSplitAnswer(text: string): string {
+  const json = JSON.parse(text) as { data: Record<string, Record<string, unknown>> };
+  Object.assign(json.data['7'], {
+    sites_available: { '2026-11-06': 4, '2026-11-07': 3 },
+    sites_code: { '2026-11-06': 0, '2026-11-07': 0 },
+    stay_through_sites_available: 0,
+    stay_through_sites_code: 3,
+  });
+  return JSON.stringify(json);
+}
+
 /** What RAC's host answers: Busselton's book-now page, and each park's availability. */
 function racAnswer(hop: HopRequest): HopAnswer {
   const url = new URL(hop.url);
@@ -118,8 +136,10 @@ function racAnswer(hop: HopRequest): HopAnswer {
     const park = RAC_PARKS.find((p) => String(p.blogId) === form.get('blog_id'));
     const arrival = form.get('available_from') === '20 Dec 2027' ? HOLIDAYS.arrival : '';
     if (park) {
+      const body = availabilityAnswer(park.slug, arrival);
+      const split = ensuiteOnNoOneSite && park.slug === 'busselton' && !arrival;
       return {
-        body: availabilityAnswer(park.slug, arrival),
+        body: split ? ensuiteSplitAnswer(body) : body,
         headers: { 'content-type': 'application/json' },
       };
     }
@@ -181,6 +201,7 @@ describe('an RAC member number in the app', () => {
 
   function start(now = NOW): void {
     fakeDateOnly(now);
+    ensuiteOnNoOneSite = false;
     logLines = [];
     capture = new winston.transports.Stream({
       stream: new Writable({
@@ -355,32 +376,9 @@ describe('an RAC member number in the app', () => {
     start();
     await sync();
     await ok(save(TYPED));
-    // Busselton's ensuite sites as a category free every night on no one site, reported as
-    // booked through the park: RAC's own answer, edited, so the place page and the alert run
-    // through RAC's links
-    const rac = container.providers.get('rac');
-    const answer = rac.availability!.check.bind(rac.availability);
-    jest.spyOn(rac.availability!, 'check').mockImplementation(async (...args) => {
-      const checked = await answer(...args);
-      return {
-        ...checked,
-        units: checked.units.map((unit) =>
-          unit.unitId === 'cat:7'
-            ? {
-                ...unit,
-                fullyAvailable: false,
-                freeCount: 0,
-                nights: unit.nights.map(({ date }) => ({
-                  date,
-                  state: 'unknown' as const,
-                  reason: 'split' as const,
-                })),
-                splitStay: { booking: 'contact' as const },
-              }
-            : unit
-        ),
-      };
-    });
+    // Busselton's ensuite sites free every night on no one site: RAC's own answer, edited, which
+    // RAC's mapping reports as a split stay booked through the park, priced at the member rate
+    ensuiteOnNoOneSite = true;
     const responses: unknown[] = [];
     const record = async <T>(pending: Promise<APIResponse<T>>): Promise<T> => {
       const response = await pending;
@@ -392,12 +390,23 @@ describe('an RAC member number in the app', () => {
       call<LocationCheck>('catalog:check-location', { key: 'rac:busselton', stay: STAY })
     );
     const split = checked.units.find((unit) => unit.splitStay);
-    expect(split).toMatchObject({ unitId: 'cat:7', unitName: 'Ensuite Site' });
+    expect(split).toMatchObject({
+      unitId: 'cat:7',
+      unitName: 'Ensuite Site',
+      splitStay: { booking: 'contact' },
+      freeCount: 0,
+      priceNote: 'RAC member rate',
+    });
+    expect(split!.nights.map((night) => [night.reason, night.price])).toEqual([
+      ['split', 115],
+      ['split', 117],
+    ]);
     expect(checked.splitStays).toEqual([
       expect.objectContaining({
         booking: 'contact',
         unitId: split!.unitId,
-        contactUrl: expect.stringMatching(/^https:\/\/parksandresorts\.rac\.com\.au\/busselton\//),
+        total: 232,
+        contactUrl: 'https://parksandresorts.rac.com.au/busselton/contact-us/',
       }),
     ]);
 

@@ -13,7 +13,10 @@
  *   &infants=…&animals=…`, the form of the `online_booking_url` RAC's availability answers
  *   carry. Checked live, anonymously, for Busselton's powered site on 17 Oct 2026: the page
  *   shows the dates, the nights, the guests and the category, then loads its availability; its
- *   cart stays empty (nothing is added until a person presses its book button).
+ *   cart stays empty (nothing is added until a person presses its book button);
+ * - a park's contact page, `/<slug>/contact-us/` (`contact`): where a person asks the park's
+ *   staff to book a split stay as separate stays (`mapping.ts`). It lists the park's phone
+ *   numbers and a question form; WA Stay links it and copies none of it.
  *
  * Every link is on RAC's own site (the manifest's `website`), over https. Never RAC's cart, or a
  * tariff's cart address from an availability answer: opening one adds the stay to a cart.
@@ -123,6 +126,7 @@ export interface RacLinks extends ProviderLinks {
 export function createRacLinks(isMember: () => boolean = () => false): RacLinks {
   return {
     location: (externalId) => parkPage(externalId),
+    contact: (externalId) => parkPage(externalId, 'contact-us/'),
     booking: (externalId, stay, unitId) => booking(isMember(), externalId, stay, unitId),
     bookNow: (externalId, stay, member) => booking(member, externalId, stay),
   };
