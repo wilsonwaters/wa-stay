@@ -8,9 +8,11 @@ import {
   bookableClassNights,
   classesOfSiteId,
   classIdOfUnit,
+  classSplitStay,
   classUnitId,
   isClassListing,
 } from '@main/providers/parkstay/site-classes';
+import { splitStayViolations } from '@tests/utils/provider-contract';
 import { createBookingForm } from '@main/providers/parkstay/holds';
 import type { RawCampsite } from '@main/providers/parkstay/types';
 import { PARKSTAY_LOCATIONS } from '@tests/fixtures/catalog/parkstay-locations';
@@ -125,6 +127,63 @@ describe('bookableClassNights', () => {
   });
 });
 
+describe('classSplitStay', () => {
+  const T = true;
+  const F = false;
+  const DATES = ['2026-11-06', '2026-11-07', '2026-11-08', '2026-11-09'];
+  const part = (arrival: string, departure: string) => ({ arrival, departure });
+
+  it('is none while one site is free every night, or some night has no free site', () => {
+    expect(classSplitStay([[T, T, T, T]], DATES)).toBeUndefined();
+    expect(
+      classSplitStay(
+        [
+          [T, T, F, F],
+          [F, F, F, T],
+        ],
+        DATES
+      )
+    ).toBeUndefined();
+    expect(classSplitStay([], DATES)).toBeUndefined();
+  });
+
+  it('is none for a stay of one night', () => {
+    expect(classSplitStay([[F], [T]], DATES.slice(0, 1))).toBeUndefined();
+  });
+
+  it('a different site each night: one booking a night', () => {
+    expect(
+      classSplitStay(
+        [
+          [T, F, F],
+          [F, T, F],
+          [F, F, T],
+        ],
+        DATES.slice(0, 3)
+      )
+    ).toEqual({
+      booking: 'separate',
+      parts: [
+        part('2026-11-06', '2026-11-07'),
+        part('2026-11-07', '2026-11-08'),
+        part('2026-11-08', '2026-11-09'),
+      ],
+    });
+  });
+
+  it('the fewest bookings, then the longest parts', () => {
+    // Every site one night at a time would take four bookings; two do. Of the two-part covers,
+    // A's 3 nights then C's 1 beat B's 2 then C's 2
+    const A = [T, T, T, F];
+    const B = [T, T, F, F];
+    const C = [F, F, T, T];
+    expect(classSplitStay([B, C, A], DATES)).toEqual({
+      booking: 'separate',
+      parts: [part('2026-11-06', '2026-11-09'), part('2026-11-09', '2026-11-10')],
+    });
+  });
+});
+
 describe('class unit ids', () => {
   it('names a class by its id, never by the site the view gave', () => {
     expect(classUnitId({ type: 117 })).toBe('class:117');
@@ -200,6 +259,24 @@ describe('ParkStay campgrounds listed by class (Lucky Bay, 43)', () => {
       expect(unit).not.toHaveProperty('total');
     });
 
+    it('reports a split stay of three class bookings, one a night: 6, 7 and 8 Nov each on another site', async () => {
+      const result = await check();
+      const [unit] = result.units;
+      expect(unit.splitStay).toEqual({
+        booking: 'separate',
+        parts: [
+          { arrival: '2026-11-06', departure: '2026-11-07' },
+          { arrival: '2026-11-07', departure: '2026-11-08' },
+          { arrival: '2026-11-08', departure: '2026-11-09' },
+        ],
+      });
+      // ParkStay picks each part's site: no count
+      expect(unit.splitStay).not.toHaveProperty('units');
+      expect(
+        splitStayViolations(parkstay.provider.manifest, parkstay.provider, LUCKY_BAY_STAY, result)
+      ).toEqual([]);
+    });
+
     it('is fully available, at $60, while a site is free for the whole stay', async () => {
       server.views.set('43', luckyBayView(330));
       const [unit] = (await check()).units;
@@ -209,6 +286,61 @@ describe('ParkStay campgrounds listed by class (Lucky Bay, 43)', () => {
         ['2026-11-08', 'available', 20],
       ]);
       expect(unit).toMatchObject({ unitId: LUCKY_BAY_CLASS, fullyAvailable: true, total: 60 });
+      expect(unit).not.toHaveProperty('splitStay');
+    });
+
+    it('reports no split stay when a night has no free site of the class', async () => {
+      const view = luckyBayView();
+      const entry = view.sites[0];
+      entry.availability[1] = [false, 'Booked', '20.00', null, [56, 0, 0], '2026-11-07'];
+      for (const row of entry.breakdown!) row.availability[1] = [false, 'Booked', '20.00', null];
+      server.views.set('43', view);
+      const [unit] = (await check()).units;
+      expect(unit.nights.map((n) => n.state)).toEqual(['available', 'booked', 'available']);
+      expect(unit).not.toHaveProperty('splitStay');
+    });
+
+    it('reports no split stay when the breakdown does not line up with the nights, or there is none', async () => {
+      const misaligned = luckyBayView();
+      misaligned.sites[0].breakdown![0].availability.pop();
+      server.views.set('43', misaligned);
+      expect((await check()).units[0]).not.toHaveProperty('splitStay');
+
+      const bare = luckyBayView();
+      delete bare.sites[0].breakdown;
+      server.views.set('43', bare);
+      expect((await check()).units[0]).not.toHaveProperty('splitStay');
+    });
+
+    it('covers a longer stay in the fewest bookings: two sites that hand over make two parts', async () => {
+      const view = luckyBayView();
+      const entry = view.sites[0];
+      // Sites 01 and 02 alone: 01 free on the 6th and 7th, 02 on the 7th and 8th
+      entry.breakdown = entry.breakdown!.slice(0, 2).map((row, site) => ({
+        ...row,
+        availability: row.availability.map((night, i): typeof night => {
+          const free = site === 0 ? i < 2 : i > 0;
+          return [free, free ? '$20.00' : 'Booked', night[2], night[3]];
+        }),
+      }));
+      server.views.set('43', view);
+      const [unit] = (await check()).units;
+      // The class offers the 6th and 7th on 01 as one stay; the 8th is free only on another site
+      expect(unit.nights.map((n) => [n.state, n.reason])).toEqual([
+        ['available', undefined],
+        ['available', undefined],
+        ['unknown', 'split'],
+      ]);
+      // Two bookings either way (6–7 then 7–9, or 6–8 then 8–9): the tie goes to the earlier move
+      expect(unit.splitStay?.parts).toEqual([
+        { arrival: '2026-11-06', departure: '2026-11-07' },
+        { arrival: '2026-11-07', departure: '2026-11-09' },
+      ]);
+    });
+
+    it('reports nothing for a stay asked by site at a campground listed by site', async () => {
+      const { units } = await parkstay.provider.availability.check('20', BUNGARRA_STAY);
+      expect(units.some((u) => u.splitStay)).toBe(false);
     });
 
     it('keeps the unit id across polls while the site the view names changes', async () => {

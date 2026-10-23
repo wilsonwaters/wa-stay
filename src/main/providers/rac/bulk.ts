@@ -20,9 +20,12 @@
  *     released), because RAC gives no total of physical sites; 0 when none can: every category
  *     closed or not released (beyond the 364-day window, a special date, a stop-sell), so
  *     Explore and the place page agree;
- *   - `byKind`: both, per unit kind (each category's `unitKind`, as `check` gives it), by the
- *     same rules, for every kind the park has (its seed's kinds and any its answer adds), with
- *     `availableUnits: 0` when none is free.
+ *   - `splitStay: true`: nothing is free for the whole stay (`availableUnits` 0), but a category
+ *     reports a split stay (`mapping.ts`: every night free, on no one site, booked through the
+ *     park). Never counted;
+ *   - `byKind`: all three, per unit kind (each category's `unitKind`, as `check` gives it), by
+ *     the same rules, for every kind the park has (its seed's kinds and any its answer adds),
+ *     with `availableUnits: 0` when none is free.
  * - **One park fails** (a 5xx such as RAC's 520, a timeout, no response, an answer that is no
  *   answer): it gets no entry, so Explore reads it as unknown; one warning names the park and
  *   the status, never the answer; the next park is asked. When every park fails, `search`
@@ -80,35 +83,55 @@ export function isBookable(unit: UnitAvailability): boolean {
 interface Tally {
   free: number;
   bookable: boolean;
+  /** A category of it reports a split stay (`mapping.ts`: one booked through the park). */
+  split: boolean;
 }
 
-/** A tally as an entry's counts: no total while anything is bookable, else 0. */
-function countsOf({ free, bookable }: Tally): { availableUnits: number; bookableUnits?: number } {
-  return bookable ? { availableUnits: free } : { availableUnits: free, bookableUnits: 0 };
+/**
+ * A tally as an entry's counts: no total while anything is bookable, else 0; a split stay only
+ * when nothing is free for the whole stay.
+ */
+function countsOf({ free, bookable, split }: Tally): {
+  availableUnits: number;
+  bookableUnits?: number;
+  splitStay?: true;
+} {
+  return {
+    availableUnits: free,
+    ...(bookable ? {} : { bookableUnits: 0 }),
+    ...(split && free === 0 ? { splitStay: true as const } : {}),
+  };
 }
+
+const emptyTally = (): Tally => ({ free: 0, bookable: false, split: false });
 
 /**
  * The park's entry for the stay, from its categories' units as `check` gives them (`unitsOf`):
  * the free ones by the sites they stand for (`freeUnitsOf`), as the place page and a watch
- * count them.
+ * count them, and `splitStay` for the park and each kind with none free but a category that
+ * reports a split stay (Explore's "Free if you move").
  */
 export function parkEntry(
   providerId: string,
   park: RacPark,
   units: readonly UnitAvailability[]
 ): BulkAvailabilityEntry {
-  const kinds = new Map<UnitKind, Tally>(
-    park.unitKinds.map((kind) => [kind, { free: 0, bookable: false }])
-  );
-  const all: Tally = { free: 0, bookable: false };
+  const kinds = new Map<UnitKind, Tally>(park.unitKinds.map((kind) => [kind, emptyTally()]));
+  const all: Tally = emptyTally();
   for (const unit of units) {
     const free = unit.fullyAvailable ? freeUnitsOf(unit) : 0;
     const bookable = isBookable(unit);
+    const split = unit.splitStay !== undefined;
     const kind = unit.unitKind ?? 'other';
-    const tally = kinds.get(kind) ?? { free: 0, bookable: false };
-    kinds.set(kind, { free: tally.free + free, bookable: tally.bookable || bookable });
+    const tally = kinds.get(kind) ?? emptyTally();
+    kinds.set(kind, {
+      free: tally.free + free,
+      bookable: tally.bookable || bookable,
+      split: tally.split || split,
+    });
     all.free += free;
     all.bookable ||= bookable;
+    all.split ||= split;
   }
   const byKind: NonNullable<BulkAvailabilityEntry['byKind']> = {};
   for (const kind of UNIT_KINDS) {

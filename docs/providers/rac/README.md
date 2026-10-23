@@ -54,10 +54,12 @@ answer an availability request with JSON, so no browser is driven.
 | `bookingImport`                   | no                                                    | WA Stay never cancels or changes an RAC booking                                                                                                                                                                                                                                                                                             |
 | `account`                         | `optional`                                            | `auth.ts` and `membership.ts`: the person's own RAC member number ([below](#the-member-number))                                                                                                                                                                                                                                             |
 
-`links.ts` gives every link: a park's home page ("View on RAC"), and its booking pages ("Book on
-RAC", [below](#availability)). There is no link to manage a booking: that needs the park's own
-sign-in on RAC's site. `client.ts` sends every request, and asks the cart guard
-(`cart-guard.ts`) about each one first ([endpoints](endpoints.md#rules-every-request-follows)).
+`links.ts` gives every link: a park's home page ("View on RAC"), its booking pages ("Book on
+RAC", [below](#availability)) and its contact page (`/<slug>/contact-us/`, `links.contact`: where
+a person asks the park to book a split stay, [below](#availability)). There is no link to manage
+a booking: that needs the park's own sign-in on RAC's site. `client.ts` sends every request, and
+asks the cart guard (`cart-guard.ts`) about each one first
+([endpoints](endpoints.md#rules-every-request-follows)).
 
 ## The parks
 
@@ -151,7 +153,18 @@ answer to a unit, night by night (the codes are in [endpoints](endpoints.md#racs
   no arrivals or no departures. A stay that breaks them is never free: its free nights read
   "stay rules apply", and a watch never alerts on it.
 - **Split stays.** When every night has a free site but no one site is free for all of them, the
-  nights are not counted as free.
+  nights are not counted as free, and the category is not free for the stay. When a rate counts
+  for the person, the category reports a split stay booked through the park
+  (`splitStay: { booking: 'contact' }`): RAC's staff book it as separate stays when the guest
+  contacts the park, so the place page, and a watch that allows split stays, say "Contact {park}"
+  and link the park's contact page. The nights keep that rate's prices (the category's nightly
+  rate, whichever site), so a watch's price limit applies and the price reads "about"; NewBook's
+  placeholder amount is never a price. RAC doesn't say which sites are free, only how many each
+  night, so a split stay has no parts and no count of sites: finding where the moves fall would
+  take a request per part, and the park's staff book it anyway. When no rate counts, or RAC's
+  stay rules refuse the stay, nothing is reported, and a night held back for a school-holiday
+  release still to come ends it too. WA Stay copies nothing from the contact page: no phone
+  number, and no promise of a reply.
 - **Pets.** Up to two, sent with the stay; a category that takes none refuses a stay with pets.
   A stay with more than two (or a fraction) is refused before anything is sent.
 - **364 days.** RAC takes bookings 364 days ahead. A night beyond that, or one held back for a
@@ -169,7 +182,10 @@ reads the number of units free for the whole stay ("27 spots free", "1 cabin fre
 for the Stay type filter, and never "N of M": RAC gives no total of its sites. A park that fails
 reads as unknown; a park with nothing free reads "None free", and one where nothing can be booked
 for those dates at all (not released yet, or closed) reads "Not open". The counts add up the same
-`freeCount` as the place page and a watch, so all three agree.
+`freeCount` as the place page and a watch, so all three agree. A park with nothing free for the
+whole stay but a category that reports a split stay is flagged (`splitStay`, for the park and for
+that category's stay type), and reads "Free if you move", after the places with something free and
+never counted.
 
 ## Pacing
 

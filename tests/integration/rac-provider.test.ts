@@ -27,6 +27,7 @@ import {
   ProviderHttpError,
   ProviderParseError,
   type HopRequest,
+  type HopResponse,
   type ProviderContext,
 } from '@main/providers/sdk';
 import { sanitizeProviderHtml } from '@main/providers/sdk/html';
@@ -68,7 +69,7 @@ import {
   RecordingHttpClient,
   type HopAnswer,
 } from '@tests/utils/fake-paced-provider';
-import { describeProviderContract } from '@tests/utils/provider-contract';
+import { bulkSplitViolations, describeProviderContract } from '@tests/utils/provider-contract';
 import { fakeDateOnly } from '@tests/utils/core-harness';
 
 /** Holds `rac/manifest.json`, which lists the recorded pages by request path. */
@@ -200,6 +201,74 @@ describe('at NOW, with auto-cart on', () => {
       sample: { externalId: 'busselton', stay: UNRELEASED_STAY },
       unknownExternalId: 'ningaloo',
     };
+  });
+});
+
+/**
+ * RAC's fixtures, with Busselton's answer for 6–8 Nov 2026 edited: its powered sites free every
+ * night, but on no one site (stay-through 0, code 3), a split stay booked through the park.
+ */
+class SplitBusseltonHttpClient extends FixtureHttpClient {
+  constructor() {
+    super({ providerId: 'rac', fixturesDir: FIXTURES_DIR, logFile: UNEXPECTED_LOG });
+  }
+
+  protected override async send(hop: HopRequest): Promise<HopResponse> {
+    const response = await super.send(hop);
+    const form = new URLSearchParams(hop.body);
+    const busselton =
+      hop.method === 'POST' &&
+      form.get('blog_id') === '6' &&
+      form.get('available_from') === '6 Nov 2026';
+    if (!busselton) return response;
+    return {
+      ...response,
+      text: async () => {
+        const json = JSON.parse(await response.text()) as {
+          data: Record<string, Record<string, unknown>>;
+        };
+        Object.assign(json.data['4'], {
+          stay_through_sites_available: 0,
+          stay_through_sites_code: 3,
+        });
+        return JSON.stringify(json);
+      },
+    };
+  }
+}
+
+/**
+ * The suite on that split stay. It runs a year before the stay opens (its departure − 365 days),
+ * so the suite's release check has an instant to compute; RAC's answers are what they were.
+ */
+const A_YEAR_BEFORE = new Date('2025-10-17T02:00:00.000Z');
+
+describe('a year before 6–8 Nov 2026 opens, with a split stay at Busselton', () => {
+  beforeAll(() => fakeDateOnly(A_YEAR_BEFORE));
+  afterAll(() => jest.useRealTimers());
+
+  const splitProvider = () =>
+    racFactory(
+      createTestProviderContext(racManifest, {
+        http: new SplitBusseltonHttpClient(),
+        clock: () => A_YEAR_BEFORE,
+      })
+    );
+
+  describeProviderContract('rac (a split stay)', () => ({
+    provider: splitProvider(),
+    sample: { externalId: 'busselton', stay: STAY },
+    unknownExternalId: 'ningaloo',
+  }));
+
+  it('gives the suite a split stay to check, on the check and in the search', async () => {
+    const provider = splitProvider();
+    const result = await provider.availability!.check('busselton', STAY);
+    expect(result.units.filter((u) => u.splitStay).map((u) => [u.unitId, u.splitStay])).toEqual([
+      ['cat:4', { booking: 'contact' }],
+    ]);
+    const [busselton] = await provider.availability!.search!(STAY);
+    expect(busselton).toMatchObject({ key: 'rac:busselton', availableUnits: 0, splitStay: true });
   });
 });
 
@@ -1001,6 +1070,26 @@ describe('RAC Parks & Resorts', () => {
   });
 });
 
+describe('RAC links', () => {
+  it("gives each of the eight parks its contact page on RAC's site, and a park the seed lacks none", () => {
+    const provider = racFactory(fixtureContext());
+    for (const links of [provider.links, racLinks]) {
+      expect(RAC_PARKS.map((park) => links.contact!(park.slug))).toEqual([
+        `${RAC}/busselton/contact-us/`,
+        `${RAC}/cable-beach/contact-us/`,
+        `${RAC}/cervantes/contact-us/`,
+        `${RAC}/esperance/contact-us/`,
+        `${RAC}/margaret-river/contact-us/`,
+        `${RAC}/exmouth/contact-us/`,
+        `${RAC}/karri-valley/contact-us/`,
+        `${RAC}/monkey-mia/contact-us/`,
+      ]);
+      expect(links.contact!('ningaloo')).toBeNull();
+      expect(links.contact!('')).toBeNull();
+    }
+  });
+});
+
 describe('RAC terms rules', () => {
   afterEach(() => jest.useRealTimers());
 
@@ -1229,6 +1318,24 @@ describe('RAC bulk availability', () => {
       expect(entries).toHaveLength(1);
       return entries[0];
     }
+
+    it('Busselton with its powered sites free every night but on no one site: none free, "Free if you move" for the park and its sites', async () => {
+      const raw = JSON.parse(page(ANSWER_FILES.busselton)) as {
+        data: Record<string, Record<string, unknown>>;
+      };
+      Object.assign(raw.data['4'], { stay_through_sites_available: 0, stay_through_sites_code: 3 });
+      const entry = await entryFor('busselton', JSON.stringify(raw), STAY);
+      expect(entry).toStrictEqual({
+        key: 'rac:busselton',
+        availableUnits: 0,
+        splitStay: true,
+        byKind: {
+          campsite: { availableUnits: 0, splitStay: true },
+          cabin: { availableUnits: 0, bookableUnits: 0 },
+        },
+      });
+      expect(bulkSplitViolations([entry])).toEqual([]);
+    });
 
     it("Exmouth's closed category (stay-through code 2, stop sold) adds nothing and makes nothing bookable", async () => {
       const entry = await entryFor(

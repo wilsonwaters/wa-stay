@@ -86,13 +86,16 @@ export interface RacAvailabilityDeps {
 
 /**
  * The unit with each night that is not free and is held back for a release still to come
- * marked `not-released` (its closed days kept).
+ * marked `not-released` (its closed days kept). A split stay with such a night is no split stay
+ * yet: the unit then reports none.
  */
 function withHeldBackNights(unit: UnitAvailability, release: StayRelease): UnitAvailability {
   if (!unit.nights.some((night) => night.state !== 'available')) return unit;
+  let heldBack = false;
   const nights = unit.nights.map((night): NightStatus => {
     if (night.state === 'available' || night.state === 'not-released') return night;
     if (!release.heldBack(night.date, unit)) return night;
+    heldBack = true;
     return {
       date: night.date,
       state: 'not-released',
@@ -100,7 +103,9 @@ function withHeldBackNights(unit: UnitAvailability, release: StayRelease): UnitA
       ...(night.noDeparture ? { noDeparture: true } : {}),
     };
   });
-  return { ...unit, nights };
+  const held: UnitAvailability = { ...unit, nights };
+  if (heldBack) delete held.splitStay;
+  return held;
 }
 
 /** The form RAC's page posts for `stay` at `park`, with `pets` as `animals`. */
