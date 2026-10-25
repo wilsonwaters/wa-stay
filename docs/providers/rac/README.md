@@ -54,10 +54,12 @@ answer an availability request with JSON, so no browser is driven.
 | `bookingImport`                   | no                                                    | WA Stay never cancels or changes an RAC booking                                                                                                                                                                                                                                                                                             |
 | `account`                         | `optional`                                            | `auth.ts` and `membership.ts`: the person's own RAC member number ([below](#the-member-number))                                                                                                                                                                                                                                             |
 
-`links.ts` gives every link: a park's home page ("View on RAC"), and its booking pages ("Book on
-RAC", [below](#availability)). There is no link to manage a booking: that needs the park's own
-sign-in on RAC's site. `client.ts` sends every request, and asks the cart guard
-(`cart-guard.ts`) about each one first ([endpoints](endpoints.md#rules-every-request-follows)).
+`links.ts` gives every link: a park's home page ("View on RAC"), its booking pages ("Book on
+RAC", [below](#availability)) and its contact page (`/<slug>/contact-us/`, `links.contact`: where
+a person asks the park to book a split stay, [below](#availability)). There is no link to manage
+a booking: that needs the park's own sign-in on RAC's site. `client.ts` sends every request, and
+asks the cart guard (`cart-guard.ts`) about each one first
+([endpoints](endpoints.md#rules-every-request-follows)).
 
 ## The parks
 
@@ -151,7 +153,20 @@ answer to a unit, night by night (the codes are in [endpoints](endpoints.md#racs
   no arrivals or no departures. A stay that breaks them is never free: its free nights read
   "stay rules apply", and a watch never alerts on it.
 - **Split stays.** When every night has a free site but no one site is free for all of them, the
-  nights are not counted as free.
+  nights are not counted as free, and the category is not free for the stay. When a rate counts
+  for the person, the category reports a split stay booked through the park
+  (`splitStay: { booking: 'contact' }`): RAC's staff book it as separate stays when the guest
+  contacts the park, so the place page, and a watch that allows split stays, say "Contact {park}"
+  and link the park's contact page. The nights keep that rate's prices (the category's nightly
+  rate, whichever site), so a watch's price limit applies and the price reads "about"; NewBook's
+  placeholder amount is never a price. RAC doesn't say which sites are free, only how many each
+  night, so a split stay has no parts and no count of sites: finding where the moves fall would
+  take a request per part, and the park's staff book it anyway. When no rate counts, or RAC's
+  stay rules refuse the stay, nothing is reported, and a night held back for a school-holiday
+  release still to come ends it too. WA Stay copies nothing from the contact page: no phone
+  number, and no promise of a reply. A recorded answer shows one: Monkey Mia's Powered Site for
+  1 to 6 July 2027, free every night but on no one site, at $450 for the five nights
+  (`availability-monkey-mia-split-2027-07-01-5n.json`).
 - **Pets.** Up to two, sent with the stay; a category that takes none refuses a stay with pets.
   A stay with more than two (or a fraction) is refused before anything is sent.
 - **364 days.** RAC takes bookings 364 days ahead. A night beyond that, or one held back for a
@@ -169,7 +184,10 @@ reads the number of units free for the whole stay ("27 spots free", "1 cabin fre
 for the Stay type filter, and never "N of M": RAC gives no total of its sites. A park that fails
 reads as unknown; a park with nothing free reads "None free", and one where nothing can be booked
 for those dates at all (not released yet, or closed) reads "Not open". The counts add up the same
-`freeCount` as the place page and a watch, so all three agree.
+`freeCount` as the place page and a watch, so all three agree. A park with nothing free for the
+whole stay but a category that reports a split stay is flagged (`splitStay`, for the park and for
+that category's stay type), and reads "Free if you move", after the places with something free and
+never counted.
 
 ## Pacing
 
@@ -402,15 +420,15 @@ there is no RAC logo.
 - `tests/unit/providers/rac/`: the manifest, the client (one host, redirects by hand, blocks and
   their pause), book-now pages, the park pages (`park-pages.test.ts`: the parks page's photos, a
   home page's photos, intro and accommodation photos), stay types, the member number's form,
-  members' tariffs, free counts (`free-count.test.ts`), the release calendar and the release
-  policy (on a fake clock).
+  members' tariffs, free counts and split stays on Explore (`free-count.test.ts`), the release
+  calendar and the release policy (on a fake clock).
 - `tests/integration/rac-provider.test.ts`: the provider contract suite and the catalogue (the
   cards' photos, a park's intro and photos, and what stands in when their pages fail);
-  `rac-availability.test.ts` (every code and refusal), `rac-watch.test.ts`, `rac-snipes.test.ts`,
-  `rac-member-rates.test.ts` and `rac-member-number.test.ts` (the number is in no request, log
-  line, IPC answer, alert or email); `rac-explore-ipc.test.ts` and `rac-snipes-ipc.test.ts`
-  through IPC; `rac-free-counts.test.ts` (for every recorded answer, Explore, the place page, a
-  watch, its alert and its email count the same, through IPC).
+  `rac-availability.test.ts` (every code and refusal, split stays included), `rac-watch.test.ts`,
+  `rac-snipes.test.ts`, `rac-member-rates.test.ts` and `rac-member-number.test.ts` (the number
+  is in no request, log line, IPC answer, alert or email); `rac-explore-ipc.test.ts` and
+  `rac-snipes-ipc.test.ts` through IPC; `rac-free-counts.test.ts` (for every recorded answer,
+  Explore, the place page, a watch, its alert and its email count the same, through IPC).
 - `tests/unit/providers/rac-fixtures.test.ts`: the fixtures hold facts only, and the module's
   code asks only RAC's host and names no cart address outside the auto-cart.
 - The auto-cart: `tests/unit/providers/rac/holds.test.ts`, `cart-page.test.ts` and
@@ -425,8 +443,10 @@ there is no RAC logo.
   status, and every path the module requests is documented.
 - The Electron smoke tests: RAC's parks on Explore and a park's categories and About
   (`rac-catalogue.spec.ts`), its free counts on Explore and the park's page
-  (`rac-explore.spec.ts`), a watch and its count (`rac-watch.spec.ts`) and the member number
-  (`rac-member-number.spec.ts`), from the recorded answers in `tests/e2e/fixtures/http/rac/`
+  (`rac-explore.spec.ts`), a watch and its count (`rac-watch.spec.ts`), the member number
+  (`rac-member-number.spec.ts`) and a split stay booked through the park on Explore, its page
+  and a watch (`split-stays.spec.ts`, on a copy of Busselton's answer edited so its powered site
+  has no site for the whole stay), from the recorded answers in `tests/e2e/fixtures/http/rac/`
   (every park's, for 6–8 Nov 2026).
 - The preview: `npm run build:e2e`, then
   `npx cross-env PREVIEW_PROVIDER=rac PREVIEW_ARRIVAL=2026-11-06 playwright test preview-provider`

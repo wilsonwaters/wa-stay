@@ -21,6 +21,15 @@
  * the stored units while the result is found or partly found for the stay's own nights. The
  * link is never stored.
  *
+ * Split stays (`split-stays.ts`, opt-in with `allowSplitStay`): with nothing free on one unit,
+ * a stay free every night by moving between units is `SPLIT_FOUND`, below found and above
+ * partly found. Its alert says how to book it (the place's contact page, or each part's booking
+ * page), never with a booking link to open, and a notify-only watch pauses after it as after a
+ * partial alert. Auto-hold never acts on one. Every read derives `splitStays` from the stored
+ * units, as `bookingLink`; they are never stored. Turning the option on or off is an edit of
+ * what a check answers: a check in flight then keeps nothing, and turning it off forgets a
+ * split-found check.
+ *
  * `execute` never throws for a failed check (only `NOT_FOUND`); after its `signal` aborts it
  * writes nothing, except a hold the provider already placed.
  */
@@ -28,6 +37,7 @@
 import {
   type AccountStatus,
   type ApiErrorCode,
+  type SplitStay,
   type Watch,
   type WatchBookingLink,
   type WatchExecutionResult,
@@ -55,6 +65,7 @@ import {
 import { withRequestPriority } from '../../providers/sdk/pacing';
 import type { HoldSuccess } from '../../providers/sdk/provider';
 import { matchedStayLink } from '../booking-link';
+import { splitStaysOf, withSplitStayLinks } from '../split-stays';
 import { checkStayRules, STAY_RULE_ISSUES } from '../stay-rules';
 import { AppError } from '../../utils/app-error';
 import { logger } from '../../utils/logger';
@@ -97,6 +108,9 @@ function checkedKey(watch: Watch, manifest: Pick<ProviderManifest, 'stayFields'>
   ]);
 }
 
+/** What a split alert adds for a watch that holds automatically: it holds whole stays only. */
+export const SPLIT_STAY_NO_HOLD_NOTE = "WA Stay doesn't hold these automatically.";
+
 /** Why an automatic hold was not placed at a place with more than one stay type. */
 const MIXED_KINDS_NOTE =
   'Not held automatically: this place has more than one stay type. Choose one stay type or units to let WA Stay hold one.';
@@ -106,7 +120,7 @@ export type WatchProvider = ProviderWith<'watches'>;
 
 export type WatchNotifications = Pick<
   NotificationService,
-  'notifyWatchFound' | 'notifyWatchPartialFound' | 'notifyWatchHeld'
+  'notifyWatchFound' | 'notifyWatchPartialFound' | 'notifyWatchSplitFound' | 'notifyWatchHeld'
 >;
 
 export interface WatchServiceDeps {
@@ -228,7 +242,8 @@ export class WatchService {
 
   /**
    * Updates a watch. A change to what is checked (location, stay, units, stay types, stay
-   * fields) or to the interval makes it due at once.
+   * fields), to the interval or to whether split stays count makes it due at once, so its
+   * result follows the edit.
    */
   async update(id: number, updates: WatchUpdate): Promise<Watch> {
     const watch = this.require(id);
@@ -269,13 +284,19 @@ export class WatchService {
     if (updates.location && updates.location.externalId !== watch.location.externalId) {
       this.repo.forgetLastCheck(id);
     }
+    // Split stays turned off: a split-found check answered what the watch no longer asks, and
+    // would keep showing it (a notify-only watch is paused after its alert)
+    if (updates.allowSplitStay === false && watch.lastResult === WatchResult.SPLIT_FOUND) {
+      this.repo.forgetLastCheck(id);
+    }
     const reschedule =
       updates.location !== undefined ||
       updates.stay !== undefined ||
       updates.unitIds !== undefined ||
       updates.unitKinds !== undefined ||
       updates.stayParams !== undefined ||
-      updates.checkIntervalMinutes !== undefined;
+      updates.checkIntervalMinutes !== undefined ||
+      (updates.allowSplitStay !== undefined && updates.allowSplitStay !== watch.allowSplitStay);
     if (reschedule) this.repo.setNextCheckAt(id, this.clock());
     return this.changed(id);
   }
@@ -419,31 +440,46 @@ export class WatchService {
       );
       if (signal?.aborted) return result({ error: 'The check was stopped' });
       // Edited while the provider answered (another place, stay, units, stay types or stay
-      // fields): the answer is about what the watch was, so nothing of it is kept or sent.
-      // The edit made the watch due at once, so the next check asks about what it is now.
+      // fields, or split stays turned on or off): the answer is about what the watch was, so
+      // nothing of it is kept or sent. The edit made the watch due at once, so the next check
+      // asks about what it is now.
       if (this.editedSince(watch, manifest)) return result({ error: WATCH_EDITED_DURING_CHECK });
 
       const units = wantedUnits(watch, availability.units);
       const full = fullMatches(watch, units);
+      // Found beats a split stay, which beats some nights: a split stay covers every night
+      const split =
+        full.length === 0 && watch.allowSplitStay
+          ? splitStaysOf(units, arrival, departure, {
+              maxPrice: watch.maxPrice,
+              providerId: watch.providerId,
+            })
+          : [];
       const partial =
-        full.length === 0 && watch.allowPartialMatch ? partialMatches(watch, units) : [];
+        full.length === 0 && split.length === 0 && watch.allowPartialMatch
+          ? partialMatches(watch, units)
+          : [];
       const matches = full.length > 0 ? full : partial;
       const resultType =
         full.length > 0
           ? WatchResult.FOUND
-          : partial.length > 0
-            ? WatchResult.PARTIAL_FOUND
-            : WatchResult.NOT_FOUND;
+          : split.length > 0
+            ? WatchResult.SPLIT_FOUND
+            : partial.length > 0
+              ? WatchResult.PARTIAL_FOUND
+              : WatchResult.NOT_FOUND;
+      const found = matches.length > 0 || split.length > 0;
 
       this.repo.recordRun(watchId, {
         result: resultType,
-        found: matches.length > 0,
+        found,
         checkedAt,
         nextCheckAt: nextCheck(),
         availability: units,
       });
 
       let hold: WatchHold | undefined;
+      let splitStays: SplitStay[] | undefined;
       if (full.length > 0) {
         // The booking page for the unit an automatic hold takes, the first full match
         const link = matchedStayLink(provider, watch, full[0], units)?.url;
@@ -460,6 +496,20 @@ export class WatchService {
           await this.notifications.notifyWatchFound(watch, full, outcome.note, link);
           if (watch.notifyOnly) this.repo.deactivate(watchId);
         }
+      } else if (split.length > 0) {
+        // How to book each one; nothing is held, even for a watch that holds automatically
+        splitStays = withSplitStayLinks(
+          provider,
+          watch.location.externalId,
+          toStayQuery(watch.stay, watch.stayParams),
+          split
+        );
+        await this.notifications.notifyWatchSplitFound(
+          watch,
+          splitStays,
+          watch.autoHold ? SPLIT_STAY_NO_HOLD_NOTE : undefined
+        );
+        if (watch.notifyOnly) this.repo.deactivate(watchId);
       } else if (partial.length > 0) {
         // The run the alert names, with its own dates
         const run = longestRun(partial);
@@ -472,9 +522,10 @@ export class WatchService {
       return {
         watchId,
         success: true,
-        found: matches.length > 0,
+        found,
         matches,
         ...(hold ? { hold } : {}),
+        ...(splitStays ? { splitStays } : {}),
         checkedAt,
       };
     } catch (error) {
@@ -506,12 +557,17 @@ export class WatchService {
   // ---- internal helpers -------------------------------------------------------
 
   /**
-   * Whether what a check asks about (`checkedKey`) has changed since `before` was read, or the
+   * Whether what a check asks about (`checkedKey`), or whether split stays count (which decides
+   * what its answer is: a split alert, or none), has changed since `before` was read, or the
    * watch is gone.
    */
   private editedSince(before: Watch, manifest: Pick<ProviderManifest, 'stayFields'>): boolean {
     const now = this.repo.findById(before.id);
-    return !now || checkedKey(now, manifest) !== checkedKey(before, manifest);
+    return (
+      !now ||
+      checkedKey(now, manifest) !== checkedKey(before, manifest) ||
+      now.allowSplitStay !== before.allowSplitStay
+    );
   }
 
   private noticeAccepted(providerId: string): boolean {
@@ -548,19 +604,54 @@ export class WatchService {
   }
 
   /**
-   * The watch as the renderer gets it: with its booking link, when it has one. A stored check
-   * that cannot be read (a malformed row) gives no link, never a failed read.
+   * The watch as the renderer gets it: with its booking link, or its split stays, when it has
+   * them. A stored check that cannot be read (a malformed row) gives neither, never a failed
+   * read.
    */
   private present(watch: Watch): Watch {
     let bookingLink: WatchBookingLink | undefined;
+    let splitStays: SplitStay[] | undefined;
     try {
       bookingLink = this.bookingLinkOf(watch);
+      splitStays = this.splitStaysOf(watch);
     } catch (error) {
       log.debug(
-        `Watch ${watch.id}: no booking link, its last check could not be read (${error instanceof Error ? error.name : 'error'})`
+        `Watch ${watch.id}: no booking link or split stays, its last check could not be read (${error instanceof Error ? error.name : 'error'})`
       );
     }
-    return bookingLink ? { ...watch, bookingLink } : watch;
+    if (!bookingLink && !splitStays) return watch;
+    return {
+      ...watch,
+      ...(bookingLink ? { bookingLink } : {}),
+      ...(splitStays ? { splitStays } : {}),
+    };
+  }
+
+  /**
+   * The split stays the last check found, from its stored units, as the alert had them: only
+   * for a split-found watch that still asks for them and whose stored nights are the stay's,
+   * with their links while the provider is registered (quietly: this runs on every read). None
+   * for any other result.
+   */
+  private splitStaysOf(watch: Watch): SplitStay[] | undefined {
+    const { lastResult, lastAvailability } = watch;
+    if (lastResult !== WatchResult.SPLIT_FOUND || !watch.allowSplitStay) return undefined;
+    if (!lastAvailability || !coversStayNights(lastAvailability, watch.stay)) return undefined;
+    const units = wantedUnits(watch, lastAvailability);
+    const found = splitStaysOf(units, watch.stay.arrival, watch.stay.departure, {
+      maxPrice: watch.maxPrice,
+      quiet: true,
+    });
+    if (found.length === 0) return undefined;
+    const provider = this.providers.tryGet(watch.providerId);
+    if (!provider) return found;
+    return withSplitStayLinks(
+      provider,
+      watch.location.externalId,
+      toStayQuery(watch.stay, watch.stayParams),
+      found,
+      { quiet: true }
+    );
   }
 
   /**

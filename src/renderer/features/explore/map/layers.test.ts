@@ -179,7 +179,7 @@ describe('map source and layers', () => {
       });
     });
 
-    it('fills available pills eucalypt, none free and not open sand, keeps Info only quiet; ink while active', () => {
+    it('fills available pills eucalypt, none free, not open and free if you move sand, keeps Info only quiet; ink while active', () => {
       expect(pill.paint).toMatchObject({
         'icon-color': [
           'case',
@@ -190,7 +190,7 @@ describe('map source and layers', () => {
             AVAIL,
             'available',
             TOKENS.eucalypt600,
-            ['full', 'none-open', 'opens', 'refused'],
+            ['full', 'none-open', 'split', 'opens', 'refused'],
             TOKENS.sand100,
             TOKENS.white,
           ],
@@ -204,7 +204,7 @@ describe('map source and layers', () => {
             AVAIL,
             'available',
             TOKENS.white,
-            ['full', 'none-open', 'opens', 'refused', 'offline-booking'],
+            ['full', 'none-open', 'split', 'opens', 'refused', 'offline-booking'],
             TOKENS.sand600,
             TOKENS.ink,
           ],
@@ -225,14 +225,14 @@ describe('map source and layers', () => {
           AVAIL,
           'available',
           TOKENS.eucalypt600,
-          ['full', 'none-open', 'opens', 'refused'],
+          ['full', 'none-open', 'split', 'opens', 'refused'],
           TOKENS.sand600,
           TOKENS.white,
         ],
         'circle-stroke-color': [
           'match',
           AVAIL,
-          ['available', 'full', 'none-open', 'opens', 'refused'],
+          ['available', 'full', 'none-open', 'split', 'opens', 'refused'],
           TOKENS.white,
           'offline-booking',
           TOKENS.sand600,
@@ -240,6 +240,23 @@ describe('map source and layers', () => {
         ],
         'circle-radius': ['case', ACTIVE, 9, 6],
       });
+    });
+
+    it('mutes a place free only if you move (a split stay) as "None free": never counted available', () => {
+      const muted = (expression: unknown, colour: string) => {
+        const [, , , , states, value] = expression as unknown[];
+        return (states as string[]).includes('split') && value === colour;
+      };
+      const iconColour = (pill.paint?.['icon-color'] as unknown[])[3];
+      const textColour = (pill.paint?.['text-color'] as unknown[])[3];
+      expect(muted(iconColour, TOKENS.sand100)).toBe(true);
+      expect(muted(textColour, TOKENS.sand600)).toBe(true);
+      expect(muted(dot.paint?.['circle-color'], TOKENS.sand600)).toBe(true);
+      // Not in the clusters' count of available places, and not placed first
+      expect(SOURCE_SPEC.clusterProperties).toEqual({
+        availableCount: ['+', ['case', ['==', AVAIL, 'available'], 1, 0]],
+      });
+      expect(pill.layout?.['symbol-sort-key']).toEqual(['match', AVAIL, 'available', 0, 1]);
     });
 
     it('pulses only checking pills, between 0.8 and 1, fading over 700 ms', () => {

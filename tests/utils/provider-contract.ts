@@ -13,7 +13,10 @@
  * `isProviderBookingLink`), and that a stay under a unit's minimum is refused: the unit is
  * not `fullyAvailable` and its nights with room are `min-stay`, never `available`
  * (`stayRuleViolations`), and that free counts are whole numbers on every unit or none
- * (`freeCountViolations`). Modules the
+ * (`freeCountViolations`). A split stay a unit reports is one (`splitStayViolations`): not
+ * free, every night free or `split`, a known way to book, parts that cover the stay, and a
+ * contact page on the provider's own site when it is booked through the place; and a bulk
+ * entry flags one only where nothing is free (`bulkSplitViolations`). Modules the
  * provider does not have are skipped. For a
  * browser-driven provider, `openPages` lets it check that no call leaves a page open.
  *
@@ -32,17 +35,20 @@ import {
   type ProviderContext,
 } from '@main/providers/sdk';
 import { isProviderBookingLink } from '@main/core/booking-link';
-import { minimumNights } from '@main/core/watches/matching';
+import { isFreeNight, minimumNights } from '@main/core/watches/matching';
 import { TEXT_SEARCH_MIN_CHARS } from '@main/core/catalog/location-catalog.service';
 import { providerViolations, ProviderRegistry } from '@main/providers/registry';
 import type { BoundingBox, LocationSummary } from '@shared/types/catalog.types';
 import {
   ProviderManifestSchema,
+  SPLIT_STAY_BOOKINGS,
+  type BulkAvailabilityEntry,
   type LocationAvailability,
+  type NightStatus,
   type ProviderManifest,
   type StayQuery,
 } from '@shared/types/provider.types';
-import { nightsBetween } from '@shared/utils/calendar-date';
+import { eachNight, isCalendarDate, nightsBetween } from '@shared/utils/calendar-date';
 import { makeLocationKey, parseLocationKey } from '@shared/utils/location-key';
 import { createTestProviderContext } from './fake-provider';
 
@@ -317,6 +323,164 @@ export function freeCountViolations(result: Pick<LocationAvailability, 'units'>)
   return violations;
 }
 
+/**
+ * Why `parts` do not cover the stay from `arrival` to `departure`, or undefined when they do:
+ * at least 2 parts, in date order, each of at least one night, the first arriving on the stay's
+ * arrival, each next one arriving the morning the one before departs, the last departing on the
+ * stay's departure.
+ */
+function partsProblem(parts: unknown, arrival: string, departure: string): string | undefined {
+  if (!Array.isArray(parts)) return 'are not a list';
+  if (parts.length < 2) return `are ${parts.length}, not 2 or more`;
+  let at = arrival;
+  for (const [i, part] of (parts as Array<{ arrival?: unknown; departure?: unknown }>).entries()) {
+    const from = part?.arrival;
+    const to = part?.departure;
+    const dated =
+      typeof from === 'string' &&
+      typeof to === 'string' &&
+      isCalendarDate(from) &&
+      isCalendarDate(to);
+    if (!dated) return `have part ${i + 1} without two calendar dates`;
+    if (from !== at) return `have part ${i + 1} arriving ${from}, not ${at}`;
+    if (nightsBetween(from, to) < 1) return `have part ${i + 1} of no night (${from} to ${to})`;
+    at = to;
+  }
+  return at === departure ? undefined : `end on ${at}, not the stay's departure ${departure}`;
+}
+
+/** A `split` night with room (`unknown` or `available`), as the core takes one. */
+const isSplitWithRoom = (night: NightStatus): boolean =>
+  night.reason === 'split' && (night.state === 'unknown' || night.state === 'available');
+
+/**
+ * What is wrong with the split stays a check's answer reports (`UnitAvailability.splitStay`),
+ * as messages ([] when nothing). A unit that reports one stands for several places and is not
+ * free for the stay: it is not `fullyAvailable`, counts no free unit (`freeCount` 0 or none),
+ * and has every night of the stay, each free (`available` with no reason) or `split` with room
+ * (`unknown` or `available`), at least one `split`. Its `booking` is `contact` or `separate`;
+ * its `units`, if any, a whole number of at least 2; its `parts`, if any, at least 2 that cover
+ * the stay exactly, in order; and no more units than parts when it gives both. One booked
+ * through the place (`contact`) needs `links.contact`, giving the place's contact page as a link
+ * the core keeps (`isProviderBookingLink`: https on the provider's own site).
+ */
+export function splitStayViolations(
+  manifest: Pick<ProviderManifest, 'website'>,
+  provider: Pick<AccommodationProvider, 'links'>,
+  stay: Pick<StayQuery, 'arrival' | 'departure'>,
+  result: Pick<LocationAvailability, 'key' | 'units'>
+): string[] {
+  const dates = eachNight(stay.arrival, stay.departure);
+  const violations: string[] = [];
+  let contactProblem: string | undefined;
+  let contactAsked = false;
+  for (const unit of result.units) {
+    const report = unit.splitStay;
+    if (report === undefined) continue;
+    const owner = `unit ${unit.unitId}'s split stay`;
+    if (unit.fullyAvailable) violations.push(`${owner}: the unit is fullyAvailable`);
+    if (unit.freeCount !== undefined && unit.freeCount !== 0) {
+      violations.push(`${owner}: the unit counts ${String(unit.freeCount)} free`);
+    }
+    const nights = dates.map((date) => unit.nights.find((night) => night.date === date));
+    const missing = dates.filter((_, i) => nights[i] === undefined);
+    if (missing.length > 0) violations.push(`${owner}: no night for ${missing.join(', ')}`);
+    for (const night of nights) {
+      if (!night || isFreeNight(night) || isSplitWithRoom(night)) continue;
+      if (night.reason === 'split') {
+        violations.push(`${owner}: ${night.date} is split but ${night.state}, with no room`);
+        continue;
+      }
+      const reason = night.reason ? ` (${night.reason})` : '';
+      violations.push(`${owner}: ${night.date} is ${night.state}${reason}, neither free nor split`);
+    }
+    if (!nights.some((night) => night !== undefined && isSplitWithRoom(night))) {
+      violations.push(`${owner}: no night is split`);
+    }
+    if (!(SPLIT_STAY_BOOKINGS as readonly unknown[]).includes(report.booking)) {
+      violations.push(
+        `${owner}: booking "${String(report.booking)}" is neither contact nor separate`
+      );
+    }
+    const units = report.units as unknown;
+    if (
+      units !== undefined &&
+      !(typeof units === 'number' && Number.isInteger(units) && units >= 2)
+    ) {
+      violations.push(`${owner}: units ${String(units)} is not a whole number of at least 2`);
+    }
+    if (report.parts !== undefined) {
+      const problem = partsProblem(report.parts, stay.arrival, stay.departure);
+      if (problem) violations.push(`${owner}: its parts ${problem}`);
+    }
+    // Each part is on one place, so a stay of N parts moves across N places at most
+    if (typeof units === 'number' && Array.isArray(report.parts) && units > report.parts.length) {
+      violations.push(
+        `${owner}: units ${String(units)} is more than its ${String(report.parts.length)} parts`
+      );
+    }
+    if (report.booking === 'contact') {
+      if (!contactAsked) {
+        contactAsked = true;
+        contactProblem = contactLinkProblem(manifest, provider, result.key);
+      }
+      if (contactProblem)
+        violations.push(`${owner} is booked through the place, but ${contactProblem}`);
+    }
+  }
+  return violations;
+}
+
+/** Why the place's contact page is no link the core keeps, or undefined when it is one. */
+function contactLinkProblem(
+  manifest: Pick<ProviderManifest, 'website'>,
+  provider: Pick<AccommodationProvider, 'links'>,
+  key: string
+): string | undefined {
+  if (!provider.links.contact) return 'the provider has no links.contact';
+  let externalId: string;
+  try {
+    externalId = parseLocationKey(key).externalId;
+  } catch {
+    return `the location key ${key} cannot be read`;
+  }
+  const url = provider.links.contact(externalId);
+  if (url === null || url === undefined) return `links.contact("${externalId}") gives none`;
+  return isProviderBookingLink(manifest, url)
+    ? undefined
+    : `links.contact("${externalId}") gives ${url}, not a page on ${manifest.website}`;
+}
+
+/**
+ * What is wrong with the split stays bulk entries flag, as messages ([] when nothing): an entry
+ * (or a kind in its `byKind`) has `splitStay` only as `true`, and only with `availableUnits` 0,
+ * since a split stay is what is left when nothing is free for the whole stay.
+ */
+export function bulkSplitViolations(entries: readonly BulkAvailabilityEntry[]): string[] {
+  const violations: string[] = [];
+  const check = (
+    owner: string,
+    counts: { availableUnits: number; splitStay?: unknown } | undefined
+  ): void => {
+    if (counts?.splitStay === undefined) return;
+    if (counts.splitStay !== true) {
+      violations.push(`${owner}'s splitStay is ${String(counts.splitStay)}, not true`);
+    }
+    if (counts.availableUnits !== 0) {
+      violations.push(
+        `${owner} flags a split stay with ${String(counts.availableUnits)} available units`
+      );
+    }
+  };
+  for (const entry of entries) {
+    check(entry.key, entry);
+    for (const [kind, counts] of Object.entries(entry.byKind ?? {})) {
+      check(`${entry.key} (${kind})`, counts);
+    }
+  }
+  return violations;
+}
+
 /** A promise that rejects with an AbortError (the caller aborted). */
 async function expectAbort(run: (signal: AbortSignal) => Promise<unknown>): Promise<void> {
   const before = new AbortController();
@@ -419,6 +583,7 @@ export function describeProviderContract(
         provider.links.booking(externalId),
         provider.links.booking(externalId, stay),
         provider.links.manageBooking?.('REF-1') ?? null,
+        provider.links.contact?.(externalId) ?? null,
       ];
       for (const url of urls) {
         if (url !== null) expect(url).toMatch(/^https:\/\/[^/\s]+/);
@@ -537,12 +702,24 @@ export function describeProviderContract(
         expect(freeCountViolations(result)).toEqual([]);
       });
 
+      it('reports a split stay only on a unit free every night but not for the whole stay, with how to book it', async () => {
+        if (!provider.availability) return;
+        const result = await provider.availability.check(externalId, stay);
+        expect(splitStayViolations(provider.manifest, provider, stay, result)).toEqual([]);
+      });
+
       it('searches with keys of this provider', async () => {
         const search = provider.availability?.search;
         if (!search) return;
         const entries = await search(stay);
         for (const entry of entries)
           expect(parseLocationKey(entry.key).providerId).toBe(provider.manifest.id);
+      });
+
+      it('flags a split stay in a search only where nothing is free for the whole stay', async () => {
+        const search = provider.availability?.search;
+        if (!search) return;
+        expect(bulkSplitViolations(await search(stay))).toEqual([]);
       });
 
       it('honours AbortSignal', async () => {

@@ -941,3 +941,95 @@ describe('Explore with dates: stay types', () => {
     });
   });
 });
+
+describe('Explore with dates: free only if you move (split stays, §12.36)', () => {
+  /** An RAC park whose powered sites are free every night only by moving between them. */
+  const BUSSELTON: LocationSummary = {
+    ...KINGSTOWN,
+    key: 'rac:busselton',
+    providerId: 'rac',
+    externalId: 'busselton',
+    name: 'RAC Busselton Holiday Park',
+    kind: 'holiday-park',
+    unitKinds: ['campsite', 'cabin'],
+    lng: 115.25,
+  };
+  const SPLIT: BulkAvailabilityEntry = {
+    key: BUSSELTON.key,
+    availableUnits: 0,
+    splitStay: true,
+    byKind: { campsite: { availableUnits: 0, splitStay: true }, cabin: { availableUnits: 0 } },
+  };
+  const ITEMS = [LUCKY, BUSSELTON, ONE_K, BUNGARRA];
+  const stubs = (entries = [...bulkAvailabilityFor([BUNGARRA, LUCKY, ONE_K]), SPLIT]) =>
+    api(
+      jest.fn(async (stay, options) => answering(entries)(stay, options)),
+      [PARKSTAY_MANIFEST, RAC_MANIFEST],
+      ITEMS
+    ).stubs;
+
+  it('reads "Free if you move sites", after the free places and before none free, never counted', async () => {
+    const { user } = await renderExplore(
+      `/?${STAY}`,
+      stubs(),
+      '4 places · 1 available for 6–8 Nov'
+    );
+    const rac = card(BUSSELTON.name);
+    expect(within(rac).getByText('Free if you move sites')).toBeInTheDocument();
+    expect(rac).toHaveAccessibleDescription(expect.stringContaining('Free if you move sites'));
+    expect(within(rac).queryByText(/available/i)).toBeNull();
+    expect(cardNames()).toEqual([
+      'Bungarra',
+      'RAC Busselton Holiday Park',
+      'Lucky Bay (Cape Le Grand)',
+      'One K',
+    ]);
+
+    // "Available only" hides it
+    await user.click(availableOnly());
+    expect(cardNames()).toEqual(['Bungarra']);
+  });
+
+  it('says what "Available only" hides when only such places are left', async () => {
+    await renderExplore(`/?${STAY}&avail=1`, stubs([SPLIT]), /./);
+    expect(
+      await screen.findByRole('heading', { name: 'No places have spots for 6–8 Nov' })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        'Places that are full, free only if you move, or not open for these dates are hidden.'
+      )
+    ).toBeInTheDocument();
+  });
+
+  it('mutes its pin with the words on its pill, and the key names it only when it is there', async () => {
+    mockMapAvailable = true;
+    const { unmount } = await renderExplore(
+      `/?${STAY}`,
+      stubs(),
+      '4 places · 1 available for 6–8 Nov'
+    );
+    const map = maps.current;
+    expect([map.pin(BUSSELTON.key)?.avail, map.pin(BUSSELTON.key)?.availLabel]).toEqual([
+      'split',
+      'Free if you move',
+    ]);
+    const key = () =>
+      within(screen.getByRole('list', { name: 'Map key' }))
+        .getAllByRole('listitem')
+        .map((item) => item.textContent);
+    expect(key()).toEqual(['Available', 'None free, not open, or only if you move']);
+    unmount();
+
+    // No such place on the map: the key says what it always said
+    await renderExplore(
+      `/?${STAY}`,
+      stubs([
+        ...bulkAvailabilityFor([BUNGARRA, LUCKY, ONE_K]),
+        { ...SPLIT, splitStay: undefined, byKind: undefined },
+      ]),
+      '4 places · 1 available for 6–8 Nov'
+    );
+    expect(key()).toEqual(['Available', 'None free or not open']);
+  });
+});

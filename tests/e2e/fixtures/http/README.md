@@ -109,7 +109,10 @@ to add.
   `tests/fixtures/parkstay/campsite_availablity_view_20.json` (the public per-campground view
   for Bungarra, campground 20), copied unchanged; it answers Bungarra's detail page and a new
   watch's first check, for any dates. `alert-snipe.spec.ts` launches on a copy moved to its own
-  dates (`support/dated-fixtures.ts`), where sites 3 to 5 are free for both nights. `profile-signed-out.json` is Django REST Framework's standard 403
+  dates (`support/dated-fixtures.ts`), where sites 3 to 5 are free for both nights;
+  `split-stays.spec.ts` edits its own moved copy (`editDatedFixture`) so CAMPSITE 03 is free on
+  the first night only, CAMPSITE 04 on the second only and CAMPSITE 05 on neither: a stay in two
+  parts. `profile-signed-out.json` is Django REST Framework's standard 403
   body for `GET /api/profile` without a session, which the account service's startup check (V6)
   sends 5 s after launch; it is written by hand, not recorded, and holds no personal data.
 - **ParkStay, the campground page** (PD2): `campground_page_20.html` is the Jest fixture
@@ -144,7 +147,10 @@ to add.
   `online_booking_url`), with the NewBook key and every cart address `<redacted>`. Its route
   matches `blog_id` (`form`), for any dates. `rac-watch.spec.ts` launches on a copy moved
   to its own dates (`support/dated-fixtures.ts`); the preview answers it with
-  `PREVIEW_ARRIVAL=2026-11-06`.
+  `PREVIEW_ARRIVAL=2026-11-06`. `split-stays.spec.ts` edits its own moved copy
+  (`editDatedFixture`) so the powered site keeps its free sites each night but has none for the
+  whole stay (stay-through 0, code 3), as RAC answers a stay that would move between sites. No
+  recorded answer here is such a split stay, so no other journey sees one.
 - **RAC, Explore's free counts** (R11): Explore asks every park once, so every park has an
   answer, routed by its `blog_id` alone (`form`), for any dates. Busselton's is the recorded one
   above. The seven others, `availability-<park>-2026-11-06-2n.json`, are RAC's answers for the

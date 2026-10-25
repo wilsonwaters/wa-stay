@@ -1,4 +1,5 @@
 import {
+  ArrowLeftRight,
   Ban,
   BellRing,
   CalendarCheck,
@@ -41,6 +42,8 @@ export const statusPresets = {
       icon: TriangleAlert,
       label: 'Some nights found',
     },
+    /** Free every night only by moving between units: never "available". */
+    [WatchResult.SPLIT_FOUND]: { tone: 'warning', icon: ArrowLeftRight, label: 'Free if you move' },
     [WatchResult.NOT_FOUND]: { tone: 'neutral', icon: Search, label: 'Nothing yet' },
     [WatchResult.HELD]: { tone: 'warning', icon: Timer, label: 'Held' },
     [WatchResult.BOOKED]: { tone: 'available', icon: CircleCheck, label: 'Booked' },

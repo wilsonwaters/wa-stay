@@ -191,12 +191,13 @@ npm run build:e2e            # no Mapbox token: Explore is list-only, determinis
 xvfb-run -a npm run test:e2e # or just npm run test:e2e with a display
 ```
 
-Playwright's `_electron` launcher drives the **built** app through 31 journeys in 19 specs
+Playwright's `_electron` launcher drives the **built** app through 33 journeys in 20 specs
 (`tests/e2e/*.spec.ts`): launch, navigation, Explore and its dates, resizing the window, a place
 to a watch, a place's campground map, creating a watch and a snipe, a held snipe paid from its notification,
 an alert snipe whose own alert opens "Book on ParkStay" (and a new snipe that alerts), bookings, the
-v1.x upgrade, RAC's parks on Explore, an RAC watch, RAC's free counts on Explore, and a
-lifecycle walk through every page and Settings section with a relaunch. One
+v1.x upgrade, RAC's parks on Explore, an RAC watch, RAC's free counts on Explore, split stays
+(an RAC park free only if you move, on Explore, its page and a watch; a ParkStay stay in two
+parts), and a lifecycle walk through every page and Settings section with a relaunch. One
 more check is opt-in: with a Mapbox token in the build and `E2E_MAP=1`, resizing the window must
 not count as a map move (`explore-resize.spec.ts`). The harness
 (`tests/e2e/support/wa-stay.ts`) gives every launch:

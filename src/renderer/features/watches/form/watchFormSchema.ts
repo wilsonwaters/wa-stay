@@ -46,6 +46,8 @@ const shape = z.object({
   maxPrice: z.string(),
   checkIntervalMinutes: z.number(),
   allowPartialMatch: z.boolean(),
+  /** Also alert on a stay free every night only by moving between units; off by default. */
+  allowSplitStay: z.boolean(),
   notifyOnly: z.boolean(),
   autoHold: z.boolean(),
   name: z.string(),

@@ -5,6 +5,7 @@ import { CopyCredentialButton } from '../../../components/accounts/CopyCredentia
 import { ExternalLink } from '../../../components/ExternalLink';
 import { NightGrid } from '../../../components/NightGrid';
 import { stayRangeLabel } from '../../../components/nightGridModel';
+import { SplitStays } from '../../../components/SplitStays';
 import { providerToday } from '../../../components/stay/providerToday';
 import { relativeTime, timeInZone } from '../../../components/timeFormat';
 import { resultSummary } from '../shared/resultSummary';
@@ -22,7 +23,9 @@ export interface WatchAvailabilityProps {
  * stay and it has not begun, "Book on {shortName}" opens the provider's booking page for it
  * in the browser, right after the result line (with a partial match's dates), with "Copy
  * {label}" beside it when the person saved a detail its checkout asks for (an RAC member
- * number).
+ * number). A check that found a stay free every night only by moving between units (split
+ * found) shows how to book it there instead (`SplitStays`: contact the place, or book each
+ * part), and its grid shows every row.
  */
 export function WatchAvailability({ watch, manifest, now }: WatchAvailabilityProps) {
   const noun = watchNoun(watch, manifest);
@@ -39,10 +42,10 @@ export function WatchAvailability({ watch, manifest, now }: WatchAvailabilityPro
   // Main sets the link only for a found or partly found stay (never a held one: that is paid
   // for in the app); the page hides it once the stay has begun where the provider is
   const partialStay = watch.lastResult === WatchResult.PARTIAL_FOUND;
+  const splitFound = watch.lastResult === WatchResult.SPLIT_FOUND;
+  const notBegun = providerToday(manifest, now) < watch.stay.arrival;
   const link =
-    watch.bookingLink &&
-    (watch.lastResult === WatchResult.FOUND || partialStay) &&
-    providerToday(manifest, now) < watch.stay.arrival
+    watch.bookingLink && (watch.lastResult === WatchResult.FOUND || partialStay) && notBegun
       ? watch.bookingLink
       : undefined;
   const book = link && (
@@ -57,6 +60,20 @@ export function WatchAvailability({ watch, manifest, now }: WatchAvailabilityPro
         </span>
       )}
     </p>
+  );
+  // A split stay is booked by contacting the place or part by part: never "Book on"
+  const split = splitFound && notBegun && watch.splitStays && watch.splitStays.length > 0 && (
+    <SplitStays
+      splitStays={watch.splitStays}
+      place={watch.location.name}
+      providerId={watch.providerId}
+      shortName={manifest?.shortName ?? 'the booking site'}
+      arrival={watch.stay.arrival}
+      departure={watch.stay.departure}
+      noun={noun}
+      currency={manifest?.currency}
+      primary
+    />
   );
 
   let body;
@@ -85,10 +102,9 @@ export function WatchAvailability({ watch, manifest, now }: WatchAvailabilityPro
         unitNoun={noun}
         currency={manifest?.currency}
         source={manifest?.shortName}
-        // A watch that found only some nights (or looks for them) shows them at once.
-        fullyAvailableOnly={
-          watch.lastResult !== WatchResult.PARTIAL_FOUND && !watch.allowPartialMatch
-        }
+        // A watch that found only some nights (or looks for them), or a stay free only if you
+        // move, shows them at once.
+        fullyAvailableOnly={!partialStay && !splitFound && !watch.allowPartialMatch}
       />
     );
   }
@@ -100,6 +116,7 @@ export function WatchAvailability({ watch, manifest, now }: WatchAvailabilityPro
       </h2>
       {when}
       {book}
+      {split}
       {body}
     </section>
   );

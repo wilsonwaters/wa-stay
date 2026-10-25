@@ -23,7 +23,7 @@ import type { LocationKind } from '@shared/types/provider.types';
 import { logger } from '../utils/logger';
 
 /** Schema version this build creates and understands. */
-export const LATEST_SCHEMA_VERSION = 12;
+export const LATEST_SCHEMA_VERSION = 13;
 
 /** A migration step failed. Its transaction was rolled back, so the database is still at the previous version. */
 export class MigrationError extends Error {
@@ -1081,6 +1081,18 @@ function v12AddSnipeActionAndAlert(db: Database.Database): void {
   addColumns(db, 'watches', [['hold_expires_estimated', 'INTEGER NOT NULL DEFAULT 0']]);
 }
 
+/** The tables v13 adds columns to. */
+const V13_TABLES = ['watches'] as const;
+
+/**
+ * Split stays (§12.36), added in place: `watches.allow_split_stay`, 1 when a watch also alerts
+ * on a stay free every night only by moving between units. Every existing watch reads 0 (off),
+ * as before. `WatchResult.SPLIT_FOUND` needs no change: `last_result` has no CHECK constraint.
+ */
+function v13AddAllowSplitStay(db: Database.Database): void {
+  addColumns(db, 'watches', [['allow_split_stay', 'INTEGER NOT NULL DEFAULT 0']]);
+}
+
 /**
  * Brings the database up to `targetVersion`, LATEST_SCHEMA_VERSION unless given. A lower
  * target stops after that version (tests use it to build a database of an older shape).
@@ -1570,6 +1582,15 @@ export function runMigrations(
       applyMigration(database, 12, [...V12_TABLES], () => {
         logger.info('Running migration 012: Snipe actions and alerts');
         v12AddSnipeActionAndAlert(database);
+      });
+    }
+
+    // Migration 013 (split stays, §12.36): `watches.allow_split_stay` (0 for every existing
+    // watch: split stays are opt-in).
+    if (pending(13)) {
+      applyMigration(database, 13, [...V13_TABLES], () => {
+        logger.info('Running migration 013: Split stays');
+        v13AddAllowSplitStay(database);
       });
     }
   } finally {

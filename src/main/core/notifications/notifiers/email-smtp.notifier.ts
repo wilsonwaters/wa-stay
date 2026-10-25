@@ -10,6 +10,11 @@
  * {shortName}" link, so the person can book from a phone: a coral text button in the HTML and
  * a plain line in the text, https only. An alert about a hold WA Stay placed (`heldInApp`)
  * says first where the hold is.
+ *
+ * A split-stay alert (`splitStay`) gets "How to book" after its message instead: the coral
+ * "Contact {place}" button for a stay the place's staff book, or an ordered list of the parts,
+ * each with a "Book on {shortName}" text link; the text email has the same as plain lines.
+ * Every link is https only and escaped.
  */
 
 import fs from 'fs';
@@ -21,6 +26,7 @@ import {
   NotifierChannel,
   NotificationMessage,
   NotificationDeliveryResult,
+  type NotificationSplitStay,
   TestConnectionResult,
   NotifierValidationResult,
   SMTPConfig,
@@ -52,8 +58,16 @@ export interface SmtpEmailNotifierOptions {
 /** The "Book on {shortName}" link of an alert. */
 interface BookingAction {
   url: string;
-  /** "Book on ParkStay", or "Book on the provider's website" for a provider the app does not know. */
+  /** "Book on ParkStay", or "Book on the booking site" for a provider the app does not know. */
   label: string;
+}
+
+/** A split stay's "How to book" as the email shows it: https links only. */
+interface SplitStayActions {
+  contact?: { label: string; url: string };
+  parts?: Array<{ label: string; url?: string }>;
+  /** Each part's link text: "Book on ParkStay", or "Book on the booking site". */
+  bookLabel: string;
 }
 
 /** What an email says, in both forms. */
@@ -306,11 +320,20 @@ export class SmtpEmailNotifier extends BaseNotifier {
       ? { url: bookingUrl, label: `Book on ${provider ?? 'the booking site'}` }
       : undefined;
     const holdNote = message.heldInApp ? heldInAppNote(provider, booking !== undefined) : undefined;
+    const split = splitStayActions(message.splitStay, provider);
 
     return {
       subject: this.buildSubject(message, provider),
-      html: this.buildHtmlEmail(message, provider, link, logo !== undefined, booking, holdNote),
-      text: this.buildTextEmail(message, provider, link, booking, holdNote),
+      html: this.buildHtmlEmail(
+        message,
+        provider,
+        link,
+        logo !== undefined,
+        booking,
+        holdNote,
+        split
+      ),
+      text: this.buildTextEmail(message, provider, link, booking, holdNote, split),
       attachments: logo ? [{ filename: 'wa-stay.png', path: logo, cid: LOGO_CID }] : [],
     };
   }
@@ -337,7 +360,8 @@ export class SmtpEmailNotifier extends BaseNotifier {
     link: string | undefined,
     hasLogo: boolean,
     booking?: BookingAction,
-    holdNote?: string
+    holdNote?: string,
+    split?: SplitStayActions
   ): string {
     const c = BRAND_COLORS;
     const esc = (text: string) => this.escapeHtml(text);
@@ -380,6 +404,8 @@ export class SmtpEmailNotifier extends BaseNotifier {
                           border-radius: 8px;">${esc(booking.label)}</a>
               </p>`
       : '';
+
+    const howToBook = split ? this.splitStayHtml(split) : '';
 
     const actionButton = link
       ? `<a href="${esc(link)}"
@@ -429,6 +455,8 @@ export class SmtpEmailNotifier extends BaseNotifier {
 
               ${note}
 
+              ${howToBook}
+
               ${bookButton}
 
               ${actionButton}
@@ -453,7 +481,8 @@ export class SmtpEmailNotifier extends BaseNotifier {
     provider: string | undefined,
     link: string | undefined,
     booking?: BookingAction,
-    holdNote?: string
+    holdNote?: string,
+    split?: SplitStayActions
   ): string {
     let text = `${APP_NAME}\n\n`;
     text += `${message.title}\n\n`;
@@ -465,6 +494,14 @@ export class SmtpEmailNotifier extends BaseNotifier {
     text += `${message.message}\n`;
 
     if (holdNote) text += `\n${holdNote}\n`;
+    if (split) {
+      text += '\nHow to book\n';
+      if (split.contact) text += `${split.contact.label}: ${split.contact.url}\n`;
+      split.parts?.forEach((part, index) => {
+        text += `${index + 1}. ${part.label}`;
+        text += part.url ? ` - ${split.bookLabel}: ${part.url}\n` : '\n';
+      });
+    }
     if (booking) text += `\n${booking.label}: ${booking.url}\n`;
 
     if (link) {
@@ -474,6 +511,47 @@ export class SmtpEmailNotifier extends BaseNotifier {
     text += `\n---\nSent by ${APP_NAME}.`;
 
     return text;
+  }
+
+  /**
+   * A split stay's "How to book" in HTML: the coral "Contact {place}" button (a text link, as
+   * "Book on"), or the parts as an ordered list, each with its "Book on {shortName}" link.
+   */
+  private splitStayHtml(split: SplitStayActions): string {
+    const c = BRAND_COLORS;
+    const esc = (text: string) => this.escapeHtml(text);
+    const heading = `<h3 style="margin: 0 0 8px 0; color: ${c.text}; font-size: 16px;">How to book</h3>`;
+    const contact = split.contact
+      ? `<p style="margin: 0 0 16px 0;">
+                <a href="${esc(split.contact.url)}"
+                   style="display: inline-block;
+                          background-color: ${c.accent};
+                          color: ${c.accentText};
+                          font-weight: bold;
+                          padding: 12px 24px;
+                          text-decoration: none;
+                          border-radius: 8px;">${esc(split.contact.label)}</a>
+              </p>`
+      : '';
+    const parts = split.parts?.length
+      ? `<ol style="margin: 0 0 16px 0; padding-left: 24px; color: ${c.text}; font-size: 16px; line-height: 1.5;">
+                ${split.parts
+                  .map(
+                    (part) =>
+                      `<li>${esc(part.label)}${
+                        part.url
+                          ? ` · <a href="${esc(part.url)}" style="color: ${c.link}; font-weight: bold;">${esc(split.bookLabel)}</a>`
+                          : ''
+                      }</li>`
+                  )
+                  .join('\n                ')}
+              </ol>`
+      : '';
+    return `<div>
+              ${heading}
+              ${contact}
+              ${parts}
+            </div>`;
   }
 
   /**
@@ -527,6 +605,30 @@ function heldInAppNote(provider: string | undefined, hasBookingLink: boolean): s
     `${inApp} Away from that computer? You can book on ${provider ?? 'the booking site'} instead. ` +
     `What ${APP_NAME} held may show as taken there until the hold ends.`
   );
+}
+
+/**
+ * A split stay's "How to book" with https links only (a link that isn't is dropped, its part
+ * kept as text), or undefined when nothing is left to show.
+ */
+function splitStayActions(
+  splitStay: NotificationSplitStay | undefined,
+  provider: string | undefined
+): SplitStayActions | undefined {
+  if (!splitStay) return undefined;
+  const contactUrl = httpsLink(splitStay.contact?.url);
+  const contact =
+    splitStay.contact && contactUrl ? { label: splitStay.contact.label, url: contactUrl } : null;
+  const parts = (splitStay.parts ?? []).map((part) => {
+    const url = httpsLink(part.url);
+    return url ? { label: part.label, url } : { label: part.label };
+  });
+  if (!contact && parts.length === 0) return undefined;
+  return {
+    ...(contact ? { contact } : {}),
+    ...(parts.length > 0 ? { parts } : {}),
+    bookLabel: `Book on ${provider ?? 'the booking site'}`,
+  };
 }
 
 /** The URL when it is an absolute http(s) URL; anything else (`javascript:`, a route) is dropped. */

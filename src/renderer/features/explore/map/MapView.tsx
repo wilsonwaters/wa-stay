@@ -95,14 +95,19 @@ const NOT_CHECKED = new Set([
 /**
  * The map key with dates: what each pin and pill colour means, in words beside a swatch drawn
  * as the pins are. "Not bookable online" and "Not checked" show only when such places are on
- * the map, so the key never names a mark that is not there.
+ * the map, and the muted entry adds "or only if you move" only when a place free only by moving
+ * between units is (a split stay, muted as "None free"), so the key never names a mark that is
+ * not there.
  */
 function MapLegend({ availability }: { availability: ReadonlyMap<string, PinAvailability> }) {
   const states = new Set([...availability.values()].map((pin) => pin.state));
   const swatch = 'inline-block h-2.5 w-2.5 shrink-0 rounded-full';
   const items: [string, string][] = [
     ['Available', 'bg-available'],
-    ['None free or not open', 'bg-fg-muted'],
+    [
+      states.has('split') ? 'None free, not open, or only if you move' : 'None free or not open',
+      'bg-fg-muted',
+    ],
   ];
   if (states.has('offline-booking')) {
     items.push(['Not bookable online', 'border border-fg-muted bg-surface']);

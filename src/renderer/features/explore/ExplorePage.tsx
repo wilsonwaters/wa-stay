@@ -87,8 +87,18 @@ export const SLOW_AVAILABILITY_MS = 10_000;
 /** The map's area is sent to main once the map has stayed still this long (search mode). */
 export const AREA_SEARCH_DEBOUNCE_MS = 500;
 const ALL_PLACES: PlaceAvailability = { state: 'no-dates' };
-/** The states in which a place's units were counted for the stay. */
-const COUNTED = new Set<AvailabilityState>(['available', 'full', 'none-open', 'opens', 'refused']);
+/**
+ * The states in which a place's units were counted for the stay (for their noun). A place free
+ * only if you move (`split`) was counted too, though never as available.
+ */
+const COUNTED = new Set<AvailabilityState>([
+  'available',
+  'split',
+  'full',
+  'none-open',
+  'opens',
+  'refused',
+]);
 const HEADER_HEIGHT = 64;
 
 const unique = (values: Iterable<string | undefined>) =>

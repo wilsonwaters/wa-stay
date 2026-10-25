@@ -50,6 +50,27 @@ and the registry ([provider guide](../adding-a-provider.md)).
   change it, so it is never hard-coded.
 - **Cancellation.** No release: poll continuously, at a polite floor.
 
+## Split stays
+
+A stay free every night, but only by moving between sites, is a split stay. It is never counted
+as free, and WA Stay never holds one.
+
+- **Campgrounds listed by site class** (Lucky Bay). ParkStay sends a per-site breakdown of the
+  class's nights when no site is free for the whole stay. When every night has a free site, the
+  class reports a split stay booked part by part (`splitStay: { booking: 'separate', parts }`):
+  the fewest bookings that cover the stay, each a run of nights on one site of the class (ties
+  go to the longest parts). Each part is a class booking for its own dates, which ParkStay fills
+  with the first site of the class free for them, so there is no count of sites. The recorded
+  Lucky Bay stay, 6 to 9 November, is three one-night parts. A breakdown that doesn't line up
+  with the nights, or a night with no free site, reports nothing.
+- **Campgrounds listed by site** report nothing: each site is one place, and the app works out
+  a split stay across them itself.
+- **Explore** can't tell: the bulk answer counts sites free for the whole stay, with no nights,
+  so a ParkStay place reads "None free" there, while its page and watches find the split stay.
+- "Book" for a part opens ParkStay's search page with that part's dates. The parts never share
+  a night, so each is a booking of its own, as DBCA's terms ask, and the person books each one
+  on ParkStay.
+
 ## Data and images
 
 Campground data and photos are fetched live from ParkStay's public endpoints and image URLs
@@ -110,7 +131,11 @@ redistributed.
 - `tests/unit/providers/parkstay-manifest.test.ts`: the manifest.
 - `npm run test:electron`: the module on the production transport (`ElectronSessionHttpClient`),
   still against the loopback server.
+- `tests/unit/providers/parkstay/site-classes.test.ts`: a class's nights and its split stay
+  (Lucky Bay's recording: three one-night parts).
 - The Electron smoke tests (`tests/e2e`) use recorded responses in `tests/e2e/fixtures/http/parkstay/`.
+  `split-stays.spec.ts` edits a copy of Bungarra's so two sites are each free on one night of
+  the stay, and checks the place page's two parts and their ParkStay links.
 
 No test or agent run ever places a real hold, booking or payment on ParkStay; live checks
 are anonymous, read-only and a handful of requests.

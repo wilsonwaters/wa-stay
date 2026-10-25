@@ -29,6 +29,9 @@ provider, the place and your dates, and opens on "Your stay"). Five steps:
      the old 1.x app with a shorter interval keeps it as an extra option, and is run every
      15 minutes.
    - **Alert on partial availability**: also tell you when only some nights are free.
+   - **Alert on stays that move between sites** ("cabins", "spots": the watch's own word): also
+     tell you when every night is free, but not on one site, so you would move during your stay
+     and book more than once or through the place. Off by default ([split stays](#split-stays)).
    - **Stop watching after the first alert**: the watch pauses once it has alerted.
    - **Hold a site automatically when found**, for providers with holds ([below](#automatic-holds)).
 5. **Review**, grouped Where, When, Who and Alerts, with a name you can change.
@@ -42,8 +45,11 @@ provider, the place and your dates, and opens on "Your stay"). Five steps:
     ([below](#stay-types)); else every unit;
   - **a full match** is a unit free on every night that passes the price rule and the
     provider's stay rules;
-  - **a partial match** (when turned on and there is no full match) is each run of
-    consecutive free nights on a unit, reported as its own shorter stay;
+  - **a split stay** (when turned on and there is no full match) is every night free, but only
+    by moving between units ([below](#split-stays)); it comes before a partial match, as it
+    covers every night;
+  - **a partial match** (when turned on and there is no full match or split stay) is each run
+    of consecutive free nights on a unit, reported as its own shorter stay;
   - the price rule applies per night, and only when every night has a price;
   - **stay rules**: where the provider has a minimum stay, or days with no arrivals or no
     departures, a night it refuses for the stay is never free, a partial run is trimmed to
@@ -63,9 +69,49 @@ provider, the place and your dates, and opens on "Your stay"). Five steps:
 - **Results** are kept on the watch: the last result, when it last ran and runs next, how
   many times it has found something, and the last availability (with each unit's count),
   which its page shows night by night. A check stored before counts reads one per unit until
-  the next check.
+  the next check. The result is, best first: the whole stay free ("51 sites free"), a split
+  stay ("Free across 2 sites", or "Free if you move sites" when the provider can't say how
+  many), some nights ("2 of 3 nights available"), or nothing free.
 - **When the arrival date has passed** (in the provider's time zone), the watch stops.
 - **Check now** runs a check at once, whether or not the watch is active.
+
+### Split stays
+
+A **split stay** is a stay free every night, but only by moving between units: site A for the
+first two nights, site B for the rest. It is never counted as free, never "available", and
+never held. Where the provider can tell, WA Stay shows it for what it is, with how to book it:
+
+- **Booked through the place.** At an RAC park, a category can have a free site every night
+  but no one site free for them all. RAC's staff book such a stay as separate stays when you
+  contact the park, so WA Stay says "Contact {park}" and links the park's contact page. RAC
+  doesn't say which sites are free, so there are no parts and no count, and the price (the
+  category's nightly rate) always reads "about".
+- **Booked part by part.** At a ParkStay campground, WA Stay finds the fewest bookings that
+  cover the stay, each a run of nights on one site that the site's stay rules allow (and, for a
+  watch, within its price limit), and lists them in order with **Book {dates} on ParkStay** for
+  each, ParkStay's page for that part's dates. The parts never share a night. At a campground
+  listed by site class, ParkStay's own breakdown gives the parts.
+- **Never across stay types.** A split stay keeps to one kind: a site then a cabin is not one.
+- **Where it shows.** A place's page shows the split stays of its check in a block under the
+  night grid ("Free if you move sites"). On Explore an RAC park whose only option is a split
+  stay reads **Free if you move**, muted, after the places with something free and before
+  "None free", and **Available only** hides it. ParkStay's Explore counts can't tell, so its
+  campgrounds read "None free" there.
+
+A watch alerts on split stays only with **Alert on stays that move between sites** ticked:
+
+- with nothing free on one unit, a split stay is the watch's result, ahead of some nights; it
+  counts as found, and its alert pauses a watch set to **Stop watching after the first alert**,
+  as an alert for some nights does;
+- the watch's page shows the same block instead of **Book on {provider}** ("Contact {park}" is
+  its main button), and its night grid shows every unit; its card and Check now say "Free
+  across 2 sites" (or "Free if you move sites");
+- **Hold a site automatically when found** never holds one: it holds only a unit free for the
+  whole stay, and the alert adds "WA Stay doesn't hold these automatically.";
+- turning the option on or off makes the watch due at once, so its result follows the setting;
+  a check already running then keeps nothing.
+
+Site Sniper never takes a split stay ([Site Sniper](site-sniper.md)).
 
 ### Stay types
 
@@ -154,6 +200,8 @@ first fully matching site, by the same path and safety rules as Site Sniper:
   ("Held until about 10:42 am", "within about 10 minutes");
 - if a hold is not placed (the site went, the provider refused), the watch alerts as usual and
   shows why;
+- a [split stay](#split-stays) is never held: its alert adds "WA Stay doesn't hold these
+  automatically.";
 - **never "any unit" across stay types**: a watch with no units chosen whose wanted units are of
   more than one kind (campsites and a hut, or the two stay types it asks for), booked or free,
   places no hold. It alerts as usual, with "Not held automatically: this place has more than one
@@ -199,15 +247,15 @@ an RAC park, the sites of every category found, not the categories.
 
 ### Where they appear
 
-| Where                    | What                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
-| ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **The bell** (top right) | Every notification, newest first, with an unread count. Click one to open what it is about (a watch, a snipe, a booking). Mark read, mark all read, delete, clear all.                                                                                                                                                                                                                                                                                                                                                    |
-| **The desktop**          | An OS notification for each one, titled with the provider, e.g. "ParkStay · Sites available at Bungarra". Clicking it brings WA Stay forward on that page. Clicking an alert that a watch found something, or that a snipe found the dates free ("A site is free at …"), also opens the provider's booking page for those dates in your browser, for every provider; an alert that a site is held opens only the watch or snipe, where you pay. Settings → Notifications: **Desktop notifications** and **Play a sound**. |
-| **Email**                | Each notification, sent through your own email account (below). An alert that a watch found something, or that a snipe found the dates free, has a **Book on {provider}** link to the provider's public booking page for those dates (the nights it found, for some nights), so you can book from your phone. The link is never a cart or a checkout. An alert that a site is held says the hold is in WA Stay on the computer that placed it, and still gives the link.                                                  |
+| Where | What |
+| --- | --- |
+| **The bell** (top right) | Every notification, newest first, with an unread count. Click one to open what it is about (a watch, a snipe, a booking). Mark read, mark all read, delete, clear all. |
+| **The desktop** | An OS notification for each one, titled with the provider, e.g. "ParkStay · Sites available at Bungarra". Clicking it brings WA Stay forward on that page. Clicking an alert that a watch found something, or that a snipe found the dates free ("A site is free at …"), also opens the provider's booking page for those dates in your browser, for every provider; an alert that a site is held opens only the watch or snipe, where you pay. A split stay's alert ("Free if you move sites at …") opens only the watch, where its parts are. Settings → Notifications: **Desktop notifications** and **Play a sound**. |
+| **Email** | Each notification, sent through your own email account (below). An alert that a watch found something, or that a snipe found the dates free, has a **Book on {provider}** link to the provider's public booking page for those dates (the nights it found, for some nights), so you can book from your phone. The link is never a cart or a checkout. An alert that a site is held says the hold is in WA Stay on the computer that placed it, and still gives the link. A split stay's alert has **How to book** instead: **Contact {place}**, the place's contact page, or each part in order with **Book on {provider}** for its dates. |
 
-What creates a notification: a watch finding sites (or some nights), a snipe finding the dates
-free (an alert, [Site Sniper](site-sniper.md#when-a-snipe-alerts)), an Open Day plan's reminder
-(one for every plan due at that time with the same provider,
+What creates a notification: a watch finding sites (or a split stay, or some nights), a snipe
+finding the dates free (an alert, [Site Sniper](site-sniper.md#when-a-snipe-alerts)), an Open Day
+plan's reminder (one for every plan due at that time with the same provider,
 [Site Sniper](site-sniper.md#stay-rottnests-open-days-plans); clicking it opens the plan, then
 the provider's booking page, and its email has the **Book on {provider}** link), a hold placed
 by a snipe or a watch, a payment confirmed (booked), the welcome notice after an upgrade, and
@@ -253,6 +301,13 @@ change makes the watch due again, and the next check asks about what it is now. 
 turning that check away (HTTP 403 or 429) is the one thing kept: the watch shows it, and its
 next check waits its interval rather than asking again at once.
 
+A split stay's alert carries no booking link, so a click opens the watch. Its email gets the
+split stay's own links instead: the place's contact page (`links.contact`, else the place's own
+page) for one booked through the place, or each part's booking page (`links.booking` with the
+part's dates and unit). Each is kept by the same rule, checked again when the alert is sent, and
+never stored; the watch's page works them out from the last check while it is a split stay on
+the watch's own dates.
+
 ### For developers
 
 - `NotificationService` (`core/notifications/notification.service.ts`) stores each
@@ -262,6 +317,11 @@ next check waits its interval rather than asking again at once.
   the desktop click only, never to `notifications` or the delivery log. `notify` keeps a link
   only when it is on the notification's provider's site (the `providerManifest` option); a
   click opens it with the `openExternal` option (`shell.openExternal`) after `app:navigate`.
+- A split stay's alert (`notifyWatchSplitFound`) carries `dispatchMeta.splitStay` (the contact
+  page, or each part's label and booking page) instead of a `bookingUrl`; `notify` checks each
+  URL against the provider's site as it does `bookingUrl`, and the email notifier renders it as
+  "How to book". The split stays themselves come from `core/split-stays.ts` (`splitStaysOf`,
+  `withSplitStayLinks`).
 - `NotificationDispatcher` (`notification-dispatcher.ts`) sends it to every enabled notifier
   and records each delivery in `notification_delivery_logs`.
 - A **notifier** is an outbound channel (`notifiers/base.notifier.ts`); the only one is

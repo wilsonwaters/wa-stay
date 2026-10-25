@@ -19,7 +19,7 @@ import {
   ProviderIdSchema,
   StayQuerySchema,
   UnitKindSchema,
-  type LocationAvailability,
+  type LocationCheck,
   type ProviderId,
   type StayQuery,
   type StayRulesVerdict,
@@ -133,11 +133,12 @@ export const catalog = {
     args: {} as [stay: StayQuery, options?: CatalogAvailabilityOptions],
     response: {} as CatalogAvailabilityResult,
   },
+  /** One place's units and nights for a stay, and the split stays in them (`LocationCheck`). */
   checkLocation: {
     channel: C.checkLocation,
     request: checkLocationRequest,
     args: {} as [key: string, stay: StayQuery],
-    response: {} as LocationAvailability,
+    response: {} as LocationCheck,
   },
   /**
    * What the place's provider's published booking rules say about the stay (`stayRules`),

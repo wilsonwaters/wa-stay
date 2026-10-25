@@ -269,6 +269,137 @@ describe('SmtpEmailNotifier: "Book on {shortName}" (R7)', () => {
   });
 });
 
+describe('SmtpEmailNotifier: "How to book" a split stay', () => {
+  const CONTACT_URL = 'https://parksandresorts.rac.com.au/busselton/contact-us/';
+  const SPLIT_FOUND: NotificationMessage = {
+    title: 'Free if you move sites at RAC Busselton Holiday Park',
+    message:
+      'Every night from 1/7/2027 - 6/7/2027 is free at RAC Busselton Holiday Park (Powered Site), but not on one site. Contact RAC Busselton Holiday Park to book it as separate stays.',
+    actionUrl: '/watches/7',
+    providerId: 'rac',
+    locationName: 'RAC Busselton Holiday Park',
+  };
+  const PARTS_FOUND: NotificationMessage = {
+    title: 'Free if you move sites at Lucky Bay',
+    message: 'Free across 2 sites at Lucky Bay for 6/11/2026 - 8/11/2026.',
+    providerId: 'parkstay',
+    locationName: 'Lucky Bay',
+  };
+  const partUrl = (date: string) =>
+    `https://parkstay.dbca.wa.gov.au/search-availability/campground/?arrival=${date}&a=1`;
+  /** The HTML's links: href (as written) and text. */
+  const anchors = (html: string) =>
+    Array.from(html.matchAll(/<a href="([^"]*)"[^>]*>([^<]*)<\/a>/g), (m) => ({
+      href: m[1],
+      text: m[2].trim(),
+    }));
+
+  it('a stay the place books: the coral "Contact {place}" button after the message, and a line', async () => {
+    const mail = await sent({
+      ...SPLIT_FOUND,
+      splitStay: { contact: { label: 'Contact RAC Busselton Holiday Park', url: CONTACT_URL } },
+    });
+    const html = String(mail.html);
+    const text = String(mail.text);
+
+    expect(html).toContain('How to book');
+    expect(anchors(html)).toEqual([
+      { href: CONTACT_URL, text: 'Contact RAC Busselton Holiday Park' },
+    ]);
+    expect(html).toMatch(
+      /<a href="https:\/\/parksandresorts[^"]*"[^>]*background-color: #BF4520;[^>]*color: #FFFFFF;/
+    );
+    expect(html.indexOf('How to book')).toBeGreaterThan(html.indexOf('separate stays.'));
+    expect(text).toContain(
+      `separate stays.\n\nHow to book\nContact RAC Busselton Holiday Park: ${CONTACT_URL}\n`
+    );
+    // No booking link to open: the subject and the rest are as for any alert
+    expect(html).not.toContain('Book on');
+    expect(mail.subject).toBe(
+      'WA Stay: Free if you move sites at RAC Busselton Holiday Park · RAC'
+    );
+  });
+
+  it('a stay booked a part at a time: an ordered list, each part with "Book on {shortName}"', async () => {
+    const mail = await sent({
+      ...PARTS_FOUND,
+      splitStay: {
+        parts: [
+          { label: 'CAMPSITE 03, 6/11/2026, 1 night', url: partUrl('2026/11/06') },
+          { label: 'CAMPSITE 04, 7/11/2026, 1 night', url: partUrl('2026/11/07') },
+          { label: 'CAMPSITE 05, 8/11/2026, 1 night' },
+        ],
+      },
+    });
+    const html = String(mail.html);
+    const text = String(mail.text);
+
+    const list = html.slice(html.indexOf('<ol'), html.indexOf('</ol>'));
+    expect(list.match(/<li>/g)).toHaveLength(3);
+    expect(list).toContain('<li>CAMPSITE 03, 6/11/2026, 1 night · <a href=');
+    expect(list).toContain('<li>CAMPSITE 05, 8/11/2026, 1 night</li>');
+    expect(anchors(list)).toEqual([
+      { href: partUrl('2026/11/06').replace('&', '&amp;'), text: 'Book on ParkStay' },
+      { href: partUrl('2026/11/07').replace('&', '&amp;'), text: 'Book on ParkStay' },
+    ]);
+    expect(text).toContain(
+      '\nHow to book\n' +
+        `1. CAMPSITE 03, 6/11/2026, 1 night - Book on ParkStay: ${partUrl('2026/11/06')}\n` +
+        `2. CAMPSITE 04, 7/11/2026, 1 night - Book on ParkStay: ${partUrl('2026/11/07')}\n` +
+        '3. CAMPSITE 05, 8/11/2026, 1 night\n'
+    );
+  });
+
+  it('escapes the labels and links, and drops a link that is not https', async () => {
+    const mail = await sent({
+      ...PARTS_FOUND,
+      splitStay: {
+        contact: { label: 'Contact <b>"Bay"</b>', url: 'javascript:alert(1)' },
+        parts: [
+          {
+            label: `O'Brien's <i>site</i> & more`,
+            url: `https://parkstay.dbca.wa.gov.au/s?q="x">`,
+          },
+          { label: 'Plain', url: 'http://parkstay.dbca.wa.gov.au/s' },
+        ],
+      },
+    });
+    const html = String(mail.html);
+
+    expect(html).not.toMatch(/<b>|<i>|javascript:|http:\/\/parkstay/);
+    expect(html).toContain('O&#039;Brien&#039;s &lt;i&gt;site&lt;/i&gt; &amp; more');
+    expect(anchors(html)).toEqual([
+      { href: 'https://parkstay.dbca.wa.gov.au/s?q=%22x%22%3E', text: 'Book on ParkStay' },
+    ]);
+    expect(html).not.toContain('Contact &lt;b&gt;');
+    expect(mail.text).toContain(
+      `1. O'Brien's <i>site</i> & more - Book on ParkStay: https://parkstay.dbca.wa.gov.au/s?q=%22x%22%3E\n2. Plain\n`
+    );
+    expect(mail.text).not.toMatch(/javascript:|http:\/\/parkstay/);
+  });
+
+  it('nothing to show (no https link, no part) gives no "How to book"', async () => {
+    const mail = await sent({
+      ...SPLIT_FOUND,
+      splitStay: {
+        contact: { label: 'Contact RAC Busselton Holiday Park', url: 'http://x.example' },
+      },
+    });
+    expect(mail.html).not.toContain('How to book');
+    expect(mail.text).not.toContain('How to book');
+  });
+
+  it('names the booking site for a provider the registry does not know', async () => {
+    const mail = await sent({
+      ...PARTS_FOUND,
+      providerId: 'gone',
+      splitStay: { parts: [{ label: 'A, 6/11/2026, 1 night', url: partUrl('2026/11/06') }] },
+    });
+    expect(mail.text).toContain('1. A, 6/11/2026, 1 night - Book on the booking site: ');
+    expect(mail.html).toContain('Book on the booking site');
+  });
+});
+
 describe('SmtpEmailNotifier: logo', () => {
   it('shows the WA Stay icon inline beside the wordmark when the file exists', async () => {
     const mail = await sent(WATCH_FOUND, notifier({ logoPath: LOGO }));

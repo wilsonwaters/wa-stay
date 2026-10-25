@@ -911,6 +911,31 @@ The rules the normalised types carry (`src/shared/types/provider.types.ts`,
   checks the numbers (`freeCountViolations`). Set `unitsAreTypes: true` on the location's
   detail too, so its page lists such units as types ("Bookable as 6 spot types") rather than
   counting them as places to stay.
+- **Split stays** (optional). A stay can be free every night, but only by moving between
+  units: a split stay. It is never free: never `fullyAvailable`, never in a `freeCount`, a free
+  count or a watch's whole-stay match. The app shows it apart ("Free if you move sites", with
+  how to book it), and a watch alerts on it only when the person asks. Where each unit is one
+  place (no `freeCount`), report nothing: the core works out split stays across your units from
+  their nights, the fewest bookings that cover the stay, each a run of `available` nights on one
+  unit within its stay rules and a watch's price limit, never across stay types, and never
+  across units with a `freeCount` (a run on a category is not a stay on one site). Where a unit
+  stands for several (a category or class) and your answer shows its stay is free every night
+  only by moving between them, set the unit's `splitStay`: the unit is not `fullyAvailable`,
+  its `freeCount` (if any) is 0, and every night of the stay is free (`available`, no reason) or
+  `unknown` with `reason: 'split'`, at least one of them `split`. Its `booking` says how the
+  person books it: `'contact'` when the place's own staff book it as separate stays (the person
+  contacts the place, so add `links.contact`, [below](#links-and-dispose)), or `'separate'` when
+  the person books each part online, on your booking page for that part's dates
+  (`links.booking`). Add `parts` when you know where the moves fall (at least 2, in date order,
+  covering the stay exactly: each departs the morning the next arrives), and `units` when you
+  know how many places it moves across (a whole number of at least 2). Leave `splitStay` out
+  when you can't tell how it would be booked: the nights stay `split` and nothing else changes.
+  Keep the split nights' prices when you have them, so a watch's price limit applies (the app
+  always shows the total as "about"). Decide from the answer `check` already has: a split stay
+  never costs a request. ParkStay's site classes report `separate` parts from the per-site
+  breakdown; RAC's categories report `contact` with no parts and no count, since RAC says how
+  many sites are free each night but not which. A bulk entry flags the same with `splitStay`
+  ([below](#bulk-availability-entries)), so Explore can say "Free if you move".
 - **Dates and time zones.** Stays are calendar dates: never turn them into `Date` objects and
   back (a time zone shifts them). Convert to the provider's own format with a string
   transform, as ParkStay's `toParkStayDate` does (`2026-11-10` → `2026/11/10`). "Today" is
@@ -932,6 +957,7 @@ it has an answer for:
 | `key` | The place's location key, `makeLocationKey(ctx.id, externalId)`. Main keeps only entries for places of this provider that are in the stored catalogue (and in the area Explore shows). |
 | `availableUnits` | How many units are free on **every** night of the stay. A unit free on some nights only does not count. |
 | `bookableUnits` | Optional: how many units can be booked online for these dates at all, free or not: the place's total, or 0 when none can be booked (not released yet, closed, or past the provider's booking window). Leave it out when the provider gives no unit total (RAC counts free units only); 0 still means none can be booked. |
+| `splitStay` | Optional: `true` when no unit is free for the whole stay (`availableUnits` 0) but the stay is free every night by moving between units, a split stay. Set it only with `availableUnits` 0, and only when you can tell; it is never counted. Each kind in `byKind` may carry it likewise. |
 | `byKind` | Optional: the same two counts for each unit kind the place has, e.g. `{ campsite: { availableUnits: 2, bookableUnits: 5 }, cabin: { availableUnits: 0, bookableUnits: 3 } }`, so a filter on cabins counts only the cabins. Set it for a place with more than one kind. Each kind's `bookableUnits` is optional too, by the same rule; a sum of kinds has no total when any kind in it has none. Main passes it on as you give it. |
 | `opensAt` | Optional: nothing at the place is on sale for the stay yet, by your own release rules; when it goes on sale (ISO 8601), with `bookableUnits` 0. |
 | `refused` | Optional: your published [booking rules](#booking-rules) refuse the stay at the place; why, in a sentence, with `bookableUnits` 0. |
@@ -1671,8 +1697,14 @@ interface StayRelease {
 (return `null` when there is no page); they must be absolute https URLs. With a stay,
 `links.booking` is a booking link (the rule under **Availability** in
 [An API provider](#4-an-api-provider)): the core asks it for a watch's alert with the stay
-found and the unit, which you may ignore (ParkStay does). `dispose()` is called on quit, after
-the access gate's; the registry also closes your browser.
+found and the unit, which you may ignore (ParkStay does). `links.contact(externalId)` is
+optional: the place's contact page, where a person asks its staff to book what the app can't (a
+split stay booked through the place, `booking: 'contact'`). It follows the booking-link rule
+(an absolute https URL on your own site, a public page that needs no sign-in), and is `null`
+when the place has none. A provider that reports such split stays needs it (the contract suite
+checks); without a contact page the app falls back to `links.location`, when that is on your
+site, and otherwise names the place without a link. `dispose()` is called on quit, after the
+access gate's; the registry also closes your browser.
 
 ## 9. Timeouts, failures and retries
 
@@ -1840,10 +1872,10 @@ first listed place and a two-night stay 30 days ahead):
 | Module | What the suite calls | What it checks |
 | --- | --- | --- |
 | The manifest | Nothing | It passes `ProviderManifestSchema`; every capability has its module and the flags agree (`providerViolations`); a three-letter currency; limits, if any, of at least 1 (`catalogTtlHours` above 0); every release mode passes `release.supports()`, and a provider with `snipes` describes at least one; it registers in a fresh `ProviderRegistry` under its id, modules unchanged. |
-| `links` | `location` and `booking` (with and without the stay) for `sample`, and `manageBooking('REF-1')` | Each is an absolute https URL or `null`. |
+| `links` | `location` and `booking` (with and without the stay) for `sample`, `manageBooking('REF-1')`, and `contact` for `sample` if there is one | Each is an absolute https URL or `null`. |
 | `catalog` | `listLocations()`, or every `searchArea` page over `searchBbox` (default: the whole world); `getLocation` for `sample` and for `unknownExternalId` | At least one place; unique keys that round-trip and name the provider; kinds from `locationKinds`; a detail with the same key and a `units` array; an unknown place rejects with a `ProviderError`; every call rejects with an `AbortError` for a signal aborted before it and one aborted during it. |
 | `search` catalogue | `searchArea` page after page over `searchBbox`; `searchText(searchText)` if there is one | Items inside the box (to 0.01°); a `nextCursor` that is a non-empty string, changes, and ends within 100 pages; an abort honoured on the first and the next page; `searchText` finds places of this provider, and honours an abort. |
-| `availability` | `check` for `sample` and for `unknownExternalId`; `search(stay)` if there is one | Nights only inside the stay, under the location key, with a `checkedAt` date; every `bookingUrl` (the place's and each unit's) https on your own site, as the core takes it (`bookingLinkViolations`); an unknown place rejects with a `ProviderError`; `search`'s keys name the provider; both honour an abort. |
+| `availability` | `check` for `sample` and for `unknownExternalId`; `search(stay)` if there is one | Nights only inside the stay, under the location key, with a `checkedAt` date; every `bookingUrl` (the place's and each unit's) https on your own site, as the core takes it (`bookingLinkViolations`); every unit's `splitStay` as [above](#4-an-api-provider) asks (not `fullyAvailable`, no free count, every night free or `split` with one `split` at least, a known `booking`, whole `units` of at least 2, `parts` covering the stay), and one booked through the place only with `links.contact` giving a page on your own site (`splitStayViolations`); a bulk `splitStay` only as `true` with `availableUnits` 0, for the place and each kind (`bulkSplitViolations`); an unknown place rejects with a `ProviderError`; `search`'s keys name the provider; both honour an abort. |
 | `access` | `status()`, `onStatus()` and its unsubscribe, `holdOpen()` released twice, `ensure()` | The status names the provider; `ensure` honours an abort. |
 | `release` | `computeReleaseAt` for every release mode, for `releaseSample` (default `sample`) | A `Date` or `null`; `pollFloorMs` above 0; an abort honoured. |
 | `holds` | `create({ externalId, stay })`, only with a signal aborted before the call or at once after it starts | It rejects with an `AbortError`. Nothing about a hold's answer is checked, and no hold is placed: test refusals, the answer's shape and `bookedReference` yourself, on recorded responses or a loopback server, as the example does. |
@@ -2041,7 +2073,9 @@ Once registered, with no other change:
   `credentials`, its saved details (add, replace, remove, copy).
 - **Notifications** name the provider; desktop titles start with its `shortName`. A watch's
   alert opens your booking page for the stay it found (a click on the desktop notification,
-  and "Book on {shortName}" in its email and on the watch's page).
+  and "Book on {shortName}" in its email and on the watch's page). A split stay's alert opens
+  the watch only, and its email says how to book it: the place's contact page, or each part's
+  booking page.
 
 ## Checklist
 

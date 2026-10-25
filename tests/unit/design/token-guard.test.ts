@@ -33,6 +33,7 @@ const SCAN_FILE_PREFIXES = [
   'components/LocationCard',
   'components/LocationCombobox',
   'components/PlacePhoto',
+  'components/SplitStays',
   'components/StepFlow',
   'components/locationFormat',
   'components/timeFormat',

@@ -8,6 +8,7 @@ const TOP_LEVEL: readonly string[] = [
   'autoHold',
   'notifyOnly',
   'allowPartialMatch',
+  'allowSplitStay',
   'maxPrice',
   'notes',
 ];

@@ -105,12 +105,15 @@ export function meetsStayRules(
  * A night matching counts as free: available, with no reason it is not (`split`, or `min-stay`:
  * refused under the stay rules). The reason wins over the state.
  */
-function isFreeNight(night: NightStatus): boolean {
+export function isFreeNight(night: NightStatus): boolean {
   return night.state === 'available' && night.reason === undefined;
 }
 
 /** The unit's night starting on the morning after `last`, when the provider reported it. */
-function nightAfter(unit: UnitAvailability, last: NightStatus): NightStatus | undefined {
+export function nightAfter(
+  unit: Pick<UnitAvailability, 'nights'>,
+  last: NightStatus
+): NightStatus | undefined {
   const date = addDays(last.date, 1);
   return unit.nights.find((night) => night.date === date);
 }

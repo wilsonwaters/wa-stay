@@ -20,7 +20,7 @@ import {
 } from '../../shared/types/catalog.types';
 import type {
   BulkAvailabilityEntry,
-  LocationAvailability,
+  LocationCheck,
   ProviderId,
   StayQuery,
   StayRulesVerdict,
@@ -317,12 +317,13 @@ export function useLocationDetailUpdates(key: string | null): void {
 }
 
 /**
- * `catalog.checkLocation(key, stay)`: each unit's nights for the stay. It asks only once a
- * stay is given (the person pressed Check), and each stay is its own cache entry. A failed
- * check is not retried by itself: the person retries, so a busy provider is not asked twice.
+ * `catalog.checkLocation(key, stay)`: each unit's nights for the stay, and the split stays in
+ * them (`LocationCheck.splitStays`). It asks only once a stay is given (the person pressed
+ * Check), and each stay is its own cache entry. A failed check is not retried by itself: the
+ * person retries, so a busy provider is not asked twice.
  */
 export function useLocationCheck(key: string | null, stay: StayQuery | null) {
-  return useQuery<LocationAvailability>({
+  return useQuery<LocationCheck>({
     queryKey: queryKeys.catalog.check(key ?? '', stay),
     queryFn: () => unwrap((api) => api.catalog.checkLocation(key as string, stay as StayQuery)),
     staleTime: LOCATION_CHECK_STALE_TIME_MS,
