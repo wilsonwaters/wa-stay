@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.2.0] - 2026-10-25
+
 ### Added
 
 - **Split stays**: when every night is free but only by moving between sites, Explore says "Free if you move" (RAC parks), a place's page explains how to book it (contact the park, or book each part on ParkStay), and a watch can alert on it if you ask (off by default). Never counted as free, and never held automatically.
