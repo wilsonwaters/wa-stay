@@ -27,6 +27,9 @@
  *   locations at all (a first launch offline), a failed automatic sync is retried after
  *   1, 2 and 5 minutes before the hourly schedule takes over. Manual refresh always runs.
  * - **Freshness.** A timestamp in the future (the clock was set back) counts as stale.
+ * - **Split stays.** A location's check also answers the split stays in its units
+ *   (`splitStaysOf`, `withSplitStayLinks`): worked out on every return from the cached or new
+ *   answer, so they cost no request, and the links read the provider as it is at that moment.
  * - **Pacing.** A detail, a location's check and bulk availability are asked at interactive
  *   priority (`withRequestPriority`: the person is waiting); syncs and searches stay
  *   background. A paced provider's deadline grows with the requests a call may wait for
@@ -82,6 +85,7 @@ import {
   providerLimits,
   type BulkAvailabilityEntry,
   type LocationAvailability,
+  type LocationCheck,
   type ProviderId,
   type StayQuery,
 } from '@shared/types/provider.types';
@@ -99,7 +103,7 @@ import {
   type LocationRepository,
 } from '../../database/repositories/location.repository';
 import type { ProviderStateRepository } from '../../database/repositories/provider-state.repository';
-import type { ProviderRegistry } from '../../providers/registry';
+import type { ProviderRegistry, ProviderWith } from '../../providers/registry';
 import type { ProviderLogger } from '../../providers/sdk/context';
 import { createLimiter, type Limiter } from '../../providers/sdk/concurrency';
 import { sanitizeProviderHtml } from '../../providers/sdk/html';
@@ -112,6 +116,7 @@ import type {
   SearchCatalogModule,
 } from '../../providers/sdk/provider';
 import { AppError } from '../../utils/app-error';
+import { splitStaysOf, withSplitStayLinks } from '../split-stays';
 import {
   catalogErrorCode,
   errorMessage,
@@ -1156,12 +1161,49 @@ export class LocationCatalogService {
 
   /**
    * One location's availability for `stay`, unit by unit and night by night (interactive: the
-   * place page is waiting). Reused for 60 s per location and stay. Throws
-   * `UnknownProviderError`, `ProviderCapabilityError` or the provider's error.
+   * place page is waiting), with the split stays in it and how to book them (`splitStays`).
+   * The provider's answer is reused for 60 s per location and stay; the split stays are worked
+   * out from it on every return, which asks nothing more. Throws `UnknownProviderError`,
+   * `ProviderCapabilityError` or the provider's error.
    */
-  checkLocation(key: string, stay: StayQuery): Promise<LocationAvailability> {
+  checkLocation(key: string, stay: StayQuery): Promise<LocationCheck> {
     const { providerId, externalId } = parseLocationKey(key);
     const provider = this.registry.require(providerId, 'availability');
+    return this.providerCheck(provider, providerId, externalId, stay).then((availability) => ({
+      ...availability,
+      splitStays: this.splitStaysIn(provider, externalId, stay, availability),
+    }));
+  }
+
+  /**
+   * The split stays in a check's units, with their links. An answer they cannot be worked out
+   * from (a unit's nights malformed) gives none, never a failed check.
+   */
+  private splitStaysIn(
+    provider: ProviderWith<'availability'>,
+    externalId: string,
+    stay: StayQuery,
+    availability: LocationAvailability
+  ): LocationCheck['splitStays'] {
+    const providerId = provider.manifest.id;
+    try {
+      const found = splitStaysOf(availability.units, stay.arrival, stay.departure, { providerId });
+      return withSplitStayLinks(provider, externalId, stay, found);
+    } catch (error) {
+      this.logger.warn(
+        `${providerId}: no split stays for a check (${error instanceof Error ? error.name : 'error'})`
+      );
+      return [];
+    }
+  }
+
+  /** The provider's answer for one location and stay: cached for 60 s, one call at a time. */
+  private providerCheck(
+    provider: ProviderWith<'availability'>,
+    providerId: ProviderId,
+    externalId: string,
+    stay: StayQuery
+  ): Promise<LocationAvailability> {
     const cacheKey = `${makeLocationKey(providerId, externalId)}|${stayCacheKey(stay)}`;
     const hit = this.checkCache.get(cacheKey);
     if (hit && this.within(hit.at, this.timings.checkTtlMs)) return Promise.resolve(hit.value);

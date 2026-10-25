@@ -12,7 +12,11 @@ export interface WatchAlertFieldsProps {
   keepInterval?: number;
 }
 
-/** How often to check and what to do when something is found: the Alerts step, and Edit. */
+/**
+ * How often to check and what to do when something is found: the Alerts step, and Edit. A
+ * stay free every night only by moving between units is alerted on only when asked (off by
+ * default), and never held automatically.
+ */
 export function WatchAlertFields({ manifest, noun, keepInterval }: WatchAlertFieldsProps) {
   const { register, formState } = useFormContext<WatchFormValues>();
   return (
@@ -34,6 +38,13 @@ export function WatchAlertFields({ manifest, noun, keepInterval }: WatchAlertFie
         label="Alert on partial availability"
         description="Also tell me when only some nights are free, such as 3 nights of a 14-night stay."
         {...register('allowPartialMatch')}
+      />
+      <Checkbox
+        label={`Alert on stays that move between ${noun.many}`}
+        description={`Also tell me when every night is free, but not on one ${noun.one}. You'd move during your stay, and book more than once or through the place.${
+          manifest?.capabilities.holds ? ' WA Stay never holds these automatically.' : ''
+        }`}
+        {...register('allowSplitStay')}
       />
       <Checkbox
         label="Stop watching after the first alert"

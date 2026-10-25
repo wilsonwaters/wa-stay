@@ -9,7 +9,8 @@
  *   catalogue `get`, a check, a bulk search, a release compute: URL, headers or body), no log
  *   line (debug included), no IPC answer (`accounts.list`, `accounts.status`, `providers.list`,
  *   `catalog.checkLocation`, `catalog.get`), and not in a watch alert's notification or email.
- *   Its only use shows: member prices.
+ *   Its only use shows: member prices. A split stay booked through the park carries none of it
+ *   either: not the place page's split stays or their contact link, the alert or its email.
  * - **A change asks again.** After a save or a removal the next check goes to RAC instead of
  *   the 60 s cache, priced for the person as they are now; replacing it twice quickly ends with
  *   the last.
@@ -41,6 +42,7 @@ import { NotifierChannel } from '@shared/types/notifier.types';
 import type {
   APIResponse,
   LocationAvailability,
+  LocationCheck,
   ProviderAccount,
   SiteSnipe,
   Watch,
@@ -98,6 +100,24 @@ function availabilityAnswer(slug: string, arrival: string): string {
     .replaceAll('2026-11-08', '2027-12-22');
 }
 
+/**
+ * Whether Busselton's ensuite sites answer free every night, but on no one site (stay-through 0,
+ * code 3): a split stay RAC's own mapping reports as booked through the park.
+ */
+let ensuiteOnNoOneSite = false;
+
+/** Busselton's answer for 6–8 Nov 2026, its ensuite sites free every night on no one site. */
+function ensuiteSplitAnswer(text: string): string {
+  const json = JSON.parse(text) as { data: Record<string, Record<string, unknown>> };
+  Object.assign(json.data['7'], {
+    sites_available: { '2026-11-06': 4, '2026-11-07': 3 },
+    sites_code: { '2026-11-06': 0, '2026-11-07': 0 },
+    stay_through_sites_available: 0,
+    stay_through_sites_code: 3,
+  });
+  return JSON.stringify(json);
+}
+
 /** What RAC's host answers: Busselton's book-now page, and each park's availability. */
 function racAnswer(hop: HopRequest): HopAnswer {
   const url = new URL(hop.url);
@@ -116,8 +136,10 @@ function racAnswer(hop: HopRequest): HopAnswer {
     const park = RAC_PARKS.find((p) => String(p.blogId) === form.get('blog_id'));
     const arrival = form.get('available_from') === '20 Dec 2027' ? HOLIDAYS.arrival : '';
     if (park) {
+      const body = availabilityAnswer(park.slug, arrival);
+      const split = ensuiteOnNoOneSite && park.slug === 'busselton' && !arrival;
       return {
-        body: availabilityAnswer(park.slug, arrival),
+        body: split ? ensuiteSplitAnswer(body) : body,
         headers: { 'content-type': 'application/json' },
       };
     }
@@ -179,6 +201,7 @@ describe('an RAC member number in the app', () => {
 
   function start(now = NOW): void {
     fakeDateOnly(now);
+    ensuiteOnNoOneSite = false;
     logLines = [];
     capture = new winston.transports.Stream({
       stream: new Writable({
@@ -346,6 +369,93 @@ describe('an RAC member number in the app', () => {
       expect(JSON.stringify(updates)).not.toContain(sentinel);
       expect(JSON.stringify(notifications)).not.toContain(sentinel);
       expect(JSON.stringify([mail.subject, mail.text, mail.html])).not.toContain(sentinel);
+    }
+  });
+
+  it('a split-stay alert carries no number: not the place page’s split stays, their link, the alert or its email', async () => {
+    start();
+    await sync();
+    await ok(save(TYPED));
+    // Busselton's ensuite sites free every night on no one site: RAC's own answer, edited, which
+    // RAC's mapping reports as a split stay booked through the park, priced at the member rate
+    ensuiteOnNoOneSite = true;
+    const responses: unknown[] = [];
+    const record = async <T>(pending: Promise<APIResponse<T>>): Promise<T> => {
+      const response = await pending;
+      responses.push(response);
+      return ok(Promise.resolve(response));
+    };
+
+    const checked = await record(
+      call<LocationCheck>('catalog:check-location', { key: 'rac:busselton', stay: STAY })
+    );
+    const split = checked.units.find((unit) => unit.splitStay);
+    expect(split).toMatchObject({
+      unitId: 'cat:7',
+      unitName: 'Ensuite Site',
+      splitStay: { booking: 'contact' },
+      freeCount: 0,
+      priceNote: 'RAC member rate',
+    });
+    expect(split!.nights.map((night) => [night.reason, night.price])).toEqual([
+      ['split', 115],
+      ['split', 117],
+    ]);
+    expect(checked.splitStays).toEqual([
+      expect.objectContaining({
+        booking: 'contact',
+        unitId: split!.unitId,
+        total: 232,
+        contactUrl: 'https://parksandresorts.rac.com.au/busselton/contact-us/',
+      }),
+    ]);
+
+    container.notifierDispatcher.configureNotifier(
+      NotifierChannel.EMAIL_SMTP,
+      {
+        host: 'smtp.example.com',
+        port: 587,
+        secure: false,
+        auth: { user: 'me@example.com', pass: 'made-up-password' },
+      },
+      true
+    );
+    const watch = await record(
+      call<Watch>('watches:create', {
+        providerId: 'rac',
+        name: 'Busselton, November',
+        location: { externalId: 'busselton', name: 'RAC Busselton Holiday Park' },
+        stay: STAY,
+        unitIds: [split!.unitId],
+        allowSplitStay: true,
+      })
+    );
+    await record(call('watches:run-now', { id: watch.id }));
+    const found = await record(call<Watch>('watches:get', { id: watch.id }));
+    expect(found).toMatchObject({ lastResult: 'split_found', splitStays: checked.splitStays });
+    const notifications = container.db
+      .prepare("SELECT title, message FROM notifications WHERE provider_id = 'rac'")
+      .all();
+    expect(notifications).toEqual([
+      expect.objectContaining({ title: 'Free if you move sites at RAC Busselton Holiday Park' }),
+    ]);
+    expect(mockSendMail).toHaveBeenCalledTimes(1);
+    const mail = mockSendMail.mock.calls[0][0];
+    expect(mail.text).toContain(
+      `How to book\nContact RAC Busselton Holiday Park: ${checked.splitStays[0].contactUrl}\n`
+    );
+
+    const requests = JSON.stringify(
+      http.requests.map(({ method, url, headers, body }) => ({ method, url, headers, body }))
+    );
+    const logs = logLines.join('\n');
+    for (const sentinel of SENTINELS) {
+      expect(requests).not.toContain(sentinel);
+      expect(logs).not.toContain(sentinel);
+      expect(JSON.stringify(responses)).not.toContain(sentinel);
+      expect(JSON.stringify(notifications)).not.toContain(sentinel);
+      expect(JSON.stringify([mail.subject, mail.text, mail.html])).not.toContain(sentinel);
+      expect(JSON.stringify(renderer.sent)).not.toContain(sentinel);
     }
   });
 

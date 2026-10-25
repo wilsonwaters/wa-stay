@@ -24,9 +24,19 @@
  * So the module shows each class as one unit, `class:<class id>`, whatever site `id` the view
  * gave, and a hold for it posts `campsite_class`: ParkStay picks the free site. Unit ids kept
  * from before #21 are site ids; they name a class through `classesOfSiteId`, from the view.
+ *
+ * When no site of a class is free for the whole stay but every night has one free, the class
+ * reports a split stay (`classSplitStay`): the fewest bookings that cover the stay, each a run
+ * of nights on one site of the class, booked as a class booking for its own dates (ParkStay
+ * then holds the first site of the class free for them). The parts never share a night, so
+ * each is a booking of its own, as DBCA's terms ask. There is no count of sites: ParkStay
+ * picks them.
  */
 
 import type { UnitSummary } from '@shared/types/catalog.types';
+import type { UnitSplitStay } from '@shared/types/provider.types';
+import { addDays } from '@shared/utils/calendar-date';
+import { fewestParts } from '@shared/utils/split-parts';
 import type { RawCampsite, RawCampsiteAvailabilityView } from './types';
 import { unitKindOf } from './unit-kinds';
 
@@ -172,4 +182,40 @@ export function bookableClassNights(
     k = start - 1;
   }
   return chosen;
+}
+
+/**
+ * A class's split stay, from which of its sites are free each night (`free[site][night]`, as
+ * for `bookableClassNights`) over the stay's `dates` (its nights, in order): the fewest parts
+ * that cover every night (`fewestParts`: ties to the longest parts, then the first sites), each
+ * a run of nights on one site, booked as a class booking for the part's dates. Undefined for a
+ * stay of one night, when a night has no free site, or when one site is free for all of them.
+ */
+export function classSplitStay(
+  free: readonly (readonly boolean[])[],
+  dates: readonly string[]
+): UnitSplitStay | undefined {
+  const nights = dates.length;
+  if (nights < 2) return undefined;
+  // From each night, how many nights in a row each site is free
+  const runFrom = free.map((site) => {
+    const run = new Array<number>(nights + 1).fill(0);
+    for (let night = nights - 1; night >= 0; night--) {
+      run[night] = site[night] === true ? run[night + 1] + 1 : 0;
+    }
+    return run;
+  });
+  const cover = fewestParts(
+    free.length,
+    nights,
+    (site, from, to) => runFrom[site][from] >= to - from
+  );
+  if (!cover || cover.length < 2) return undefined;
+  return {
+    booking: 'separate',
+    parts: cover.map(({ from, to }) => ({
+      arrival: dates[from],
+      departure: addDays(dates[to - 1], 1),
+    })),
+  };
 }

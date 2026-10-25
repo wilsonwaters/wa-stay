@@ -42,3 +42,23 @@ describe('WatchAlertFields: how often a watch checks', () => {
     }
   });
 });
+
+describe('WatchAlertFields: stays that move between units (§12.36)', () => {
+  const box = () =>
+    screen.getByRole('checkbox', { name: 'Alert on stays that move between sites' });
+
+  it('offers it unticked, saying what it means and that WA Stay never holds these', () => {
+    renderWithProviders(<Harness manifest={PARKSTAY_MANIFEST} />);
+    expect(box()).not.toBeChecked();
+    expect(box()).toHaveAccessibleDescription(
+      "Also tell me when every night is free, but not on one site. You'd move during your stay, and book more than once or through the place. WA Stay never holds these automatically."
+    );
+  });
+
+  it('says nothing of holds where the provider holds nothing', () => {
+    renderWithProviders(<Harness manifest={RAC_MANIFEST} />);
+    expect(box()).toHaveAccessibleDescription(
+      "Also tell me when every night is free, but not on one site. You'd move during your stay, and book more than once or through the place."
+    );
+  });
+});

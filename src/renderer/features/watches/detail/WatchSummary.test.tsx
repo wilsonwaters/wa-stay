@@ -40,3 +40,27 @@ describe('WatchSummary: stay type', () => {
     expect(within(preferences).queryByText('Stay type')).toBeNull();
   });
 });
+
+describe('WatchSummary: alerts on stays that move between units (§12.36)', () => {
+  const alerts = (watch: Watch) => within(show(watch)).getByText(/whole stay|some nights/);
+
+  it('says so only when the watch asks for them', () => {
+    expect(alerts(makeWatch())).toHaveTextContent(
+      /^When the whole stay is free; stops after the first alert$/
+    );
+  });
+
+  it('adds them after what else it alerts on', () => {
+    expect(alerts(makeWatch({ allowSplitStay: true }))).toHaveTextContent(
+      /^When the whole stay is free; also when it's free only if you move sites; stops after the first alert$/
+    );
+  });
+
+  it('keeps partial availability beside them', () => {
+    expect(
+      alerts(makeWatch({ allowSplitStay: true, allowPartialMatch: true, notifyOnly: false }))
+    ).toHaveTextContent(
+      /^Also when only some nights are free; also when it's free only if you move sites; keeps checking after alerts$/
+    );
+  });
+});

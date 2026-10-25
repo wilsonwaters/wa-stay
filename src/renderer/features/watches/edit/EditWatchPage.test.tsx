@@ -72,6 +72,19 @@ describe('EditWatchPage', () => {
     expect(screen.queryByText('Sites no longer listed')).toBeNull();
   });
 
+  it('shows "Alert on stays that move between sites" as stored, and sends a change of it alone', async () => {
+    const mock = api({ ...LEGACY, allowSplitStay: true });
+    const { user } = renderWithApp({ route: '/watches/5/edit', api: mock });
+    const split = await screen.findByRole('checkbox', {
+      name: 'Alert on stays that move between sites',
+    });
+    expect(split).toBeChecked();
+    await user.click(split);
+    await user.click(screen.getByRole('button', { name: 'Save changes' }));
+    await waitFor(() => expect(mock.watches.update).toHaveBeenCalledTimes(1));
+    expect(mock.watches.update).toHaveBeenCalledWith(5, { allowSplitStay: false });
+  });
+
   it('Save changes sends the changed fields to watches.update, then opens the watch', async () => {
     const mock = api();
     const { user } = renderWithApp({ route: '/watches/5/edit', api: mock });

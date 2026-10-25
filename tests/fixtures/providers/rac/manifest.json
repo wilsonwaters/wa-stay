@@ -226,6 +226,15 @@
       "method": "POST",
       "path": "/wp-content/themes/parks-and-resorts/template-parts/components/booking-engine/availability-ajax.php",
       "form": {
+        "blog_id": "2",
+        "available_from": "1 Jul 2027"
+      },
+      "file": "availability-monkey-mia-split-2027-07-01-5n.json"
+    },
+    {
+      "method": "POST",
+      "path": "/wp-content/themes/parks-and-resorts/template-parts/components/booking-engine/availability-ajax.php",
+      "form": {
         "blog_id": "6",
         "available_from": "1 Dec 2026"
       },

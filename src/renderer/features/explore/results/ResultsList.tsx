@@ -345,7 +345,7 @@ export function ResultsList({
           }
           description={
             state.checked
-              ? 'Places that are full or not open for these dates are hidden.'
+              ? 'Places that are full, free only if you move, or not open for these dates are hidden.'
               : 'Show all places, or try again from the notice above.'
           }
           actions={

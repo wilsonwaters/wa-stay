@@ -129,7 +129,9 @@ and dates). The flow has five steps:
   stay type: choose one stay type or units for it." The flow asks for one stay type or units at
   a place it knows is mixed, so this happens only when the flow could not load the place's
   units, or they changed after the snipe was made. A snipe set to hold whose provider no longer
-  places holds alerts too, with a note saying so.
+  places holds alerts too, with a note saying so. A stay free every night only by moving
+  between units ([a split stay](watches-and-notifications.md#split-stays)) is never taken: a
+  snipe waits for one unit free for the whole stay.
 - **A provider that turns it away.** If the provider answers a check or a hold with HTTP 403 or
   429 (a block, a challenge or "too many requests"), the snipe stops at once and ends **Failed**
   with "{provider} refused the check (HTTP {status}). Site Sniper stopped and won't try again by

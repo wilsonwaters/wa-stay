@@ -46,6 +46,7 @@ export const watchInputSchema = z.object({
   autoHold: z.boolean().optional(),
   notifyOnly: z.boolean().optional(),
   allowPartialMatch: z.boolean().optional(),
+  allowSplitStay: z.boolean().optional(),
   maxPrice: z.number().nonnegative().optional(),
   notes: z.string().optional(),
 });

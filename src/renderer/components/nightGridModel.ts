@@ -56,6 +56,27 @@ export function isSplitNight(night: NightStatus): boolean {
   return night.reason === 'split';
 }
 
+/**
+ * A unit standing for several whose provider reported a split stay on it (`splitStay`): every
+ * night of the stay is free, `available` or `split`, but on no one of its units for them all.
+ * Read from its nights too, so the words never claim more than they show.
+ */
+export function isFreeEveryNightIfYouMove(
+  unit: UnitAvailability,
+  nights: readonly string[]
+): boolean {
+  if (!unit.splitStay || nights.length === 0) return false;
+  let split = false;
+  for (const date of nights) {
+    const night = nightOf(unit, date);
+    // A split night counts only with room, as the core takes one: never a booked or closed one
+    if (isSplitNight(night) && (night.state === 'unknown' || night.state === 'available')) {
+      split = true;
+    } else if (night.state !== 'available' || night.reason !== undefined) return false;
+  }
+  return split;
+}
+
 /** A whole number of nights of 1 or more; anything else (0, negative, a fraction) is none. */
 const wholeNights = (value: number | undefined): number | undefined =>
   typeof value === 'number' && Number.isInteger(value) && value >= 1 ? value : undefined;
@@ -115,6 +136,11 @@ export interface AvailabilitySummary {
   unknown: number;
   /** Of `known`: free on some nights, but not on one unit for the whole stay. */
   split?: number;
+  /**
+   * Of `split`: units the provider reported a split stay on (`isFreeEveryNightIfYouMove`):
+   * free every night, but on no one of their units for the whole stay.
+   */
+  splitStays?: number;
   /** Of `known`: nothing taken, but refused for this stay by the provider's stay rules. */
   minStay?: number;
   /**
@@ -154,6 +180,9 @@ export function summariseAvailability(
       summary.known += 1;
       summary.partly += 1;
       summary.split = (summary.split ?? 0) + 1;
+      if (isFreeEveryNightIfYouMove(unit, nights)) {
+        summary.splitStays = (summary.splitStays ?? 0) + 1;
+      }
     } else if (standing === 'min-stay') {
       summary.known += 1;
       summary.minStay = (summary.minStay ?? 0) + 1;
@@ -222,7 +251,12 @@ export function summaryNotes(
     rowsAreTypes
       ? `Some ${noun.many} ${verbs[1]}`
       : `${count} ${plural(count, noun)} ${count === 1 ? verbs[0] : verbs[1]}`;
-  if ((summary.split ?? 0) > 0) {
+  // A split stay the provider reported: every night free, by moving between its units
+  const splitStays = summary.splitStays ?? 0;
+  if (splitStays > 0) {
+    notes.push(`Free every night, but not on one ${noun.one} for the whole stay.`);
+  }
+  if ((summary.split ?? 0) > splitStays) {
     notes.push(`Free on some nights, but not on one ${noun.one} for the whole stay.`);
   }
   const minimums = Object.entries(summary.minimums ?? {})

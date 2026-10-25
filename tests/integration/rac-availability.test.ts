@@ -31,7 +31,7 @@ import type {
 } from '@shared/types/provider.types';
 import { createMemoryLogger, createTestProviderContext } from '@tests/utils/fake-provider';
 import { RecordingHttpClient, type HopAnswer } from '@tests/utils/fake-paced-provider';
-import { stayRuleViolations } from '@tests/utils/provider-contract';
+import { splitStayViolations, stayRuleViolations } from '@tests/utils/provider-contract';
 
 const FIXTURES_DIR = path.join(__dirname, '../fixtures/providers');
 const RAC_FIXTURES = path.join(FIXTURES_DIR, 'rac');
@@ -504,20 +504,114 @@ describe('RAC availability: the mapping of a stay', () => {
     return unit(await provider.availability!.check('busselton', BUSSELTON), 'cat:4');
   }
 
+  /** No site free for the whole stay, though every night has free sites: RAC's split. */
+  const noSiteForStay = (s: RawAnswer['data'][string]) =>
+    Object.assign(s, {
+      stay_through_sites_available: 0,
+      stay_through_sites_code: 3,
+      stay_through_sites_message: 'There is no longer availability for the dates given',
+    });
+
   it('every night free but no site for the whole stay (stay-through 0 with code 3): split, not free', async () => {
-    const site = await poweredSite((s) =>
-      Object.assign(s, {
-        stay_through_sites_available: 0,
-        stay_through_sites_code: 3,
-        stay_through_sites_message: 'There is no longer availability for the dates given',
-      })
-    );
+    const site = await poweredSite(noSiteForStay);
+    // The nights keep the Standard Rate's prices: a split stay the park books (below)
+    expect(site.nights).toEqual([
+      { date: '2026-11-06', state: 'unknown', reason: 'split', price: 75 },
+      { date: '2026-11-07', state: 'unknown', reason: 'split', price: 75 },
+    ]);
+    expect(site.fullyAvailable).toBe(false);
+    expect(site.total).toBeUndefined();
+  });
+
+  it("with a tariff that counts, it is a split stay booked through the park: no parts, no count, the nights' prices, nothing free", async () => {
+    const { provider } = recordingProvider(() => ({
+      body: edited('2026-11-06-2n', (json) => noSiteForStay(json.data['4'])),
+    }));
+    const result = await provider.availability!.check('busselton', BUSSELTON);
+    const site = unit(result, 'cat:4');
+    expect(site.splitStay).toEqual({ booking: 'contact' });
+    expect(site).toMatchObject({ fullyAvailable: false, freeCount: 0 });
+    expect(site).not.toHaveProperty('total');
+    expect(site.nights.map((n) => n.price)).toEqual([75, 75]);
+    // The sold-out ensuite site reports none
+    expect(unit(result, 'cat:7')).not.toHaveProperty('splitStay');
+    // As the contract suite reads it: the park's contact page is on RAC's site
+    expect(splitStayViolations(racManifest, provider, BUSSELTON, result)).toEqual([]);
+    expect(provider.links.contact!('busselton')).toBe(`${RAC}/busselton/contact-us/`);
+  });
+
+  it.each([
+    ['stay-through code 5', { stay_through_sites_available: 0, stay_through_sites_code: 5 }],
+    ['code 0 with no site', { stay_through_sites_available: 0, stay_through_sites_code: 0 }],
+    ['code 0 with less than one site', { stay_through_sites_available: 0.5 }],
+  ])('%s is a split stay too', async (_name, change) => {
+    const site = await poweredSite((s) => Object.assign(s, change));
+    expect(site.nights.map((n) => [n.state, n.reason, n.price])).toEqual([
+      ['unknown', 'split', 75],
+      ['unknown', 'split', 75],
+    ]);
+    expect(site.splitStay).toEqual({ booking: 'contact' });
+  });
+
+  it('with no tariff that counts, the nights are split with no price, and no split stay is reported', async () => {
+    const site = await poweredSite((s) => {
+      noSiteForStay(s);
+      // Only the members' rate succeeds, and no member number is saved
+      for (const tariff of s.tariffs_available) {
+        if (tariff.tariff_label !== 'RAC Member Rate') {
+          Object.assign(tariff, { tariff_success: 'false', tariff_code: 4 });
+        }
+      }
+    });
     expect(site.nights).toEqual([
       { date: '2026-11-06', state: 'unknown', reason: 'split' },
       { date: '2026-11-07', state: 'unknown', reason: 'split' },
     ]);
-    expect(site.fullyAvailable).toBe(false);
-    expect(site.total).toBeUndefined();
+    expect(site).not.toHaveProperty('splitStay');
+    expect(site.freeCount).toBe(0);
+  });
+
+  it("with a member number, a members' tariff counts: the split stay at the member rate", async () => {
+    const body = edited('2026-11-06-2n', (json) => noSiteForStay(json.data['4']));
+    const http = new RecordingHttpClient({ providerId: 'rac', respond: () => ({ body }) });
+    const factory = defineProvider(racManifest, (ctx) =>
+      createRacModules(ctx, { isMember: async () => true })
+    );
+    const provider = factory(createTestProviderContext(racManifest, { http, clock: () => NOW }));
+    const site = unit(await provider.availability!.check('busselton', BUSSELTON), 'cat:4');
+    expect(site.splitStay).toEqual({ booking: 'contact' });
+    expect(site.nights.map((n) => n.price)).toEqual([68, 68]);
+    expect(site.priceNote).toBe('RAC member rate');
+  });
+
+  it("never prices a split night with NewBook's placeholder, 999", async () => {
+    const site = await poweredSite((s) => {
+      noSiteForStay(s);
+      const quoted = s.tariffs_available[0].tariffs_quoted as Record<string, { amount: unknown }>;
+      quoted['2026-11-07'].amount = 999;
+    });
+    expect(site.nights.map((n) => [n.reason, n.price])).toEqual([
+      ['split', 75],
+      ['split', undefined],
+    ]);
+    expect(site.splitStay).toEqual({ booking: 'contact' });
+    expect(JSON.stringify(site)).not.toContain('999');
+  });
+
+  it('keeps the closed days on a split stay’s nights', async () => {
+    const site = await poweredSite((s) => {
+      noSiteForStay(s);
+      const quoted = s.tariffs_available[0].tariffs_quoted as Record<string, object>;
+      Object.assign(quoted['2026-11-07'], { close_departure: 1 });
+    });
+    expect(site.nights[1]).toEqual({
+      date: '2026-11-07',
+      state: 'unknown',
+      reason: 'split',
+      price: 75,
+      noDeparture: true,
+    });
+    expect(site.splitStay).toEqual({ booking: 'contact' });
   });
 
   it('a minimum above the stay comes before split: the nights are min-stay', async () => {
@@ -532,6 +626,30 @@ describe('RAC availability: the mapping of a stay', () => {
       ['unknown', 'min-stay', 3],
     ]);
     expect(site.fullyAvailable).toBe(false);
+    // A stay RAC's rules refuse is never a split stay
+    expect(site).not.toHaveProperty('splitStay');
+  });
+
+  it('no arrivals on the first night comes before split too: no split stay', async () => {
+    const site = await poweredSite((s) => {
+      noSiteForStay(s);
+      const quoted = s.tariffs_available[0].tariffs_quoted as Record<string, object>;
+      Object.assign(quoted['2026-11-06'], { close_arrival: 1 });
+    });
+    expect(site.nights.map((n) => n.reason)).toEqual(['min-stay', 'min-stay']);
+    expect(site).not.toHaveProperty('splitStay');
+  });
+
+  it('a night with no free site is no split stay: the free nights stay available', async () => {
+    const site = await poweredSite((s) => {
+      noSiteForStay(s);
+      (s.sites_available as Record<string, number>)['2026-11-07'] = 0;
+    });
+    expect(site.nights.map((n) => [n.state, n.reason])).toEqual([
+      ['available', undefined],
+      ['booked', undefined],
+    ]);
+    expect(site).not.toHaveProperty('splitStay');
   });
 
   it('a whole-stay count lower than every night (51 against 53 and 55) is still bookable above 0', async () => {
@@ -922,6 +1040,57 @@ describe('RAC availability: never a cart address', () => {
   });
 });
 
+describe('RAC availability: a split stay recorded live (Monkey Mia, 1–6 Jul 2027)', () => {
+  /** The stay RAC's staff book as three stays: a site for nights 1–3, another for 4, another for 5. */
+  const SPLIT_STAY: StayQuery = { arrival: '2027-07-01', departure: '2027-07-06', adults: 2 };
+
+  it('the Powered Site, free every night on no one site, is a split stay booked through the park, at $450', async () => {
+    const provider = fixtureProvider();
+    const result = await provider.availability!.check('monkey-mia', SPLIT_STAY);
+    const powered = unit(result, 'cat:7');
+    expect(powered.unitName).toBe('Powered Site');
+    // RAC: 20, 22, 16, 1 and 2 sites free; none for the whole stay (stay-through 0, code 3)
+    expect(powered.nights.map((n) => [n.date, n.state, n.reason, n.price])).toEqual([
+      ['2027-07-01', 'unknown', 'split', 75],
+      ['2027-07-02', 'unknown', 'split', 75],
+      ['2027-07-03', 'unknown', 'split', 100],
+      ['2027-07-04', 'unknown', 'split', 100],
+      ['2027-07-05', 'unknown', 'split', 100],
+    ]);
+    expect(powered).toMatchObject({
+      fullyAvailable: false,
+      freeCount: 0,
+      splitStay: { booking: 'contact' },
+    });
+    expect(powered).not.toHaveProperty('total');
+    // The Standard Rate's $450 for the 5 nights, as RAC's page showed it
+    expect(powered.nights.reduce((sum, n) => sum + (n.price ?? 0), 0)).toBe(450);
+    // Three of its rooms are split stays too; what is free for the stay stays free
+    expect(result.units.filter((u) => u.splitStay).map((u) => [u.unitId, u.unitName])).toEqual([
+      ['cat:10', 'Superior Beach View Room'],
+      ['cat:30', 'Family Garden View Room'],
+      ['cat:12', 'Budget Room Shared Bathroom'],
+      ['cat:7', 'Powered Site'],
+    ]);
+    expect(unit(result, 'cat:38')).toMatchObject({ fullyAvailable: true, freeCount: 59 });
+    expect(splitStayViolations(racManifest, provider, SPLIT_STAY, result)).toEqual([]);
+    expect(stayRuleViolations(SPLIT_STAY, result)).toEqual([]);
+  });
+
+  it("with a member number, at the RAC Member Rate's $414", async () => {
+    const body = answer('monkey-mia-split-2027-07-01-5n');
+    const http = new RecordingHttpClient({ providerId: 'rac', respond: () => ({ body }) });
+    const factory = defineProvider(racManifest, (ctx) =>
+      createRacModules(ctx, { isMember: async () => true })
+    );
+    const provider = factory(createTestProviderContext(racManifest, { http, clock: () => NOW }));
+    const powered = unit(await provider.availability!.check('monkey-mia', SPLIT_STAY), 'cat:7');
+    expect(powered.splitStay).toEqual({ booking: 'contact' });
+    expect(powered.nights.map((n) => n.price)).toEqual([69, 69, 92, 92, 92]);
+    expect(powered.priceNote).toBe('RAC member rate');
+  });
+});
+
 describe('RAC availability: releases (release.opensAt)', () => {
   /** 23:36 AWST on 16 Oct 2026, when the window-edge answer was recorded. */
   const EDGE_CHECKED = new Date('2026-10-16T15:36:00.000Z');
@@ -1000,6 +1169,29 @@ describe('RAC availability: releases (release.opensAt)', () => {
     ]);
     expect(unit(result, 'cat:4').fullyAvailable).toBe(true);
     expect(result.release).toEqual({ open: false, opensAt: '2027-02-05T00:00:00.000Z' });
+  });
+
+  it('a split stay in holidays still to come is held back: its nights are not released, and it reports no split stay yet', async () => {
+    const json = JSON.parse(holidayAnswer()) as RawAnswer;
+    Object.assign(json.data['4'], { stay_through_sites_available: 0, stay_through_sites_code: 3 });
+    const body = JSON.stringify(json);
+    const before = await providerAt(
+      new Date('2027-01-20T02:00:00.000Z'),
+      false,
+      body
+    ).availability!.check('busselton', HOLIDAYS);
+    expect(states(unit(before, 'cat:4'))).toEqual([
+      ['2027-12-20', 'not-released'],
+      ['2027-12-21', 'not-released'],
+    ]);
+    expect(unit(before, 'cat:4')).not.toHaveProperty('splitStay');
+    // Once the holidays are released, it is a split stay
+    const after = await providerAt(
+      new Date('2027-02-06T00:00:00.000Z'),
+      false,
+      body
+    ).availability!.check('busselton', HOLIDAYS);
+    expect(unit(after, 'cat:4').splitStay).toEqual({ booking: 'contact' });
   });
 
   it('with a member number, the pre-sale releases them 48 hours earlier', async () => {
