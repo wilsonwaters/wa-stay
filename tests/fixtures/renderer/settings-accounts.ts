@@ -65,7 +65,7 @@ export function setupAccounts({
   experiments?: jest.Mock;
   /** `providers.setExperiment` (R17). */
   setExperiment?: jest.Mock;
-  /** `providers.notice`, `acceptNotice` and `withdrawNotice` (§12.36). */
+  /** `providers.notice`, `acceptNotice` and `withdrawNotice` (§12.37). */
   notice?: jest.Mock;
   acceptNotice?: jest.Mock;
   withdrawNotice?: jest.Mock;

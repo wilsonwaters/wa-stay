@@ -1,5 +1,5 @@
 /**
- * An Open Day plan's reminders as instants (§12.38): a reminder-only release mode declares
+ * An Open Day plan's reminders as instants (§12.39): a reminder-only release mode declares
  * them as days before the release day and a local time (`ReleaseReminder`), and this works out
  * when each is due for one release, in the provider's time zone. Main sends them on time;
  * the renderer shows the same times on the plan. Pure.

@@ -1,5 +1,5 @@
 /**
- * An Open Day plan's page (§12.38): "Reminders set" while it runs, its next reminder, each
+ * An Open Day plan's page (§12.39): "Reminders set" while it runs, its next reminder, each
  * reminder at its time (those done marked), what to have ready, "Open Stay Rottnest", that it
  * only reminds (no
  * attempts, timing or Run now); once it has reminded, "Reminders sent" with "Watch for

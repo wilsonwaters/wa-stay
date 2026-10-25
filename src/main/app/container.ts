@@ -282,7 +282,7 @@ export function createContainer({
   });
 
   // Before WA Stay sends a provider anything, the person accepts its notice, if it has one
-  // (§12.36). Withdrawing it drops the provider's availability answers, so nothing is shown
+  // (§12.37). Withdrawing it drops the provider's availability answers, so nothing is shown
   // or reused from before; the checks themselves are refused from then on.
   let forgetAvailability: (providerId: string) => void = () => undefined;
   const notices = new ProviderNotices({

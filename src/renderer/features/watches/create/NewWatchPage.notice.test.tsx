@@ -1,5 +1,5 @@
 /**
- * The create-watch flow with a provider whose notice is not accepted (§12.36): Continue on the
+ * The create-watch flow with a provider whose notice is not accepted (§12.37): Continue on the
  * provider step opens the notice, and the flow goes on once it is accepted; Not now stays on
  * the step. A create main refuses (`NOTICE_REQUIRED`: withdrawn meanwhile) opens the notice,
  * and accepting creates the watch.

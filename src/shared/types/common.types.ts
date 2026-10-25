@@ -28,7 +28,7 @@ export enum SnipeResult {
   ERROR = 'error',
   /** An alert was sent: the dates were free, and nothing was held (§12.35). */
   ALERTED = 'alerted',
-  /** An Open Day plan sent its reminders: nothing was checked or held (§12.38). */
+  /** An Open Day plan sent its reminders: nothing was checked or held (§12.39). */
   REMINDED = 'reminded',
 }
 
@@ -38,7 +38,7 @@ export enum SnipeReleaseMode {
   CANCELLATION = 'cancellation', // no fixed release; poll for freed site
   /**
    * A release day the person goes to themselves (Stay Rottnest's Open Days, with their waiting
-   * room): a plan that only reminds (`remindOnly`), never checks (§12.38).
+   * room): a plan that only reminds (`remindOnly`), never checks (§12.39).
    */
   OPEN_DAY = 'open_day',
 }
@@ -55,7 +55,7 @@ export enum SnipeStatus {
   DISABLED = 'disabled',
   /** The dates were free and the person was alerted; nothing is held (terminal, §12.35). */
   ALERTED = 'alerted',
-  /** An Open Day plan sent its reminders; nothing was checked or held (terminal, §12.38). */
+  /** An Open Day plan sent its reminders; nothing was checked or held (terminal, §12.39). */
   REMINDED = 'reminded',
 }
 

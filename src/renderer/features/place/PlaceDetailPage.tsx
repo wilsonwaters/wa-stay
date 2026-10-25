@@ -232,7 +232,7 @@ export default function PlaceDetailPage() {
   const noticeGate = useNoticeGate(manifest);
   // What the provider's booking rules say about the dates in the card (no request to it)
   const stayRules = useStayRules(manifest ? key : null, currentStay);
-  // Site Sniper only plans for releases here: every release mode only reminds (§12.38)
+  // Site Sniper only plans for releases here: every release mode only reminds (§12.39)
   const remindsOnly = Boolean(
     manifest?.releaseModes?.length && manifest.releaseModes.every((mode) => mode.remindOnly)
   );

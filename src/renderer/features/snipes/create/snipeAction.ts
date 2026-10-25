@@ -2,7 +2,7 @@
  * What a snipe does when the dates are free (`SiteSnipe.action`, §12.35) and how long it keeps
  * trying, as the new-snipe flow and the snipe's page decide them from the provider's manifest:
  * a hold where the provider places holds (its default there, RS9), else an alert, and in a mode
- * that only reminds (`remindOnly`, §12.38) an Open Day plan; and a release mode's limit on the
+ * that only reminds (`remindOnly`, §12.39) an Open Day plan; and a release mode's limit on the
  * window (`maxWindowMinutes`). Pure.
  */
 import type { ProviderExperimentState } from '../../../../shared/contracts/providers';
@@ -30,7 +30,7 @@ export function releaseModeOf(manifest: ProviderManifest | undefined, modeId: st
   return manifest?.releaseModes?.find((mode) => mode.id === modeId);
 }
 
-/** Whether the mode only reminds (an Open Day plan, §12.38): it never checks, alerts or holds. */
+/** Whether the mode only reminds (an Open Day plan, §12.39): it never checks, alerts or holds. */
 export function remindsOnly(manifest: ProviderManifest | undefined, modeId: string): boolean {
   return releaseModeOf(manifest, modeId)?.remindOnly === true;
 }

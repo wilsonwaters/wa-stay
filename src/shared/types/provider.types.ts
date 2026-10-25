@@ -157,7 +157,7 @@ export interface ProviderExperiment {
 
 /**
  * What the person reads and accepts before WA Stay sends the provider anything
- * (architecture-notes §12.36): a risk the provider's own terms put on them, such as Stay
+ * (architecture-notes §12.37): a risk the provider's own terms put on them, such as Stay
  * Rottnest's clause on automated software. Until it is accepted (at this `version`), WA Stay
  * checks no availability there, and runs none of its watches or snipes. Plain text only: no
  * markup and no links.
@@ -297,7 +297,7 @@ export interface ReleaseModeDescriptor {
   /** Extra inputs this mode needs. */
   fields?: StayFieldDescriptor[];
   /**
-   * The mode only reminds (§12.38): a snipe in it is an Open Day plan (`remind`), sent its
+   * The mode only reminds (§12.39): a snipe in it is an Open Day plan (`remind`), sent its
    * `reminders` before the release and never checking availability, holding or reserving a
    * night. Needs `reminders`.
    */

@@ -436,7 +436,7 @@ export class NotificationService {
   }
 
   /**
-   * An Open Day plan's reminder (§12.38), or one reminder for several plans of one provider due
+   * An Open Day plan's reminder (§12.39), or one reminder for several plans of one provider due
    * together (two stays for the same Open Day): the provider's own words and the plans it is
    * for. A desktop click opens the plan (the first, for several), then its booking page; the
    * email links that page. Nothing was checked: it never says anything is free.

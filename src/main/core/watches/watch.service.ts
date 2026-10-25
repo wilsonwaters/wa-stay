@@ -125,7 +125,7 @@ export interface WatchServiceDeps {
   holdsTurningOff?: (providerId: string) => boolean;
   /**
    * Throws `NOTICE_REQUIRED` while the provider's notice is not accepted (`ProviderNotices`,
-   * §12.36): a watch is then neither created nor activated, and a run asks nothing (default:
+   * §12.37): a watch is then neither created nor activated, and a run asks nothing (default:
    * never throws).
    */
   assertNotice?: (providerId: string) => void;

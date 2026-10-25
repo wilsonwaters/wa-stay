@@ -11,7 +11,7 @@
  * terms.md` §9), and its limits are the terms review's: one request at a time, 60 s apart in
  * the background, watches every 30 minutes at most. Before WA Stay sends Stay Rottnest
  * anything, each person reads and accepts the notice below (§9.1): the core sends nothing
- * until then (architecture-notes §12.36).
+ * until then (architecture-notes §12.37).
  */
 
 import type { ProviderManifest } from '@shared/types/provider.types';

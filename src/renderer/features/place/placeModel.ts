@@ -183,7 +183,7 @@ export type CheckFailure = 'access-gate' | 'rate-limit' | 'notice' | 'other';
 /**
  * What a failed check means. The access gate only counts for a provider that has one
  * (`capabilities.accessGate`, §12.2); `RATE_LIMITED` is the provider's HTTP 429;
- * `NOTICE_REQUIRED` is a notice the person has not accepted (§12.36), so nothing was asked.
+ * `NOTICE_REQUIRED` is a notice the person has not accepted (§12.37), so nothing was asked.
  */
 export function checkFailure(
   error: { code?: string } | null | undefined,

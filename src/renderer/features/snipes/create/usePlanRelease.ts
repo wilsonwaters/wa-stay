@@ -68,7 +68,7 @@ export function useSnipeStayRules(
 }
 
 /**
- * When an Open Day plan's stay goes on sale (§12.38), from the provider's booking rules
+ * When an Open Day plan's stay goes on sale (§12.39), from the provider's booking rules
  * (`useSnipeStayRules`), so the person sees the Open Day, and so when the reminders come,
  * before the plan is made. Asks only while `enabled` and in a mode that only reminds.
  */

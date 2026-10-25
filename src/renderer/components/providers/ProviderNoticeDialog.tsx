@@ -13,7 +13,7 @@ export interface ProviderNoticeDialogProps {
 }
 
 /**
- * A provider's notice (§12.36), before WA Stay sends it anything: its title, its paragraphs
+ * A provider's notice (§12.37), before WA Stay sends it anything: its title, its paragraphs
  * and points as plain text, a checkbox with its `confirmLabel`, and Continue, disabled until
  * it is ticked; Not now leaves everything as it was. Mount it to open it and unmount it to
  * close it. Continue stores the acceptance at the version shown; a refusal (the notice changed

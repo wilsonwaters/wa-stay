@@ -1,5 +1,5 @@
 /**
- * A provider's notice (§12.36): the dialog shows the manifest's notice as text, Continue waits
+ * A provider's notice (§12.37): the dialog shows the manifest's notice as text, Continue waits
  * for the tick, Not now asks nothing, Continue accepts the version shown, and a refusal shows
  * main's words. `useNoticeGate` asks only for a provider with a notice.
  */

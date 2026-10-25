@@ -154,7 +154,7 @@ export function makeAlertedSnipe(overrides: Partial<SiteSnipe> = {}): SiteSnipe 
 export const PLAN_OPEN_DAY = new Date('2099-11-04T00:30:00.000Z');
 
 /**
- * An Open Day plan (§12.38): Stay Rottnest's Geordie Bay for Mon 6 – Wed 8 Jul 2099, reminding
+ * An Open Day plan (§12.39): Stay Rottnest's Geordie Bay for Mon 6 – Wed 8 Jul 2099, reminding
  * before its Open Day, armed, with no reminder sent yet.
  */
 export function makePlan(overrides: Partial<SiteSnipe> = {}): SiteSnipe {

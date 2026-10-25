@@ -1,5 +1,5 @@
 /**
- * A place whose provider has a notice the person has not accepted (§12.36): Check availability
+ * A place whose provider has a notice the person has not accepted (§12.37): Check availability
  * opens the notice first and asks nothing; Not now leaves the card as it was; Continue accepts
  * and then checks. A check main refuses (`NOTICE_REQUIRED`: withdrawn meanwhile) says why and
  * offers the notice, and accepting asks the check again.

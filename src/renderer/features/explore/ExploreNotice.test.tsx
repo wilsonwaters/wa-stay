@@ -1,5 +1,5 @@
 /**
- * Explore with dates and a provider whose notice is not accepted (§12.36): main does not ask
+ * Explore with dates and a provider whose notice is not accepted (§12.37): main does not ask
  * it, and says so (`notice`); Explore offers the notice once, above the list, its cards say
  * why they have no count, and accepting asks that provider again, and no other.
  */

@@ -93,7 +93,7 @@ export function useSetExperiment() {
 }
 
 /**
- * Whether the person has accepted a provider's notice (`providers.notice`, §12.36): until
+ * Whether the person has accepted a provider's notice (`providers.notice`, §12.37): until
  * then WA Stay checks nothing there. Ask only for a provider whose manifest has a notice
  * (`enabled` false asks nothing); a provider without one is always `accepted`.
  */

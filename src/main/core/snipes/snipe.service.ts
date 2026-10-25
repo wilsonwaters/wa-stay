@@ -163,7 +163,7 @@ export interface SnipeServiceDeps {
   holdsTurningOff?: (providerId: string) => boolean;
   /**
    * Throws `NOTICE_REQUIRED` while the provider's notice is not accepted (`ProviderNotices`,
-   * §12.36): a snipe is then neither created nor armed, uses no queue, and a poll ends it
+   * §12.37): a snipe is then neither created nor armed, uses no queue, and a poll ends it
    * FAILED having asked nothing (default: never throws).
    */
   assertNotice?: (providerId: string) => void;
@@ -191,7 +191,7 @@ function modeOf(provider: Pick<SnipeProvider, 'manifest'>, mode: string) {
   return provider.manifest.releaseModes?.find((m) => m.id === mode);
 }
 
-/** Whether `mode` only reminds (§12.38): its snipes are Open Day plans. */
+/** Whether `mode` only reminds (§12.39): its snipes are Open Day plans. */
 export function remindsOnly(provider: Pick<SnipeProvider, 'manifest'>, mode: string): boolean {
   return modeOf(provider, mode)?.remindOnly === true;
 }
@@ -257,7 +257,7 @@ export class SiteSniperService {
     const reminds = remindsOnly(provider, input.releaseMode);
     const action = input.action ?? (reminds ? 'remind' : this.holdsOf(provider) ? 'hold' : 'alert');
     this.assertAction(provider, action, input.releaseMode);
-    // A plan sends the provider nothing, so it needs no notice (§12.36)
+    // A plan sends the provider nothing, so it needs no notice (§12.37)
     if (action !== 'remind') this.assertNotice(input.providerId);
     const unitKinds = cleanUnitKinds(input.unitKinds);
     const prepared = {
@@ -591,7 +591,7 @@ export class SiteSniperService {
    * still carry the old midnight instant). Keeps the stored one when the provider cannot answer.
    */
   async refreshReleaseAt(snipe: SiteSnipe, signal?: AbortSignal): Promise<Date | undefined> {
-    // A daily rollover's instant moves each day; a plan's when its Open Day moves (§12.38)
+    // A daily rollover's instant moves each day; a plan's when its Open Day moves (§12.39)
     if (snipe.releaseMode !== SnipeReleaseMode.DAILY_ROLLOVER && snipe.action !== 'remind') {
       return snipe.releaseAt;
     }

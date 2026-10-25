@@ -75,7 +75,7 @@ function WhenFree(props: { manifest: ProviderManifest; noun: UnitNoun; placesHol
  * provider's own check. A scheduled release asks for its date and time where the place is. Then
  * what happens when the dates are free (`WhenFree`), and the advanced timing, whose window is
  * checked again when a mode with a limit is chosen. A mode that only reminds (an Open Day plan,
- * §12.38) previews the stay's Open Day from the provider's booking rules instead, asking the
+ * §12.39) previews the stay's Open Day from the provider's booking rules instead, asking the
  * provider nothing, and shows the plan's reminders and checklist in place of both.
  */
 export function ReleaseStep(props: ReleaseStepProps) {

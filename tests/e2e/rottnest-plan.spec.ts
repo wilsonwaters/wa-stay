@@ -1,5 +1,5 @@
 /**
- * An Open Day plan for Stay Rottnest (§12.38), network-free: Site Sniper only reminds there, so
+ * An Open Day plan for Stay Rottnest (§12.39), network-free: Site Sniper only reminds there, so
  * a plan is made, armed and shown without a request to Stay Rottnest and without its notice.
  *
  * The journey starts without Stay Rottnest's fixture routes, so any request to it would be

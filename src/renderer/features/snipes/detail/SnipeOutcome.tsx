@@ -25,7 +25,7 @@ export interface SnipeOutcomeProps {
 /**
  * What a snipe has come to, under its page's header: the hold to pay for (or, let go here, how it
  * ended), the alert sent (what was free and "Book on {shortName}"), the booking, an Open Day
- * plan's reminders sent (with "Watch for cancellations" for a stay it didn't get, §12.38), or
+ * plan's reminders sent (with "Watch for cancellations" for a stay it didn't get, §12.39), or
  * why it stopped; and, while a snipe that holds runs, the provider's account (a hint where it is
  * optional, §12.32). An alert needs no account.
  */

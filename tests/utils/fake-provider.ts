@@ -39,7 +39,7 @@
  * - `experiments`: declared in the manifest, with the capabilities they turn on off there; the
  *   modules of those capabilities (built as `capabilities` says) reach the registry only when
  *   `ctx.manifest` has them on, as a provider's factory does (`withExperiments` applies them);
- * - `notice`: declared in the manifest, for the core's notice gate (§12.36);
+ * - `notice`: declared in the manifest, for the core's notice gate (§12.37);
  * - `credentials`: a `credentials` sign-in instead of `browser-session` (R15), with
  *   `FAKE_CREDENTIAL_FIELDS` (a copyable member number and a password that is not) and one
  *   statement, `FAKE_CONFIRMATIONS`, unless given; `signIn` answers `signed-in` unless
@@ -201,7 +201,7 @@ export interface FakeProviderOptions {
    * `holds.releaseOnPaymentClose`. None by default: the fake cannot let a hold go.
    */
   holdRelease?: { onPaymentClose?: boolean };
-  /** The manifest's `notice` (§12.36): none by default. */
+  /** The manifest's `notice` (§12.37): none by default. */
   notice?: ProviderNotice;
 }
 

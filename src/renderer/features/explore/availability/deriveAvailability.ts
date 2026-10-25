@@ -184,7 +184,7 @@ export function deriveAvailability(
     case 'unsupported':
       return { state: 'not-supported' };
     case 'error':
-      // Not asked: the person has not accepted the provider's notice (§12.36)
+      // Not asked: the person has not accepted the provider's notice (§12.37)
       if (input.errorCode === 'NOTICE_REQUIRED') return { state: 'notice' };
       return {
         state: 'error',

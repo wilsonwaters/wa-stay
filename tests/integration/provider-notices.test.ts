@@ -1,5 +1,5 @@
 /**
- * Provider notices (§12.36) through the IPC harness: a real container on a database file, so
+ * Provider notices (§12.37) through the IPC harness: a real container on a database file, so
  * a second container on the same file is a restart of WA Stay. The provider is a FakeProvider
  * that declares a notice, as Stay Rottnest does; ParkStay registers beside it, with none.
  *

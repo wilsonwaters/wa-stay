@@ -437,7 +437,7 @@ describe('ProviderManifestSchema: experiments (R17)', () => {
   });
 });
 
-describe('ProviderManifestSchema: notice (§12.36)', () => {
+describe('ProviderManifestSchema: notice (§12.37)', () => {
   const notice: ProviderNotice = {
     version: 1,
     title: 'Before WA Stay checks Stay Rottnest',

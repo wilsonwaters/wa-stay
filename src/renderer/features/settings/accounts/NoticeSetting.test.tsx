@@ -1,5 +1,5 @@
 /**
- * Settings → Accounts: a provider's notice (§12.36). Stay Rottnest's row says whether it is
+ * Settings → Accounts: a provider's notice (§12.37). Stay Rottnest's row says whether it is
  * accepted: "Notice not accepted" with "Read the notice", which opens it to accept, or "Notice
  * accepted on {date}" with Withdraw, asked first. ParkStay, with no notice, has no such group.
  */

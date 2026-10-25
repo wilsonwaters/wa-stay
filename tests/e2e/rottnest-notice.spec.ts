@@ -1,5 +1,5 @@
 /**
- * Stay Rottnest's notice, network-free (§12.36): with Stay Rottnest registered, WA Stay sends it
+ * Stay Rottnest's notice, network-free (§12.37): with Stay Rottnest registered, WA Stay sends it
  * nothing until the person has read and accepted its notice.
  *
  * The journey starts without Stay Rottnest's fixture routes, so any request to it would be

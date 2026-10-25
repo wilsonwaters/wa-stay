@@ -669,7 +669,7 @@ export default function ExplorePage() {
 
   // ---- Notices -----------------------------------------------------------------------------
   // One notice per provider that failed or is slow, never one per card.
-  /** The provider whose notice is open (§12.36): it was not asked for availability. */
+  /** The provider whose notice is open (§12.37): it was not asked for availability. */
   const [noticeFor, setNoticeFor] = useState<ProviderManifest | null>(null);
   const availabilityNotices = stay
     ? bulkProviders.map((manifest) => {

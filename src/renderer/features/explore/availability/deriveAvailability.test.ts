@@ -74,7 +74,7 @@ describe('deriveAvailability', () => {
         { state: 'error', queue: true },
       ],
       [
-        "the provider's notice is not accepted, so it was not asked (§12.36)",
+        "the provider's notice is not accepted, so it was not asked (§12.37)",
         ONLINE,
         { ...answered, status: 'error', errorCode: 'NOTICE_REQUIRED' },
         { state: 'notice' },

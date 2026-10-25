@@ -1,5 +1,5 @@
 /**
- * An Open Day plan on its card (§12.38): "Reminders set", the countdown to its Open Day and its
+ * An Open Day plan on its card (§12.39): "Reminders set", the countdown to its Open Day and its
  * next reminder, its step with no attempts (it never checks), and no Run now; once reminded,
  * "Reminders sent" with no Arm again.
  */

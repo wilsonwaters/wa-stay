@@ -252,7 +252,7 @@ describe('snipe alert notifications', () => {
     }
   });
 
-  describe('an Open Day plan’s reminders (§12.38)', () => {
+  describe('an Open Day plan’s reminders (§12.39)', () => {
     const planned = (id: number, name: string): SiteSnipe =>
       alerted({
         id,

@@ -21,7 +21,7 @@
  *   `forgetAvailability(providerId)` drops one provider's bulk and per-location answers (the
  *   container calls it when the person's saved details for it change: an RAC member number
  *   changes its prices and free nights); an answer still in flight then is not kept.
- * - **Notices** (§12.36). A provider whose notice is not accepted (`assertNotice`) is never
+ * - **Notices** (§12.37). A provider whose notice is not accepted (`assertNotice`) is never
  *   asked for availability: a place's check is refused with `NOTICE_REQUIRED`, and the bulk
  *   call lists the provider in `errors` as `notice`. Its catalogue and details still come.
  * - **Automatic sync** (`start`) begins 5 s after the window is up and re-checks hourly,

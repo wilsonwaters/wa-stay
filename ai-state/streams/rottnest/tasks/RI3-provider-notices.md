@@ -46,7 +46,7 @@ M. Types, the core's gate, three IPC methods, a dialog and a Settings row.
      - the place page's "Check availability";
      - Explore, where an unaccepted provider's cards read "Read Stay Rottnest's notice to check dates", with a button that opens the dialog.
    - **Settings → Accounts:** the provider's row shows "Notice accepted on {date}" with Withdraw, or "Notice not accepted" with Read.
-7. **Docs:** architecture-notes §12.36 "Provider notices"; CLAUDE.md (manifest, IPC table, error codes).
+7. **Docs:** architecture-notes §12.37 "Provider notices"; CLAUDE.md (manifest, IPC table, error codes).
 
 ## Completion criteria
 

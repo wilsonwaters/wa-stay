@@ -7,7 +7,7 @@
  * renderer's components, the features that show units and Settings (whose notification copy
  * names what a watch finds), and fails on "site" or "sites" in any case, except:
  * - "Site Sniper", the feature's name, and `site-sniper`, its route;
- * - "booking site", what copy calls a provider (architecture-notes §12.39), never a unit;
+ * - "booking site", what copy calls a provider (architecture-notes §12.40), never a unit;
  * - a line marked `unit-noun-ok` with a reason (`// unit-noun-ok: …`).
  *
  * Test files are skipped: their mocks may quote old messages. Provider folders are outside it:

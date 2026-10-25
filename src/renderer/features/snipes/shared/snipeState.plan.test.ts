@@ -1,5 +1,5 @@
 /**
- * `snipeState` and `planSteps` for Open Day plans (§12.38): a plan's timeline is "Reminders
+ * `snipeState` and `planSteps` for Open Day plans (§12.39): a plan's timeline is "Reminders
  * set" then "Reminders sent", its pill reads "Reminders set" while it runs, a reminded or
  * expired plan is offered no Arm again (main refuses a past release), it sorts with the ended
  * snipes once reminded, and its next reminder is the first neither done nor past.

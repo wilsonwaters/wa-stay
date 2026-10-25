@@ -84,7 +84,7 @@ export interface ConsistencyRule {
 
 const fn = (value: unknown): boolean => typeof value === 'function';
 const hasCheck = (p: AccommodationProvider): boolean => fn(p.availability?.check);
-/** Every release mode only reminds (§12.38): its snipes are plans, which never check. */
+/** Every release mode only reminds (§12.39): its snipes are plans, which never check. */
 const onlyReminds = (m: Readonly<ProviderManifest>): boolean =>
   Boolean(m.releaseModes?.length) && m.releaseModes!.every((mode) => mode.remindOnly === true);
 
@@ -92,7 +92,7 @@ const onlyReminds = (m: Readonly<ProviderManifest>): boolean =>
 const FLAG_RULES: readonly ManifestRule[] = [
   {
     // Holds are optional: a snipe without them alerts (§12.35, amends §12.30); a provider whose
-    // every release mode only reminds checks nothing for its snipes (§12.38)
+    // every release mode only reminds checks nothing for its snipes (§12.39)
     rule: 'snipes needs availability',
     violation: (m) =>
       m.capabilities.snipes && !m.capabilities.availability && !onlyReminds(m)
@@ -117,7 +117,7 @@ const FLAG_RULES: readonly ManifestRule[] = [
   },
   {
     rule: 'notice needs no account and no access gate',
-    // The notice gates availability, watches and snipes (§12.36); an account's signed-in check
+    // The notice gates availability, watches and snipes (§12.37); an account's signed-in check
     // and a queue would ask the provider outside it.
     violation: ({ notice, capabilities: c }) => {
       if (!notice) return undefined;

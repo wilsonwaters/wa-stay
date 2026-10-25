@@ -1,5 +1,5 @@
 /**
- * Stay Rottnest's release policy, for Open Day plans (§12.38): Site Sniper's only mode here is
+ * Stay Rottnest's release policy, for Open Day plans (§12.39): Site Sniper's only mode here is
  * `open_day`, a reminder-only mode (`manifest.ts`), so a plan reminds the person before the
  * Open Day that opens their stay and never checks, waits in the waiting room or books
  * (`ai-state/research/rottnest-terms.md` §9.9). Pure: no request.

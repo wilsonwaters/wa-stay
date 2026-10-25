@@ -1,5 +1,5 @@
 /**
- * Notices (architecture-notes §12.36): what the person reads and accepts before WA Stay sends
+ * Notices (architecture-notes §12.37): what the person reads and accepts before WA Stay sends
  * a provider anything (`manifest.notice`), such as the risk Stay Rottnest's clause on
  * automated software puts on their own bookings.
  *

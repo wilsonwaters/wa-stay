@@ -1,5 +1,5 @@
 /**
- * An Open Day plan's reminders on its card and page (§12.38): its release mode (one that only
+ * An Open Day plan's reminders on its card and page (§12.39): its release mode (one that only
  * reminds) and the next reminder still to come, at the times main sends them
  * (`reminderSteps`). Pure.
  */

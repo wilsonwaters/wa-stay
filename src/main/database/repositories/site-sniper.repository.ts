@@ -87,7 +87,7 @@ function readAction(value: string | null, where: string): SnipeAction {
   return 'alert';
 }
 
-/** An Open Day plan's reminders sent, as stored in the `alert` column (§12.38). */
+/** An Open Day plan's reminders sent, as stored in the `alert` column (§12.39). */
 function remindersToWrite(sent: readonly Date[]): string {
   return JSON.stringify({ reminders: sent.map((at) => at.toISOString()) });
 }

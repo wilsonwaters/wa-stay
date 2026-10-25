@@ -11,7 +11,7 @@ export interface PlanSectionProps {
 }
 
 /**
- * An Open Day plan's reminders on its page (§12.38): each at its time, the done ones marked,
+ * An Open Day plan's reminders on its page (§12.39): each at its time, the done ones marked,
  * the checklist, and "Open {shortName}", where the person joins the queue and books on the
  * day. Nothing for a snipe that is not a plan.
  */

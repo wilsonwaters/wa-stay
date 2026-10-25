@@ -78,7 +78,7 @@ export interface PlanRemindersProps {
 }
 
 /**
- * An Open Day plan's reminders and checklist (§12.38), as the new-snipe flow's Release step and
+ * An Open Day plan's reminders and checklist (§12.39), as the new-snipe flow's Release step and
  * the plan's page show them: when each reminder comes, in the provider's time once the release
  * is known (`reminderSteps`, the same times main sends them at), else as days before it, and
  * which are done; then what to have ready (the mode's `checklist`), and that Site Sniper only

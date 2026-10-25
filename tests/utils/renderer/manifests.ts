@@ -266,7 +266,7 @@ export const RAC_AUTO_CART_MANIFEST: ProviderManifest = {
 /**
  * Stay Rottnest as main registers it (tests/unit/renderer/mock-manifests.test.ts pins it to the
  * real manifest): Explore's free counts and watches, nothing held or booked, its terms' limits,
- * and its notice, which the person accepts before WA Stay checks anything there (§12.36).
+ * and its notice, which the person accepts before WA Stay checks anything there (§12.37).
  */
 export const ROTTNEST_MANIFEST: ProviderManifest = {
   id: 'rottnest',

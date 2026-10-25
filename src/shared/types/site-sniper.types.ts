@@ -6,7 +6,7 @@ import type { LocationRef, Stay, StayInput } from './stay.types';
  * What a snipe does when the dates are free (architecture-notes §12.35):
  * - `hold`: places the provider's temporary hold (needs `capabilities.holds`); the person pays;
  * - `alert`: a desktop alert and email with the provider's booking page; nothing is held;
- * - `remind` (§12.38): an Open Day plan, in a release mode that only reminds (`remindOnly`):
+ * - `remind` (§12.39): an Open Day plan, in a release mode that only reminds (`remindOnly`):
  *   the mode's reminders before the release, and nothing checked, held or reserved.
  */
 export type SnipeAction = 'alert' | 'hold' | 'remind';

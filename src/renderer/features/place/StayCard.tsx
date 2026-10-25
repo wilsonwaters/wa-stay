@@ -64,7 +64,7 @@ export interface StayCardProps {
   watchHref?: string;
   snipeHref?: string;
   /**
-   * Site Sniper only plans for releases here (every release mode only reminds, §12.38): the
+   * Site Sniper only plans for releases here (every release mode only reminds, §12.39): the
    * hand-off reads "Set release reminders", not "Snipe a site".
    */
   snipeRemindsOnly?: boolean;

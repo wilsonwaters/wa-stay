@@ -1,5 +1,5 @@
 /**
- * Open Day plans in the new-snipe flow (§12.38): in a mode that only reminds, the Release step
+ * Open Day plans in the new-snipe flow (§12.39): in a mode that only reminds, the Release step
  * shows the stay's Open Day from the provider's booking rules (`catalog.stayRules`, asking the
  * provider nothing: no `catalog.checkLocation`), when each reminder comes and what to have
  * ready, with no "When the dates are free" choice or advanced timing; Review says it reminds;

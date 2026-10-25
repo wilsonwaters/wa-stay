@@ -23,7 +23,7 @@ function acceptedOn(acceptedAt: string, timeZone: string): string {
 }
 
 /**
- * A provider's notice on its Settings → Accounts row (§12.36): accepted on a date, with
+ * A provider's notice on its Settings → Accounts row (§12.37): accepted on a date, with
  * Withdraw (asked first, then WA Stay stops checking the provider at once), or not accepted,
  * with "Read the notice", which opens it to accept.
  */

@@ -1,5 +1,5 @@
 /**
- * Open Day plans (§12.38) on the real core and the real Stay Rottnest provider, with fake
+ * Open Day plans (§12.39) on the real core and the real Stay Rottnest provider, with fake
  * timers: a plan for July 2027 is armed for Wed 4 Nov 2026, 8:30 am Perth, and sends its three
  * reminders (6 pm the day before, 6 am and 8:15 am) at their times, then is REMINDED, having
  * checked nothing; two plans for one Open Day get one notification per reminder; a plan whose

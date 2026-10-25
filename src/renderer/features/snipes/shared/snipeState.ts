@@ -60,7 +60,7 @@ export function isFinished(snipe: Pick<SiteSnipe, 'status'>): boolean {
  * Disarm a running one, pay for a held unit, see a booked one. Main refuses to arm a held or
  * booked snipe again (§12.31), so neither is ever offered Arm; an alerted one holds nothing, so
  * it may be (§12.35). An Open Day plan that has reminded, or expired, is over: its release has
- * come, and main refuses to arm it again (§12.38).
+ * come, and main refuses to arm it again (§12.39).
  */
 export type PrimaryAction = 'arm' | 'arm-again' | 'disarm' | 'pay' | 'booking';
 

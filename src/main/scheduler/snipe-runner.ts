@@ -44,7 +44,7 @@ const log = logger.child({ module: 'scheduler' });
 export const MAX_TIMER_MS = 2_000_000_000;
 /** How often a far-off release is re-armed. */
 export const REARM_INTERVAL_MS = 24 * 60 * 60 * 1000;
-/** How long a due reminder waits for other plans' reminders due with it (§12.38). */
+/** How long a due reminder waits for other plans' reminders due with it (§12.39). */
 export const REMINDER_BATCH_MS = 1000;
 
 /** Why a snipe's window closed, by what it does when the dates are free. */
@@ -379,7 +379,7 @@ export class SnipeRunner {
   }
 
   /**
-   * An Open Day plan's chain (§12.38): its release asked again (a moved Open Day moves the
+   * An Open Day plan's chain (§12.39): its release asked again (a moved Open Day moves the
    * reminders left), then one timer for its next reminder. A plan with none left (its release
    * long past) records the rest as passed and is REMINDED. It never checks.
    */

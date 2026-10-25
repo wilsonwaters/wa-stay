@@ -262,6 +262,6 @@ RAC may cancel a booking it believes disrupts its parks or guests.
   `checklist` are in the manifest ([Release modes](providers/adding-a-provider.md#release-modes)),
   the times come from `src/shared/utils/release-reminders.ts`, the runner sends them
   (`prepareReminders` in `snipe-runner.ts`), and a plan ends REMINDED (architecture-notes
-  §12.38). Stay Rottnest's: `src/main/providers/rottnest/release-policy.ts` and its manifest.
+  §12.39). Stay Rottnest's: `src/main/providers/rottnest/release-policy.ts` and its manifest.
 - No test or agent run places a real hold (architecture-notes §12.33); holds are tested with
   fixtures and seeded rows.
