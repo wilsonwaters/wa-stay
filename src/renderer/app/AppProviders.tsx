@@ -27,7 +27,7 @@ function ProviderManifests({ children }: { children: ReactNode }) {
     if (!error) return;
     const apiError = toApiError(error);
     if (apiError.code !== 'API_UNAVAILABLE') {
-      toast.error(`Provider details couldn't be loaded. ${apiError.message}`);
+      toast.error(`Booking site details couldn't be loaded. ${apiError.message}`);
     }
   }, [error, toast]);
   return (

@@ -31,10 +31,11 @@ import { LocationStep } from './steps/LocationStep';
 import { ProviderStep } from './steps/ProviderStep';
 import { ReviewStep, type FlowStepId } from './steps/ReviewStep';
 import { StayStep } from './steps/StayStep';
+import { useNoticeGate } from '../../../components/providers/ProviderNoticeDialog';
 import { providerToday } from '../../../components/stay/providerToday';
 
 const STEPS: (FlowStep & { id: FlowStepId })[] = [
-  { id: 'provider', title: 'Provider' },
+  { id: 'provider', title: 'Booking site' },
   { id: 'location', title: 'Location' },
   { id: 'stay', title: 'Your stay' },
   { id: 'alerts', title: 'Alerts' },
@@ -90,6 +91,9 @@ export function WatchFlow({ manifests, initialValues, initialStep, notices = [] 
   ]);
   const manifest = manifestOf(providerId);
   const today = providerToday(manifest, now);
+  // A provider with a notice the person has not accepted: asked once its step is done, and
+  // before the watch is created (main refuses it until then)
+  const noticeGate = useNoticeGate(manifest);
   // The place's units, for the unit choice (a search result has none until the detail loads).
   const detail = useLocationDetail(location ? `${providerId}:${location.externalId}` : null);
   const units = detail.isPlaceholderData ? undefined : detail.data?.units;
@@ -159,7 +163,9 @@ export function WatchFlow({ manifests, initialValues, initialStep, notices = [] 
       const fields = (apiError.issues ?? [])
         .map(issueField)
         .filter((name): name is WatchFieldName => Boolean(name));
-      if (apiError.code === 'VALIDATION' && fields.length > 0) {
+      if (apiError.code === 'NOTICE_REQUIRED') {
+        noticeGate.ask(() => void submit());
+      } else if (apiError.code === 'VALIDATION' && fields.length > 0) {
         for (const name of fields) setError(name, { type: 'server', message: apiError.message });
         const failing = firstStepWithError();
         if (failing && failing !== step) setStep(failing);
@@ -170,8 +176,19 @@ export function WatchFlow({ manifests, initialValues, initialStep, notices = [] 
     }
   };
 
-  const onContinue = async () =>
-    step === 'review' ? submit() : trigger(stepFields(step, manifest, autoHold));
+  const onContinue = async (): Promise<boolean> => {
+    if (step === 'review') {
+      if (!noticeGate.needed) return submit();
+      noticeGate.ask(() => void submit());
+      return false;
+    }
+    const valid = await trigger(stepFields(step, manifest, autoHold));
+    if (valid && step === 'provider' && noticeGate.needed) {
+      noticeGate.ask(() => setStep('location'));
+      return false;
+    }
+    return valid;
+  };
   const linkNotices = [...notices, ...placeNotices];
 
   return (
@@ -197,7 +214,7 @@ export function WatchFlow({ manifests, initialValues, initialStep, notices = [] 
         >
           {step === 'provider' && <ProviderStep onProviderChange={changeProvider} />}
           {step !== 'provider' && !manifest && (
-            <Notice tone="warning">Choose a provider first.</Notice>
+            <Notice tone="warning">Choose a booking site first.</Notice>
           )}
           {step === 'location' && manifest && (
             <LocationStep manifest={manifest} place={detail.data} placeLoading={detail.isLoading} />
@@ -220,6 +237,7 @@ export function WatchFlow({ manifests, initialValues, initialStep, notices = [] 
           )}
         </StepFlow>
       </form>
+      {noticeGate.dialog}
     </FormProvider>
   );
 }

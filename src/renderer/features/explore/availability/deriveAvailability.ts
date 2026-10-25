@@ -33,6 +33,7 @@ export type AvailabilityState =
   | 'no-dates'
   | 'offline-booking'
   | 'check-dates'
+  | 'notice'
   | 'not-supported'
   | 'error'
   | 'loading'
@@ -40,6 +41,8 @@ export type AvailabilityState =
   | 'split'
   | 'full'
   | 'none-open'
+  | 'opens'
+  | 'refused'
   | 'unknown';
 
 /**
@@ -66,7 +69,16 @@ export type PlaceAvailability =
   | { state: 'full'; bookableUnits?: number }
   /** `queue`: the provider's waiting queue is up (its access gate), not a fault. */
   | { state: 'error'; queue: boolean }
-  | { state: Exclude<AvailabilityState, 'available' | 'split' | 'full' | 'error'> };
+  /** Not on sale yet, by the provider's release rules: when it opens (ISO 8601). */
+  | { state: 'opens'; opensAt: string }
+  /** The provider's published rules refuse the stay here: why. */
+  | { state: 'refused'; reason: string }
+  | {
+      state: Exclude<
+        AvailabilityState,
+        'available' | 'split' | 'full' | 'error' | 'opens' | 'refused'
+      >;
+    };
 
 export interface AvailabilityInput {
   /** Both dates are chosen and valid (`exploreStay`). */
@@ -194,9 +206,12 @@ function splitKinds(
 /**
  * The place's availability state. Precedence, first match wins: `no-dates` (no stay),
  * `offline-booking` (not bookable online), `check-dates` (the provider checks one place at a
- * time but not in bulk), `not-supported` (no availability at all), `error`, `loading`, then
- * from the provider's entry `available` (a unit free every night), `split` (no unit free every
- * night, but every night free by moving between units, where the provider can tell), `full`
+ * time but not in bulk), `not-supported` (no availability at all), `notice` (its notice is not
+ * accepted, so it was not asked: `NOTICE_REQUIRED`), `error`, `loading`, then
+ * from the provider's entry `refused` (its published rules refuse the stay: `entry.refused`),
+ * `opens` (not on sale yet: `entry.opensAt`), `available` (a unit free every night), `split`
+ * (no unit free every night, but every night free by moving between units, where the provider
+ * can tell), `full`
  * (no unit free every night, some bookable or no total given) or `none-open` (a total of 0:
  * not released, closed or too far ahead), and `unknown` when the provider answered without
  * this place.
@@ -220,6 +235,8 @@ export function deriveAvailability(
     case 'unsupported':
       return { state: 'not-supported' };
     case 'error':
+      // Not asked: the person has not accepted the provider's notice (§12.37)
+      if (input.errorCode === 'NOTICE_REQUIRED') return { state: 'notice' };
       return {
         state: 'error',
         queue: input.errorCode === 'ACCESS_GATE' && capabilities.accessGate === true,
@@ -233,6 +250,13 @@ export function deriveAvailability(
   }
   const { entry } = input;
   if (!entry) return { state: 'unknown' };
+  // Held back by the provider's own rules, known without asking it
+  if (typeof entry.refused === 'string' && entry.refused) {
+    return { state: 'refused', reason: entry.refused };
+  }
+  if (typeof entry.opensAt === 'string' && entry.opensAt) {
+    return { state: 'opens', opensAt: entry.opensAt };
+  }
   const counts = chosenCounts(location, entry, input.stayTypes ?? []);
   if (!counts) return { state: 'check-dates' };
   const { available, bookable } = counts;
@@ -276,7 +300,9 @@ export const LOADING_PILL = '···';
 export function availabilityLabel(
   availability: PlaceAvailability,
   kinds: readonly UnitKind[],
-  shortName: string
+  shortName: string,
+  /** The provider's time zone, for when a stay opens. */
+  timeZone = 'Australia/Perth'
 ): AvailabilityLabel | null {
   const noun = nounForKinds(kinds);
   switch (availability.state) {
@@ -321,6 +347,28 @@ export function availabilityLabel(
       return { pill: 'Not open', card: `No ${noun.many} open for these dates`, tone: 'neutral' };
     case 'check-dates':
       return { pill: 'Check dates', card: 'Check dates on the place page', tone: 'neutral' };
+    case 'opens': {
+      const at = new Date(availability.opensAt);
+      if (Number.isNaN(at.getTime())) {
+        return { pill: 'Not open', card: 'Not on sale yet', tone: 'neutral' };
+      }
+      const day = (options: Intl.DateTimeFormatOptions) =>
+        new Intl.DateTimeFormat('en-AU', { ...options, timeZone }).format(at).replace(',', '');
+      return {
+        pill: `Opens ${day({ day: 'numeric', month: 'short' })}`,
+        card: `Opens ${day({ weekday: 'short', day: 'numeric', month: 'short' })}`,
+        tone: 'neutral',
+      };
+    }
+    case 'refused':
+      return { pill: NO_STATE_PILL, card: 'Not bookable for these dates', tone: 'neutral' };
+    case 'notice':
+      // The notice is offered once, above the list
+      return {
+        pill: NO_STATE_PILL,
+        card: `Read ${shortName}'s notice to check dates`,
+        tone: 'neutral',
+      };
     case 'offline-booking':
       // The card already says "Info only".
       return { pill: 'Info only', card: null, tone: 'neutral' };
@@ -350,7 +398,10 @@ const RANK: Record<AvailabilityState, number> = {
   split: 1,
   full: 2,
   'none-open': 3,
+  opens: 3,
+  refused: 3,
   'check-dates': 4,
+  notice: 4,
   'offline-booking': 5,
   'not-supported': 6,
   unknown: 7,

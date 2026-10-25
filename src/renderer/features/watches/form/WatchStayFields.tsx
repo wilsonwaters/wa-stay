@@ -57,7 +57,7 @@ export function WatchStayFields({
       'location',
     ]);
   const fields = watchStayFields(manifest).watch;
-  const provider = manifest?.shortName ?? 'the provider';
+  const provider = manifest?.shortName ?? 'the booking site';
   const placeKinds = useMemo(() => (units ? placeUnitKinds(units) : undefined), [units]);
   const stayTypes = placeKinds ? stayTypeOptions(placeKinds, [...unitKinds, ...keepKinds]) : [];
   // An automatic hold needs a stay type or a unit at a mixed place (Alerts): once that error

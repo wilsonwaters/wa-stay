@@ -330,7 +330,7 @@ describe('SiteSniperRepository', () => {
       dbHelper.getDb().prepare(`UPDATE site_snipes SET action = 'cart' WHERE id = ?`).run(snipe.id);
       expect(repo.findById(snipe.id)?.action).toBe('alert');
       expect(warn).toHaveBeenCalledWith(
-        `site_snipes ${snipe.id}: action is not "hold" or "alert"; read as "alert"`
+        `site_snipes ${snipe.id}: action is not "hold", "alert" or "remind"; read as "alert"`
       );
       warn.mockRestore();
     });

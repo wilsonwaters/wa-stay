@@ -123,7 +123,7 @@ describe('BookingDetailPage', () => {
   it('shows an unknown provider as such, with no manage link', async () => {
     setup(makeBooking({ id: 1, providerId: 'gone', manageUrl: undefined }));
     await page();
-    expect(screen.getByRole('img', { name: 'Unknown provider' })).toBeInTheDocument();
+    expect(screen.getByRole('img', { name: 'Unknown booking site' })).toBeInTheDocument();
     expect(screen.queryByRole('link', { name: /^Manage on/ })).toBeNull();
     expect(screen.getByRole('button', { name: 'Copy reference PB123456' })).toBeInTheDocument();
   });

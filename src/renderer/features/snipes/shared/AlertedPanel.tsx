@@ -52,7 +52,7 @@ export function AlertedPanel({
   className,
 }: AlertedPanelProps) {
   const headingId = useId();
-  const provider = manifest?.shortName ?? 'the provider';
+  const provider = manifest?.shortName ?? 'the booking site';
   const unit = alertedUnitLabel(snipe, manifest, place);
   const url = alertBookingUrl(snipe);
   const at = alertTime(snipe, manifest, now);
@@ -114,7 +114,7 @@ export interface AlertedSummaryProps {
  */
 export function AlertedSummary({ snipe, manifest, className }: AlertedSummaryProps) {
   const now = useNow();
-  const provider = manifest?.shortName ?? 'the provider';
+  const provider = manifest?.shortName ?? 'the booking site';
   const unit = alertedUnitLabel(snipe, manifest);
   const url = alertBookingUrl(snipe);
   const at = alertTime(snipe, manifest, now);

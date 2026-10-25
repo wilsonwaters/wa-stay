@@ -43,8 +43,8 @@ export function parseWatchPrefill(
   if (raw.has('provider')) {
     if (manifest?.capabilities.watches) prefill.providerId = manifest.id;
     else if (manifest) {
-      prefill.notices.push(`${manifest.shortName} can't be watched, so choose a provider.`);
-    } else prefill.notices.push("The link's provider isn't available, so choose a provider.");
+      prefill.notices.push(`${manifest.shortName} can't be watched, so choose a booking site.`);
+    } else prefill.notices.push("The link's booking site isn't available, so choose one.");
   }
 
   if (raw.has('location')) {

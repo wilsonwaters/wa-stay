@@ -23,7 +23,7 @@ export interface SnipeActionsBarProps {
  * One visible action by status (Arm, Arm again, Disarm, View booking; a held unit's "Pay now"
  * is in its hold panel, and on the page an alerted snipe's "Arm again" is in its alert panel),
  * and a "More actions for {name}" menu with View details, Run now and Delete (Run now only
- * while it runs). A held or booked snipe is never offered Arm: main refuses it (§12.31).
+ * while it runs, and never for an Open Day plan). A held or booked snipe is never offered Arm: main refuses it (§12.31).
  */
 export function SnipeActionsBar({
   snipe,
@@ -36,8 +36,9 @@ export function SnipeActionsBar({
   // On the page an alerted snipe's Arm again is in its alert panel, beside "Book on …"
   const inPanel = onPage && snipe.status === SnipeStatus.ALERTED;
   const action = inPanel ? null : primaryActionFor(snipe);
-  // One attempt now only while it runs: main answers "not active" for a stopped snipe.
-  const canRun = known && isRunning(snipe);
+  // One attempt now only while it runs: main answers "not active" for a stopped snipe. An Open
+  // Day plan never checks.
+  const canRun = known && isRunning(snipe) && snipe.action !== 'remind';
   const size = onPage ? 'md' : 'sm';
 
   return (

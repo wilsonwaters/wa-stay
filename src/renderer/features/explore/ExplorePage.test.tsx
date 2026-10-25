@@ -75,7 +75,14 @@ describe('Explore (list-only)', () => {
       within(filters)
         .getAllByRole('button')
         .map((b) => b.textContent)
-    ).toEqual(['Provider', 'Stay type', 'Region', 'Facilities', 'Book online', 'Available only']);
+    ).toEqual([
+      'Booking site',
+      'Stay type',
+      'Region',
+      'Facilities',
+      'Book online',
+      'Available only',
+    ]);
     expect(resultsHeading()).toHaveTextContent('169 places');
     // 40 cards first.
     expect(cards()).toHaveLength(40);
@@ -266,7 +273,7 @@ describe('Explore (list-only)', () => {
       within(screen.getByRole('group', { name: 'Filters' }))
         .getAllByRole('button')
         .map((b) => b.textContent)
-    ).toEqual(['Provider', 'Region', 'Facilities', 'Book online', 'Available only']);
+    ).toEqual(['Booking site', 'Region', 'Facilities', 'Book online', 'Available only']);
   });
 
   it('keeps a stay type no place has, checked with no places, and still listed', async () => {
@@ -293,11 +300,11 @@ describe('Explore (list-only)', () => {
     );
   });
 
-  it('always shows the Provider chip, with the one catalogue provider', async () => {
+  it('always shows the Booking site chip, with the one catalogue provider', async () => {
     const { user } = await renderExplore();
-    await user.click(chip('Provider'));
+    await user.click(chip('Booking site'));
     expect(
-      within(screen.getByRole('dialog', { name: 'Provider' })).getByRole('checkbox', {
+      within(screen.getByRole('dialog', { name: 'Booking site' })).getByRole('checkbox', {
         name: 'ParkStay WA, 169 places',
       })
     ).toBeInTheDocument();
@@ -602,7 +609,7 @@ describe('Explore states', () => {
       api: catalogApi({ stubs: { providers: { list: jest.fn().mockResolvedValue(ok([])) } } }),
     });
     expect(
-      await screen.findByRole('heading', { name: 'No providers with places are installed' })
+      await screen.findByRole('heading', { name: 'No booking sites with places are installed' })
     ).toBeInTheDocument();
   });
 

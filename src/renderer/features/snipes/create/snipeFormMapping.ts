@@ -1,7 +1,7 @@
 /**
  * Between the snipe form and the snipes contract (V4): the timing conversions (seconds and
- * minutes in the form, ms in the contract), what create sends (its `action` always), the name a
- * new snipe gets, and which field a `VALIDATION` issue from main names. Calendar dates stay `YYYY-MM-DD` strings;
+ * minutes in the form, ms in the contract), what create sends (its `action` always, and no timing
+ * for an Open Day plan), the name a new snipe gets, and which field a `VALIDATION` issue from main names. Calendar dates stay `YYYY-MM-DD` strings;
  * no user id (main resolves the local profile). Pure.
  */
 import { SnipeReleaseMode } from '../../../../shared/types/common.types';
@@ -16,6 +16,7 @@ import {
   type SnipeFieldName,
   type SnipeFormValues,
 } from './snipeForm';
+import { defaultSnipeAction, remindsOnly } from './snipeAction';
 import { zonedInstant } from './zonedTime';
 
 /** Seconds as the contract's whole milliseconds: 1.5 → 1500. */
@@ -46,6 +47,20 @@ export function modeUsesQueue(manifest: ProviderManifest | undefined, modeId: st
   return manifest.releaseModes?.find((mode) => mode.id === modeId)?.usesAccessGate === true;
 }
 
+/**
+ * What the snipe does in its mode: a plan (`remind`) in a mode that only reminds, and in any
+ * other mode what was chosen there, never a plan (a mode changed after a plan's was chosen).
+ */
+export function actionFor(
+  values: Pick<SnipeFormValues, 'releaseMode' | 'action'>,
+  manifest: ProviderManifest | undefined
+): SnipeFormValues['action'] {
+  if (remindsOnly(manifest, values.releaseMode)) return 'remind';
+  return values.action === 'remind'
+    ? defaultSnipeAction(manifest, values.releaseMode)
+    : values.action;
+}
+
 /** What `snipes.create` gets. `values` must have passed the schema. */
 export function toSnipeInput(
   values: SnipeFormValues,
@@ -60,6 +75,19 @@ export function toSnipeInput(
   const continuous = values.releaseMode === SnipeReleaseMode.CANCELLATION;
   const notes = values.notes.trim();
   const { location } = values;
+  const action = actionFor(values, manifest);
+  // A plan only reminds: it has no timing of its own
+  const timing =
+    action === 'remind'
+      ? {}
+      : {
+          ...(continuous ? {} : { leadTimeSeconds: parseNumber(values.leadTimeSeconds) ?? 0 }),
+          pollIntervalMs: secondsToMs(parseNumber(values.pollIntervalSeconds) ?? 0),
+          ...(continuous
+            ? {}
+            : { windowDurationMs: minutesToMs(parseNumber(values.windowMinutes) ?? 0) }),
+          maxAttempts: parseNumber(values.maxAttempts) ?? 0,
+        };
   return {
     providerId: values.providerId,
     name: values.name.trim(),
@@ -79,7 +107,7 @@ export function toSnipeInput(
     ...(values.unitKinds.length ? { unitKinds: values.unitKinds } : {}),
     ...(Object.keys(stayParams).length ? { stayParams } : {}),
     releaseMode: values.releaseMode as SnipeReleaseMode,
-    action: values.action,
+    action,
     ...(releaseAt ? { releaseAt } : {}),
     ...(manifest?.capabilities.accessGate
       ? {
@@ -87,12 +115,7 @@ export function toSnipeInput(
             values.accessGateEnabled && modeUsesQueue(manifest, values.releaseMode),
         }
       : {}),
-    ...(continuous ? {} : { leadTimeSeconds: parseNumber(values.leadTimeSeconds) ?? 0 }),
-    pollIntervalMs: secondsToMs(parseNumber(values.pollIntervalSeconds) ?? 0),
-    ...(continuous
-      ? {}
-      : { windowDurationMs: minutesToMs(parseNumber(values.windowMinutes) ?? 0) }),
-    maxAttempts: parseNumber(values.maxAttempts) ?? 0,
+    ...timing,
     ...(notes ? { notes } : {}),
   };
 }

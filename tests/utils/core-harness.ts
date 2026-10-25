@@ -87,6 +87,7 @@ export function recordingNotifications(): RecordingNotifications {
     notifyWatchHeld: jest.fn().mockResolvedValue(undefined),
     notifySnipeHeld: jest.fn().mockResolvedValue(undefined),
     notifySnipeAlert: jest.fn().mockResolvedValue(undefined),
+    notifySnipeReminders: jest.fn().mockResolvedValue(undefined),
     notifyWarning: jest.fn().mockResolvedValue(undefined),
   };
 }

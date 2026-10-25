@@ -5,8 +5,10 @@ import type { SnipeAction } from '../../../../../shared/types/site-sniper.types'
 import type { UnitNoun } from '../../../../components/stay/UnitPicker';
 import { Field, RadioCard, RadioCardGroup, TextField } from '../../../../components/ui';
 import { cx } from '../../../../components/ui/cx';
-import { windowCapMinutes } from '../snipeAction';
+import { PlanReminders } from '../../shared/PlanReminders';
+import { defaultSnipeAction, releaseModeOf, remindsOnly, windowCapMinutes } from '../snipeAction';
 import type { SnipeFormValues } from '../snipeForm';
+import { usePlanRelease } from '../usePlanRelease';
 import { isComputedMode, useReleasePreview } from '../useReleasePreview';
 import { inZoneAndLocal, zonedInstant, zoneName } from '../zonedTime';
 import { AdvancedTiming } from './AdvancedTiming';
@@ -72,11 +74,13 @@ function WhenFree(props: { manifest: ProviderManifest; noun: UnitNoun; placesHol
  * release rule leads, and a computed mode previews when the stay's first night opens, from the
  * provider's own check. A scheduled release asks for its date and time where the place is. Then
  * what happens when the dates are free (`WhenFree`), and the advanced timing, whose window is
- * checked again when a mode with a limit is chosen.
+ * checked again when a mode with a limit is chosen. A mode that only reminds (an Open Day plan,
+ * §12.39) previews the stay's Open Day from the provider's booking rules instead, asking the
+ * provider nothing, and shows the plan's reminders and checklist in place of both.
  */
 export function ReleaseStep(props: ReleaseStepProps) {
   const { manifest, noun, releaseInfo, refusal, placesHolds, now } = props;
-  const { register, watch, setValue, formState, getFieldState, trigger } =
+  const { register, watch, setValue, getValues, formState, getFieldState, trigger } =
     useFormContext<SnipeFormValues>();
   // The date and time are checked together, on the date: a new time re-checks a date's error.
   const recheckDate = () => {
@@ -94,6 +98,11 @@ export function ReleaseStep(props: ReleaseStepProps) {
     'releaseTime',
   ]);
   const modes = manifest.releaseModes ?? [];
+  const planMode = remindsOnly(manifest, releaseMode)
+    ? releaseModeOf(manifest, releaseMode)
+    : undefined;
+  const plan = usePlanRelease(manifest, getValues(), Boolean(planMode));
+  const planLine = refusal ?? plan.refused;
   const preview = useReleasePreview(
     manifest,
     { location, arrival, departure, adults, stayParams },
@@ -111,6 +120,10 @@ export function ReleaseStep(props: ReleaseStepProps) {
         value={releaseMode}
         onValueChange={(id) => {
           setValue('releaseMode', id, { shouldDirty: true, shouldValidate: true });
+          // A plan in a mode that only reminds; any other mode's own choice
+          if (remindsOnly(manifest, id)) setValue('action', 'remind');
+          else if (getValues('action') === 'remind')
+            setValue('action', defaultSnipeAction(manifest, id));
           // A mode's limit on the window (`maxWindowMinutes`) applies at once
           if (windowCapMinutes(manifest, id) !== undefined || getFieldState('windowMinutes').error)
             void trigger('windowMinutes');
@@ -122,7 +135,18 @@ export function ReleaseStep(props: ReleaseStepProps) {
             value={mode.id}
             title={mode.label}
             description={
-              isComputedMode(mode.id) ? (
+              mode.remindOnly ? (
+                <>
+                  <span className="block">{mode.description}</span>
+                  {mode.id === releaseMode && planLine ? (
+                    <span className="mt-1 block font-semibold text-danger">{planLine}</span>
+                  ) : mode.id === releaseMode && (plan.text || plan.loading) ? (
+                    <span className="mt-1 block font-semibold text-fg">
+                      {plan.text ?? 'Working out the Open Day for these dates…'}
+                    </span>
+                  ) : null}
+                </>
+              ) : isComputedMode(mode.id) ? (
                 <>
                   <span className="block">{mode.description}</span>
                   {refusal && mode.id === releaseMode ? (
@@ -164,8 +188,19 @@ export function ReleaseStep(props: ReleaseStepProps) {
           </Field>
         </div>
       )}
-      <WhenFree manifest={manifest} noun={noun} placesHolds={placesHolds} />
-      <AdvancedTiming manifest={manifest} />
+      {planMode ? (
+        <PlanReminders
+          manifest={manifest}
+          mode={planMode}
+          releaseAt={planLine ? undefined : plan.releaseAt}
+          now={now}
+        />
+      ) : (
+        <>
+          <WhenFree manifest={manifest} noun={noun} placesHolds={placesHolds} />
+          <AdvancedTiming manifest={manifest} />
+        </>
+      )}
     </>
   );
 }

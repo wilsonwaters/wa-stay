@@ -160,7 +160,7 @@ export function watchFormSchema({
     const issue = (path: (string | number)[], message: string) =>
       ctx.addIssue({ code: 'custom', path, message });
 
-    if (!v.providerId) issue(['providerId'], 'Choose a provider');
+    if (!v.providerId) issue(['providerId'], 'Choose a booking site');
     if (!v.location) issue(['location'], 'Choose a location');
     if (!v.arrival || !v.departure) {
       issue(['arrival'], 'Choose your check-in and check-out dates');

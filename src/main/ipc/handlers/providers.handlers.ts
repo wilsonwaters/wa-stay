@@ -7,6 +7,9 @@
  *   (`ProviderExperiments`); `UNKNOWN_PROVIDER` for one that is not registered, `NOT_FOUND`
  *   for an experiment it does not declare, `ACCOUNT_BUSY` for turning off its holds while a
  *   hold or snipe needs it.
+ * - `notice` / `acceptNotice` / `withdrawNotice`: what the person accepts before WA Stay sends
+ *   the provider anything (`ProviderNotices`); `NOT_FOUND` for accepting a notice it does not
+ *   have, `VALIDATION` for a version that is no longer current.
  */
 
 import { contract } from '@shared/contracts';
@@ -35,6 +38,9 @@ export function registerProvidersHandlers(handle: Handle, c: AppContainer): void
   handle(api.setExperiment, ({ providerId, experimentId, enabled }) =>
     c.experiments.set(providerId, experimentId, enabled)
   );
+  handle(api.notice, ({ providerId }) => c.notices.status(providerId));
+  handle(api.acceptNotice, ({ providerId, version }) => c.notices.accept(providerId, version));
+  handle(api.withdrawNotice, ({ providerId }) => c.notices.withdraw(providerId));
 
   // A gate drops its listeners when it is disposed (registry.disposeAll on quit).
   for (const provider of registry.withCapability('accessGate')) {

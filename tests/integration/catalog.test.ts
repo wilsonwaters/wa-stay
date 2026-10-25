@@ -636,7 +636,7 @@ describe('catalog.* over IPC (P3 harness, real container)', () => {
     removeUserData(userDataDir);
   });
 
-  it('registers the seven catalog handlers and no parkstay ones', () => {
+  it('registers the eight catalog handlers and no parkstay ones', () => {
     expect(ipc.registrations.filter((c) => c.startsWith('catalog:')).sort()).toEqual([
       'catalog:availability',
       'catalog:check-location',
@@ -645,6 +645,7 @@ describe('catalog.* over IPC (P3 harness, real container)', () => {
       'catalog:refresh',
       'catalog:search',
       'catalog:status',
+      'catalog:stay-rules',
     ]);
     expect(ipc.registrations.filter((c) => c.startsWith('parkstay:'))).toEqual([]);
   });

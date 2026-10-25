@@ -10,10 +10,12 @@ import {
   useLocationDetail,
   useLocationDetailUpdates,
   useProviders,
+  useStayRules,
 } from '../../api';
 import { buildPath, PATTERNS, placeLinkState, ROUTES } from '../../app/routes';
 import { parseStayTypes, stayParamsQuery, type StayParams } from '../../app/stayParams';
 import { areaLine, kindLabel, placeNoun } from '../../components/locationFormat';
+import { useNoticeGate } from '../../components/providers/ProviderNoticeDialog';
 import {
   BackLink,
   Badge,
@@ -40,6 +42,7 @@ import {
 import {
   checkFailure,
   handoffPrefill,
+  noticeNeededMessage,
   placeKey,
   rateLimitedMessage,
   resolvePlaceLinks,
@@ -47,6 +50,7 @@ import {
   stayQueryOf,
 } from './placeModel';
 import { MAX_NIGHTS, StayCard, type CheckAbility } from './StayCard';
+import { StayRulesPanel } from '../../components/stay/StayRulesPanel';
 import { usePlaceStay } from './usePlaceStay';
 
 /** After this long, a check says it is still going (EQ7: a busy DBCA queue can delay it). */
@@ -116,7 +120,7 @@ function PlaceUnavailable({ stay }: { stay: StayParams }) {
         headingLevel={1}
         icon={<MapPinOff size={24} />}
         title="This place isn't available"
-        description="The provider may no longer list it, or the link is out of date."
+        description="The booking site may no longer list it, or the link is out of date."
         actions={
           <BackToExplore stay={stay} className={buttonClassName({ variant: 'secondary' })} />
         }
@@ -225,15 +229,27 @@ export default function PlaceDetailPage() {
   const summaryRef = useRef<HTMLParagraphElement>(null);
   /** The person pressed Check: focus and announce the result once it is on screen. */
   const awaiting = useRef(false);
+  // A provider with a notice the person has not accepted is asked nothing until they do
+  const noticeGate = useNoticeGate(manifest);
+  // What the provider's booking rules say about the dates in the card (no request to it)
+  const stayRules = useStayRules(manifest ? key : null, currentStay);
+  // Site Sniper only plans for releases here: every release mode only reminds (§12.39)
+  const remindsOnly = Boolean(
+    manifest?.releaseModes?.length && manifest.releaseModes.every((mode) => mode.remindOnly)
+  );
   const onCheck = () => {
     if (!currentStay) {
       setDatesError('Choose your check-in and check-out dates');
       return;
     }
     setDatesError(undefined);
-    awaiting.current = true;
-    if (sameStay(requested, currentStay)) void check.refetch();
-    else setRequested(currentStay);
+    const run = () => {
+      awaiting.current = true;
+      if (sameStay(requested, currentStay)) void check.refetch();
+      else setRequested(currentStay);
+    };
+    if (noticeGate.needed) noticeGate.ask(run);
+    else run();
   };
 
   useEffect(() => {
@@ -245,6 +261,8 @@ export default function PlaceDetailPage() {
         announce(`${shortName} has a waiting queue right now. Try again in a few minutes.`);
       } else if (kind === 'rate-limit') {
         announce(rateLimitedMessage(shortName));
+      } else if (kind === 'notice') {
+        announce(noticeNeededMessage(shortName));
       }
       // Anything else shows an alert, which announces itself.
       return;
@@ -425,9 +443,26 @@ export default function PlaceDetailPage() {
             checked={checked}
             failure={failure}
             onRetry={() => void check.refetch()}
+            // Accepting asks the check again by itself (its answer is dropped)
+            onReadNotice={() => noticeGate.ask()}
+            rules={
+              stayRules.data && (
+                <StayRulesPanel
+                  verdict={stayRules.data}
+                  shortName={shortName}
+                  onSuggest={({ arrival, departure }) => onDatesChange({ arrival, departure })}
+                />
+              )
+            }
             links={links}
             watchHref={manifest?.capabilities.watches ? ROUTES.watchNew(prefill) : undefined}
-            snipeHref={manifest?.capabilities.snipes ? ROUTES.snipeNew(prefill) : undefined}
+            snipeHref={
+              // Reminders only for dates not yet on sale: a plan for any other is refused
+              manifest?.capabilities.snipes && !(remindsOnly && stayRules.data?.release?.open)
+                ? ROUTES.snipeNew(prefill)
+                : undefined
+            }
+            snipeRemindsOnly={remindsOnly}
             unitNoun={noun}
           />
         </div>
@@ -467,6 +502,7 @@ export default function PlaceDetailPage() {
           {loaded && detail && <BookingRulesSection releaseInfo={detail.releaseInfo} />}
         </div>
       </div>
+      {noticeGate.dialog}
     </div>
   );
 }

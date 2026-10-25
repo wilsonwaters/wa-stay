@@ -25,7 +25,10 @@ export function useReleasePreview(
   enabled = true
 ): string {
   const { location, arrival, departure, adults, stayParams } = values;
-  const wanted = enabled && (manifest.releaseModes ?? []).some((mode) => isComputedMode(mode.id));
+  // A mode that only reminds asks the provider nothing (`usePlanRelease`)
+  const wanted =
+    enabled &&
+    (manifest.releaseModes ?? []).some((mode) => isComputedMode(mode.id) && !mode.remindOnly);
   const params = useMemo(
     () => toStayParams(snipeStayFields(manifest), stayParams),
     [manifest, stayParams]

@@ -80,7 +80,7 @@ export function providerFilterOptions(
     const manifest = manifests.find((m) => m.id === watch.providerId);
     options.push({
       value: watch.providerId,
-      label: manifest?.shortName ?? `Unknown provider (${watch.providerId})`,
+      label: manifest?.shortName ?? `Unknown booking site (${watch.providerId})`,
     });
   }
   return options;

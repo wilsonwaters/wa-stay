@@ -82,9 +82,25 @@ function actionToWrite(action: SnipeAction | undefined): SnipeAction {
  */
 function readAction(value: string | null, where: string): SnipeAction {
   if (value === null || value === 'hold') return 'hold';
-  if (value === 'alert') return 'alert';
-  log.warn(`${where}: action is not "hold" or "alert"; read as "alert"`);
+  if (value === 'alert' || value === 'remind') return value;
+  log.warn(`${where}: action is not "hold", "alert" or "remind"; read as "alert"`);
   return 'alert';
+}
+
+/** An Open Day plan's reminders sent, as stored in the `alert` column (§12.39). */
+function remindersToWrite(sent: readonly Date[]): string {
+  return JSON.stringify({ reminders: sent.map((at) => at.toISOString()) });
+}
+
+/** The reminders sent, when the `alert` column holds them; undefined otherwise. */
+function readReminders(json: string | null): Date[] | undefined {
+  if (json === null || json === '') return undefined;
+  const raw = parseObject(json);
+  if (!raw || !Array.isArray(raw.reminders)) return undefined;
+  return raw.reminders
+    .filter((value): value is string => typeof value === 'string')
+    .map((value) => readInstant(value))
+    .filter((at): at is Date => at !== undefined && !Number.isNaN(at.getTime()));
 }
 
 /** `alert` as stored: JSON with an ISO `at`. Only `null` is NULL. */
@@ -112,6 +128,8 @@ function parseObject(json: string): Record<string, unknown> | undefined {
 function readAlert(json: string | null, where: string): SnipeAlert | undefined {
   if (json === null || json === '') return undefined;
   const raw = parseObject(json);
+  // A plan's reminders, not an alert
+  if (raw && Array.isArray(raw.reminders)) return undefined;
   const at = typeof raw?.at === 'string' ? readInstant(raw.at) : undefined;
   if (!raw || !at || Number.isNaN(at.getTime()) || typeof raw.unitId !== 'string') {
     log.warn(`${where}: alert is not a readable alert; read as none`);
@@ -508,6 +526,39 @@ export class SiteSniperRepository extends BaseRepository<SiteSnipe> {
       );
   }
 
+  /**
+   * An Open Day plan's reminders so far: those sent (or passed while WA Stay was closed), when
+   * it last sent one, and when the next is due.
+   */
+  recordReminders(id: number, sent: readonly Date[], at: Date, nextAt: Date | undefined): void {
+    this.db
+      .prepare(
+        `UPDATE site_snipes SET alert = ?, last_checked_at = ?, next_check_at = ? WHERE id = ?`
+      )
+      .run(remindersToWrite(sent), at.toISOString(), nextAt?.toISOString() ?? null, id);
+  }
+
+  /**
+   * An Open Day plan is done: REMINDED with the reminders it sent, nothing due, inactive, in
+   * one statement. Nothing was checked or held.
+   */
+  markReminded(id: number, sent: readonly Date[], at: Date): void {
+    this.db
+      .prepare(
+        `UPDATE site_snipes
+         SET status = ?, last_result = ?, alert = ?, last_error = NULL, is_active = 0,
+             last_checked_at = ?, next_check_at = NULL
+         WHERE id = ?`
+      )
+      .run(
+        SnipeStatus.REMINDED,
+        SnipeResult.REMINDED,
+        remindersToWrite(sent),
+        at.toISOString(),
+        id
+      );
+  }
+
   /** Ends the snipe: a terminal status (EXPIRED, FAILED), its result and message, inactive. */
   finish(id: number, status: SnipeStatus, result: SnipeResult, error?: string): void {
     this.db
@@ -588,6 +639,7 @@ export class SiteSniperRepository extends BaseRepository<SiteSnipe> {
   protected mapRow(row: SiteSnipeRow): SiteSnipe {
     const where = `site_snipes ${row.id}`;
     const alert = readAlert(row.alert, where);
+    const remindersSent = readReminders(row.alert);
     return {
       id: row.id,
       userId: row.user_id,
@@ -625,6 +677,7 @@ export class SiteSniperRepository extends BaseRepository<SiteSnipe> {
       paymentUrl: row.payment_url || undefined,
       bookedReference: row.booked_reference || undefined,
       ...(alert ? { alert } : {}),
+      ...(remindersSent ? { remindersSent } : {}),
       notes: row.notes || undefined,
       createdAt: this.parseDate(row.created_at)!,
       updatedAt: this.parseDate(row.updated_at)!,

@@ -398,7 +398,7 @@ export class NotificationService {
 
     const place = watch.location.name;
     const noun = this.nounFor(watch, best.unitKind ? [{ unitKind: best.unitKind }] : []);
-    const shortName = this.providerName(watch.providerId) ?? "the provider's website";
+    const shortName = this.providerName(watch.providerId) ?? 'the booking site';
     const arrival = formatCalendarDate(watch.stay.arrival);
     const departure = formatCalendarDate(watch.stay.departure);
 
@@ -568,6 +568,45 @@ export class NotificationService {
         actionUrl: relatedPath(RelatedType.SNIPE, snipe.id),
       },
       { locationName: snipe.location.name || undefined, bookingUrl: snipe.alert?.bookingUrl }
+    );
+  }
+
+  /**
+   * An Open Day plan's reminder (§12.39), or one reminder for several plans of one provider due
+   * together (two stays for the same Open Day): the provider's own words and the plans it is
+   * for. A desktop click opens the plan (the first, for several), then its booking page; the
+   * email links that page. Nothing was checked: it never says anything is free.
+   */
+  async notifySnipeReminders(
+    items: readonly {
+      snipe: SiteSnipe;
+      step: { title: string; body: string };
+      bookingUrl?: string;
+    }[]
+  ): Promise<void> {
+    const [first] = items;
+    if (!first) return;
+    const plans = items.map(
+      ({ snipe }) =>
+        `${snipe.location.name || snipe.location.externalId}, ${formatCalendarDate(snipe.stay.arrival)}–${formatCalendarDate(snipe.stay.departure)}`
+    );
+    const single = items.length === 1;
+    const message = `${first.step.body} ${single ? 'Your plan' : 'Your plans'}: ${plans.join('; ')}.`;
+    await this.notify(
+      {
+        userId: first.snipe.userId,
+        providerId: first.snipe.providerId,
+        type: NotificationType.SNIPE_REMINDER,
+        title: first.step.title,
+        message,
+        relatedId: first.snipe.id,
+        relatedType: RelatedType.SNIPE,
+        actionUrl: relatedPath(RelatedType.SNIPE, first.snipe.id),
+      },
+      {
+        locationName: single ? first.snipe.location.name || undefined : undefined,
+        bookingUrl: first.bookingUrl,
+      }
     );
   }
 

@@ -23,7 +23,7 @@ export function NewSnipePage() {
     body = (
       <Notice
         tone="danger"
-        title="Providers couldn't be loaded"
+        title="Booking sites couldn't be loaded"
         actions={
           <Button variant="secondary" size="sm" onClick={() => void providers.refetch()}>
             Try again
@@ -37,7 +37,7 @@ export function NewSnipePage() {
     body = (
       <EmptyState
         size="md"
-        title="No provider supports Site Sniper yet"
+        title="No booking site supports Site Sniper yet"
         description={NO_SNIPE_PROVIDER_DESCRIPTION}
       />
     );
@@ -56,7 +56,7 @@ export function NewSnipePage() {
     <div className="mx-auto flex w-full max-w-3xl flex-col gap-8 px-6 py-8 lg:px-8">
       <PageHeader
         title="New snipe"
-        description={`Choose a place, your dates and when its ${noun.many} are released. Site Sniper alerts you the moment one opens or, where the provider allows it, tries to hold it; you book and pay yourself.`}
+        description={`Choose a place, your dates and when its ${noun.many} are released. Site Sniper alerts you the moment one opens or, where the booking site allows it, tries to hold it; you book and pay yourself.`}
         back={{ label: 'Site Sniper', href: `#${ROUTES.snipes()}` }}
       />
       {body}

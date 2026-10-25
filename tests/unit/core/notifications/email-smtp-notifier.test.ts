@@ -111,11 +111,11 @@ describe('SmtpEmailNotifier: body', () => {
     const html = String(mail.html);
     expect(html).toMatch(/>\s*WA Stay\s*</);
     expect(html).toMatch(/Location: Dales/);
-    expect(html).toMatch(/Provider: ParkStay/);
+    expect(html).toMatch(/Booking site: ParkStay/);
     expect(html).toContain('Sent by WA Stay');
     expect(html).not.toMatch(/Campground:|ParkStay Bookings/);
 
-    expect(mail.text).toContain('Location: Dales\nProvider: ParkStay\n');
+    expect(mail.text).toContain('Location: Dales\nBooking site: ParkStay\n');
     expect(mail.text).toMatch(/^WA Stay\n/);
     expect(mail.text).toMatch(/Sent by WA Stay\.$/);
   });
@@ -247,10 +247,10 @@ describe('SmtpEmailNotifier: "Book on {shortName}" (R7)', () => {
     expect(mail.html).not.toMatch(/javascript:|http:\/\/parkstay|me:pw/);
   });
 
-  it("names the provider's website for a provider the registry does not know", async () => {
+  it('names the booking site for a provider the registry does not know', async () => {
     const mail = await sent({ ...WATCH_FOUND, providerId: 'gone', bookingUrl: BOOKING_URL });
-    expect(mail.text).toContain(`Book on the provider's website: ${BOOKING_URL}`);
-    expect(mail.html).toContain('Book on the provider&#039;s website');
+    expect(mail.text).toContain(`Book on the booking site: ${BOOKING_URL}`);
+    expect(mail.html).toContain('Book on the booking site');
   });
 
   it('escapes &, \', " and non-ASCII in the href, and keeps the text part raw', async () => {
@@ -389,14 +389,14 @@ describe('SmtpEmailNotifier: "How to book" a split stay', () => {
     expect(mail.text).not.toContain('How to book');
   });
 
-  it("names the provider's website for a provider the registry does not know", async () => {
+  it('names the booking site for a provider the registry does not know', async () => {
     const mail = await sent({
       ...PARTS_FOUND,
       providerId: 'gone',
       splitStay: { parts: [{ label: 'A, 6/11/2026, 1 night', url: partUrl('2026/11/06') }] },
     });
-    expect(mail.text).toContain("1. A, 6/11/2026, 1 night - Book on the provider's website: ");
-    expect(mail.html).toContain('Book on the provider&#039;s website');
+    expect(mail.text).toContain('1. A, 6/11/2026, 1 night - Book on the booking site: ');
+    expect(mail.html).toContain('Book on the booking site');
   });
 });
 

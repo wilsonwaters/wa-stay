@@ -46,7 +46,7 @@ export function HoldLine({
   actions: Pick<WatchActions, 'payNow' | 'paying'>;
 }) {
   const zone = manifest?.timezone ?? 'Australia/Perth';
-  const provider = manifest?.shortName ?? 'the provider';
+  const provider = manifest?.shortName ?? 'the booking site';
   const unit = unitNameOf(watch, watch.hold?.unitId, heldNoun(watch, manifest));
   const at = watch.hold ? timeInZone(new Date(watch.hold.expiresAt), zone) : undefined;
   if (state === 'held') {

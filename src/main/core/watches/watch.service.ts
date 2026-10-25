@@ -54,6 +54,7 @@ import { toStayQuery, type StayInput } from '@shared/types/stay.types';
 import { compareDates, eachNight, isCalendarDate, todayIn } from '@shared/utils/calendar-date';
 import { cleanUnitKinds } from '@shared/utils/unit-kinds';
 import type { WatchRepository } from '../../database/repositories';
+import { noticePausedMessage } from '../../providers/notices';
 import type { ProviderRegistry, ProviderWith } from '../../providers/registry';
 import {
   isAbortError,
@@ -65,6 +66,7 @@ import { withRequestPriority } from '../../providers/sdk/pacing';
 import type { HoldSuccess } from '../../providers/sdk/provider';
 import { matchedStayLink } from '../booking-link';
 import { splitStaysOf, withSplitStayLinks } from '../split-stays';
+import { checkStayRules, STAY_RULE_ISSUES } from '../stay-rules';
 import { AppError } from '../../utils/app-error';
 import { logger } from '../../utils/logger';
 import type { NightGuard } from '../holds/night-guard';
@@ -135,6 +137,12 @@ export interface WatchServiceDeps {
    * WA Stay restarts, and until then no automatic hold is placed (default: never).
    */
   holdsTurningOff?: (providerId: string) => boolean;
+  /**
+   * Throws `NOTICE_REQUIRED` while the provider's notice is not accepted (`ProviderNotices`,
+   * §12.37): a watch is then neither created nor activated, and a run asks nothing (default:
+   * never throws).
+   */
+  assertNotice?: (providerId: string) => void;
   clock?: () => Date;
   /** For the jitter; returns [0, 1). */
   random?: () => number;
@@ -174,6 +182,7 @@ export class WatchService {
   private readonly events?: EventSink;
   private readonly accountState: (providerId: string) => AccountStatus['state'];
   private readonly holdsTurningOff: (providerId: string) => boolean;
+  private readonly assertNotice: (providerId: string) => void;
   private readonly clock: () => Date;
   private readonly random: () => number;
 
@@ -185,6 +194,7 @@ export class WatchService {
     this.events = deps.events;
     this.accountState = deps.accountState ?? (() => 'unknown');
     this.holdsTurningOff = deps.holdsTurningOff ?? (() => false);
+    this.assertNotice = deps.assertNotice ?? (() => undefined);
     this.clock = deps.clock ?? (() => new Date());
     this.random = deps.random ?? Math.random;
   }
@@ -192,13 +202,21 @@ export class WatchService {
   /**
    * Creates a watch. Throws `ProviderCapabilityError` (`CAPABILITY`) when the provider has no
    * watches, or no holds for `autoHold`; `VALIDATION` on `autoHold` while its holds are turning
-   * off (as a hold snipe is refused); `UnknownProviderError` for an unknown provider. The new
-   * watch is due at once.
+   * off (as a hold snipe is refused); `UnknownProviderError` for an unknown provider;
+   * `NOTICE_REQUIRED` while the provider's notice is not accepted. The new watch is due at once.
    */
   async create(userId: number, input: WatchInput): Promise<Watch> {
     const provider = this.providers.require(input.providerId, 'watches');
+    this.assertNotice(input.providerId);
     this.assertAutoHold(provider, input.autoHold);
     this.assertStay(provider, input.stay);
+    this.assertStayRules(provider, {
+      externalId: input.location.externalId,
+      stay: input.stay,
+      stayParams: input.stayParams,
+      unitIds: input.unitIds,
+      unitKinds: input.unitKinds,
+    });
     const prepared: WatchInput = {
       ...input,
       unitKinds: cleanUnitKinds(input.unitKinds),
@@ -236,6 +254,21 @@ export class WatchService {
       this.assertAutoHold(provider, updates.autoHold, { turningOn: !watch.autoHold });
     }
     if (updates.stay) this.assertStay(provider, updates.stay);
+    // What the provider's rules judge changed: the place, the stay, the units or the stay types
+    if (
+      updates.location !== undefined ||
+      updates.stay !== undefined ||
+      updates.unitIds !== undefined ||
+      updates.unitKinds !== undefined
+    ) {
+      this.assertStayRules(provider, {
+        externalId: (updates.location ?? watch.location).externalId,
+        stay: updates.stay ?? watch.stay,
+        stayParams: updates.stayParams ?? watch.stayParams,
+        unitIds: updates.unitIds ?? watch.unitIds,
+        unitKinds: updates.unitKinds ?? watch.unitKinds,
+      });
+    }
     const prepared: WatchUpdate = { ...updates };
     if (updates.unitKinds !== undefined) prepared.unitKinds = cleanUnitKinds(updates.unitKinds);
     if (updates.stayParams !== undefined || updates.autoHold !== undefined) {
@@ -280,7 +313,8 @@ export class WatchService {
 
   /**
    * Activates a watch, due at once. A watch whose auto-hold placed a hold, or whose hold was
-   * paid for, is refused: it would hold the same nights again.
+   * paid for, is refused: it would hold the same nights again. So is one whose provider's
+   * notice is not accepted (`NOTICE_REQUIRED`).
    */
   async activate(id: number): Promise<void> {
     const watch = this.require(id);
@@ -292,6 +326,7 @@ export class WatchService {
           : 'This watch is already booked; create a new watch to look again'
       );
     }
+    if (this.providers.tryGet(watch.providerId)) this.assertNotice(watch.providerId);
     this.repo.activate(id, this.clock());
     this.changed(id);
   }
@@ -324,7 +359,9 @@ export class WatchService {
 
   /**
    * One check: availability, matches, notifications and (auto-hold) a hold. Persists the
-   * result and when the watch is next due, and returns what it found.
+   * result and when the watch is next due, and returns what it found. While the provider's
+   * notice is not accepted it asks nothing: the run is recorded as paused (an error naming
+   * the notice, `NOTICE_REQUIRED`), and the watch checks again at its next run once accepted.
    */
   async execute(watchId: number, options: WatchRunOptions = {}): Promise<WatchExecutionResult> {
     const { signal, manual = false } = options;
@@ -377,6 +414,21 @@ export class WatchService {
         this.repo.deactivate(watchId);
         this.emitChanged(watchId);
         return result({ expired: true, error: 'The arrival date has passed' });
+      }
+
+      // The person has not accepted the provider's notice (or withdrew it): nothing is asked
+      if (!this.noticeAccepted(watch.providerId)) {
+        const error = noticePausedMessage(manifest);
+        log.info(`Watch ${watchId}: paused, the notice of ${watch.providerId} is not accepted`);
+        this.repo.recordRun(watchId, {
+          result: WatchResult.ERROR,
+          found: false,
+          checkedAt,
+          nextCheckAt: nextCheck(),
+          error,
+        });
+        this.emitChanged(watchId);
+        return result({ error, errorCode: 'NOTICE_REQUIRED' });
       }
 
       // One request: every unit, night by night. Wanted units are picked here, by id, name
@@ -518,6 +570,15 @@ export class WatchService {
     );
   }
 
+  private noticeAccepted(providerId: string): boolean {
+    try {
+      this.assertNotice(providerId);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
   private require(id: number): Watch {
     const watch = this.repo.findById(id);
     if (!watch) throw new AppError('NOT_FOUND', 'Watch not found');
@@ -655,6 +716,44 @@ export class WatchService {
     if (compareDates(departure, arrival) <= 0) {
       throw new AppError('VALIDATION', 'Departure date must be after arrival date', {
         issues: ['stay.departure'],
+      });
+    }
+  }
+
+  /**
+   * A stay the provider's published rules refuse (`stayRules`: too long, outside fixed peak
+   * dates, a party too big…) is `VALIDATION` on the field to change, in the provider's words.
+   * A provider without rules, or one that can't judge the stay, is not asked.
+   */
+  private assertStayRules(
+    provider: WatchProvider,
+    watch: {
+      externalId: string;
+      stay: StayInput;
+      stayParams?: Watch['stayParams'];
+      unitIds?: string[];
+      unitKinds?: Watch['unitKinds'];
+    }
+  ): void {
+    const { stay } = watch;
+    const verdict = checkStayRules(provider, {
+      externalId: watch.externalId,
+      stay: {
+        arrival: stay.arrival,
+        departure: stay.departure,
+        adults: stay.adults,
+        children: stay.children ?? 0,
+        infants: stay.infants ?? 0,
+        concessions: stay.concessions ?? 0,
+        params: watch.stayParams ?? {},
+      },
+      ...(watch.unitIds?.length ? { unitIds: [...watch.unitIds] } : {}),
+      ...(watch.unitKinds?.length ? { unitKinds: [...watch.unitKinds] } : {}),
+      now: this.clock(),
+    });
+    if (verdict && !verdict.ok) {
+      throw new AppError('VALIDATION', verdict.reason, {
+        issues: [STAY_RULE_ISSUES[verdict.field]],
       });
     }
   }

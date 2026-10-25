@@ -21,6 +21,9 @@
  *   `forgetAvailability(providerId)` drops one provider's bulk and per-location answers (the
  *   container calls it when the person's saved details for it change: an RAC member number
  *   changes its prices and free nights); an answer still in flight then is not kept.
+ * - **Notices** (§12.37). A provider whose notice is not accepted (`assertNotice`) is never
+ *   asked for availability: a place's check is refused with `NOTICE_REQUIRED`, and the bulk
+ *   call lists the provider in `errors` as `notice`. Its catalogue and details still come.
  * - **Automatic sync** (`start`) begins 5 s after the window is up and re-checks hourly,
  *   only for stale providers, and never while one of the provider's snipes is queueing or
  *   sniping (a 1.2 MB fetch must not compete with a release). While a provider has no cached
@@ -88,6 +91,8 @@ import {
   type LocationCheck,
   type ProviderId,
   type StayQuery,
+  type StayRulesVerdict,
+  type UnitKind,
 } from '@shared/types/provider.types';
 import type { EventSink } from '@shared/contracts/events';
 import { bboxContains, catalogSearchArea } from '@shared/utils/catalog-area';
@@ -114,9 +119,12 @@ import type {
   ProviderLocationDetail,
   ProviderLocationDocument,
   SearchCatalogModule,
+  StayRulesInput,
 } from '../../providers/sdk/provider';
+import { ProviderCapabilityError } from '../../providers/sdk/errors';
 import { AppError } from '../../utils/app-error';
 import { splitStaysOf, withSplitStayLinks } from '../split-stays';
+import { checkStayRules } from '../stay-rules';
 import {
   catalogErrorCode,
   errorMessage,
@@ -280,6 +288,11 @@ export interface LocationCatalogServiceDeps {
    * it; a manual refresh does not.
    */
   isReleaseInProgress?: (providerId: ProviderId) => boolean;
+  /**
+   * Throws `NOTICE_REQUIRED` while the provider's notice is not accepted (`ProviderNotices`):
+   * its availability is then never asked. Default: never throws.
+   */
+  assertNotice?: (providerId: ProviderId) => void;
   timings?: Partial<CatalogTimings>;
 }
 
@@ -296,6 +309,7 @@ export class LocationCatalogService {
   private readonly logger: CatalogLogger;
   private readonly clock: () => Date;
   private readonly isReleaseInProgress: (providerId: ProviderId) => boolean;
+  private readonly assertNotice: (providerId: ProviderId) => void;
   private readonly timings: CatalogTimings;
 
   /** Aborted by `stop()`: every provider call in flight is cancelled with it. */
@@ -339,6 +353,7 @@ export class LocationCatalogService {
     this.logger = deps.logger;
     this.clock = deps.clock ?? (() => new Date());
     this.isReleaseInProgress = deps.isReleaseInProgress ?? (() => false);
+    this.assertNotice = deps.assertNotice ?? (() => undefined);
     this.timings = { ...DEFAULT_CATALOG_TIMINGS, ...deps.timings };
   }
 
@@ -1056,16 +1071,28 @@ export class LocationCatalogService {
    * the catalogue, and to `bbox` when given. A provider that fails is listed in `errors`
    * while the others still answer. Each provider's answer is reused for 5 minutes per stay
    * (keyed by the stay fields its manifest says the answer depends on), and its `access-gate`
-   * or `timeout` error for 60 s.
+   * or `timeout` error for 60 s. A provider whose notice is not accepted is not asked: it is
+   * listed in `errors` as `notice`.
    */
   async availability(
     stay: StayQuery,
     filter: CatalogAvailabilityFilter = {}
   ): Promise<CatalogAvailabilityResult> {
     const wanted = filter.providerIds?.length ? new Set(filter.providerIds) : undefined;
+    const result: CatalogAvailabilityResult = { entries: [], errors: [] };
     const providers = this.registry
       .withCapability('bulkAvailability')
-      .filter((p) => !wanted || wanted.has(p.manifest.id));
+      .filter((p) => !wanted || wanted.has(p.manifest.id))
+      .filter((p) => {
+        try {
+          this.assertNotice(p.manifest.id);
+          return true;
+        } catch (error) {
+          const providerId = p.manifest.id;
+          result.errors.push({ providerId, code: 'notice', message: errorMessage(error) });
+          return false;
+        }
+      });
     // Each provider's answer is keyed by the stay fields it reads, so a change it ignores (the
     // party, for ParkStay) reuses the answer.
     const settled = await Promise.allSettled(
@@ -1078,7 +1105,6 @@ export class LocationCatalogService {
       )
     );
 
-    const result: CatalogAvailabilityResult = { entries: [], errors: [] };
     settled.forEach((outcome, i) => {
       const providerId = providers[i].manifest.id;
       if (outcome.status === 'rejected') {
@@ -1164,11 +1190,13 @@ export class LocationCatalogService {
    * place page is waiting), with the split stays in it and how to book them (`splitStays`).
    * The provider's answer is reused for 60 s per location and stay; the split stays are worked
    * out from it on every return, which asks nothing more. Throws `UnknownProviderError`,
-   * `ProviderCapabilityError` or the provider's error.
+   * `ProviderCapabilityError`, `NOTICE_REQUIRED` while the provider's notice is not accepted
+   * (nothing is asked, nor answered from the cache), or the provider's error.
    */
   checkLocation(key: string, stay: StayQuery): Promise<LocationCheck> {
     const { providerId, externalId } = parseLocationKey(key);
     const provider = this.registry.require(providerId, 'availability');
+    this.assertNotice(providerId);
     return this.providerCheck(provider, providerId, externalId, stay).then((availability) => ({
       ...availability,
       splitStays: this.splitStaysIn(provider, externalId, stay, availability),
@@ -1236,6 +1264,26 @@ export class LocationCatalogService {
       });
     this.checks.set(cacheKey, run);
     return run;
+  }
+
+  /**
+   * What the place's provider's published booking rules say about `stay` (`stayRules.check`),
+   * worked out without asking it, so neither the notice nor pacing applies. A verdict the
+   * provider could not give reads as allowed, with no notes. Throws `UnknownProviderError`,
+   * and `ProviderCapabilityError` for a provider without rules.
+   */
+  stayRules(
+    key: string,
+    stay: StayQuery,
+    options: { unitIds?: string[]; unitKinds?: UnitKind[] } = {}
+  ): StayRulesVerdict {
+    const { providerId, externalId } = parseLocationKey(key);
+    const provider = this.registry.get(providerId);
+    if (!provider.stayRules) throw new ProviderCapabilityError(providerId, 'stayRules');
+    const input: StayRulesInput = { externalId, stay, now: this.clock() };
+    if (options.unitIds?.length) input.unitIds = options.unitIds;
+    if (options.unitKinds?.length) input.unitKinds = options.unitKinds;
+    return checkStayRules(provider, input) ?? { ok: true, notes: [] };
   }
 
   /** Caches `value` and drops entries that have expired, so the caches stay small. */

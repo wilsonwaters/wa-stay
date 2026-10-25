@@ -19,7 +19,12 @@ import {
 import { buttonClassName } from '../../components/ui/Button';
 import { InfoLink, MoreInformationLink } from './PlaceSections';
 import type { UnitNoun } from '../../components/nightGridModel';
-import { rateLimitedMessage, type CheckFailure, type PlaceLinks } from './placeModel';
+import {
+  noticeNeededMessage,
+  rateLimitedMessage,
+  type CheckFailure,
+  type PlaceLinks,
+} from './placeModel';
 
 /** The longest stay the dates allow (EQ6), as on Explore. */
 export const MAX_NIGHTS = 30;
@@ -50,10 +55,19 @@ export interface StayCardProps {
   checked: boolean;
   failure: CheckFailure | null;
   onRetry: () => void;
+  /** Opens the provider's notice, for a check it held back (`failure` is `notice`). */
+  onReadNotice?: () => void;
+  /** What the provider's booking rules say about the dates, when it has rules. */
+  rules?: ReactNode;
   links: PlaceLinks;
   /** The create-flow hand-offs, when the provider offers them. */
   watchHref?: string;
   snipeHref?: string;
+  /**
+   * Site Sniper only plans for releases here (every release mode only reminds, §12.39): the
+   * hand-off reads "Set release reminders", not "Snipe a site".
+   */
+  snipeRemindsOnly?: boolean;
   /** What the place's units are called: "Snipe a site". */
   unitNoun: UnitNoun;
 }
@@ -62,11 +76,29 @@ function FailureNotice({
   failure,
   shortName,
   onRetry,
+  onReadNotice,
 }: {
   failure: CheckFailure;
   shortName: string;
   onRetry: () => void;
+  onReadNotice?: () => void;
 }) {
+  if (failure === 'notice') {
+    return (
+      <Notice
+        tone="info"
+        actions={
+          onReadNotice && (
+            <Button variant="secondary" size="sm" onClick={onReadNotice}>
+              Read the notice
+            </Button>
+          )
+        }
+      >
+        {noticeNeededMessage(shortName)}
+      </Notice>
+    );
+  }
   if (failure === 'access-gate') {
     return (
       <Notice tone="warning">
@@ -113,11 +145,15 @@ export function StayCard({
   checked,
   failure,
   onRetry,
+  onReadNotice,
+  rules,
   links,
   watchHref,
   snipeHref,
+  snipeRemindsOnly = false,
   unitNoun,
 }: StayCardProps) {
+  const snipeLabel = snipeRemindsOnly ? 'Set release reminders' : `Snipe a ${unitNoun.one}`;
   const headingId = useId();
   const bookIsNext = checked || ability.kind === 'unavailable';
   const extraLinks: ReactNode[] = [];
@@ -156,6 +192,8 @@ export function StayCard({
         <GuestsField label="Guests" value={guests} onChange={onGuestsChange} />
       </div>
 
+      {rules}
+
       {ability.kind === 'loading' && <Skeleton className="h-10 w-full" />}
       {ability.kind === 'available' && (
         <Button
@@ -181,7 +219,12 @@ export function StayCard({
         </p>
       )}
       {!checking && failure && (
-        <FailureNotice failure={failure} shortName={shortName} onRetry={onRetry} />
+        <FailureNotice
+          failure={failure}
+          shortName={shortName}
+          onRetry={onRetry}
+          onReadNotice={onReadNotice}
+        />
       )}
 
       {(links.book || watchHref || snipeHref) && (
@@ -212,11 +255,11 @@ export function StayCard({
             >
               <CalendarClock size={18} aria-hidden="true" />
               {/* The name comes whole from the hidden text: "Snipe a cabin, coming soon". */}
-              <span aria-hidden="true">Snipe a {unitNoun.one}</span>
+              <span aria-hidden="true">{snipeLabel}</span>
               <span aria-hidden="true">
                 <Badge tone="sun">Soon</Badge>
               </span>
-              <VisuallyHidden>Snipe a {unitNoun.one}, coming soon</VisuallyHidden>
+              <VisuallyHidden>{snipeLabel}, coming soon</VisuallyHidden>
             </Link>
           )}
         </div>

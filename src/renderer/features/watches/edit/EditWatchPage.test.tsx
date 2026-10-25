@@ -47,10 +47,10 @@ describe('EditWatchPage', () => {
     expect(
       await screen.findByRole('heading', { level: 1, name: 'Edit Easter at Osprey' })
     ).toBeInTheDocument();
-    const provider = screen.getByRole('region', { name: 'Provider' });
+    const provider = screen.getByRole('region', { name: 'Booking site' });
     expect(await within(provider).findByRole('img', { name: 'ParkStay WA' })).toBeInTheDocument();
     expect(within(provider).queryByRole('radio')).toBeNull();
-    expect(within(provider).getByText('A watch stays with its provider.')).toBeInTheDocument();
+    expect(within(provider).getByText('A watch stays with its booking site.')).toBeInTheDocument();
 
     expect(screen.getByRole('combobox', { name: 'Location' })).toHaveValue('Osprey Bay');
     expect(screen.getByRole('button', { name: 'Dates Fri 11 – Sun 13 Dec' })).toBeInTheDocument();

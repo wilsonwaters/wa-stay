@@ -9,7 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Stay Rottnest**, WA Stay's third booking site: Rottnest Island's nine precincts on Explore, each with its villas, cottages, cabins, hostel rooms and campsites as types, a place's availability for your dates with the stay's price, Explore's free counts, and watches every 30 minutes at most that tell you when a type comes free. WA Stay only looks: you book on Stay Rottnest yourself, and it never holds, books or signs in. It doesn't check on Open Day mornings, and stops for at least 12 hours if Stay Rottnest turns a check away.
+- **Booking site notices**: before WA Stay checks a booking site whose terms put a risk on you (Stay Rottnest's rule on automated software, under which a booking may be cancelled without a refund), you read its notice and tick that you understand. Until then nothing is sent to it: Explore and the place page offer the notice, and its watches are paused. You can withdraw it in Settings → Accounts at any time, and checking stops at once.
+- **Booking rules**: for a booking site that publishes them (Stay Rottnest's terms and booking guides), a place's page says what they make of your dates before anything is checked: when the stay goes on sale, whether the rules allow it and why not, with dates they would take as buttons, and notes such as a public holiday. Explore reads "Opens Wed 4 Nov" or "Not bookable for these dates", and a watch or snipe the rules refuse says why.
+- **Open Day plans** in Site Sniper, for Stay Rottnest: WA Stay works out your stay's Open Day from Stay Rottnest's own rules and reminds you at 6 pm the day before, at 6 am when the waiting room opens and at 8:15 am, with what to have ready. A plan never checks Stay Rottnest, waits in its queue or books for you; once the Open Day has come, "Watch for cancellations" sets a watch for the same stay. On the place page, for dates not yet on sale, Site Sniper's button reads "Set release reminders".
 - **Split stays**: when every night is free but only by moving between sites, Explore says "Free if you move" (RAC parks), a place's page explains how to book it (contact the park, or book each part on ParkStay), and a watch can alert on it if you ask (off by default). Never counted as free, and never held automatically.
+
+### Changed
+
+- The app and the website call the places WA Stay brings together **booking sites** rather than "providers": Explore's **Booking site** filter, "Which booking site" when you make a snipe, **Booking site** as the first step of a new watch, snipe or booking, the filters on Watches and Bookings, and the messages that named a provider. The email alert's "Provider" line is now "Booking site".
 
 ## [2.1.1] - 2026-10-19
 

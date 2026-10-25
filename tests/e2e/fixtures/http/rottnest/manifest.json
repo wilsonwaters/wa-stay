@@ -1,0 +1,10 @@
+{
+  "routes": [
+    {
+      "method": "GET",
+      "path": "/rates-room1",
+      "query": { "hotel": "62607" },
+      "file": "results.html"
+    }
+  ]
+}

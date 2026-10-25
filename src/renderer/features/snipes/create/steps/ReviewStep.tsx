@@ -141,7 +141,13 @@ export function ReviewStep(props: ReviewStepProps) {
         >
           <Items>
             <Item label="When">{releaseSummary}</Item>
-            <Item label="When the dates are free">{holds ? `Hold a ${noun.one}` : 'Alert me'}</Item>
+            {v.action === 'remind' ? (
+              <Item label="What it does">Reminds you before the release</Item>
+            ) : (
+              <Item label="When the dates are free">
+                {holds ? `Hold a ${noun.one}` : 'Alert me'}
+              </Item>
+            )}
             {manifest.capabilities.accessGate && (
               <Item label="Queue">
                 {queue ? `Uses the ${manifest.shortName} queue` : 'Not used'}

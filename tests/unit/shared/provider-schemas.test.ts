@@ -15,6 +15,7 @@ import {
   StayQuerySchema,
   type ProviderExperiment,
   type ProviderManifest,
+  type ProviderNotice,
 } from '@shared/types/provider.types';
 import { CATALOG_MAX_LIMIT, CatalogQuerySchema } from '@shared/types/catalog.types';
 import { testManifest } from '@tests/utils/fake-provider';
@@ -433,6 +434,53 @@ describe('ProviderManifestSchema: experiments (R17)', () => {
     };
     // `cartToo` is not applied, but `holds` is on through `autoCart`
     expect(issuesAt(ProviderManifestSchema.safeParse(applied))).toEqual([]);
+  });
+});
+
+describe('ProviderManifestSchema: notice (§12.37)', () => {
+  const notice: ProviderNotice = {
+    version: 1,
+    title: 'Before WA Stay checks Stay Rottnest',
+    body: 'Its terms say bookings may not be assisted by automated software.\n\nThe risk is yours.',
+    points: [
+      'It may cancel such a booking without a refund.',
+      'You can withdraw this at any time.',
+    ],
+    confirmLabel: 'I understand',
+  };
+  const parse = (value: ProviderNotice) =>
+    ProviderManifestSchema.safeParse(testManifest('rottnest', { notice: value }));
+
+  it('accepts a plain-text notice and keeps it when parsed', () => {
+    const result = parse(notice);
+    expect(result.success).toBe(true);
+    expect(result.data?.notice).toEqual(notice);
+    expect(parse({ ...notice, points: [] }).success).toBe(true);
+    expect(ProviderManifestSchema.safeParse(testManifest('rottnest')).success).toBe(true);
+  });
+
+  it('needs a whole version from 1, and every text', () => {
+    expect(issuesAt(parse({ ...notice, version: 0 }))).toEqual(['notice.version']);
+    expect(issuesAt(parse({ ...notice, version: 1.5 }))).toEqual(['notice.version']);
+    expect(issuesAt(parse({ ...notice, title: ' ' }))).toEqual(['notice.title']);
+    expect(issuesAt(parse({ ...notice, confirmLabel: '' }))).toEqual(['notice.confirmLabel']);
+    expect(issuesAt(parse({ ...notice, points: [''] }))).toEqual(['notice.points.0']);
+  });
+
+  it.each([
+    ['markup', 'Read <b>this</b>'],
+    ['a link', 'See https://example.com/terms'],
+    ['a bare address', 'See www.example.com'],
+  ])('refuses %s anywhere in it', (_what, text) => {
+    expect(issuesAt(parse({ ...notice, body: text }))).toEqual(['notice.body']);
+    expect(issuesAt(parse({ ...notice, points: ['Fine.', text] }))).toEqual(['notice.points.1']);
+  });
+
+  it('keeps it short: a title of 80 characters, at most 8 points', () => {
+    expect(issuesAt(parse({ ...notice, title: 'x'.repeat(81) }))).toEqual(['notice.title']);
+    expect(issuesAt(parse({ ...notice, points: Array(9).fill('A point.') }))).toEqual([
+      'notice.points',
+    ]);
   });
 });
 

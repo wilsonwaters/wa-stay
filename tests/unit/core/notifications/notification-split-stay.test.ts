@@ -374,7 +374,7 @@ describe('the split-stay alert', () => {
         ],
       },
     ]);
-    expect(lastStored().message).toMatch(/Book each part on the provider's website\.$/);
+    expect(lastStored().message).toMatch(/Book each part on the booking site\.$/);
     expect(lastDispatched().splitStay?.parts?.every((p) => p.url === undefined)).toBe(true);
   });
 

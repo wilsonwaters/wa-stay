@@ -56,7 +56,7 @@ describe('BookingsPage', () => {
   it('shows the banner, one h1, Add booking and three counted tabs with Upcoming selected', async () => {
     setup();
     expect(screen.getByRole('heading', { level: 1, name: 'Bookings' })).toBeInTheDocument();
-    expect(screen.getByText('Your trips across every provider.')).toBeInTheDocument();
+    expect(screen.getByText('Your trips across every booking site.')).toBeInTheDocument();
     expect(screen.getByText(/Bookings is still being finalised/)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Add booking' })).toBeInTheDocument();
 
@@ -110,7 +110,7 @@ describe('BookingsPage', () => {
   it('narrows by provider and by search, and recounts the tabs', async () => {
     const { user } = setup();
     await waitFor(() => expect(cardNames()).toHaveLength(2));
-    const provider = screen.getByRole('radiogroup', { name: 'Provider' });
+    const provider = screen.getByRole('radiogroup', { name: 'Booking site' });
     expect(
       within(provider)
         .getAllByRole('radio')
@@ -162,6 +162,6 @@ describe('BookingsPage', () => {
     const known = await screen.findByRole('article', { name: 'Osprey Bay' });
     expect(within(known).getByRole('img', { name: 'ParkStay WA' })).toBeInTheDocument();
     const unknown = screen.getByRole('article', { name: 'Old Camp' });
-    expect(within(unknown).getByRole('img', { name: 'Unknown provider' })).toBeInTheDocument();
+    expect(within(unknown).getByRole('img', { name: 'Unknown booking site' })).toBeInTheDocument();
   });
 });

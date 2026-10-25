@@ -1,0 +1,16 @@
+{
+  "routes": [
+    {
+      "method": "GET",
+      "path": "/rates-room1",
+      "query": { "hotel": "62607", "arrival": "2027-06-28", "departure": "2027-07-01" },
+      "file": "results-2027-06-28-3n-1a.html"
+    },
+    {
+      "method": "GET",
+      "path": "/rates-room1",
+      "query": { "hotel": "62607", "arrival": "2027-06-14", "departure": "2027-06-17" },
+      "file": "results-all-unavailable.html"
+    }
+  ]
+}

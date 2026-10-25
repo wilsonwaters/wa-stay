@@ -54,7 +54,7 @@ describe('WatchesPage', () => {
   it('filters by provider and status; ?provider=parkstay&status=active restores both', async () => {
     const { user } = setup('/watches?provider=parkstay&status=active');
     await waitFor(() => expect(cardNames()).toEqual(['Osprey Bay summer']));
-    const provider = screen.getByRole('radiogroup', { name: 'Provider' });
+    const provider = screen.getByRole('radiogroup', { name: 'Booking site' });
     expect(
       within(provider)
         .getAllByRole('radio')
@@ -83,11 +83,11 @@ describe('WatchesPage', () => {
 
   it('shows the provider filter even with one provider (§12.9)', async () => {
     setup('/watches', [OSPREY], [PARKSTAY_MANIFEST]);
-    const provider = await screen.findByRole('radiogroup', { name: 'Provider' });
+    const provider = await screen.findByRole('radiogroup', { name: 'Booking site' });
     expect(within(provider).getAllByRole('radio')).toHaveLength(2);
   });
 
-  it('waits for the providers before offering a provider filter: no "Unknown provider" flash', async () => {
+  it('waits for the providers before offering a provider filter: no "Unknown booking site" flash', async () => {
     let resolve: (value: unknown) => void = () => undefined;
     const pending = new Promise((r) => (resolve = r));
     renderWithProviders(<WatchesPage />, {
@@ -98,12 +98,12 @@ describe('WatchesPage', () => {
       },
     });
     await waitFor(() => expect(cards()).toHaveLength(2));
-    expect(screen.queryByRole('radiogroup', { name: 'Provider' })).not.toBeInTheDocument();
-    expect(screen.queryByText(/Unknown provider/)).not.toBeInTheDocument();
+    expect(screen.queryByRole('radiogroup', { name: 'Booking site' })).not.toBeInTheDocument();
+    expect(screen.queryByText(/Unknown booking site/)).not.toBeInTheDocument();
     resolve(ok([PARKSTAY_MANIFEST, FAKE_MANIFEST]));
-    const provider = await screen.findByRole('radiogroup', { name: 'Provider' });
+    const provider = await screen.findByRole('radiogroup', { name: 'Booking site' });
     expect(within(provider).getByRole('radio', { name: /ParkStay/ })).toBeInTheDocument();
-    expect(screen.queryByText(/Unknown provider/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Unknown booking site/)).not.toBeInTheDocument();
   });
 
   it('shows each place’s photo from one catalogue search, named by the place', async () => {
@@ -189,7 +189,7 @@ describe('WatchesPage', () => {
     setup('/watches', [], [BROWSE_ONLY_MANIFEST]);
     const button = await screen.findByRole('button', { name: 'New watch' });
     expect(button).toBeDisabled();
-    expect(button).toHaveAccessibleDescription('No provider supports watches yet');
+    expect(button).toHaveAccessibleDescription('No booking site supports watches yet');
     expect(screen.queryByRole('link', { name: 'Create your first watch' })).toBeNull();
   });
 
@@ -203,10 +203,12 @@ describe('WatchesPage', () => {
     });
     await waitFor(() => expect(cards()).toHaveLength(1));
     expect(
-      await screen.findByText("Provider details couldn't be loaded", {}, { timeout: 4000 })
+      await screen.findByText("Booking site details couldn't be loaded", {}, { timeout: 4000 })
     ).toBeInTheDocument();
-    expect(within(cards()[0]).getByRole('img', { name: 'Unknown provider' })).toBeInTheDocument();
-    expect(screen.queryByRole('radiogroup', { name: 'Provider' })).toBeNull();
+    expect(
+      within(cards()[0]).getByRole('img', { name: 'Unknown booking site' })
+    ).toBeInTheDocument();
+    expect(screen.queryByRole('radiogroup', { name: 'Booking site' })).toBeNull();
     expect(within(cards()[0]).getByRole('button', { name: 'Check now' })).toBeDisabled();
   });
 

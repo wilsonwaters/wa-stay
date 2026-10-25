@@ -132,7 +132,7 @@ describe('BookingsPage actions', () => {
     const dialog = screen.getByRole('dialog', { name: 'Add booking' });
     expect(dialog).toHaveAttribute('aria-modal', 'true');
     expect(
-      within(dialog).getByRole('heading', { level: 2, name: /Provider$/ })
+      within(dialog).getByRole('heading', { level: 2, name: /Booking site$/ })
     ).toBeInTheDocument();
     await user.keyboard('{Escape}');
     expect(screen.queryByRole('dialog')).toBeNull();

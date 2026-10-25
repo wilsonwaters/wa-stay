@@ -59,6 +59,12 @@ export interface ProviderContractSubject {
    * and a two-night stay starting 30 days from today.
    */
   sample?: { externalId?: string; stay?: StayQuery };
+  /**
+   * A location and stay the release policy times, for every release mode: one not on sale
+   * yet, for a provider that refuses a plan for a stay already on sale (Stay Rottnest's Open
+   * Days). Defaults to `sample`.
+   */
+  releaseSample?: { externalId?: string; stay?: StayQuery };
   /** An external id the provider does not know. Default `does-not-exist-0`. */
   unknownExternalId?: string;
   /** Builds the context used for the registration check. Defaults to `createTestProviderContext`. */
@@ -761,11 +767,14 @@ export function describeProviderContract(
         if (!release) return;
         expect(release.pollFloorMs.window).toBeGreaterThan(0);
         expect(release.pollFloorMs.continuous).toBeGreaterThan(0);
+        const timed = {
+          externalId: subject.releaseSample?.externalId ?? externalId,
+          stay: subject.releaseSample?.stay ?? stay,
+        };
         for (const mode of provider.manifest.releaseModes ?? []) {
           const at = await release.computeReleaseAt({
             mode: mode.id,
-            externalId,
-            stay,
+            ...timed,
             requestedAt: new Date(Date.now() + 86_400_000),
             now: new Date(),
           });
@@ -774,7 +783,7 @@ export function describeProviderContract(
         const [first] = provider.manifest.releaseModes ?? [];
         if (first) {
           await expectAbort((signal) =>
-            release.computeReleaseAt({ mode: first.id, externalId, stay, now: new Date(), signal })
+            release.computeReleaseAt({ mode: first.id, ...timed, now: new Date(), signal })
           );
         }
       });

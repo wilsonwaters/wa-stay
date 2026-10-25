@@ -266,6 +266,7 @@ export const exampleApiManifest: ProviderManifest = {
 | `releaseModes` | Site Sniper's release modes, when `capabilities.snipes` ([below](#release-modes)). |
 | `bulkAvailabilityStayFields` | What bulk availability depends on ([below](#bulk-availability-stay-fields)). |
 | `experiments` | What you ship switched off, for the person to turn on ([below](#experiments)). |
+| `notice` | What the person reads and accepts before the app sends you anything ([below](#notice)). |
 
 ### Location kinds
 
@@ -396,6 +397,16 @@ interface ReleaseModeDescriptor {
   usesAccessGate: boolean; // a snipe in this mode waits in the provider's queue
   maxWindowMinutes?: number; // the longest a snipe keeps trying after the release (1–1440)
   fields?: StayFieldDescriptor[]; // extra inputs this mode needs
+  remindOnly?: boolean; // a plan: it reminds before the release, and never checks
+  reminders?: ReleaseReminder[]; // a remindOnly mode's reminders
+  checklist?: string[]; // what to have ready, shown with them
+}
+
+interface ReleaseReminder {
+  daysBefore: number; // 0 for the release day
+  at: string; // 'HH:MM' in the provider's time zone
+  title: string;
+  body: string;
 }
 ```
 
@@ -408,6 +419,17 @@ whose `computeReleaseAt` gives an instant: a `cancellation` mode has no release 
 window, so it polls (at `pollFloorMs.continuous` at the fastest) until it ends some other way.
 ParkStay's modes are `daily_rollover`, `scheduled` and `cancellation`, with no cap. RAC's are
 `daily_rollover` and `scheduled`, each capped at 30 minutes, with a 10 s `pollFloorMs.window`.
+
+A mode with `remindOnly` is for a release where your terms keep WA Stay from checking, such as
+a queue that opens at a set time: a snipe in it is a plan (`action: 'remind'`). It asks your
+`computeReleaseAt` for the instant, as any mode does, then sends its `reminders` at their times
+before it (the release day's date in your time zone, less `daysBefore`, at `at`; one at or after
+the release is left out) as desktop alerts and emails, and ends **Reminders sent**. It never
+checks availability, waits in a queue, holds or reserves a night. A `remindOnly` mode needs
+reminders and no access gate, and only such a mode has reminders. When every mode is
+`remindOnly`, `snipes` doesn't need `availability`. Keep the words to what the person does:
+nothing in them should suggest that a plan finds, holds or secures anything. Stay Rottnest's
+one mode, `open_day`, is one.
 
 Without `holds`, every snipe of the provider is an alert: when the dates are free it ends
 **Alert sent** with a desktop alert and email that link to your booking page (the unit's
@@ -464,6 +486,41 @@ interface ProviderExperiment {
   experiment on, register `withExperiments(factory, ['autoCart'])`
   (`src/main/providers/experiments.ts`) instead of the factory: the contract suite runs on it
   as on any provider.
+
+### Notice
+
+When your provider's own terms put a risk on the person for using the app with it (Stay
+Rottnest's terms say a booking assisted by automated software may be cancelled without a
+refund), say so in a notice. The person reads it and ticks its checkbox once, before the app
+sends your provider anything.
+
+```ts
+interface ProviderNotice {
+  version: number; // a whole number from 1; raise it when what the notice says changes
+  title: string; // the dialog's title, at most 80 characters
+  body: string; // one or two short paragraphs, separated by a blank line
+  points: string[]; // what it means for the person, one point each, at most 8
+  confirmLabel: string; // the checkbox, e.g. 'I understand'
+}
+```
+
+- **Plain text only.** No markup and no links (`<`, `>`, `https://` and `www.` are refused): the
+  app shows it as text. Say what the terms say, what can happen, what the app does and doesn't
+  do, and that the person can withdraw.
+- **What waits for it.** Until the notice is accepted at its current `version`, the app asks
+  your provider nothing: a place's Check availability opens the notice first, Explore offers it
+  once above the list and its cards say why they have no count, a watch can't be created and an
+  existing one's run is paused ("Paused: read and accept {shortName}'s notice in WA Stay."), and
+  a snipe can't be armed. Your catalogue and a place's details are still asked for, so serve
+  them without asking your site (from a seed, as Stay Rottnest's precincts are).
+- **No account, no access gate.** Their signed-in check and queue would ask your site before
+  the notice: a manifest with a notice must have `account: 'none'` and `accessGate: false`
+  (`MANIFEST_RULES`).
+- **A new version asks again.** The acceptance counts only at the version it was given, so
+  raising `version` asks everyone to read it again before anything more is sent.
+- **The acceptance is not yours.** The app keeps it in your `provider_state` under
+  `core.notice`, which your `ctx.state` cannot reach. Withdrawing it in Settings → Accounts
+  stops every check at once and drops your provider's cached availability.
 
 ## 3. The provider context
 
@@ -902,6 +959,8 @@ it has an answer for:
 | `bookableUnits` | Optional: how many units can be booked online for these dates at all, free or not: the place's total, or 0 when none can be booked (not released yet, closed, or past the provider's booking window). Leave it out when the provider gives no unit total (RAC counts free units only); 0 still means none can be booked. |
 | `splitStay` | Optional: `true` when no unit is free for the whole stay (`availableUnits` 0) but the stay is free every night by moving between units, a split stay. Set it only with `availableUnits` 0, and only when you can tell; it is never counted. Each kind in `byKind` may carry it likewise. |
 | `byKind` | Optional: the same two counts for each unit kind the place has, e.g. `{ campsite: { availableUnits: 2, bookableUnits: 5 }, cabin: { availableUnits: 0, bookableUnits: 3 } }`, so a filter on cabins counts only the cabins. Set it for a place with more than one kind. Each kind's `bookableUnits` is optional too, by the same rule; a sum of kinds has no total when any kind in it has none. Main passes it on as you give it. |
+| `opensAt` | Optional: nothing at the place is on sale for the stay yet, by your own release rules; when it goes on sale (ISO 8601), with `bookableUnits` 0. |
+| `refused` | Optional: your published [booking rules](#booking-rules) refuse the stay at the place; why, in a sentence, with `bookableUnits` 0. |
 
 The names invite a swap: `availableUnits` is the smaller number, the free ones, and
 `bookableUnits` the total. Explore reads them as:
@@ -912,6 +971,8 @@ The names invite a swap: `availableUnits` is the smaller number, the free ones, 
 | `availableUnits` above 0, no `bookableUnits` | "2 sites free" ("2 free" on its map pin), never "of" a total |
 | `availableUnits` 0, `bookableUnits` above 0 or left out | "No site free every night" |
 | Both 0 | "No sites open for these dates" |
+| `opensAt` | "Opens Wed 4 Nov" ("Opens 4 Nov" on its pin) |
+| `refused` | "Not bookable for these dates" |
 | No entry for the place | "Availability unknown" |
 
 So leave out a place you have no answer for rather than send zeros, which would read as full or
@@ -1568,12 +1629,67 @@ When dates become bookable, for Site Sniper (`release`). ParkStay: `release-poli
   window and continuously. Pick them for the provider's capacity, not yours.
 - `availability.check` can say when a stay not released yet opens: `release: { open: false,
   opensAt }`, with `opensAt` from the same policy (Site Sniper's release step shows it).
+- For a `remindOnly` mode the instant is the release the reminders count back from. Refuse a
+  stay already on sale with a `ProviderError` saying so: a plan for it would remind no one.
+  Site Sniper's release step shows such a mode's release from your booking rules
+  (`stayRules`, below) rather than a check, so give the rules a `release` too.
 
 ### Bookings
 
 `bookings.get(reference)` (and `list`) return `ExternalBooking`s, for "Import booking"
 (`capabilities.bookingImport`). `links.manageBooking(reference)` gives "Manage on {shortName}"
 on a booking.
+
+### Booking rules
+
+When your provider publishes rules a stay must follow (the longest stay, fixed arrival dates in
+the peak, minimum stays, closures, how many a unit sleeps, when dates go on sale), give them as
+`stayRules`. The app refuses a watch or a snipe for a stay they refuse, and the place page says
+what they mean for the dates before anything is checked.
+
+```ts
+interface StayRulesModule {
+  check(input: {
+    externalId: string;
+    stay: StayQuery;
+    unitIds?: string[]; // the units the person chose
+    unitKinds?: UnitKind[]; // the stay types the person chose
+    now: Date;
+  }): StayRulesVerdict;
+}
+
+type StayRulesVerdict =
+  | { ok: true; notes: string[]; release?: StayRelease }
+  | {
+      ok: false;
+      reason: string; // why, in a sentence
+      field: 'arrival' | 'departure' | 'guests' | 'units'; // what the person changes
+      notes: string[];
+      release?: StayRelease;
+      suggestions?: { arrival: string; departure: string }[]; // dates you would take instead
+    };
+
+interface StayRelease {
+  open: boolean;
+  opensAt?: string; // ISO 8601, while not open
+  expected?: boolean; // from your usual rule, not a published date
+  text: string; // "Opens Wed 4 Nov 2026, 8:30 am."
+}
+```
+
+- **Pure.** `check` sends nothing and waits for nothing: it reads facts your module keeps (a
+  seed of your published rules). For a place or a stay it doesn't know, it answers `ok` with no
+  notes; it never throws.
+- **Its words are the person's.** Plain text, each at most 200 characters (longer is cut), at
+  most 6 notes and 6 suggestions.
+- **What the app does with it.** A watch or a snipe whose stay you refuse is refused on the
+  field you name, in your words. The place page shows your verdict beside the dates, with your
+  suggestions as buttons that set them. Your own `availability` may use it too, to answer a
+  stay you refuse, or one not on sale yet, without asking your site: give a refused stay's
+  nights `unknown` with the reason as their `label`, and an unreleased stay's nights
+  `not-released` with `release: { open: false, opensAt }`. In bulk availability, such a place's
+  entry has `bookableUnits: 0` and `refused` (the reason) or `opensAt`, and Explore reads it as
+  "Not bookable for these dates" or "Opens Wed 4 Nov".
 
 ### Links and dispose
 
@@ -1761,12 +1877,14 @@ first listed place and a two-night stay 30 days ahead):
 | `search` catalogue | `searchArea` page after page over `searchBbox`; `searchText(searchText)` if there is one | Items inside the box (to 0.01°); a `nextCursor` that is a non-empty string, changes, and ends within 100 pages; an abort honoured on the first and the next page; `searchText` finds places of this provider, and honours an abort. |
 | `availability` | `check` for `sample` and for `unknownExternalId`; `search(stay)` if there is one | Nights only inside the stay, under the location key, with a `checkedAt` date; every `bookingUrl` (the place's and each unit's) https on your own site, as the core takes it (`bookingLinkViolations`); every unit's `splitStay` as [above](#4-an-api-provider) asks (not `fullyAvailable`, no free count, every night free or `split` with one `split` at least, a known `booking`, whole `units` of at least 2, `parts` covering the stay), and one booked through the place only with `links.contact` giving a page on your own site (`splitStayViolations`); a bulk `splitStay` only as `true` with `availableUnits` 0, for the place and each kind (`bulkSplitViolations`); an unknown place rejects with a `ProviderError`; `search`'s keys name the provider; both honour an abort. |
 | `access` | `status()`, `onStatus()` and its unsubscribe, `holdOpen()` released twice, `ensure()` | The status names the provider; `ensure` honours an abort. |
-| `release` | `computeReleaseAt` for every release mode | A `Date` or `null`; `pollFloorMs` above 0; an abort honoured. |
+| `release` | `computeReleaseAt` for every release mode, for `releaseSample` (default `sample`) | A `Date` or `null`; `pollFloorMs` above 0; an abort honoured. |
 | `holds` | `create({ externalId, stay })`, only with a signal aborted before the call or at once after it starts | It rejects with an `AbortError`. Nothing about a hold's answer is checked, and no hold is placed: test refusals, the answer's shape and `bookedReference` yourself, on recorded responses or a loopback server, as the example does. |
 | `auth` | Nothing: `isSignedIn` is never called | `isSignedIn` is a function; a `browser-session` sign-in has an https `signInUrl` and https `allowedOrigins`. Test `isSignedIn`'s answers yourself. |
 | `bookings`, `dispose` | Nothing | Nothing. |
 
 For a browser provider, pass `openPages`: after every test its browser must have no page open.
+A policy that refuses a stay already on sale (a `remindOnly` mode's) needs `releaseSample`, a
+place and stay whose release is still to come.
 
 Register the provider as the app does, in a fresh registry, on recorded responses:
 
@@ -1875,6 +1993,8 @@ app as the smoke tests do (fixture mode, a temp profile, no network) with only y
 registered, and checks that:
 
 - Explore lists its places;
+- a provider with a [notice](#notice) offers it in Settings → Accounts, where the preview reads
+  and accepts it, as a person would, before it asks the provider anything;
 - with dates (two nights from `PREVIEW_ARRIVAL`, by default tomorrow in the provider's time
   zone, set through Explore's address), Explore shows its free counts without an error, when it
   has `bulkAvailability`;

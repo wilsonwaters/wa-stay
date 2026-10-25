@@ -14,7 +14,8 @@
 <p align="center">
   A map of every place, availability for your dates, watches that tell you when a site frees
   up, and help getting hard-to-book sites, from the providers that own them: ParkStay WA's
-  national-park campgrounds and RAC Parks &amp; Resorts' holiday parks.
+  national-park campgrounds, RAC Parks &amp; Resorts' holiday parks and Stay Rottnest's places
+  on Rottnest Island.
 </p>
 
 <p align="center">
@@ -58,9 +59,15 @@ bookings: ParkStay is now one **provider** of several, and existing users are
   provider opens new dates, at a release time you set, or, for ParkStay, when someone cancels.
   It alerts you with a link to book, or holds the site for you to pay for on the provider's own
   page, in the app (ParkStay). RAC snipes alert, timed to its school-holiday releases and, with
-  your member number, the members' pre-sale.
+  your member number, the members' pre-sale. For Stay Rottnest, whose terms rule out checking
+  on its Open Days, Site Sniper plans instead: it works out your stay's Open Day and reminds
+  you before it, with what to have ready.
 - **Bookings** *(coming soon)*. Your trips from every provider in one place, with links to
   manage them on the provider's site; holds you pay for in the app are added for you.
+- **Provider notices.** Where a provider's terms put a risk on you (Stay Rottnest's rule on
+  automated software, under which a booking may be cancelled without a refund), WA Stay shows
+  you its notice and checks nothing there until you accept it. You can withdraw it in Settings
+  at any time.
 - **Private and local.** Your data stays on your computer. WA Stay has no account, cloud
   service or analytics of its own; it talks to the providers, Mapbox (the map, whose library
   also reports its usage to Mapbox), GitHub (updates) and your email server if you set one up.
@@ -78,11 +85,13 @@ Site Sniper and Bookings work but are still being finished, so the navigation ma
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | **ParkStay WA** (DBCA national-park campgrounds) | Built in | Yes, 169 campgrounds | Yes, per night with prices | Yes | Coming soon (alert or hold) | Yes (30-minute holds, paid on ParkStay) | Optional |
 | **RAC Parks & Resorts** (holiday parks and resorts) | Built in | Yes, 8 parks | Yes, per category and night with prices (members' rates with your member number) | Yes | Coming soon (release alerts) | Off by default (an experimental cart, paid on RAC's own page) | Optional (your member number) |
+| **Stay Rottnest** (Rottnest Island's villas, cabins, hostel and campground) | Built in, after you accept its notice | Yes, 9 precincts | Yes, per room type for the whole stay, with booking rules and when dates go on sale | Yes, every 30 minutes at most | Coming soon (Open Day reminders) | No: you book on Stay Rottnest | None |
 
 Providers are modules behind a provider SDK, so more can be added, including sites with no
 API: see [adding a provider](docs/providers/adding-a-provider.md). Each built-in provider has its
-own page: [ParkStay WA](docs/providers/parkstay/README.md) and
-[RAC Parks & Resorts](docs/providers/rac/README.md).
+own page: [ParkStay WA](docs/providers/parkstay/README.md),
+[RAC Parks & Resorts](docs/providers/rac/README.md) and
+[Stay Rottnest](docs/providers/rottnest/README.md).
 
 ## Download
 

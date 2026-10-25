@@ -156,6 +156,26 @@ export interface ProviderExperiment {
 }
 
 /**
+ * What the person reads and accepts before WA Stay sends the provider anything
+ * (architecture-notes §12.37): a risk the provider's own terms put on them, such as Stay
+ * Rottnest's clause on automated software. Until it is accepted (at this `version`), WA Stay
+ * checks no availability there, and runs none of its watches or snipes. Plain text only: no
+ * markup and no links.
+ */
+export interface ProviderNotice {
+  /** A whole number from 1; a higher one asks everyone again. */
+  version: number;
+  /** The dialog's title, e.g. "Before WA Stay checks Stay Rottnest". */
+  title: string;
+  /** One or two short paragraphs, separated by a blank line. */
+  body: string;
+  /** What it means for the person, one point each. */
+  points: string[];
+  /** The checkbox the person ticks, e.g. "I understand". */
+  confirmLabel: string;
+}
+
+/**
  * How hard the app may use a provider (§12.30). Core services read them from the provider
  * context or the manifest; a manifest without `limits` gets `DEFAULT_PROVIDER_LIMITS`.
  */
@@ -276,6 +296,29 @@ export interface ReleaseModeDescriptor {
   maxWindowMinutes?: number;
   /** Extra inputs this mode needs. */
   fields?: StayFieldDescriptor[];
+  /**
+   * The mode only reminds (§12.39): a snipe in it is an Open Day plan (`remind`), sent its
+   * `reminders` before the release and never checking availability, holding or reserving a
+   * night. Needs `reminders`.
+   */
+  remindOnly?: boolean;
+  /** What a plan in this mode sends, before its release, in the provider's time zone. */
+  reminders?: ReleaseReminder[];
+  /** What to have ready for the release, one item each, shown with the plan. */
+  checklist?: string[];
+}
+
+/**
+ * One of a reminder-only mode's reminders: sent `daysBefore` days before the release day, at
+ * `at` (`HH:MM`) where the provider is, with its own words. Plain text.
+ */
+export interface ReleaseReminder {
+  /** 0 is the release day itself. */
+  daysBefore: number;
+  /** Local time, `HH:MM`. */
+  at: string;
+  title: string;
+  body: string;
 }
 
 /**
@@ -334,6 +377,8 @@ export interface ProviderManifest {
    * experiment not turned on) it may stand alone.
    */
   holdRelease?: boolean;
+  /** What the person accepts before WA Stay checks the provider (`ProviderNotice`). */
+  notice?: ProviderNotice;
 }
 
 /** Values for a provider's `stayFields`, keyed by `StayFieldDescriptor.key`. */
@@ -473,6 +518,44 @@ export interface UnitAvailability {
   splitStay?: UnitSplitStay;
 }
 
+/** The part of a stay a provider's rules refuse: what the person changes to fix it. */
+export type StayRuleField = 'arrival' | 'departure' | 'guests' | 'units';
+
+/**
+ * Whether a stay is on sale yet, by the provider's own release rules (`stayRules`): `open`, or
+ * when it opens (`opensAt`, ISO 8601), `expected` when that comes from the provider's usual
+ * rule rather than a published date; `text` says it in a sentence.
+ */
+export interface StayRelease {
+  open: boolean;
+  opensAt?: string;
+  expected?: boolean;
+  text: string;
+}
+
+/** A stay the provider's rules suggest instead: other dates, at the same place. */
+export interface StaySuggestion {
+  arrival: string;
+  departure: string;
+}
+
+/**
+ * What a provider's booking rules say about a stay (`stayRules.check`), worked out without
+ * asking it: allowed (`ok`), or refused with the `reason` and the `field` to change (and
+ * `suggestions`: dates it would take instead). `notes` are rules worth knowing either way,
+ * and `release` whether the stay is on sale. Plain text, each at most 200 characters.
+ */
+export type StayRulesVerdict =
+  | { ok: true; notes: string[]; release?: StayRelease }
+  | {
+      ok: false;
+      reason: string;
+      field: StayRuleField;
+      notes: string[];
+      release?: StayRelease;
+      suggestions?: StaySuggestion[];
+    };
+
 export interface LocationAvailability {
   /** Location key `${providerId}:${externalId}`. */
   key: string;
@@ -586,6 +669,16 @@ export interface BulkAvailabilityEntry {
   byKind?: Partial<
     Record<UnitKind, { availableUnits: number; bookableUnits?: number; splitStay?: true }>
   >;
+  /**
+   * Nothing can be booked for the stay yet: when it goes on sale (ISO 8601), by the provider's
+   * own release rules, with `bookableUnits` 0. Explore reads "Opens Wed 4 Nov".
+   */
+  opensAt?: string;
+  /**
+   * The provider's published rules refuse the stay here (`stayRules`), in a sentence, with
+   * `bookableUnits` 0. Explore reads "Not bookable for these dates".
+   */
+  refused?: string;
 }
 
 /** The state of a provider's waiting room or queue. */
@@ -736,14 +829,58 @@ const uniqueBy =
   (items: T[]): boolean =>
     new Set(items.map(key)).size === items.length;
 
-export const ReleaseModeDescriptorSchema = z.object({
-  id: z.string().regex(/^[a-z][a-z0-9_-]*$/, 'Release mode ids are lower-case'),
-  label: nonEmpty,
-  description: nonEmpty,
-  usesAccessGate: z.boolean(),
-  maxWindowMinutes: z.number().int().min(1).max(1440).optional(),
-  fields: z.array(StayFieldDescriptorSchema).optional(),
+/** Words shown as text: no markup and no links (a notice, a reminder, a checklist). */
+const plainText = (max: number) =>
+  nonEmpty
+    .max(max)
+    .refine((text) => !/[<>]/.test(text), 'Plain text, without markup')
+    .refine((text) => !/\b(?:https?:\/\/|www\.)/i.test(text), 'No links');
+
+export const ReleaseReminderSchema = z.object({
+  daysBefore: z.number().int().min(0).max(14),
+  at: z.string().regex(/^(?:[01]\d|2[0-3]):[0-5]\d$/, 'A local time, HH:MM'),
+  title: plainText(80),
+  body: plainText(400),
 });
+assertTypeEquals<z.input<typeof ReleaseReminderSchema>, ReleaseReminder>(true);
+assertTypeEquals<z.output<typeof ReleaseReminderSchema>, ReleaseReminder>(true);
+
+export const ReleaseModeDescriptorSchema = z
+  .object({
+    id: z.string().regex(/^[a-z][a-z0-9_-]*$/, 'Release mode ids are lower-case'),
+    label: nonEmpty,
+    description: nonEmpty,
+    usesAccessGate: z.boolean(),
+    maxWindowMinutes: z.number().int().min(1).max(1440).optional(),
+    fields: z.array(StayFieldDescriptorSchema).optional(),
+    remindOnly: z.boolean().optional(),
+    reminders: z.array(ReleaseReminderSchema).max(6).optional(),
+    checklist: z.array(plainText(200)).max(12).optional(),
+  })
+  // A mode that only reminds has reminders and waits in no queue; only it has reminders
+  .superRefine((mode, ctx) => {
+    if (mode.remindOnly && !mode.reminders?.length) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['reminders'],
+        message: 'A remindOnly mode needs reminders',
+      });
+    }
+    if (mode.remindOnly && mode.usesAccessGate) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['usesAccessGate'],
+        message: 'A remindOnly mode waits in no access gate',
+      });
+    }
+    if (!mode.remindOnly && mode.reminders?.length) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['reminders'],
+        message: 'Only a remindOnly mode has reminders',
+      });
+    }
+  });
 assertTypeEquals<z.input<typeof ReleaseModeDescriptorSchema>, ReleaseModeDescriptor>(true);
 assertTypeEquals<z.output<typeof ReleaseModeDescriptorSchema>, ReleaseModeDescriptor>(true);
 
@@ -764,6 +901,23 @@ export const ProviderExperimentSchema = z.object({
 });
 assertTypeEquals<z.input<typeof ProviderExperimentSchema>, ProviderExperiment>(true);
 assertTypeEquals<z.output<typeof ProviderExperimentSchema>, ProviderExperiment>(true);
+
+/** A notice's text: plain words, never markup or a link (the renderer shows it as text). */
+const noticeText = (max: number) =>
+  nonEmpty
+    .max(max)
+    .refine((text) => !/[<>]/.test(text), 'A notice is plain text, without markup')
+    .refine((text) => !/\b(?:https?:\/\/|www\.)/i.test(text), 'A notice has no links');
+
+export const ProviderNoticeSchema = z.object({
+  version: z.number().int().min(1).max(1000),
+  title: noticeText(80),
+  body: noticeText(1200),
+  points: z.array(noticeText(400)).max(8),
+  confirmLabel: noticeText(120),
+});
+assertTypeEquals<z.input<typeof ProviderNoticeSchema>, ProviderNotice>(true);
+assertTypeEquals<z.output<typeof ProviderNoticeSchema>, ProviderNotice>(true);
 
 /** A `credentials` field's or confirmation's key: a letter, then letters and digits. */
 export const AccountKeySchema = z
@@ -880,6 +1034,7 @@ export const ProviderManifestSchema = z
       )
       .optional(),
     holdRelease: z.boolean().optional(),
+    notice: ProviderNoticeSchema.optional(),
   })
   // An experiment turns on capabilities that are off, and they are on only once it is applied
   // (`withExperiments`), by itself or by another applied experiment.

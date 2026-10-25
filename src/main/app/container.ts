@@ -52,6 +52,7 @@ import { RendererEvents } from '../ipc/events';
 import { TrustedWebContents } from '../ipc/trusted-web-contents';
 import { BUILT_IN_PROVIDERS, registerBuiltInProviders } from '../providers';
 import { ProviderExperiments } from '../providers/experiments';
+import { ProviderNotices } from '../providers/notices';
 import { ProviderRegistry } from '../providers/registry';
 import {
   createProviderContext,
@@ -108,6 +109,8 @@ export interface AppContainer {
   readonly providers: ProviderRegistry;
   /** The providers' experiments: the person's choices, applied when the providers register. */
   readonly experiments: ProviderExperiments;
+  /** The providers' notices: what the person accepts before WA Stay sends a provider anything. */
+  readonly notices: ProviderNotices;
   /** Every provider's locations: sync, search, detail and availability (`catalog.*`). */
   readonly catalogService: LocationCatalogService;
   readonly notifierDispatcher: NotificationDispatcher;
@@ -278,6 +281,18 @@ export function createContainer({
     experiments,
   });
 
+  // Before WA Stay sends a provider anything, the person accepts its notice, if it has one
+  // (§12.37). Withdrawing it drops the provider's availability answers, so nothing is shown
+  // or reused from before; the checks themselves are refused from then on.
+  let forgetAvailability: (providerId: string) => void = () => undefined;
+  const notices = new ProviderNotices({
+    state: providerState,
+    providers,
+    onWithdrawn: (providerId) => forgetAvailability(providerId),
+    logger,
+  });
+  const assertNotice = (providerId: string): void => notices.assertAccepted(providerId);
+
   const catalogService = new LocationCatalogService({
     registry: providers,
     locations: repositories.locations,
@@ -296,7 +311,9 @@ export function createContainer({
             snipe.releaseMode !== SnipeReleaseMode.CANCELLATION &&
             RELEASE_STATUSES.has(snipe.status)
         ),
+    assertNotice,
   });
+  forgetAvailability = (providerId) => catalogService.forgetAvailability(providerId);
 
   // Sign-in and payment windows share each provider's session partition with its HTTP client.
   const providerWindows = new ProviderWindows({ devTools: fromSource });
@@ -373,6 +390,7 @@ export function createContainer({
     accountState: (providerId) => accounts.storedState(providerId),
     // A holds experiment turned off: no new hold before the restart
     holdsTurningOff: (providerId) => experiments.holdsTurningOff(providerId),
+    assertNotice,
   });
   const siteSniperService = new SiteSniperService({
     snipes: repositories.snipes,
@@ -383,6 +401,7 @@ export function createContainer({
     // Only for providers whose holds need an account (ParkStay's is optional)
     accounts,
     holdsTurningOff: (providerId) => experiments.holdsTurningOff(providerId),
+    assertNotice,
   });
   const holdPayments = new HoldPaymentService({
     providers,
@@ -448,6 +467,7 @@ export function createContainer({
     profile,
     providers,
     experiments,
+    notices,
     catalogService,
     notifierDispatcher,
     providerWindows,

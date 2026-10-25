@@ -122,6 +122,9 @@ const api: WindowApi = {
     accessStatus: (providerId) => ({ providerId }),
     experiments: (providerId) => ({ providerId }),
     setExperiment: (providerId, experimentId, enabled) => ({ providerId, experimentId, enabled }),
+    notice: (providerId) => ({ providerId }),
+    acceptNotice: (providerId, version) => ({ providerId, version }),
+    withdrawNotice: (providerId) => ({ providerId }),
   }),
 
   catalog: bind('catalog', {
@@ -129,6 +132,7 @@ const api: WindowApi = {
     get: (key) => ({ key }),
     availability: (stay, options) => ({ stay, ...options }),
     checkLocation: (key, stay) => ({ key, stay }),
+    stayRules: (key, stay, options) => ({ key, stay, ...options }),
     refresh: (providerId) => ({ providerId }),
     status: none,
     openDocument: (locationKey, documentId) => ({ locationKey, documentId }),

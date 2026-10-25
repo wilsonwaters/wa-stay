@@ -12,11 +12,14 @@ the release instant, and then does what the snipe is set to do:
   hold on the provider's own payment page before it runs out.
 - **Alert**: it sends a desktop alert (and an email, if set up) with a link to book on the
   provider's own site, and holds nothing, so book it before someone else does.
+- **Plan** (Stay Rottnest's Open Days): it checks nothing. It reminds you before the release,
+  with what to have ready, and you join the provider's queue and book yourself
+  ([Open Day plans](#stay-rottnests-open-days-plans)).
 
 Site Sniper never pays for you. A snipe holds when its provider can place holds, and alerts
 otherwise; a provider that places no holds offers alerts only.
 
-Two providers have Site Sniper. ParkStay WA's snipes hold by default (you can choose an alert
+Three providers have Site Sniper. Stay Rottnest's are plans only. ParkStay WA's snipes hold by default (you can choose an alert
 instead), and its hold lasts **30 minutes**. RAC Parks & Resorts' snipes alert: RAC's holds are
 an experiment, off by default. With **Put stays in my RAC cart automatically** turned on
 (Settings → Accounts, under Experimental on RAC's row, after a restart), an RAC snipe holds by
@@ -63,14 +66,42 @@ at the fastest, for at most 30 minutes, and alerts you when the dates are free.
   pre-sale has passed that way is timed to the public release instead. RAC has no "When
   someone cancels" mode, as a watch covers it, every 15 minutes at most.
 
+## Stay Rottnest's Open Days: plans
+
+Stay Rottnest opens a whole month of stays at once, at 8:30 am Perth time on its Open Day (the
+first Wednesday of each month, for stays eight months on), behind a waiting room that opens at 6 am and
+gives everyone who joins before 8:30 a random place. Checking faster at the release would gain
+nothing, and Stay Rottnest's terms don't allow bookings made or assisted by automated software,
+so Site Sniper never checks Stay Rottnest. It has one mode there, **On its Open Day**, and a
+snipe in it is a **plan**:
+
+- **When:** Site Sniper works out your stay's Open Day from Stay Rottnest's own booking rules,
+  without asking Stay Rottnest (the 5/3 rule included: five nights in an open month can take up
+  to three of the next). The Release step says when it opens; dates already on sale, or a stay
+  the rules don't allow, are refused before the plan is made, and the Stay step shows the rules,
+  with dates they would take as buttons.
+- **Reminders:** at 6 pm the day before ("Open Day tomorrow"), at 6 am when the waiting room
+  opens, and at 8:15 am ("15 minutes to Open Day"), as desktop alerts and emails, while WA Stay
+  is running. Plans for the same Open Day share each reminder. If WA Stay was closed, it sends
+  only the latest one it missed, and nothing more than 30 minutes after 8:30.
+- **Have ready:** your choices in order, dates that can move, the party within what a type
+  sleeps, your Stay Rottnest profile, your own mobile for the waiting room's passcode, a Visa or
+  Mastercard, a keyholder for a second unit, and only what you need.
+- **Afterwards:** the plan reads **Reminders sent**, with **Watch for cancellations**, which
+  opens a watch for the same stay. A plan can't be armed again once its Open Day has passed.
+
+A plan makes no attempts and has no timing or **Run now**; its card and page say its next
+reminder. The place page's Site Sniper button reads **Set release reminders** for Stay Rottnest, for
+dates not yet on sale.
+
 ## Creating a snipe
 
 **Site Sniper → New snipe**, or **Snipe a site** on a place's page (which fills in the place
 and dates). The flow has five steps:
 
-1. **Provider**: whose sites to snipe. Only providers with Site Sniper are listed; with one,
-   it is chosen for you but still shown. A provider that places no holds says **Alerts
-   only**.
+1. **Booking site** (the provider): whose sites to snipe. Only providers with Site Sniper are
+   listed; with one, it is chosen for you but still shown. A provider that places no holds says
+   **Alerts only**.
 2. **Location**: the place (a campground, a holiday park…).
 3. **Your stay**: dates and guests, plus the provider's own fields (ParkStay: Camping with,
    Vehicles, Postcode), the **Stay type** at a place whose units are of more than one kind, and
@@ -229,5 +260,10 @@ RAC may cancel a booking it believes disrupts its parks or guests.
   ([Adding a provider](providers/adding-a-provider.md#release-policy)); its snipes alert. With
   `holds` too, they can hold. A snipe's `action` (`alert` or `hold`), its `alert` and the
   ALERTED status are in architecture-notes §12.35.
+- A release mode with `remindOnly` makes plans (`action: 'remind'`): its `reminders` and
+  `checklist` are in the manifest ([Release modes](providers/adding-a-provider.md#release-modes)),
+  the times come from `src/shared/utils/release-reminders.ts`, the runner sends them
+  (`prepareReminders` in `snipe-runner.ts`), and a plan ends REMINDED (architecture-notes
+  §12.39). Stay Rottnest's: `src/main/providers/rottnest/release-policy.ts` and its manifest.
 - No test or agent run places a real hold (architecture-notes §12.33); holds are tested with
   fixtures and seeded rows.

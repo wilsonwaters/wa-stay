@@ -13,6 +13,7 @@ import {
 } from './accountText';
 import { CredentialsActions } from './CredentialsActions';
 import { Experiments } from './Experiments';
+import { NoticeSetting } from './NoticeSetting';
 import { SignInLinkField } from './SignInLinkField';
 
 /** How the row's last sign-in ended, when it needs saying. */
@@ -72,8 +73,9 @@ function ButtonLabel({ label, waiting }: { label: string; waiting: boolean }) {
 /**
  * One provider on Settings → Accounts (§12.9: shown even when there is only one). A
  * `browser-session` account connects in the provider's sign-in window; a `credentials` one
- * saves its details in a form instead (`CredentialsActions`). A provider that declares
- * experiments gets their switches too (`Experiments`).
+ * saves its details in a form instead (`CredentialsActions`). A provider that declares a notice
+ * shows whether it is accepted (`NoticeSetting`), and one that declares experiments gets their
+ * switches too (`Experiments`).
  */
 export function AccountRow({
   manifest,
@@ -145,6 +147,7 @@ export function AccountRow({
             </div>
           </Disclosure>
         )}
+        {manifest.notice ? <NoticeSetting manifest={manifest} /> : null}
         {manifest.experiments?.length ? <Experiments manifest={manifest} /> : null}
       </div>
       {credentials && (

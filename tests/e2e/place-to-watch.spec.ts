@@ -78,7 +78,7 @@ test('a place’s "Watch for availability" opens a prefilled watch, which a rela
   await expectHeadingFocused(window, 'New watch');
   const steps = window.getByRole('navigation', { name: 'New watch steps' });
   await expectCurrentStep(steps, 'Your stay');
-  await expect(steps.getByRole('button', { name: 'Provider, done' })).toBeVisible();
+  await expect(steps.getByRole('button', { name: 'Booking site, done' })).toBeVisible();
   await expect(steps.getByRole('button', { name: 'Location, done' })).toBeVisible();
   await expect(window.getByRole('heading', { level: 2, name: /Your stay$/ })).toBeVisible();
   await expect(window.getByRole('button', { name: /^Dates .+ – .+/ })).toBeVisible();

@@ -83,7 +83,14 @@ function prefersReducedMotion(): boolean {
 }
 
 /** States drawn hollow with an ink ring: not checked in bulk, unknown, failed or checking. */
-const NOT_CHECKED = new Set(['check-dates', 'not-supported', 'unknown', 'error', 'loading']);
+const NOT_CHECKED = new Set([
+  'check-dates',
+  'notice',
+  'not-supported',
+  'unknown',
+  'error',
+  'loading',
+]);
 
 /**
  * The map key with dates: what each pin and pill colour means, in words beside a swatch drawn

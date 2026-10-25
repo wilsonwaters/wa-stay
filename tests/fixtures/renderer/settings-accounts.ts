@@ -43,6 +43,9 @@ export function setupAccounts({
   copyCredential = jest.fn().mockResolvedValue(ok(undefined)),
   experiments,
   setExperiment,
+  notice,
+  acceptNotice,
+  withdrawNotice,
 }: {
   /** The registered providers, in order. Default: ParkStay, FakeStay and OpenStay. */
   providers?: ProviderManifest[];
@@ -62,6 +65,10 @@ export function setupAccounts({
   experiments?: jest.Mock;
   /** `providers.setExperiment` (R17). */
   setExperiment?: jest.Mock;
+  /** `providers.notice`, `acceptNotice` and `withdrawNotice` (§12.37). */
+  notice?: jest.Mock;
+  acceptNotice?: jest.Mock;
+  withdrawNotice?: jest.Mock;
 } = {}) {
   let stored = accounts;
   const remember = async (answer: Promise<unknown>) => {
@@ -77,6 +84,9 @@ export function setupAccounts({
       list: jest.fn().mockResolvedValue(ok(providers)),
       ...(experiments ? { experiments } : {}),
       ...(setExperiment ? { setExperiment } : {}),
+      ...(notice ? { notice } : {}),
+      ...(acceptNotice ? { acceptNotice } : {}),
+      ...(withdrawNotice ? { withdrawNotice } : {}),
     },
     accounts: {
       list: jest.fn(() => Promise.resolve(ok(stored))),
@@ -100,7 +110,7 @@ export const row = (name: string) => {
   return heading.closest('li') as HTMLElement;
 };
 export const rows = async () => {
-  const list = await screen.findByRole('list', { name: 'Provider accounts' });
+  const list = await screen.findByRole('list', { name: 'Booking site accounts' });
   return within(list).getAllByRole('listitem');
 };
 

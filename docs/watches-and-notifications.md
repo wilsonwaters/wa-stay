@@ -24,7 +24,8 @@ provider, the place and your dates, and opens on "Your stay"). Five steps:
    ([below](#what-a-check-does)).
 4. **Alerts.**
    - **Check every**: 15 minutes, 30 minutes, 1, 4 or 12 hours, or daily (default 1 hour).
-     A provider can set a longer minimum (`limits.minWatchIntervalMinutes`). A watch saved by
+     A provider can set a longer minimum (`limits.minWatchIntervalMinutes`: Stay
+     Rottnest's is 30 minutes). A watch saved by
      the old 1.x app with a shorter interval keeps it as an extra option, and is run every
      15 minutes.
    - **Alert on partial availability**: also tell you when only some nights are free.
@@ -155,7 +156,21 @@ Resorts asks for 10 seconds, so its requests go one at a time:
   the request away (HTTP 429). WA Stay won't ask again until 3:45 pm." It checks again at its
   next check after that.
 
+Stay Rottnest asks for 60 seconds, and one search of it answers every watch, check and Explore
+count for the same stay and party, so ten watches of one stay cost one request. It isn't checked
+from 5:30 am to noon on its Open Days, and a request it turns away stops every check of it for 12
+hours, doubling up to 7 days ([Stay Rottnest](providers/rottnest/README.md#availability)).
+
 ParkStay asks for no pause. [How RAC is paced](providers/rac/README.md#pacing).
+
+### A provider with a notice
+
+Some providers' terms put a risk on you for using WA Stay with them, and WA Stay asks you to read
+a notice before it checks them at all (Stay Rottnest's, about its rule on automated software).
+Until you accept it, a watch on that provider can't be created, and an existing one doesn't
+check: it reads "Paused: read and accept Stay Rottnest's notice in WA Stay." The new-watch flow
+shows the notice when you choose the provider. Once you accept it, paused watches check again at
+their next check. Withdrawing it in Settings → Accounts pauses them again at once.
 
 ### Automatic holds
 
@@ -238,10 +253,13 @@ an RAC park, the sites of every category found, not the categories.
 | **The desktop** | An OS notification for each one, titled with the provider, e.g. "ParkStay · Sites available at Bungarra". Clicking it brings WA Stay forward on that page. Clicking an alert that a watch found something, or that a snipe found the dates free ("A site is free at …"), also opens the provider's booking page for those dates in your browser, for every provider; an alert that a site is held opens only the watch or snipe, where you pay. A split stay's alert ("Free if you move sites at …") opens only the watch, where its parts are. Settings → Notifications: **Desktop notifications** and **Play a sound**. |
 | **Email** | Each notification, sent through your own email account (below). An alert that a watch found something, or that a snipe found the dates free, has a **Book on {provider}** link to the provider's public booking page for those dates (the nights it found, for some nights), so you can book from your phone. The link is never a cart or a checkout. An alert that a site is held says the hold is in WA Stay on the computer that placed it, and still gives the link. A split stay's alert has **How to book** instead: **Contact {place}**, the place's contact page, or each part in order with **Book on {provider}** for its dates. |
 
-What creates a notification: a watch finding sites (or a split stay, or some nights), a snipe finding the dates
-free (an alert, [Site Sniper](site-sniper.md#when-a-snipe-alerts)), a hold placed by a snipe or
-a watch, a payment confirmed (booked), the welcome notice after an upgrade, and errors that
-need your attention.
+What creates a notification: a watch finding sites (or a split stay, or some nights), a snipe
+finding the dates free (an alert, [Site Sniper](site-sniper.md#when-a-snipe-alerts)), an Open Day
+plan's reminder (one for every plan due at that time with the same provider,
+[Site Sniper](site-sniper.md#stay-rottnests-open-days-plans); clicking it opens the plan, then
+the provider's booking page, and its email has the **Book on {provider}** link), a hold placed
+by a snipe or a watch, a payment confirmed (booked), the welcome notice after an upgrade, and
+errors that need your attention.
 
 Notifications and the record of emails sent are deleted automatically after 30 days (the
 retention job, 5 minutes after start and then daily).

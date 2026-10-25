@@ -252,6 +252,65 @@ describe('snipe alert notifications', () => {
     }
   });
 
+  describe('an Open Day plan’s reminders (§12.39)', () => {
+    const planned = (id: number, name: string): SiteSnipe =>
+      alerted({
+        id,
+        action: 'remind',
+        status: SnipeStatus.ARMED,
+        isActive: true,
+        lastResult: undefined,
+        alert: undefined,
+        location: { externalId: String(id), name },
+      });
+    const step = { title: 'Open Day tomorrow', body: 'The waiting room opens at 6 am.' };
+
+    it('one plan: the provider’s words and the plan, typed snipe_reminder; a click opens the plan, then the page', async () => {
+      await service.notifySnipeReminders([
+        { snipe: planned(7, 'Banksia Camp'), step, bookingUrl: BOOKING_URL },
+      ]);
+      const [stored] = repo.findByUserId(1);
+      const [arrival, departure] = dates('2026-12-01', '2026-12-03');
+      expect(stored).toMatchObject({
+        type: NotificationType.SNIPE_REMINDER,
+        providerId: 'fake',
+        title: 'Open Day tomorrow',
+        message: `The waiting room opens at 6 am. Your plan: Banksia Camp, ${arrival}–${departure}.`,
+        relatedType: RelatedType.SNIPE,
+        relatedId: 7,
+      });
+      expect(lastDesktop().options.title).toBe('Fake · Open Day tomorrow');
+      click();
+      expect(navigations()).toEqual([['app:navigate', { path: '/site-sniper/7' }]]);
+      await Promise.resolve();
+      expect(openExternal).toHaveBeenCalledWith(BOOKING_URL);
+      expect(dispatched()).toMatchObject({ locationName: 'Banksia Camp', bookingUrl: BOOKING_URL });
+      // Nothing was checked: it never says anything is free, found or held
+      expect(stored.message).not.toMatch(/\b(free|found|held|secured)\b/i);
+    });
+
+    it('several plans due together: one notification naming each, opening the first', async () => {
+      await service.notifySnipeReminders([
+        { snipe: planned(7, 'Banksia Camp'), step, bookingUrl: BOOKING_URL },
+        { snipe: planned(8, 'Lucky Bay'), step },
+      ]);
+      const all = repo.findByUserId(1);
+      expect(all).toHaveLength(1);
+      expect(all[0].message).toMatch(
+        /^The waiting room opens at 6 am\. Your plans: Banksia Camp, .+; Lucky Bay, .+\.$/
+      );
+      expect(dispatched().locationName).toBeUndefined();
+      click();
+      expect(navigations()).toEqual([['app:navigate', { path: '/site-sniper/7' }]]);
+    });
+
+    it('nothing to send, nothing sent', async () => {
+      await service.notifySnipeReminders([]);
+      expect(repo.findByUserId(1)).toEqual([]);
+      expect(dispatch).not.toHaveBeenCalled();
+    });
+  });
+
   describe('a held snipe (brief R7)', () => {
     const held = (): SiteSnipe =>
       alerted({

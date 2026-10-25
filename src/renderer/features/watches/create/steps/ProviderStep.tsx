@@ -14,13 +14,13 @@ export function ProviderStep({ onProviderChange }: ProviderStepProps) {
   return (
     <ProviderPicker
       capability="watches"
-      label="Provider"
-      hint="Watches check this provider's places for your dates."
+      label="Booking site"
+      hint="Watches check this booking site's places for your dates."
       value={providerId || undefined}
       onChange={(id) => {
         if (id !== providerId) onProviderChange(id);
       }}
-      emptyMessage="No provider supports watches yet"
+      emptyMessage="No booking site supports watches yet"
     />
   );
 }

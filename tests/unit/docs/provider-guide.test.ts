@@ -77,7 +77,7 @@ function section(text: string, heading: string): string {
 describe('provider-facing docs', () => {
   const docs = docFiles().filter((file) => file.startsWith('docs/providers/'));
 
-  it('cover the guide, the browser guide, ParkStay and RAC', () => {
+  it('cover the guide, the browser guide, ParkStay, RAC and Stay Rottnest', () => {
     expect(docs).toEqual(
       expect.arrayContaining([
         GUIDE,
@@ -87,6 +87,9 @@ describe('provider-facing docs', () => {
         'docs/providers/rac/README.md',
         'docs/providers/rac/endpoints.md',
         'docs/providers/rac/release-calendar.md',
+        'docs/providers/rottnest/README.md',
+        'docs/providers/rottnest/endpoints.md',
+        'docs/providers/rottnest/open-days.md',
       ])
     );
   });

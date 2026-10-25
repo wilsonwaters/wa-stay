@@ -111,7 +111,7 @@ describe('Explore journey', () => {
       await screen.findByRole('heading', { level: 2, name: 'Step 3 of 5: Your stay' })
     ).toBeInTheDocument();
     const steps = screen.getByRole('navigation', { name: 'New watch steps' });
-    expect(within(steps).getByRole('button', { name: 'Provider, done' })).toBeInTheDocument();
+    expect(within(steps).getByRole('button', { name: 'Booking site, done' })).toBeInTheDocument();
     expect(within(steps).getByRole('button', { name: 'Location, done' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Dates Sat 10 – Mon 12 Jan' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /^Guests 2 adults/ })).toBeInTheDocument();

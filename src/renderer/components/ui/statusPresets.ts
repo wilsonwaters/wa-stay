@@ -2,6 +2,7 @@ import {
   ArrowLeftRight,
   Ban,
   BellRing,
+  CalendarCheck,
   CalendarClock,
   CalendarX,
   CircleAlert,
@@ -59,6 +60,7 @@ export const statusPresets = {
     [SnipeStatus.EXPIRED]: { tone: 'neutral', icon: CircleX, label: 'Expired' },
     [SnipeStatus.DISABLED]: { tone: 'neutral', icon: CirclePause, label: 'Paused' },
     [SnipeStatus.ALERTED]: { tone: 'available', icon: BellRing, label: 'Alert sent' },
+    [SnipeStatus.REMINDED]: { tone: 'neutral', icon: CalendarCheck, label: 'Reminders sent' },
   },
   /** The outcome of a snipe attempt. */
   snipeResult: {
@@ -71,6 +73,7 @@ export const statusPresets = {
     [SnipeResult.EXPIRED]: { tone: 'neutral', icon: CircleX, label: 'Expired' },
     [SnipeResult.ERROR]: { tone: 'danger', icon: CircleAlert, label: 'Error' },
     [SnipeResult.ALERTED]: { tone: 'available', icon: BellRing, label: 'Alert sent' },
+    [SnipeResult.REMINDED]: { tone: 'neutral', icon: CalendarCheck, label: 'Reminders sent' },
   },
   booking: {
     [BookingStatus.CONFIRMED]: { tone: 'available', icon: CircleCheck, label: 'Confirmed' },

@@ -33,14 +33,14 @@ describe('ProviderBadge', () => {
     expect(screen.getByRole('img', { name: 'ParkStay WA' })).toHaveTextContent('ParkStay');
   });
 
-  it('an unknown provider shows its id and is named "Unknown provider"', () => {
+  it('an unknown provider shows its id and is named "Unknown booking site"', () => {
     render(
       <ProviderManifestsProvider manifests={[PARKSTAY]}>
         <ProviderBadge providerId="rac" />
         <ProviderBadge providerId="hipcamp" variant="compact" />
       </ProviderManifestsProvider>
     );
-    const [full, compact] = screen.getAllByRole('img', { name: 'Unknown provider' });
+    const [full, compact] = screen.getAllByRole('img', { name: 'Unknown booking site' });
     expect(full).toHaveTextContent('rac');
     expect(compact).toHaveTextContent('hipcamp');
   });

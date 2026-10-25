@@ -1,8 +1,9 @@
 import { SnipeReleaseMode } from '../../../../shared/types/common.types';
-import { PARKSTAY_MANIFEST } from '@tests/utils/renderer/manifests';
+import { PARKSTAY_MANIFEST, ROTTNEST_MANIFEST } from '@tests/utils/renderer/manifests';
 import { parseSnipePrefill } from './prefill';
 import { emptySnipeForm } from './snipeForm';
 import {
+  actionFor,
   issueField,
   minutesToMs,
   msToMinutes,
@@ -67,6 +68,42 @@ describe('toSnipeInput', () => {
   });
 });
 
+describe('an Open Day plan (a mode that only reminds)', () => {
+  it('starts as a plan, and sends action remind with no timing', () => {
+    const form = {
+      ...emptySnipeForm(ROTTNEST_MANIFEST),
+      location: { externalId: 'geordie-bay', name: 'Geordie Bay' },
+      arrival: '2099-07-06',
+      departure: '2099-07-08',
+      name: 'Geordie Bay in July',
+    };
+    expect(form).toMatchObject({ releaseMode: 'open_day', action: 'remind' });
+    const input = toSnipeInput(form, ROTTNEST_MANIFEST);
+    expect(input).toMatchObject({ releaseMode: 'open_day', action: 'remind' });
+    for (const key of ['leadTimeSeconds', 'pollIntervalMs', 'windowDurationMs', 'maxAttempts']) {
+      expect(input).not.toHaveProperty(key);
+    }
+  });
+
+  it('is a plan in its mode whatever was chosen, and never in another mode', () => {
+    expect(actionFor({ releaseMode: 'open_day', action: 'alert' }, ROTTNEST_MANIFEST)).toBe(
+      'remind'
+    );
+    expect(
+      actionFor(
+        { releaseMode: SnipeReleaseMode.DAILY_ROLLOVER, action: 'remind' },
+        PARKSTAY_MANIFEST
+      )
+    ).toBe('hold');
+    expect(
+      actionFor(
+        { releaseMode: SnipeReleaseMode.DAILY_ROLLOVER, action: 'alert' },
+        PARKSTAY_MANIFEST
+      )
+    ).toBe('alert');
+  });
+});
+
 describe('issueField', () => {
   it('maps main’s issue paths to the form’s fields', () => {
     expect(issueField('releaseAt', 'scheduled')).toBe('releaseDate');
@@ -117,7 +154,7 @@ describe('parseSnipePrefill', () => {
     );
     expect(prefill.providerId).toBeUndefined();
     expect(prefill.notices).toEqual([
-      "ParkStay doesn't offer Site Sniper, so choose a provider.",
+      "ParkStay doesn't offer Site Sniper, so choose a booking site.",
       "The link's place couldn't be used, so choose a location.",
       "The link's dates couldn't be used (they have passed or are out of order), so choose your dates.",
     ]);

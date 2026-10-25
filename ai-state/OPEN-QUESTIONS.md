@@ -29,3 +29,17 @@
 | RQ6 | Cable Beach's dry-season nights (15 May–15 Oct) open on RAC's monthly seasonal release days, not the rolling window (rac-terms §4); RS10 ("rolling only") was answered without that detail. | RAC snipes at Cable Beach | **Orchestrator default (2026-10-17):** refuse automatic release timing for Cable Beach stays inside the dry season ("choose a time you set, or set a watch"); a `scheduled` snipe or a watch still works. Stakeholder to confirm, or supply RAC's seasonal release days to encode. |
 | RQ7 | RAC counts read differently: Explore counts free sites for the stay ("51 spots free", RS12), while a watch's alert and the watch and place pages count RAC's booking categories ("Found 1 site available", "1 of 2 sites free"). | nothing (wording) | Resolved 2026-10-17: both count the same way as Explore ("51 spots free"): free units for the stay, RAC's categories counted by their free sites, with no "of M" total for RAC |
 | RQ8 | If a provider never answers a "let it go" request, the app stops counting it as busy at its deadline, so sign-out or turning auto-cart off could go ahead while that request still runs. The alternative keeps them refused until the provider answers, possibly until restart. | nothing today (RAC answers or times out) | Default: keep clearing at the deadline; stakeholder may prefer the stricter rule |
+
+## Project 3 — Rottnest Island (Stay Rottnest)
+
+| # | Question | Blocks | Status |
+|---|---|---|---|
+| T1 | Links-only, or an automatic watch, given clause 4 (`ai-state/research/rottnest-terms.md`)? | the watch | Resolved 2026-10-18: an automatic notify-only watch, 30 minutes at least, accepting the risk; the terms review's §9 rules apply |
+| T2 | Ask RIA in writing? | nothing | Resolved 2026-10-18: no |
+| T4 | How do people consent to clause 4's risk? | RI3 | Resolved 2026-10-18: a first-use notice, accepted once, withdrawable |
+| T5 | Where else may WA Stay check? | RI2 | Resolved 2026-10-18: the place page's check and Explore's counts too |
+| TQ1 | How does a month not yet released answer on the results page? | RI2's reading of it | Default: every type unavailable; RI5's calendar marks the stay not released |
+| TQ2 | Does a party bigger than a type's `data-sleeps` hide it or mark it unavailable? | nothing | Default: the parser refuses it itself |
+| TQ3 | Peak blocks after April 2027 are not published yet | RI5 | Default: a note, no refusal |
+| TQ4 | The 14-night maximum: all year or peak only? | RI5 | Default: all year |
+| TQ5 | A second capture (an unreleased month, a peak block) would harden the parser | nothing | Stakeholder may add one |

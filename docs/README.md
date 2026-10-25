@@ -1,7 +1,8 @@
 # WA Stay documentation
 
 WA Stay is a desktop app for finding and booking places to stay across Western Australia, from
-ParkStay WA's national-park campgrounds to RAC Parks & Resorts' holiday parks. The project
+ParkStay WA's national-park campgrounds to RAC Parks & Resorts' holiday parks and Rottnest
+Island's villas, cabins and campground on Stay Rottnest. The project
 overview and downloads are in the [README](../README.md).
 
 ## Using WA Stay
@@ -43,6 +44,12 @@ overview and downloads are in the [README](../README.md).
     RAC's codes.
   - [Release calendar](providers/rac/release-calendar.md): keeping the school-holiday release
     days current.
+- [Stay Rottnest](providers/rottnest/README.md): the manifest, the precincts, the shared search,
+  booking rules, Open Days and plans, the notice and Stay Rottnest's terms.
+  - [Endpoints](providers/rottnest/endpoints.md): the one request, with verification status,
+    and what is never used.
+  - [Open Days and booking guides](providers/rottnest/open-days.md): keeping the Open Days,
+    booking guides and public holidays current.
 
 ## Design
 

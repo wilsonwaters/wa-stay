@@ -1,5 +1,6 @@
 import { Link } from 'react-router';
 import {
+  AlarmClock,
   BellRing,
   CalendarCheck,
   Check,
@@ -23,6 +24,7 @@ const TYPE_ICONS: Record<NotificationType, LucideIcon> = {
   [NotificationType.SNIPE_HELD]: Timer,
   [NotificationType.SNIPE_BOOKED]: CalendarCheck,
   [NotificationType.SNIPE_ALERT]: BellRing,
+  [NotificationType.SNIPE_REMINDER]: AlarmClock,
   [NotificationType.BOOKING_CONFIRMED]: CalendarCheck,
   [NotificationType.ERROR]: CircleAlert,
   [NotificationType.WARNING]: TriangleAlert,

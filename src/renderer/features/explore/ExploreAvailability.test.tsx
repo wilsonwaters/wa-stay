@@ -449,7 +449,7 @@ describe('Explore with dates: "Available only"', () => {
     await renderExplore(`/?${STAY}`, stubs, '1 place');
     expect(availableOnly()).toHaveAttribute('aria-disabled', 'true');
     expect(availableOnly()).toHaveAccessibleDescription(
-      "Availability filtering isn't supported by these providers"
+      "Availability filtering isn't supported by these booking sites"
     );
     expect(
       within(card('Kingstown Barracks')).getByText('Check dates on the place page')

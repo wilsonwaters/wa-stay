@@ -29,9 +29,9 @@ test('creates a ParkStay watch through the provider-first flow', async ({ launch
   await expectRoute(window, '/watches/new');
   await expectHeadingFocused(window, 'New watch');
 
-  // 1. Provider: the only provider with watches, chosen for you but shown.
+  // 1. Booking site: the only provider with watches, chosen for you but shown.
   const steps = window.getByRole('navigation', { name: 'New watch steps' });
-  await expectCurrentStep(steps, 'Provider');
+  await expectCurrentStep(steps, 'Booking site');
   await expect(window.getByRole('radio', { name: 'ParkStay WA' })).toBeChecked();
   await window.getByRole('button', { name: 'Continue' }).click();
 
